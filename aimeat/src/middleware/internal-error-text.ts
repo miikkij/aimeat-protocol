@@ -72,8 +72,8 @@ export function keepErrorMessage<T extends object>(envelope: T): T {
 
 /** What the caller reads instead of the exception text. */
 export function internalErrorSentence(requestId: string | undefined): string {
-  const ref = requestId ? ` The node logged the details under request id ${requestId}.` : '';
-  return `The node could not finish this request. This was not caused by anything you did, and trying again often works.${ref}`;
+  const ref = requestId ? ` The server logged the details under request id ${requestId}.` : '';
+  return `The server could not finish this request. This was not caused by anything you did, and trying again often works.${ref}`;
 }
 
 export function hideInternalErrorText() {

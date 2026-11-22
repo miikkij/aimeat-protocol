@@ -130,7 +130,7 @@ async function askOwner(ctx: Ctx, ownerName: string, digest: string, requester: 
       asks: 'let your welcome page read your memory when you open it while signed in',
       why: (writer
         ? `${writer} wrote the page, and ${writer} may not read your memory itself. `
-        : 'The page was changed outside the page editor, so the node does not know who wrote it. ')
+        : 'The page was changed outside the page editor, so this server does not know who wrote it. ')
         + 'A page that reads your memory while you look at it can send what it reads elsewhere. If you do not allow it, the page is shown as before, without your private entries.',
       approve_scope: 'memory:read',
       change: { link: '/v1/portfolio', key: 'approval_change.portfolio_page' },

@@ -368,7 +368,7 @@ export function registerConnectionTools(
                     return ok({
                         status: result.status, message_id: result.log.id,
                         ...(result.aiProvenanceId ? { ai_provenance_id: result.aiProvenanceId } : {}),
-                        note: 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
+                        note: 'Passed to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
                     });
                 } catch (err) {
                     if (!(err instanceof OutboundError)) throw err;

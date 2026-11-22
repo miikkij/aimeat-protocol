@@ -68,8 +68,8 @@ export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'book', what: 'REQUIRED before any code on `fine`: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'screens', what: 'REQUIRED before any code on `plain` and `fine`: the phone and the desktop as two layouts decided from the person\'s tasks, and the desktop rules.' },
-  { id: 'look', what: 'The look presets, the pattern shelf (backgrounds), the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
-  { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
+  { id: 'look', what: 'The look presets, the pattern list (backgrounds), the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
+  { id: 'motion', what: 'What already moves, the attention gesture, and the controls that respond to input. Read it before you make anything move.' },
 ];
 
 /**
@@ -92,8 +92,8 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
 
   'Start from a GENRE — a complete committed register, and the register is required': 'genre',
   'A fork people sign in to, in two languages': 'genre',
-  'The pattern shelf': 'look',
-  'The signature: this app\'s own hand': 'genre',
+  'The pattern list': 'look',
+  'The signature: this app\'s own style': 'genre',
 
   'The node\'s libraries: read this list before you write a mechanism': 'libraries',
   // Moved from `start` on 2026-10-01, when the library blocks took `start` past the limit.
@@ -118,16 +118,16 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The Design Book first': 'book',
   'The Design Book in a genre fork: the working screen, components, and why': 'book',
 
-  'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS STAND ON EACH OTHER IS A RECORD': 'patterns',
+  'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS DEPEND ON EACH OTHER IS A RECORD': 'patterns',
   'Six patterns to copy': 'patterns',
-  'The mosaic: the arrangement lives outside your file': 'patterns',
+  'The mosaic: the arrangement is stored outside your file': 'patterns',
   // Since 2026-11-20 (atelier-screens.ts): a part of its own, because the desktop is where builds fail.
   'The phone and the desktop: two layouts of one app': 'screens',
 
   'The look': 'look',
   'The ambient: the one layer allowed to move at idle': 'look',
-  'Effects: still on the words, a moment on a cue, living only behind them': 'look',
-  'Motion, and the moment something needs the eye': 'motion',
+  'Effects: still on the words, a moment on a cue, animated only behind them': 'look',
+  'Motion, and the moment something needs attention': 'motion',
   'Imagery': 'look',
 };
 
@@ -159,7 +159,7 @@ function partsIndex(nodeUrl: string, specToken: string | null): string {
   // The token travels in the first part, though "Finishing" moved to `libraries` (2026-11-09):
   // a publish that sends it proves the build read this specification.
   if (specToken) out += 'Publish with `spec_token: ' + specToken + '`; section "Finishing" (part `libraries`) says what is owed after it.\n';
-  out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
+  out += 'You are reading part `start`. The others belong to the same specification and have the same authority. '
     + 'Read `libraries`, `patterns` and `screens` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';

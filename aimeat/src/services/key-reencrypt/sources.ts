@@ -297,6 +297,6 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/totp.ts': 'two-step sign-in secrets',
   'src/services/config/at-rest.ts': 'secret Config settings',
   'src/services/extension/secrets.ts': 'extension settings, extension instance settings',
-  'src/services/oauth/round-secrets.ts': 'none: a sign-in round lives 10 to 15 minutes and opens with either key while it lives',
+  'src/services/oauth/round-secrets.ts': 'none: a sign-in round lasts 10 to 15 minutes and opens with either key while it lasts',
   'src/utils/app-protect.ts': 'none: the watermark is sealed into the copy a person downloads, not stored here',
 };

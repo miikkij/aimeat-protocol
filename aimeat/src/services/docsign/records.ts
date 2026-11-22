@@ -258,7 +258,7 @@ function predatesAccount(rec: DocSignRecord, accountCreatedAt: string | null): b
 // carries no anonymous claim, so its kind is 'agent' and the kind check alone does not see it.
 function refuseVisitor(caller: CallerContext): void {
   if (caller.visitor || caller.kind === 'anonymous' || isAnonymousPrincipal(caller.auth)) {
-    throw new DocsignError('FORBIDDEN', 403, 'Sign in on this node to create or sign a request.');
+    throw new DocsignError('FORBIDDEN', 403, 'Sign in on this server to create or sign a request.');
   }
 }
 
@@ -528,7 +528,7 @@ export async function signRequest(ctx: DocsignCtx, caller: CallerContext, id: st
       // memory scopes, passkey for people", 2026-10-09; feature-list audit #37).
       if (caller.kind === 'owner' && credential.via === 'pat') {
         throw new DocsignError('METHOD_NOT_ALLOWED', 400,
-          'A personal access token is a program acting for you, so it cannot sign with your session. Sign with a passkey, or press Sign on the request while signed in to this node.');
+          'A personal access token is a program acting for you, so it cannot sign with your session. Sign with a passkey, or press Sign on the request while signed in to this server.');
       }
     } else {
       throw new DocsignError('INVALID_INPUT', 400, 'method is passkey, key or session.');

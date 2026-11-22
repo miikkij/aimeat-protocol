@@ -121,7 +121,7 @@ function sampleChapters() {
     { id: 's-move', group: { en: 'The board', fi: 'Lauta' }, title: { en: 'Move and Use', fi: 'Siirrä ja Käytä' },
       body: { en: 'Move drags frames; Use lets you click inside them.', fi: 'Siirrä raahaa kehyksiä, Käytä päästää klikkaamaan niiden sisällä.' } },
     { id: 's-share', group: { en: 'Together', fi: 'Yhdessä' }, title: { en: 'Share a board', fi: 'Jaa lauta' },
-      body: { en: 'Invite people to the workspace the board lives in.', fi: 'Kutsu ihmisiä työtilaan, jossa lauta on.' } },
+      body: { en: 'Invite people to the workspace that holds the board.', fi: 'Kutsu ihmisiä työtilaan, jossa lauta on.' } },
   ];
 }
 

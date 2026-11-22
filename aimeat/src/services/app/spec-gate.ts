@@ -86,9 +86,9 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
   if (given && given === buildAtelierSpecToken(config)) {
     return {
       status: 'ok',
-      message: 'You carried the current ATELIER build spec token, so that spec was fetched at this '
+      message: 'You sent the current ATELIER build spec token, so that spec was fetched at this '
         + 'version. That is what this attests — not that it was read. The parts a search skips are '
-        + 'the parts that bite: the component contract, the look rule, the imagery cost rule.',
+        + 'the parts that cause failures: the component contract, the look rule, the imagery cost rule.',
     };
   }
 
@@ -104,9 +104,9 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
       // template, the login pill, the design system — are exactly what the published app was
       // missing. A stamp that overstates itself is worse than no stamp, because the next reader
       // believes it.
-      message: 'You carried the current build spec token, so the spec was fetched at this version. '
+      message: 'You sent the current build spec token, so the spec was fetched at this version. '
         + 'That is what this attests — not that it was read. If you searched it rather than read it, '
-        + 'the parts you skipped are the parts that bite: the shell template, the login pill, the '
+        + 'the parts you skipped are the parts that cause failures: the shell template, the login pill, the '
         + 'namespace rule.',
     };
   }
@@ -123,8 +123,8 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
   if (given) {
     return {
       status: 'stale',
-      message: 'The build spec has changed since the token you carried. Fetch GET /v1/prompts/build-app-atelier '
-        + 'and pass spec_token. Read what changed before the next publish — the parts you did not read are the parts that bite.',
+      message: 'The build spec has changed since the token you sent. Fetch GET /v1/prompts/build-app-atelier '
+        + 'and pass spec_token. Read what changed before the next publish — the parts you did not read are the parts that cause failures.',
       skill: ATELIER_BUILDER_SKILL_REF,
       spec_url: specUrl,
     };

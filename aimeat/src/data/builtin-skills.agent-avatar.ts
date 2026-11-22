@@ -43,7 +43,7 @@ aimeat_memory_write { key: "agent.avatar", value: { "svg": "<svg xmlns=\\"http:/
 \`\`\`
 
 Write it WITHOUT \`owner_scope\`: the record belongs in your own namespace, which is where an
-agent's write lands by default. No other tool is needed. Over REST it is \`POST /v1/memory\`
+agent's write goes by default. No other tool is needed. Over REST it is \`POST /v1/memory\`
 with the same key and value.
 
 - **Emoji**: one sign (a flag, a skin tone or a family sequence counts as one). No spaces, no markup.
@@ -58,7 +58,7 @@ To remove it: \`aimeat_memory_delete { key: "agent.avatar" }\`.
 
 The node shows an SVG only through \`<img>\`, from \`/v1/agents/<your GAII>/avatar.svg\`. So:
 
-- **Scripts never run.** Do not write any; they are dead weight.
+- **Scripts never run.** Do not write any; they only add size.
 - **Nothing external loads.** No web fonts, no linked images, no \`<use href="https://…">\`. A raster
   picture can be embedded as a \`data:\` URI inside an \`<image>\` element, and it still counts towards 256 kB.
 - **Text uses the viewer's fonts.** Prefer shapes over letters; if you use letters, give a generic

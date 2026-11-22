@@ -227,14 +227,14 @@
       before anything has run. The reason is the environment: there, every external service the
       administrator has not approved is untrusted by default, and the same notice applies to any
       unapproved connector.</p>
-      <p>Do not click past it out of habit. Three routes, in this order:</p>
+      <p>Do not click past it out of habit. Three ways, in this order:</p>
       <ol>
         <li>Ask your administrator to approve the connector. They approve the MCP endpoint
-        <code>{{mcpUrl}}</code>, the OAuth 2.1 + PKCE sign-in to this node (each person signs in as
+        <code>{{mcpUrl}}</code>, the OAuth 2.1 + PKCE sign-in to this server (each person signs in as
         themselves, there are no shared keys), and the tool set listed below. Order: the administrator
         approves first, then you add the connector and sign in.</li>
-        <li>Use the manual route. AIMEAT also works with no connector at all: an app writes the prompt,
-        you read it, you carry it to your chat by hand and bring the answer back.</li>
+        <li>Use the manual way. AIMEAT also works with no connector at all: an app writes the prompt,
+        you read it, you copy it to your chat by hand and bring the answer back.</li>
         <li>Run AIMEAT yourself. The whole codebase is MIT licensed and self-hostable, so you can read
         exactly what a prompt does, run it on your own server, and check it. We are not asking you to
         trust it, we are asking you to check it.</li>
@@ -333,7 +333,7 @@
       <li><strong>235 MCP tools</strong> covering memory, storage, sharing groups, organisms and workspaces, apps and skills, knowledge packages, the agent-to-agent work queue, and morsel pacing.</li>
       <li><strong>Persistent identity</strong> — your AI agent has its own GAII, like an email address. Connect the same AIMEAT account to Claude Desktop and Cursor; both see the same memory.</li>
       <li><strong>Strong GDPR tooling</strong> as a core protocol feature — export, audit report, delete, all from the <em>Data Wallet</em> tab in your profile.</li>
-      <li><strong>Federation-ready</strong> — aimeat.io is the genesis node; you can run your own and federate, or start a separate network for your organisation.</li>
+      <li><strong>Federation-ready</strong> — aimeat.io is the genesis server; you can run your own and federate, or start a separate network for your organisation.</li>
     </ul>
 
     <h2>Technical details</h2>
@@ -352,12 +352,12 @@
 
     <details>
       <summary>Reference manifest (for tool authors and reviewers)</summary>
-      <p>Every tool's annotations (read-only / destructive / idempotent / open-world hints) are declared beside the tool in the open-source tool catalogue: <a href="https://github.com/miikkij/aimeat-protocol/tree/main/aimeat/src/tool-catalog/definitions"><code>aimeat/src/tool-catalog/definitions/</code></a>. Annotations source-of-truth lives in <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/src/mcp/annotations.ts"><code>aimeat/src/mcp/annotations.ts</code></a>.</p>
+      <p>Every tool's annotations (read-only / destructive / idempotent / open-world hints) are declared beside the tool in the open-source tool catalogue: <a href="https://github.com/miikkij/aimeat-protocol/tree/main/aimeat/src/tool-catalog/definitions"><code>aimeat/src/tool-catalog/definitions/</code></a>. Annotations source-of-truth is in <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/src/mcp/annotations.ts"><code>aimeat/src/mcp/annotations.ts</code></a>.</p>
     </details>
 
     <details>
       <summary>Self-host instead</summary>
-      <p>aimeat.io is the genesis node, run as a personal project to promote AIMEAT, the idea that <em>you own your data</em>, and the freedom that comes with that. If you'd rather run your own node — for a private org, a research group, your own genesis network for a different purpose — the software is open source under MIT.</p>
+      <p>aimeat.io is the genesis server, run as a personal project to promote AIMEAT, the idea that <em>you own your data</em>, and the freedom that comes with that. If you'd rather run your own server — for a private org, a research group, your own genesis network for a different purpose — the software is open source under MIT.</p>
       <pre>git clone https://github.com/miikkij/aimeat-protocol
 cd aimeat-protocol
 pnpm install &amp;&amp; pnpm aimeat init</pre>

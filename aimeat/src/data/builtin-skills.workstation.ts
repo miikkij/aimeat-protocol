@@ -140,7 +140,7 @@ POST /v1/apps   { filename, mode: "presigned", name, description, spec_token }
 PUT <upload_url>   Content-Type: text/html   --data-binary @dist/myapp.html
 \`\`\`
 
-Read \`next_steps.size\` in the answer. It carries the bytes, the share of this node's ceiling, how
+Read \`next_steps.size\` in the answer. It contains the bytes, the share of this node's ceiling, how
 fast the app is growing and the date that rate meets the ceiling. When it grows and you did not add
 much, something was inlined.
 

@@ -79,7 +79,7 @@ function agentPrompt(data) {
     : data.grant_owner ? 'owner (acts as me)'
     : `scoped agent (${(data.scopes || []).join(', ') || 'no scopes'})`;
   const until = data.expires_at ? `It expires on ${data.expires_at.slice(0, 10)}.` : 'It does not expire; I will revoke it by hand.';
-  return `I'm giving you an AIMEAT access token so you can log in to my node (${url}) as ${level} and act for me within those limits. ${until}
+  return `I'm giving you an AIMEAT access token so you can log in to my AIMEAT (${url}) as ${level} and act for me within those limits. ${until}
 
 Use it by adding this HTTP header to your requests (and, for browser testing, set it as an extra header in your browser automation so every request the page makes carries it):
 

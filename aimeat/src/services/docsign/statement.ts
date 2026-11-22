@@ -109,7 +109,7 @@ export type StatementCaveatCode = 'REVOCATION_UNKNOWN' | 'NAME_NOT_VERIFIED';
 /** The sentence each caveat is sealed with, in English, as the statement is. */
 export const STATEMENT_CAVEATS: Record<StatementCaveatCode, string> = {
   REVOCATION_UNKNOWN: 'Whether the signing certificate had been revoked could not be established when this signature was sealed.',
-  NAME_NOT_VERIFIED: 'The name in the signing certificate was compared with the name the account holder gave on this node, which no identity verification has confirmed.',
+  NAME_NOT_VERIFIED: 'The name in the signing certificate was compared with the name the account holder gave on this server, which no identity verification has confirmed.',
 };
 
 /** A caveat with its sentence. */

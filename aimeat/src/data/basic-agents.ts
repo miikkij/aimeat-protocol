@@ -182,7 +182,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
   {
     name: 'concierge',
     displayName: 'Concierge',
-    description: 'The first point of contact. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.',
+    description: 'The first point of contact. Takes what arrives, works out what it is about, answers what it can, and passes the rest to whoever should have it.',
     scopes: withCrewRuntimeScopes([
       'memory:read', 'memory:write',
       'messages:read', 'messages:send',
@@ -205,7 +205,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     runMode: 'resident',
     tags: ['crew.basic', 'role.concierge'],
     crewDef: {
-      readme_md: '# Concierge\\n\\nThe first point of contact.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
+      readme_md: '# Concierge\\n\\nThe first point of contact.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and passes the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
       tags: ['crew.basic', 'role.concierge'],
       process: 'sequential',
       // Messages and DMs, as a front door. And tasks: its tasks start on their own
@@ -228,7 +228,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
           // and without a delegation tool it could only ever answer or drop. `dm`: it has to say
           // who it passed something to, and the reply itself goes to a person.
           tools: ['delegate', 'dm'],
-          goal: 'Answer what can be answered from what is known, and hand on what cannot, naming who should have it.',
+          goal: 'Answer what can be answered from what is known, and pass on what cannot, naming who should have it.',
           backstory: 'You write the reply the person reads. You answer only from what was established, and where nothing was established you say that plainly instead of producing something that merely sounds right. When something belongs to another agent or to the owner, you say who you passed it to and why, because a request that vanishes into a queue is worse than one that was refused.',
           allow_delegation: false,
         },
@@ -236,14 +236,14 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       tasks: [
         {
           id: 'triage',
-          description: 'Read what arrived and work out what it asks for. The message and its context: {{ctx.prompt}}\\n\\nName the request in one line. Then say what this account already holds that bears on it, and what it does not. If the message carries more than one request, list them separately. Do not answer yet.',
+          description: 'Read what arrived and work out what it asks for. The message and its context: {{ctx.prompt}}\\n\\nName the request in one line. Then say what this account already holds that bears on it, and what it does not. If the message contains more than one request, list them separately. Do not answer yet.',
           expected_output: 'The request named in one line, what is known that bears on it, and what is not established.',
           agent: 'Triager',
         },
         {
           id: 'respond',
-          description: 'Write the reply, or hand the request on. Answer only from what the triage established. Anything that was not established is left out or named as unknown. If this needs the owner or another agent, say who and why, in one sentence the person can act on.',
-          expected_output: 'A reply in the sender\'s own language, and where something was handed on, who it went to and why.',
+          description: 'Write the reply, or pass the request on. Answer only from what the triage established. Anything that was not established is left out or named as unknown. If this needs the owner or another agent, say who and why, in one sentence the person can act on.',
+          expected_output: 'A reply in the sender\'s own language, and where something was passed on, who it went to and why.',
           agent: 'Responder',
           context: ['triage'],
         },
@@ -298,7 +298,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     runMode: 'spawn',
     tags: ['crew.basic', 'role.workflow-manager'],
     crewDef: {
-      readme_md: '# Workflow manager\\n\\nOrders work from your other agents and keeps track of what came back.\\n\\nIt breaks a job into steps, sends each one to whoever should do it, and holds the thread: what was asked, what arrived, what is still out. A step that fails is reported as a step that failed, not quietly dropped from the summary.\\n\\n**It orders work; it does not do it.** What comes back is the other agents\' answer, and it says whose.',
+      readme_md: '# Workflow manager\\n\\nOrders work from your other agents and keeps track of what came back.\\n\\nIt breaks a job into steps, sends each one to whoever should do it, and keeps track of the job: what was asked, what arrived, what is still out. A step that fails is reported as a step that failed, not quietly dropped from the summary.\\n\\n**It orders work; it does not do it.** What comes back is the other agents\' answer, and it says whose.',
       tags: ['crew.basic', 'role.workflow-manager'],
       process: 'sequential',
       // Its mode is task-runner: the node activates its queued tasks without the owner, so a
@@ -322,7 +322,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
           // outstanding and failed back to the person who asked.
           tools: ['delegate', 'dm'],
           goal: 'Send each step to the agent that should do it, collect what comes back, and report the state of the whole job honestly.',
-          backstory: 'You keep the thread. You know which steps are done, which are out, and which failed, and your summary says all three — a job reported as finished when a step failed is the one outcome that destroys the point of having you. You attribute every answer to the agent that gave it.',
+          backstory: 'You keep track of the job. You know which steps are done, which are out, and which failed, and your summary says all three — a job reported as finished when a step failed is the one outcome that destroys the point of having you. You attribute every answer to the agent that gave it.',
           allow_delegation: false,
         },
       ],
@@ -335,7 +335,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
         },
         {
           id: 'dispatch',
-          description: 'Run the plan. Send each step to its agent, wait for what comes back, and keep the thread. Report done, outstanding and failed separately, and attribute every answer to the agent that gave it. Do not do a step yourself because nobody answered.',
+          description: 'Run the plan. Send each step to its agent, wait for what comes back, and keep track of the job. Report done, outstanding and failed separately, and attribute every answer to the agent that gave it. Do not do a step yourself because nobody answered.',
           expected_output: 'What each step returned and who returned it, with done, outstanding and failed listed separately.',
           agent: 'Dispatcher',
           context: ['plan'],

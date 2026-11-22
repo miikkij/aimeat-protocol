@@ -1118,7 +1118,7 @@
     const code = r && r.error && r.error.code || "UNKNOWN";
     const said = r && r.error && r.error.message;
     const human = {
-      AI_JOB_QUEUE_FULL: "The node is busy right now. Try again in a moment.",
+      AI_JOB_QUEUE_FULL: "This server is busy right now. Try again in a moment.",
       AI_JOB_LIMIT_REACHED: "You already have a lot of AI jobs waiting. Something may be looping — check the list before starting more.",
       AI_JOB_CHAIN_TOO_DEEP: "A chain of jobs kept calling itself and was stopped.",
       AI_JOB_PROMPT_TOO_LARGE: "The prompt and the records it reads are too big to send. Read fewer records, or smaller ones.",

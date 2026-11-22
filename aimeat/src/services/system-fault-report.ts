@@ -72,7 +72,7 @@ export const FAULT_CODES = new Set([
 export const SYSTEM_FAULT_REPLY = [
     'This was not caused by anything you did.',
     'It is a fault on our side and it is being corrected.',
-    'Thank you for using the node and finding it — this is how the service gets better.',
+    'Thank you for using AIMEAT and finding it — this is how the service gets better.',
 ].join(' ');
 
 /**

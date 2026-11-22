@@ -116,7 +116,7 @@ export async function* streamTurn(id, text, signal, attachments = [], starter) {
         const body = await res.json()
             // eslint-disable-next-line aimeat/no-silent-catch -- the status below carries the reason
             .catch(() => null);
-        yield { kind: 'error', message: body?.error?.message || `The node refused the message (${res.status}).` };
+        yield { kind: 'error', message: body?.error?.message || `The server refused the message (${res.status}).` };
         return;
     }
     if (!res.body) {
@@ -198,7 +198,7 @@ export async function speakToText(file) {
         body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }),
     });
     const uploadUrl = mint?.data?.upload_url;
-    if (!uploadUrl) throw new Error(mint?.error?.message || 'The node would not accept the recording.');
+    if (!uploadUrl) throw new Error(mint?.error?.message || 'The server would not accept the recording.');
 
     // Checked before the token is spent: it is single-use, so an oversized PUT burns it and answers
     // a bare 413 instead of naming the limit.
@@ -241,7 +241,7 @@ export async function uploadAttachment(file) {
         body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }),
     });
     const uploadUrl = mint?.data?.upload_url;
-    if (!uploadUrl) throw new Error(mint?.error?.message || 'The node would not accept the file.');
+    if (!uploadUrl) throw new Error(mint?.error?.message || 'The server would not accept the file.');
 
     const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
     if (maxBytes && file.size > maxBytes) {

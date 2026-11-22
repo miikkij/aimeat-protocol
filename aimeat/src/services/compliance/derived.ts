@@ -112,7 +112,7 @@ export function nodeRegistersDraft(config: Pick<AimeatConfig, 'operator' | 'cons
       id: 'node-ai-usage', title: 'AI usage ledger', type: 'personal', purpose: 'service-operation', ...common,
       legalBasis: ['contract'], subjects: ['account holders', 'their agents'],
       dataCategories: ['who called which model', 'tokens', 'cost', 'time'],
-      source: 'The node, on every AI call it carries.',
+      source: 'The node, on every AI call it makes.',
       answerSources: src(['type', 'purpose', 'role', 'subjects', 'dataCategories', 'source']),
     },
     {

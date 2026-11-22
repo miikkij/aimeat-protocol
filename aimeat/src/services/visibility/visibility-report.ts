@@ -209,7 +209,7 @@ export async function readVisibilityReport(
       channels: 'People only, by the page that sent them: an AI answer, a search engine, a social network, another site, or nothing (a typed address, a bookmark, an app that hides where it came from). Internal is a move between your own pages.',
       assistant: 'A person asked an AI something and it fetched this page to answer. Each one is a moment your business was part of an AI answer.',
       crawler: 'An AI built its index or its training data. Nobody was waiting; this is how an AI comes to know you exist.',
-      discovery: 'Fetches of the files an AI or an agent reads to learn how to use your place: llms.txt, AGENTS.md, the MCP server card and the UCP profile.',
+      discovery: 'Fetches of the files an AI or an agent reads to learn how to use your site: llms.txt, AGENTS.md, the MCP server card and the UCP profile.',
       purchases: 'Completed purchases by where the buyer came from. "page" is a person who bought on your page; "agent" is an AI that bought through your checkout for someone. "none" is a purchase whose buyer asked not to be followed, or that nothing could place.',
       not_seen: 'The questions people asked the AI are not visible here. Only whoever runs the AI sees them. This report shows which pages and tools the AI fetched, when, on whose behalf, and what followed.',
       opted_out: 'Visitors whose browser asks not to be followed (Global Privacy Control or Do Not Track) are in the request total only.',

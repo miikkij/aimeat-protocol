@@ -121,7 +121,7 @@ const instagramMetrics: Reader = async ({ credential, externalRef }) => {
       }
     } catch (err) {
       // The counts above are the sample; insights are a bonus the account may not grant.
-      logger.info('connections: Instagram insights were not read; the sample carries no shares', { error: String(err) });
+      logger.info('connections: Instagram insights were not read; the sample has no shares', { error: String(err) });
     }
     return sample({ likes: n(j.like_count), comments: n(j.comments_count), shares }, raw);
   } catch (err) {

@@ -259,7 +259,7 @@ function formContradiction(map: DataMap): string | null {
   }
   if (sharedForm && !inWorkspace && map.held.length > 0
       && map.held.every(r => r.where === 'owner-memory-private')) {
-    return 'This says several people share it, and every row lands in one person\'s own memory, where only they can read it.';
+    return 'This says several people share it, and every row is written to one person\'s own memory, where only they can read it.';
   }
   if (map.form === 'static' && map.held.some(writtenByThePage)) {
     return 'This says it is a static page, and it lists rows it stores.';
@@ -382,7 +382,7 @@ export function checkMap(
   if (badMark.length > 0) {
     findings.push({
       code: 'DATAMAP_ROW_BAD_PUBLISHABLE',
-      message: `${badMark.length} of ${map.held.length} rows carry a "publishable" that is not true or false. `
+      message: `${badMark.length} of ${map.held.length} rows have a "publishable" that is not true or false. `
         + 'true offers the family to a data product as material; leave the field out otherwise. '
         + `Rows: ${badMark.map(r => r.what).join(', ')}.`,
     });

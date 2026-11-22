@@ -47,7 +47,7 @@ export function aiPathStep(f: AiPathFacts): Record<string, unknown> {
     : 'No bound skill, so no AI can do the person\'s work here. The skill says';
   return {
     ai_path_tools_count: f.toolsCount,
-    ai_path: `How the person's own AI uses this app. ${tools} ${skill} where each kind of data lives (keys or workspace spaces), `
+    ai_path: `How the person's own AI uses this app. ${tools} ${skill} where each kind of data is stored (keys or workspace spaces), `
       + 'the record shape with an example and what the app derives itself, the rules the app checks, which acts the person confirms and how the AI proposes them, '
       + `and whether the open app shows a change without a reload (${GUIDE}). `
       + 'A presentation the owner will not change declares <meta name="aimeat-ai-path" content="none"> and this line goes quiet.',

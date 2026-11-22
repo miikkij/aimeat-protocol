@@ -59,7 +59,7 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Quien visita tu página recibe respuesta en un minuto. Una reserva, un precio o algo raro te llega a ti con el motivo.',
     },
     say: {
-      en: 'Answer the questions that arrive at LUUKKU from my opening hours and services, and hand every booking, price or unusual request to me with the reason.',
+      en: 'Answer the questions that arrive at LUUKKU from my opening hours and services, and pass every booking, price or unusual request to me with the reason.',
       fi: 'Vastaa LUUKKUun tuleviin kysymyksiin aukioloaikojeni ja palveluideni perusteella, ja siirrä jokainen varaus, hinta ja epätavallinen pyyntö minulle syyn kanssa.',
       es: 'Responde las preguntas que llegan a LUUKKU con mis horarios y servicios, y pásame cada reserva, precio o pedido inusual con el motivo.',
     },
@@ -199,7 +199,7 @@ const APPS: Array<{ id: string; ready_app: string | null; agent: string | null; 
     name: { en: 'Customer window', fi: 'Asiakasluukku', es: 'Ventanilla de clientes' },
     you: { en: 'Visitors write on your public page.', fi: 'Vierailijat kirjoittavat julkiselle sivullesi.', es: 'Las visitas escriben en tu página pública.' },
     agent_uses: {
-      en: 'Answers through the app and hands over what it must not promise.',
+      en: 'Answers through the app and passes to you what it must not promise.',
       fi: 'Vastaa sovelluksen kautta ja siirtää sinulle sen, mitä se ei saa luvata.',
       es: 'Responde a través de la app y te pasa lo que no puede prometer.',
     },
@@ -304,7 +304,7 @@ export const HOME_IDEAS_SEEDS: SeedEntry[] = [
     id: 'home-ideas',
     group: 'portal',
     name: 'Home ideas — agents and apps to start from',
-    description: 'The examples the home offers when a person makes an agent or an app, as JSON: groups, agent ideas (each with the sentence it was made from) and app ideas (what the person does, what the agent does with the app\'s tools, what the app shows). One document per language. A missing field leaves that one entry out; the page lists what to fix.',
+    description: 'The examples the home page offers when a person makes an agent or an app, as JSON: groups, agent ideas (each with the sentence it was made from) and app ideas (what the person does, what the agent does with the app\'s tools, what the app shows). One document per language. A missing field leaves that one entry out; the page lists what to fix.',
     content: documentIn('en'),
     variables: [],
     usedIn: ['/v1/prompts/home-ideas', '/v1/home?new-agent=1', '/v1/home'],

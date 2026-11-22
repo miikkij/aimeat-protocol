@@ -65,7 +65,7 @@ export const UI_LAYOUT_PRESETS: readonly AppUiLayoutPreset[] = [
   },
   {
     id: 'dashboard',
-    summary: 'Numbers across the top, the detail panels on one wall under them — the operator shape.',
+    summary: 'Numbers across the top, the detail panels together under them — the operator shape.',
     fill: 'Replace every <angle-bracketed> value; add or drop panels freely, and set nav: "tabs" if you would rather they took turns.',
     layout: {
       v: 1,
@@ -97,7 +97,7 @@ export const UI_LAYOUT_PRESETS: readonly AppUiLayoutPreset[] = [
   {
     id: 'work-queue',
     summary: 'The queue itself, its counts over it and its history beside it — the doing shape.',
-    fill: 'Replace every <angle-bracketed> value; on a phone the grid stacks on its own, and nav: "bottom-bar" gives the units a thumb bar instead.',
+    fill: 'Replace every <angle-bracketed> value; on a phone the grid stacks on its own, and nav: "bottom-bar" gives the units a bottom bar instead.',
     layout: {
       v: 1,
       look: 'calm-card',
@@ -127,7 +127,7 @@ export const UI_LAYOUT_PRESETS: readonly AppUiLayoutPreset[] = [
   },
   {
     id: 'guided-flow',
-    summary: 'Step by step to a finish line, the path in sight the whole way — the onboarding and wizard shape.',
+    summary: 'Step by step to the end, every step in view the whole way — the onboarding and wizard shape.',
     fill: 'Replace every <angle-bracketed> value; the app moves the steps record\'s `current` as the person advances, and nav: "flow" turns the same blocks into one-step-at-a-time with a Previous and a Next.',
     layout: {
       v: 1,
@@ -136,7 +136,7 @@ export const UI_LAYOUT_PRESETS: readonly AppUiLayoutPreset[] = [
         { id: 'path', component: 'steps', span: 'full', props: { source: '<your steps source>', title: '<what this takes>' } },
         { id: 'intro', component: 'section', span: 'full', props: { title: '<where this starts>', hint: '<what the person will have at the end>' } },
         { id: 'pick', component: 'list', span: 'main', props: { source: '<your choices source>', title: '<the choosing step>' } },
-        { id: 'finish', component: 'section', span: 'side', props: { title: '<the finish line>', hint: '<what happens next>' } },
+        { id: 'finish', component: 'section', span: 'side', props: { title: '<the last step>', hint: '<what happens next>' } },
       ],
     },
   },

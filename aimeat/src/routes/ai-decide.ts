@@ -347,7 +347,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     try {
       if (!(await deleteOwnerProvider(storage, config, gaii, req.params.id as string))) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provider of yours. A node provider is the operator\'s to remove.'));
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provider of yours. A provider of this server is the operator\'s to remove.'));
       }
       res.json(success(config.nodeId, await providersView(storage, config, gaii)));
     } catch (e) { fail(res, e); }

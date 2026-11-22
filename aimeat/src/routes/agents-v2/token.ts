@@ -116,7 +116,7 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
 
     const claims = decodeClaims(assertion);
     if (!claims || typeof claims.sub !== 'string' || !isValidGAII(claims.sub)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion must carry `sub`: the agent identity it is for.'));
+      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion must contain `sub`: the agent identity it is for.'));
       return;
     }
     if (claims.aud !== config.nodeId) {
@@ -126,17 +126,17 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
       return;
     }
     if (typeof claims.jti !== 'string' || claims.jti.length < 8) {
-      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion must carry `jti`: a unique id, so it can be spent once.'));
+      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion must contain `jti`: a unique id, so it can be used once.'));
       return;
     }
     const now = Math.floor(Date.now() / 1000);
     if (typeof claims.exp !== 'number' || claims.exp <= now) {
-      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion has expired or carries no `exp`.'));
+      res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion has expired or has no `exp`.'));
       return;
     }
     if (claims.exp - now > MAX_ASSERTION_LIFETIME_SECONDS) {
       res.status(400).json(error(config.nodeId, 'INVALID_ASSERTION',
-        `The assertion may live at most ${MAX_ASSERTION_LIFETIME_SECONDS} seconds. A longer one is a bearer token, which is what the key replaces.`));
+        `The assertion may be valid for at most ${MAX_ASSERTION_LIFETIME_SECONDS} seconds. A longer one is a bearer token, which is what the key replaces.`));
       return;
     }
     if (typeof claims.iat === 'number' && claims.iat - now > MAX_CLOCK_SKEW_SECONDS) {

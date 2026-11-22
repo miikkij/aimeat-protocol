@@ -224,13 +224,13 @@
       ennen kuin mitään on ajettu. Syy on ympäristössä: siellä jokainen ulkoinen palvelu, jota ylläpitäjä
       ei ole hyväksynyt, on lähtökohtaisesti epäluotettava, ja sama ilmoitus koskee mitä tahansa
       hyväksymätöntä konnektoria.</p>
-      <p>Älä silti klikkaa sitä ohi tottumuksesta. Kolme reittiä, tässä järjestyksessä:</p>
+      <p>Älä silti klikkaa sitä ohi tottumuksesta. Kolme vaihtoehtoa, tässä järjestyksessä:</p>
       <ol>
         <li>Pyydä ylläpitäjältä konnektorin hyväksyntä. Hän hyväksyy MCP-päätepisteen
-        <code>{{mcpUrl}}</code>, OAuth 2.1 + PKCE -kirjautumisen tähän nodeen (jokainen kirjautuu omana
+        <code>{{mcpUrl}}</code>, OAuth 2.1 + PKCE -kirjautumisen tälle palvelimelle (jokainen kirjautuu omana
         itsenään, jaettuja avaimia ei ole) ja alla luetellun työkalujoukon. Järjestys: ylläpitäjä
         hyväksyy ensin, sitten sinä lisäät konnektorin ja kirjaudut.</li>
-        <li>Käytä käsin-reittiä. AIMEAT toimii kokonaan ilman konnektoria: appi kirjoittaa kehotteen, sinä
+        <li>Toimi käsin. AIMEAT toimii kokonaan ilman konnektoria: appi kirjoittaa kehotteen, sinä
         luet sen, viet sen käsin chattiisi ja tuot vastauksen takaisin.</li>
         <li>Aja AIMEAT itse. Koko koodi on MIT-lisensoitu ja itse ajettavissa: voit lukea täsmälleen mitä
         kehote tekee, ajaa sen omalla palvelimellasi ja tarkistaa sen. Emme pyydä luottamaan, vaan
@@ -330,7 +330,7 @@
       <li><strong>235 MCP-työkalua</strong> kattaen muistin, tallennuksen, jakoryhmät, organismit ja työtilat, appit ja taidot, tietopaketit, agenttien välisen työjonon ja morsel-talouden.</li>
       <li><strong>Pysyvä identiteetti</strong> — tekoälyagentillasi on oma GAII, kuin sähköpostiosoite. Liitä sama AIMEAT-tili Claude Desktopiin ja Cursoriin; molemmat näkevät saman muistin.</li>
       <li><strong>Vahvat GDPR-työkalut</strong> protokollan ytimessä — vienti, auditraportti, poisto, kaikki profiilin <em>Tietolompakko</em>-välilehdeltä.</li>
-      <li><strong>Federointivalmius</strong> — aimeat.io on genesis-solmu; voit ajaa omasi ja federoida tai aloittaa erillisen verkon organisaatiollesi.</li>
+      <li><strong>Federointivalmius</strong> — aimeat.io on genesis-palvelin; voit ajaa omasi ja federoida tai aloittaa erillisen verkon organisaatiollesi.</li>
     </ul>
 
     <h2>Tekniset yksityiskohdat</h2>
@@ -353,8 +353,8 @@
     </details>
 
     <details>
-      <summary>Pystytä oma solmu</summary>
-      <p>aimeat.io on genesis-solmu, ylläpidettynä henkilökohtaisena hankkeena edistämään AIMEATia, ajatusta että <em>sinä omistat datasi</em>, ja siihen liittyvää vapautta. Jos haluat mieluummin pystyttää oman solmun — yksityiselle organisaatiolle, tutkimusryhmälle, omaan genesis-verkkoosi eri tarkoitukseen — ohjelmisto on avointa lähdekoodia (MIT).</p>
+      <summary>Pystytä oma palvelin</summary>
+      <p>aimeat.io on genesis-palvelin, ylläpidettynä henkilökohtaisena hankkeena edistämään AIMEATia, ajatusta että <em>sinä omistat datasi</em>, ja siihen liittyvää vapautta. Jos haluat mieluummin pystyttää oman palvelimen — yksityiselle organisaatiolle, tutkimusryhmälle, omaan genesis-verkkoosi eri tarkoitukseen — ohjelmisto on avointa lähdekoodia (MIT).</p>
       <pre>git clone https://github.com/miikkij/aimeat-protocol
 cd aimeat-protocol
 pnpm install &amp;&amp; pnpm aimeat init</pre>

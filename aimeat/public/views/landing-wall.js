@@ -64,11 +64,11 @@ export function StatsPanel() {
     <div class="ld-stats">
       <div class="ld-stats-line">
         ${parts.length > 0
-          ? html`${tr('landing.todayPrefix', 'This node today:')} ${parts.join(' · ')} · 0 ${tr('landing.humanHours', 'human hours')}`
-          : tr('landing.statsFallback', 'This node runs agents around the clock: schedules, tasks and publishing without human hours.')}
+          ? html`${tr('landing.todayPrefix', 'Here today:')} ${parts.join(' · ')} · 0 ${tr('landing.humanHours', 'human hours')}`
+          : tr('landing.statsFallback', 'This server runs agents around the clock: schedules, tasks and publishing without human hours.')}
       </div>
       <div class="ld-stats-own">
-        ${tr('landing.ownLine', 'The same could run for you. Your own node, your data, your agents.')}
+        ${tr('landing.ownLine', 'The same could run for you. Your own server, your data, your agents.')}
         ${/* The store is the one price door, so this line names no price of its own any more. */''}
         <${StoreDoor} class="ld-stats-cta" label=${tr('landing.ownCta', 'Get your own →')} />
       </div>
@@ -139,7 +139,7 @@ export function Gallery() {
       </div>
       ${shown.length === 0
         ? html`<p class="ld-app-desc">${apps.length === 0
-            ? tr('landing.wallEmpty', 'Be the first. Copy the prompt above, build something, and it lands here.')
+            ? tr('landing.wallEmpty', 'Be the first. Copy the prompt above, build something, and it shows up here.')
             : tr('landing.wallNoMatch', 'No apps match your search.')}</p>`
         : html`<div class="ld-gallery">
             ${shown.map((a) => {

@@ -71,7 +71,7 @@ It **never sends** anything. Approving a record and sending it on is the person'
 ## Before you start
 
 - A mailbox the refinery may read: \`aimeat_connection_list\`. None yet: \`aimeat_connection_start\` with
-  a read provider (\`google-mail\`, \`microsoft-mail\`) and hand the address to the person. **A connection
+  a read provider (\`google-mail\`, \`microsoft-mail\`) and give the address to the person. **A connection
   belongs to whoever made it**: a refinery you run reads only a mailbox YOU connected, never the one
   your owner connected in their browser.
 - Your permissions: \`connections:read-through\`, \`ai:use\`, \`organism:rows\` and \`memory:write\`, all four.
@@ -170,7 +170,7 @@ permissions are checked again at every fire.
 An app does not read mail or ask the models itself: \`/v1/libs/aimeat-refinery.js\` (after aimeat-auth)
 starts the node's batch and follows it (\`AIMEAT.refinery.run(prefix, { onProgress })\`), reads the
 queues (\`rows\`, \`counts\`, \`log\`), moves and corrects rows (\`move\`, \`update\`), teaches (\`teach\`),
-and puts the refinery on the node's clock (\`schedule\`, which runs with the page closed; reading the
+and puts the refinery on the node's schedule (\`schedule\`, which runs with the page closed; reading the
 schedules needs \`workflow:read\`). With aimeat-atelier.js on the page, \`AIMEAT.refinery.console({
 target, prefix })\` draws the batch figure, the steps, the tallies and the batch rows from kit parts.
 The app asks for \`connections:read-through ai:use organism:rows memory:write\`, its data map names

@@ -356,7 +356,7 @@ export async function reportLearnedPitfall(
         const told = existing ? false : await tellOperator(storage, config, who.principal, wish);
         platformDefect = {
             wish_text: wish,
-            how: 'The platform owner tracks defects as wishes. Hand wish_text to the person you work for, so it reaches the platform owner as a wish; '
+            how: 'The platform owner tracks defects as wishes. Give wish_text to the person you work for, so it reaches the platform owner as a wish; '
                 + (told ? 'this node\'s operator was told as well.' : existing ? 'this node\'s operator was told when the entry was first reported.' : 'no operator on this node could be told, so send it to support@operators with aimeat_dm_send.'),
             operators_told: told,
         };

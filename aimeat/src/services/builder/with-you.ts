@@ -356,7 +356,7 @@ export async function operatorHandOp(deps: Deps, body: Record<string, unknown>) 
     if (!cur.request) throw new BuildError(404, 'NOT_FOUND', 'This place has no build request.');
     if (cur.request.requestId) {
       if (cur.request.requestId === requestId) { already = true; return UNCHANGED; }
-      throw new BuildError(409, 'BUILD_REQUEST_HANDED', 'This request already carries another requestId from the queue.');
+      throw new BuildError(409, 'BUILD_REQUEST_HANDED', 'This request already has another requestId from the queue.');
     }
     owner = cur.request.submittedBy;
     // Not marked as checked: the owner's next read asks the queue at once, which is what the operator's

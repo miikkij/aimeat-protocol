@@ -162,7 +162,7 @@ export default function BuildStory({ navigate }) {
               <span>${tr('story.chipPacks', 'the packs you ticked')}</span>
               <span>${tr('story.chipPitfalls', 'the pitfalls other builders hit')}</span>
             </div>
-            <pre class="bs-prompt-preview">${prompt ? prompt.slice(0, 600) : tr('landing.buildLoading', 'Loading the build prompt from this node…')}</pre>
+            <pre class="bs-prompt-preview">${prompt ? prompt.slice(0, 600) : tr('landing.buildLoading', 'Loading the build prompt from this server…')}</pre>
             <${CopyButton} text=${prompt} disabled=${!prompt} className="btn-primary bs-copy"
               label=${tr('common.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('common.copied', 'Copied')} />
           </div>
@@ -184,7 +184,7 @@ export default function BuildStory({ navigate }) {
             </div>
             <div class="bs-door bs-door--ink">
               <span class="bs-door-title">${tr('story.b3ByAi', 'By your AI')}</span>
-              <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better choice for everything after this.')}</span>
+              <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to AIMEAT over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better choice for everything after this.')}</span>
               <a class="ld-sh-door showroom-door" href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             </div>
           </div>

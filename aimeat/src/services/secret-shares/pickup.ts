@@ -97,7 +97,7 @@ export async function pickupShare(
   const share = await deps.storage.getSecretShare(id);
   if (!share) return notFound();
   const key = getEncryptionKey(deps.config);
-  if (!key) return refuse(503, 'SECRET_STORE_UNAVAILABLE', 'This node has no encryption key configured.');
+  if (!key) return refuse(503, 'SECRET_STORE_UNAVAILABLE', 'This server has no encryption key configured.');
   const to = body.to === 'vault' ? 'vault' : 'reveal';
 
   // WHO. A caller with a role first; a code second.
@@ -132,7 +132,7 @@ export async function pickupShare(
   let vaultName = '';
   let vaultHost: string | null = null;
   if (share.protectionLevel === 'e2e') {
-    if (to === 'vault') return refuse(400, 'E2E_NO_VAULT', 'An end-to-end share opens only on its recipient\'s own device, so the node cannot copy it into a vault. Open it on your device and store it yourself.');
+    if (to === 'vault') return refuse(400, 'E2E_NO_VAULT', 'An end-to-end share opens only on its recipient\'s own device, so this server cannot copy it into a vault. Open it on your device and store it yourself.');
     if (isAgent) return refuse(403, 'E2E_PERSON_ONLY', 'An end-to-end share opens only on its recipient\'s own device. An agent cannot open it.');
     if (via !== 'code' && !(share.e2eKeys ?? []).some(k => k.ghii === caller!.ownerGhii)) {
       return refuse(409, 'NO_DEVICE_KEY', 'This share was sealed for other devices than yours. Ask its maker to share it again to a device you have registered on the Vault page.');

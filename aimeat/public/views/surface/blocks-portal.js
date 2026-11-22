@@ -128,7 +128,7 @@ export function TransparencyBlock(/** @type {{ ctx?: any, props?: Record<string,
       ${tr('landing.transLine', 'Content a model wrote here has a record of how it was made, and a label where a person reads it.')}
       ${' '}
       <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>
-        ${tr('landing.transCta', 'How this node marks AI content →')}
+        ${tr('landing.transCta', 'How this server marks AI content →')}
       </a>
     </p>`;
 }

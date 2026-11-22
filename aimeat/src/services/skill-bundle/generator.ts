@@ -227,13 +227,13 @@ accepted by \`aimeat connect call <name>\`):
 | declare_offerings / make_workflow_compatible / price_offer | \`aimeat_memory_write\` → key \`agents.<your-name>.offers\` (optional) |
 | set_avatar | \`aimeat_memory_write\` → key \`agent.avatar\`, value \`{ "emoji": "…" }\` or \`{ "svg": "<svg…>" }\` (optional; skill \`agent-avatar\`) |
 
-Stop as soon as \`summary.completable\` is true (every required step passed); the optional offers-ladder steps never block completion.
+Stop as soon as \`summary.completable\` is true (every required step passed); the optional offer steps never block completion.
 
 Use \`${bundle.metadata.runtime}\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
 
 ## Scheduling (recurring work)
 
-When the user asks for something recurring ("every morning…", "each evening…"), create a server-run schedule instead of relying on your own uptime — the AIMEAT server owns the clock, so it fires even when you are offline, and the owner can pause/cancel it any time.
+When the user asks for something recurring ("every morning…", "each evening…"), create a server-run schedule instead of relying on your own uptime — the AIMEAT server owns the schedule, so it fires even when you are offline, and the owner can pause/cancel it any time.
 
 - \`aimeat_schedule_create\` — kinds:
   - \`extension\` — run an installed extension action (fetch + store), **zero tokens**. Prefer this for pure data work (AIMEAT-first).

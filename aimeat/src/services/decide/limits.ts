@@ -209,7 +209,7 @@ export function checkDecideRequest(
     out.push({ code: 'TOO_LARGE',
       message: Number.isFinite(tokens)
         ? `The request is about ${tokens} tokens; the limit is ${limits.maxRequestTokens}. Send a smaller state: the fields the questions need, not the whole record.`
-        : 'The request cannot be written as JSON (it has a cycle or a value JSON does not carry). Send plain data.' });
+        : 'The request cannot be written as JSON (it has a cycle or a value JSON cannot hold). Send plain data.' });
   }
   return out;
 }

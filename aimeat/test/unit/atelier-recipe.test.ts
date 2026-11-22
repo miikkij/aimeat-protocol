@@ -158,7 +158,7 @@ describe('the six patterns call the kit, not an invented surface', () => {
 
   it('names all six', () => {
     for (const title of ['A LIST THAT ARRIVES', 'A PANEL THAT CHANGES', 'A SCREEN THAT SWITCHES',
-      'A FORM THAT LANDS', 'A NEARLY-RIGHT ROW', 'A SHEET THAT RECOMPUTES']) {
+      'A FORM THAT SUBMITS', 'A NEARLY-RIGHT ROW', 'A SHEET THAT RECOMPUTES']) {
       expect(text).toContain(title);
     }
   });
@@ -207,9 +207,9 @@ describe('the living section is held to living/describe-data.js', () => {
   });
 
   it('the two spellings that decide the numbers are both said', () => {
-    // A percentage is a label on a face number and the two temperatures are affine — the pair a
+    // A percentage is a label on a plain number and the two temperatures are affine — the pair a
     // first document trips over, and both are the library's behaviour rather than a convention.
-    expect(LIVING).toMatch(/A PERCENTAGE IS A LABEL ON A FACE NUMBER/);
+    expect(LIVING).toMatch(/A PERCENTAGE IS A LABEL ON A PLAIN NUMBER/);
     expect(LIVING).toContain('fraction(');
     expect(LIVING).toContain('percent(');
     expect(LIVING).toMatch(/SCALES WITH AN OFFSET/);

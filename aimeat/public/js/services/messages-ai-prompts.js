@@ -85,7 +85,7 @@ function transcript(thread, peerGhii, peerName) {
  * AIMEAT (organisms, memory, workspaces, librarian) to ground the reply. */
 function enrichmentBlock() {
   return [
-    'This conversation lives in AIMEAT — my AI-native workspace, where my company\'s knowledge lives',
+    'This conversation is in AIMEAT — my AI-native workspace, where my company\'s knowledge is stored',
     '(organisms, workspaces, memory, documents). If you have my AIMEAT MCP connected, look things up',
     'before you answer instead of guessing:',
     '- Search my memory (aimeat_memory_search) and read my workspaces (aimeat_workspace_overview,',

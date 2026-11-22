@@ -56,7 +56,7 @@ export const WORKSPACE_CONTRACTS_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-workspace-contracts
-description: How to build an agent that does work inside an organism's workspace, where it reads requests from one space, writes results to another and moves each request through its states, and everyone in the workspace sees the work. Covers the contract the agent carries (inputs, outputs, schemas, states), adding its spaces to a workspace without overwriting it and who may do that, being woken by the workspace.record event instead of polling, a loop that is safe to run again, the workspace-contract tags, the adopt-contract task, engagements (active or retired), and the optional objectives, KPIs and _meta note. Use before you build or run an agent that processes workspace records, or when a person wants an agent to "work in" a workspace.
+description: How to build an agent that does work inside an organism's workspace, where it reads requests from one space, writes results to another and moves each request through its states, and everyone in the workspace sees the work. Covers the contract the agent has (inputs, outputs, schemas, states), adding its spaces to a workspace without overwriting it and who may do that, being woken by the workspace.record event instead of polling, a loop that is safe to run again, the workspace-contract tags, the adopt-contract task, engagements (active or retired), and the optional objectives, KPIs and _meta note. Use before you build or run an agent that processes workspace records, or when a person wants an agent to "work in" a workspace.
 license: MIT
 metadata:
   audience: agent
@@ -75,7 +75,7 @@ the node.
 
 ## 1. The contract
 
-Carry it in the agent as data:
+Keep it in the agent as data:
 
 \`\`\`yaml
 contract:
@@ -186,7 +186,7 @@ GET  /local/wake/next?wait=60000        → wakes on any source: a task, a recor
 something arrived, so read each queue after it wakes you.
 
 - \`space\` is the space's **namespace**, as the manifest names it.
-- The event carries where the record is and what happened to it, never the record itself. Read it
+- The event says where the record is and what happened to it, never the record itself. Read it
   with your own access (\`aimeat_workspace_read\` with \`ids\`).
 - A published record wakes you; a draft and the version history do not.
 - The connector keeps the list and subscribes again after every reconnect. The node checks read
@@ -248,7 +248,7 @@ its scope row \`kind = adopt-contract\`, never by its title:
 }
 \`\`\`
 
-The \`contract\` row is absent when the agent carries only the \`workspace-contract\` tag. The agent then:
+The \`contract\` row is absent when the agent has only the \`workspace-contract\` tag. The agent then:
 
 1. Joins the organism with \`aimeat_organism_join\` if it is not a member (ALREADY_MEMBER is fine).
 2. Adds the spaces of its own contract with \`add_spaces\` (section 3). This is safe to repeat.
@@ -300,26 +300,26 @@ through the node's push.
 
 ## 11. Why the organism exists, and whether it works (optional)
 
-Use this only when the organism carries real, ongoing value; a place for one afternoon declares none
+Use this only when the organism has real, ongoing value; an organism for one afternoon declares none
 of it.
 
 - **\`objectives\`** on the manifest: the organism's own (\`organism.<id>.meta.manifest\`, written by a
   creator or admin) for the direction of the whole organism, or a workspace's for its work. Each is
-  \`{ id, statement, why, status }\`, status \`active\`, \`met\` or \`abandoned\`, and may carry \`level\`
+  \`{ id, statement, why, status }\`, status \`active\`, \`met\` or \`abandoned\`, and may have \`level\`
   (\`main\`, \`important\` or \`background\`), \`serves\` (\`[{ organism, objective }]\`, the objective it
   serves) and \`until\` (a date). Each has \`kpis\`: \`{ name, kind, unit, target: { op, value },
   source }\`. \`kind\` is \`value\`, \`cost\`, \`roi\`, \`outcome\` or \`quality\`, and the unit is the
   domain's own (euros, plots, closed deals). A \`source\` of the form \`{ from: 'records', space, agg:
   'sum'|'count'|'avg'|'min'|'max', field, equals?: { field, value } }\` is computed by the node from the
   workspace's own published records; on the organism's manifest it also names the workspace (\`ws\`)
-  and is computed only for a reader who may read that workspace. A text \`source\` is a recipe a person
+  and is computed only for a reader who may read that workspace. A text \`source\` is a description a person
   updates by hand. Members read the organism's objectives in \`aimeat_organism_get\` and
   \`aimeat_organism_overview\`, a workspace's in \`aimeat_workspace_overview\`.
 - **Changing a workspace manifest safely.** \`aimeat_workspace_update\` with \`manifest\` replaces the
   whole manifest. Send the \`manifest_version\` that \`aimeat_workspace_read\` gave you as
   \`expected_version\`: if someone changed the manifest meanwhile, nothing is written and the answer is
   \`VERSION_CONFLICT\`; read it again and apply your change to that version.
-- **\`servesObjective: "<objective id>"\`** on a space says which objective it feeds.
+- **\`servesObjective: "<objective id>"\`** on a space says which objective it serves.
 - **\`_meta\`** inside a record: \`{ why, value: { metric, amount, unit }, log: [{ at, by, note }] }\`, one
   line per change that matters. It says why the record changed, which the version history cannot. A
   record space that wants it includes it in its schema or leaves the schema open.

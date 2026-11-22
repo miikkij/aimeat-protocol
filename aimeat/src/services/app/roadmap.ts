@@ -265,7 +265,7 @@ export function roadmapGate(input: { line: string | undefined; shared: boolean }
   }
   return {
     ok: true, line: null,
-    warning: 'No roadmap line was carried, so this version is not on the app\'s roadmap. '
+    warning: 'No roadmap line was sent, so this version is not on the app\'s roadmap. '
       + 'Send `roadmap` with one sentence next time; on an app somebody else helps build, it is required.',
   };
 }

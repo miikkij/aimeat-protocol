@@ -31,7 +31,7 @@ export function buildStatsPrompt({ url = '', from = '', to = '' } = {}) {
   aimeat_admin_statistics { from, to }   the counters over that period, the day-by-day tallies behind them, and the live gauges
 Read it twice more: once for the stretch immediately before, so you have something to compare against, and once with NO from or to, which gives the counters over the whole life of the node.
 
-(aimeat_admin_stats is a different tool and answers a different question: how many agents, actions and boards this node holds. It carries none of the counters below.)
+(aimeat_admin_stats is a different tool and answers a different question: how many agents, actions and boards this node holds. It has none of the counters below.)
 
 == 2. Judge ==
 Lead with anything that looks like somebody trying to get in. auth_failures_total is the count of people and machines refused at sign-in, and its SHAPE matters more than its total: a number that is flat across a weekend is a script working through credentials, not people mistyping a password. scope_denials_total is a named principal calling an endpoint its scopes do not allow, which is either a misconfigured integration or somebody testing the limits.

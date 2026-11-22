@@ -388,7 +388,7 @@ async function start(provider, opts = {}) {
     }),
   });
   const url = must(res, 'the connection could not be started').authorize_url;
-  if (!url) throw new Error('the node did not return an authorization URL');
+  if (!url) throw new Error('the server did not return an authorization URL');
 
   const win = window.open(url, 'aimeat-connect', 'width=620,height=760,noopener=no');
   if (!win) throw new Error('the connect window was blocked; allow pop-ups for this site');

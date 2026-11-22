@@ -145,7 +145,7 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
     let sourceShare: string | undefined;
     if (n.offerKind === 'share') {
         const source = n.offerRef ? await storage.getConsent(n.offerRef) : null;
-        if (!source || !isLiveShare(source)) return { ok: false, code: 'OFFER_GONE', message: 'The share this offer stood on has ended.' };
+        if (!source || !isLiveShare(source)) return { ok: false, code: 'OFFER_GONE', message: 'The share this offer was based on has ended.' };
         sourceShare = source.id;
     }
     const party = await ensureParticipantParty(storage, n.ownerGhii, n.participantId, `dsp:${n.providerPid}`);
@@ -159,7 +159,7 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
 
     if (n.offerKind === 'exchange') {
         const o = n.offerRef ? await getOffering(storage, n.offerRef) : null;
-        if (!o || o.state !== 'listed' || o.unit !== 'money' || o.surface?.kind !== 'datapackage') return { ok: false, code: 'OFFERING_GONE', message: 'The EXCHANGE listing this offer stood on is no longer listed.' };
+        if (!o || o.state !== 'listed' || o.unit !== 'money' || o.surface?.kind !== 'datapackage') return { ok: false, code: 'OFFERING_GONE', message: 'The EXCHANGE listing this offer was based on is no longer listed.' };
         const surface = o.surface;
         const plan = o.plans.find(p => p.id === 'per_month' && p.model === 'subscription') as { periodPrice?: number; callsPerWindow?: number; windowSeconds?: number } | undefined;
         const amount = surface.model === 'per_month' ? plan?.periodPrice ?? o.basePrice : o.basePrice;

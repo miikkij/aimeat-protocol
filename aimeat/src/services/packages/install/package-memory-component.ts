@@ -133,7 +133,7 @@ export function reservedComponentMessage(componentId: string, keys: string[]): s
     }
     if (registry) {
         parts.push(`Component "${componentId}" would write ${registry}, which is the skill registry of the account that installs it. `
-            + 'A package adds a skill through a skill component, which is refused when it carries the name of one of this node\'s own skills.');
+            + 'A package adds a skill through a skill component, which is refused when it has the name of one of this node\'s own skills.');
     }
     if (organism) {
         parts.push(`Component "${componentId}" would write ${organism}, which belongs to an organism and its members. `
@@ -194,6 +194,6 @@ export function memoryComponentWriteRefusal(
     return {
         status: 403, code: 'SCOPE_DENIED', missing,
         message: `Component "${memory.id}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
-            + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. The owner grants it in the permissions of this agent or app.`,
+            + `and this session does not have ${missing.length === 1 ? 'it' : 'them'}. The owner grants it in the permissions of this agent or app.`,
     };
 }

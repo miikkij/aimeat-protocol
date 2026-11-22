@@ -114,7 +114,7 @@ export async function kitPublishing(
   if (body.reach === 'own') return { earned: true, why: 'Yours: only you read it and build with it.' };
   if (body.reach === 'organism') return { earned: true, why: `The members of organism "${body.organism}" read it and build with it. Its owners and admins can make it the organism's default (aimeat_designbook_kit_default).` };
   if (!body.from_app) {
-    return { earned: false, why: 'A kit for the whole node names the app it was taken from (from_app), and is published by itself when its owner said that app turned out well. It stays proposed: usable by you, and one operator action away from the shelf.' };
+    return { earned: false, why: 'A kit for the whole node names the app it was taken from (from_app), and is published by itself when its owner said that app turned out well. It stays proposed: usable by you, and one operator action away from being published.' };
   }
   const state = await new DesignBookReasons(storage, config).keptState(ownerGhii, body.from_app);
   if (!state.kept) {

@@ -91,7 +91,7 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
       }
       // Validate against the node maximum — same rule as agent provisioning.
       if (exceedsCeiling(config.maxAgentScopes, tokenScopes).length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this server allows. Choose fewer permissions, or ask whoever runs this server.`));
         return;
       }
     }

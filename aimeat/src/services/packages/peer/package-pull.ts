@@ -270,7 +270,7 @@ export async function pullPackage(
         if (!resolved) {
             return {
                 ok: false, status: 502, code: 'SOURCE_UNREACHABLE',
-                message: 'That address did not answer with an AIMEAT node card carrying a public key.',
+                message: 'That address did not answer with an AIMEAT node card with a public key.',
             };
         }
         source = resolved;

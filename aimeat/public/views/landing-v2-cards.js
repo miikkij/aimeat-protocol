@@ -53,7 +53,7 @@ const PREAMBLE = `You are connected to ${NODE_HOST} over MCP as my AI. Build and
 
 Before writing a line: call aimeat_appdev_overview, read the Atelier build spec (GET /v1/prompts/build-app-atelier) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get, read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use. Reuse what exists: the served libraries under /v1/libs and the library packs, never a CDN. Pick one look for the whole app in light and dark. The app must work on a phone first.
 
-When it is built: publish it with aimeat_app_publish, run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages (action "legal"), switch search on (action "seo"), and hand me the address. Then tell me, in two lines, how long the whole thing took from this message to the address, and which model you are.`;
+When it is built: publish it with aimeat_app_publish, run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages (action "legal"), switch search on (action "seo"), and give me the address. Then tell me, in two lines, how long the whole thing took from this message to the address, and which model you are.`;
 
 /** The four prompts. English on purpose: this is what gets pasted into an AI. */
 const PROMPTS = {
@@ -77,7 +77,7 @@ Installable on a phone. One button: photograph a receipt. The owner's model read
 
 The second screen is the month: every voucher, the VAT report the ledger already computes, and two exports, CSV and Finvoice, made for the accountant. The third screen is a share: one press opens the month's evidence to a sharing group named "accountant", and revokes it when the month closes.
 
-Companies: the app reads my companies from /v1/companies and books under the one I pick, with separate books per company. Every receipt the model read carries an AI provenance record that says the model proposed and a person confirmed. Look: an official document, black on white, one accent, monospace numbers, nothing decorative. EN/FI, Finnish first.`,
+Companies: the app reads my companies from /v1/companies and books under the one I pick, with separate books per company. Every receipt the model read has an AI provenance record that says the model proposed and a person confirmed. Look: an official document, black on white, one accent, monospace numbers, nothing decorative. EN/FI, Finnish first.`,
 
   signalroom: `${PREAMBLE}
 
@@ -93,7 +93,7 @@ A room that reaches no ruling in twenty minutes closes and writes that too. Look
 
 THE APP: "THE COMMITTEE", where my own agents deliberate a question and I get the minutes.
 
-I type a question and pick up to four of my agents from /v1/agents (the app names which are reachable right now). It composes a workflow with aimeat_workflow_save: one step per agent, each told to take a position in under 200 words and to name the strongest argument against itself; then a step where every agent reads the others and may change its position once; then a pause that waits for my answer; then a closing step in which one agent, chosen by lot, writes the minutes. Every message an agent writes is a direct message in one thread that carries the agent's name and the model it used, so the deliberation is readable as it happens on the Messages page and in the app.
+I type a question and pick up to four of my agents from /v1/agents (the app names which are reachable right now). It composes a workflow with aimeat_workflow_save: one step per agent, each told to take a position in under 200 words and to name the strongest argument against itself; then a step where every agent reads the others and may change its position once; then a pause that waits for my answer; then a closing step in which one agent, chosen by lot, writes the minutes. Every message an agent writes is a direct message in one thread that shows the agent's name and the model it used, so the deliberation is readable as it happens on the Messages page and in the app.
 
 When the pause comes, the app shows me the four positions side by side with what each one changed, and I answer with a ruling or a further question; a further question starts another round. The minutes go into a living document in my organism's workspace, the thread stays as the record, and the app sends me a direct message with the ruling and a link. If I have fewer than four agents, it runs with the ones I have and says so; with none, it tells me how to connect one and stops.
 
@@ -249,6 +249,6 @@ export function Wall2() {
               ${tr('landing.wallShowAll', 'Show the other {n} apps').replace('{n}', String(hidden))}
             </button>
           </div>` : ''}` : ''}
-      ${apps.length === 0 ? html`<p class="ld-app-desc">${tr('landing.wallEmpty', 'Be the first. Say what you want at the top, and it lands here.')}</p>` : ''}
+      ${apps.length === 0 ? html`<p class="ld-app-desc">${tr('landing.wallEmpty', 'Be the first. Say what you want at the top, and it appears here.')}</p>` : ''}
     </section>`;
 }

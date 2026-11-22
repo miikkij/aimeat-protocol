@@ -84,7 +84,7 @@ function itemSub(i) {
     case 'organism': return i.workspaces != null ? o('workspacesN', '{n} workspaces', { n: i.workspaces }) : o('organism', 'Organism');
     case 'workspace': return o('workspace', 'Workspace');
     case 'app-tools': return `${o('toolsSub', '{n} tools, {f} free', { n: i.tools, f: i.free_tools })}${i.exchange ? ` · ${o('onExchange', 'on EXCHANGE')}` : ''}`;
-    case 'agent-offer': return i.capability ? o('offerPublic', 'Public, a capability on the node') : o('offerPrivate', 'Private, not yet a capability');
+    case 'agent-offer': return i.capability ? o('offerPublic', 'Public, a capability on this server') : o('offerPrivate', 'Private, not yet a capability');
     case 'agent': return i.tasks_done ? o('tasksDone', '{n} tasks done', { n: i.tasks_done }) : o('agent', 'Agent');
     default: return '';
   }

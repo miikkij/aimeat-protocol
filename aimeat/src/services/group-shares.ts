@@ -67,7 +67,7 @@ export function validateSharePattern(pattern: string): { ok: true } | { ok: fals
     if (p.startsWith(reserved) || reserved.startsWith(literalHead)) {
       return {
         ok: false, code: 'RESERVED_KEY',
-        message: `"${reserved}*" is managed by the node on your behalf and cannot be shared.`,
+        message: `"${reserved}*" is managed by AIMEAT on your behalf and cannot be shared.`,
       };
     }
   }
@@ -190,7 +190,7 @@ function gate(caller: ShareCaller): Extract<ShareResult<never>, { ok: false }> |
   if (isHumanOwnerSession || scopeIsCovered(caller.scopes, 'share:manage')) return null;
   return {
     ok: false, status: 403, code: 'SCOPE_DENIED',
-    message: 'Sharing a key space with someone else needs the "share:manage" permission, which this session does not carry.',
+    message: 'Sharing a key space with someone else needs the "share:manage" permission, which this session does not have.',
   };
 }
 

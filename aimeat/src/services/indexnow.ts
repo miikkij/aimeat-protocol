@@ -212,7 +212,7 @@ export async function stampAnnounced(
     try {
       await storage.updateAppMeta(app.ownerGaii, app.filename, { seo: { announcedAt: at } });
     } catch (err) {
-      logger.warn('IndexNow: the app was announced but the stamp did not land', { filename: app.filename, error: String(err) });
+      logger.warn('IndexNow: the app was announced but the stamp was not saved', { filename: app.filename, error: String(err) });
     }
   }
 }

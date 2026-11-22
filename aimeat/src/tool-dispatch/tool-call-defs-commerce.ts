@@ -129,7 +129,7 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
             if (owner && !owner.includes('@')) {
                 return { ok: false as const, error: {
                     code: 'INVALID_INPUT',
-                    message: `owner must be a full GHII ("${owner}@<node-id>"), not a bare name — a cross-owner read needs the node it lives on. Omit owner entirely to read your own manifest.`,
+                    message: `owner must be a full GHII ("${owner}@<node-id>"), not a bare name — a cross-owner read needs the node it is stored on. Omit owner entirely to read your own manifest.`,
                 } };
             }
             // `shop` names the manifest of `shop.html`: each name the app can be stored under is read

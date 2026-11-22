@@ -236,8 +236,8 @@ export function buildFindings(f: IntermediationFacts): IntermediationFinding[] {
         id: 'priced_named_share', kind: 'priced_named_share', code: 'di-priced-named-share',
         count: f.pricedShares.length, items: cap(f.pricedShares.map(s => ({ share_id: s.id, owner: s.owner, package: s.package }))),
         reason: f.pricedShares.length
-            ? `${f.pricedShares.length} named share(s) to an outside party carry a price, and this node knows of the sale.`
-            : 'No named share to an outside party carries a price. A free share to a named recipient is a technical tool of the data holder.',
+            ? `${f.pricedShares.length} named share(s) to an outside party have a price, and this node knows of the sale.`
+            : 'No named share to an outside party has a price. A free share to a named recipient is a technical tool of the data holder.',
         regulation: [DGA_REFS.marketplace],
     });
     for (const p of f.personParties) {

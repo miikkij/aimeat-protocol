@@ -48,8 +48,8 @@ const DEFAULTS: Record<string, Record<TemplateId, DefaultTemplate>> = {
     email_mailbox: {
       id: 'email_mailbox',
       fields: {
-        subject: 'AIMEAT: {count} pending message(s) for your node',
-        body: 'Your personal node "{nodeId}" has {count} pending message(s).\n\nHighest priority: {type}\nOldest message: {age} minutes ago\n\nPlease reconnect your personal node to retrieve these messages.',
+        subject: 'AIMEAT: {count} pending message(s) for your own server',
+        body: 'Your own server "{nodeId}" has {count} pending message(s).\n\nHighest priority: {type}\nOldest message: {age} minutes ago\n\nPlease reconnect your own server to retrieve these messages.',
       },
       placeholders: ['{count}', '{type}', '{nodeId}', '{age}'],
     },
@@ -66,8 +66,8 @@ const DEFAULTS: Record<string, Record<TemplateId, DefaultTemplate>> = {
     email_mailbox: {
       id: 'email_mailbox',
       fields: {
-        subject: 'AIMEAT: {count} odottavaa viesti\u00e4 solmullesi',
-        body: 'Henkil\u00f6kohtaisella solmullasi "{nodeId}" on {count} odottavaa viesti\u00e4.\n\nKorkein prioriteetti: {type}\nVanhin viesti: {age} minuuttia sitten\n\nYhdist\u00e4 solmusi uudelleen hakeaksesi viestit.',
+        subject: 'AIMEAT: {count} odottavaa viesti\u00e4 omalle palvelimellesi',
+        body: 'Omalla palvelimellasi "{nodeId}" on {count} odottavaa viesti\u00e4.\n\nKorkein prioriteetti: {type}\nVanhin viesti: {age} minuuttia sitten\n\nYhdist\u00e4 palvelimesi uudelleen hakeaksesi viestit.',
       },
       placeholders: ['{count}', '{type}', '{nodeId}', '{age}'],
     },
@@ -84,8 +84,8 @@ const DEFAULTS: Record<string, Record<TemplateId, DefaultTemplate>> = {
     email_mailbox: {
       id: 'email_mailbox',
       fields: {
-        subject: 'AIMEAT: {count} mensaje(s) en espera para tu nodo',
-        body: 'Tu nodo personal "{nodeId}" tiene {count} mensaje(s) en espera.\n\nPrioridad más alta: {type}\nMensaje más antiguo: hace {age} minutos\n\nVuelve a conectar tu nodo personal para recogerlos.',
+        subject: 'AIMEAT: {count} mensaje(s) en espera para tu servidor propio',
+        body: 'Tu servidor propio "{nodeId}" tiene {count} mensaje(s) en espera.\n\nPrioridad más alta: {type}\nMensaje más antiguo: hace {age} minutos\n\nVuelve a conectar tu servidor propio para recogerlos.',
       },
       placeholders: ['{count}', '{type}', '{nodeId}', '{age}'],
     },

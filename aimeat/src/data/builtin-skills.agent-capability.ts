@@ -133,12 +133,12 @@ running:
   checkout. A direct call answers \`TOOL_NOT_INVOKABLE\`, for the owner's own agent too. So an
   agent's definition names a tool that has an action.
 
-A tool may carry a money price and a pacing amount, and it can be listed on the Exchange. A tool
+A tool may have a money price and a pacing amount, and it can be listed on the Exchange. A tool
 with an action and no price is the owner's own: their agents call it directly. A listed tool says
 whether it delivers data (\`deliversData\`); left out, the node proposes it from the tool's output
 shape (rows or records count as data).
 
-**A tool's checks hold only if the agent cannot write past the tool.** The extension writes the
+**A tool's checks hold only if the agent cannot bypass the tool.** The extension writes the
 workspace as the agent that called it, so the same agent can write the same record directly with
 the plain workspace tools, and then nothing the tool checks is checked. Close that in the
 workspace's structure: name the extension on every record space an agent may write only through
@@ -151,7 +151,7 @@ agent. Say in the space's \`description\` which tool writes it: the home's new-a
 that sentence beside the space, writes it into the agent's tasks, and gives an agent that watches
 such a workspace the tool that calls app tools.
 
-The owner can let one agent through: the permission \`organism:direct\` (the agent editor's
+The owner can exempt one agent: the permission \`organism:direct\` (the agent editor's
 organism row; full access \`*\` covers it, the read-only and read-and-write presets do not hold
 it). An agent whose session holds it writes a closed space directly, and it may change the list.
 Nobody else changes a list that is there: a change to the workspace's structure that alters or
@@ -180,10 +180,10 @@ This is what an agent reaches through an app tool. The extension's manifest decl
 | \`ctx.files\` | Reads and writes files in the node's storage. |
 | \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it, and the extension reads the answer back while it stays private to the owner. |
 | \`ctx.email\`, \`ctx.notify\` | Sends an email through the node's mail service, or a notice to the owner. |
-| \`ctx.changed\` | Tells the open pages of named owners that the extension's data changed for them, so an app showing it reads again without a timer. It carries no data. |
+| \`ctx.changed\` | Tells the open pages of named owners that the extension's data changed for them, so an app showing it reads again without a timer. It contains no data. |
 | \`ctx.buy\` | Buys one call of another app's tool, under a contract the extension's owner holds. |
 | \`ctx.calendar\` | Calendar arithmetic on the node, with the library the browser uses (\`aimeat-calendar\`): the occurrences of repeating events in a range, free time, a time zone's local time to an instant and back, ICS text to events and back. An extension has no time-zone data of its own, so a calendar tool ("what is booked this week", "when is free") is built on these calls and stores events in the library's event shape. |
-| A schedule | Runs an action on a clock, for example to fetch from an outside system and write rows. |
+| A schedule | Runs an action on a schedule, for example to fetch from an outside system and write rows. |
 
 The served libraries give an app the rest in the person's browser: \`aimeat-ai\` (text, pictures,
 speech, **transcription**, embeddings on the person's own AI providers), \`aimeat-connect\` (the
@@ -196,10 +196,10 @@ free time) and \`aimeat-workflows\` (a run with a step that waits for a person).
 
 | Source | How it reaches AIMEAT | What wakes the agent |
 |---|---|---|
-| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`). The row holds the read fields and a 280-character snippet; it holds the message's text and each PDF's text only when the definition says \`keepText\`, which a tool that checks the fields against the mail needs | A clock, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
+| Email | The mail refinery reads a connected mailbox on a schedule and writes each message as a workspace row (skill \`aimeat-refinery\`). The row holds the read fields and a 280-character snippet; it holds the message's text and each PDF's text only when the definition says \`keepText\`, which a tool that checks the fields against the mail needs | A schedule, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
 | A visitor on the web | An intake form writes a record into a workspace | The new record, for an agent that holds a workspace contract |
 | A visitor who expects an answer on the page | An intake form defined with \`thread\` keeps a conversation: the node writes the visitor's messages into one record, and the visitor reads the answers back with the secret the start gave them (library \`aimeat-intake\`, \`AIMEAT.intake.thread\`) | The signal record the node writes for a message an agent is to answer, for an agent that holds a contract on the signal space. The agent reads the thread record of the same id and appends its answer to the reply record of that id. The node writes no signal once a person took the conversation over or the form's agent messages for the day are spent, so the agent needs no rule for either |
-| An outside system | An extension fetches on a clock and writes rows | A clock, or a workflow that starts on the new rows (below) |
+| An outside system | An extension fetches on a schedule and writes rows | A schedule, or a workflow that starts on the new rows (below) |
 | A person in an app | The app writes into a workspace, or gives the agent a task | The task or the record |
 | Sound | The app transcribes it (\`aimeat-ai\` in the browser, or the extension's \`ctx.ai\` for a stored file) and writes the text into a workspace | The task or the record |
 | Another agent | An offer, a workflow step, or an app tool bought through a checkout and fulfilled as a task | The task |
@@ -211,7 +211,7 @@ way exists: skill \`aimeat-workspace-contracts\`. Use it, and build no second wa
 follow a workspace.
 
 **A row is not a record, and a new row wakes no agent by itself.** Two ways give an agent work from
-rows. The simple one is a clock: the agent runs a few minutes after whatever writes the rows. The
+rows. The simple one is a schedule: the agent runs a few minutes after whatever writes the rows. The
 other is a workflow that starts on the event, for when the delay matters or the rows come at no
 fixed time. Its definition has this trigger and an agent step:
 
@@ -224,10 +224,10 @@ fixed time. Its definition has this trigger and an agent step:
 
 - The workflow starts **once for each append call**, whether the call wrote one row or five
   hundred. It starts for an owner only while that owner is a member who may read the space.
-- The run carries what arrived as variables, and an agent step gets them with its task as
+- The run receives what arrived as variables, and an agent step gets them with its task as
   \`var.event_organism\`, \`var.event_workspace\`, \`var.event_space\`, \`var.event_count\`,
   \`var.event_row_ids\` (at most 50 ids, and only ids made of letters, digits and \`. _ : @ + = -\`),
-  \`var.event_at\` and \`var.event_folded\`. The event carries ids and a count, never a row's
+  \`var.event_at\` and \`var.event_folded\`. The event contains ids and a count, never a row's
   content: the agent reads the rows through an app tool.
 - One run of a workflow is live at a time. Without \`coalesce\` an append that arrives during a run
   starts nothing. With \`"coalesce": true\` the appends that arrive during a run start **one** more
@@ -270,8 +270,8 @@ definition is not that approval.
 2. **Where does the information come from?** Mail, a form, an outside system, a person, sound,
    another agent.
 3. **Which workspace holds it, and in what shape?** Records or rows, and their fields.
-4. **What wakes the agent?** A new record (a contract agent), a task, a message or a clock. A row
-   does not by itself: a clock after the writer, or a workflow that starts on \`workspace.rows\`.
+4. **What wakes the agent?** A new record (a contract agent), a task, a message or a schedule. A row
+   does not by itself: a schedule after the writer, or a workflow that starts on \`workspace.rows\`.
 5. **What do plain rules settle before a model reads anything?** Rules drop the noise first; the
    model reads what is left.
 6. **What does the agent decide, and what does it only prepare?**
@@ -286,12 +286,12 @@ definition is not that approval.
 
 ### Email
 
-- **In:** the mail refinery runs on a clock. Each message is a workspace row with its class and the
+- **In:** the mail refinery runs on a schedule. Each message is a workspace row with its class and the
   fields read from it.
 - **The tools:** the mail app publishes "new messages" and "one message". The extension behind them
   reads the rows (\`ctx.workspace.readRows\`), because the agent's own \`workspace\` tool reads records
   and not rows.
-- **The agent:** runs on a clock after the refinery, or as the step of a workflow that starts on
+- **The agent:** runs on a schedule after the refinery, or as the step of a workflow that starts on
   the new rows. It calls those tools (\`app_tools\`), and writes a reply draft and its own
   classification back (\`workspace_write\`).
 - **The person:** reads the drafts in the app and presses Send. The app sends through the connected
@@ -301,7 +301,7 @@ definition is not that approval.
 ### A calendar
 
 - **The information:** events are records in a workspace. An outside calendar comes in as an ICS
-  file, or an extension fetches an ICS feed on a clock.
+  file, or an extension fetches an ICS feed on a schedule.
 - **The tools:** the app publishes "events between two dates", "free time" and "propose a booking".
   An extension that uses the calendar library's code is behind them.
 - **The agent:** calls those tools (\`app_tools\`) and proposes times.
@@ -345,12 +345,12 @@ purpose which of the person's workspaces and apps the agent works on, in the nam
 
 Ask for the scopes those tools use. An agent that calls an app tool needs \`ext:invoke\`: the tool
 runs an extension action, and the node calls it with the agent's own token. From node 4.0.0 that
-call is refused without the word; before it, the call works and its answer carries a
+call is refused without the scope; before it, the call works and its answer has a
 \`Deprecation\` header. An agent that reads a workspace needs \`organism:read\`, and one that writes
 into it \`organism:write\` as well. **An app tool that reads or writes the app's workspace does it
-as the agent that called it**, so the agent needs those same words for the tool to work: with
+as the agent that called it**, so the agent needs those same scopes for the tool to work: with
 \`ext:invoke\` alone the call arrives and the tool answers that the workspace is not one the caller
 can read. The home's new-agent page asks \`organism:read\` for every agent that calls an app tool;
-a tool that saves something needs the reach that writes.
+a tool that saves something needs the scope that writes.
 `,
 };

@@ -45,7 +45,7 @@ const PHASER_ENTRY_SKILL: BuiltinSkill = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-phaser
-description: "The entry point for building a Phaser 4 game on an AIMEAT node with the aimeat-phaser library: which module carries what, the paved path from nothing to a playing game, the publish checklist, and the two rules that break a game when they are ignored. Load this first, then the one area skill your task is about. Triggers on: phaser, aimeat-phaser, game, arcade, platformer, canvas game, sprite, scene, peli, pelimoottori, tasohyppely, arkadipeli, kenttä, pelin teko."
+description: "The entry point for building a Phaser 4 game on an AIMEAT node with the aimeat-phaser library: which module has what, the standard steps from nothing to a playing game, the publish checklist, and the two rules that break a game when they are ignored. Load this first, then the one area skill your task is about. Triggers on: phaser, aimeat-phaser, game, arcade, platformer, canvas game, sprite, scene, peli, pelimoottori, tasohyppely, arkadipeli, kenttä, pelin teko."
 license: MIT
 metadata:
   audience: agent
@@ -84,7 +84,7 @@ Without them the game still runs, and everything it saves stays in the browser.
 | a level editor a player paints in (\`levelEditor\`) | \`node:aimeat-phaser-menus-levels\` |
 | the phone half: turn-your-phone, the notch, the wake lock, install (\`mobile\`) | \`node:aimeat-phaser-boot\` |
 
-## Quick Start: the paved path
+## Quick Start: the standard steps
 
 Twelve lines from nothing to a playing platformer with a title screen, a HUD and saves.
 
@@ -115,21 +115,21 @@ The first scene in \`scenes\` is the one that starts. \`h.game\` is the Phaser.G
 ## Core Concepts
 
 **The look comes from the page, never from a literal.** \`P.theme(el)\` reads the Atelier
-\`--ak-*\` custom properties off the element the game lives in and hands back numbers, which
-is what Phaser wants for a colour. So a game wears the app's palette and its light or dark
+\`--ak-*\` custom properties off the element the game runs in and returns numbers, which
+is what Phaser wants for a colour. So a game uses the app's palette and its light or dark
 mode without naming a colour, and the HUD, the menus, the generated tiles and the transition
 tint all change together. Write \`th.accent\`, not \`0xe8564a\`.
 
-**Everything is finite.** No part of the library animates while the game sits still: the
+**Everything is finite.** No part of the library animates while the game is idle: the
 score pops once when it changes, a toast rises once and removes itself, the title's stars
 twinkle once and hold, an audio fade is a counted ramp. This is what makes an idle screen
 measurable, so keep it true in your own code.
 
 **Every handle has \`destroy()\`, and the scene's shutdown calls it.** \`menuItems\`,
-\`platformer\` and the game handle take their listeners down with them. When you build a
+\`platformer\` and the game handle remove their listeners with them. When you build a
 handle in \`create()\` and the scene restarts, you get a fresh one; do not keep the old.
 
-**Guest is the floor.** \`saves()\` works signed out, keeping the file in the browser, and
+**Guest play always works.** \`saves()\` works signed out, keeping the file in the browser, and
 merges it into the node's copy the first time the player signs in. Never gate play behind a
 login.
 
@@ -161,7 +161,7 @@ beside each one. Copy from a demo that runs rather than from memory of an API.
 3. The tab hiding pauses it. \`game()\` does this already unless you passed \`pauseOnHide: false\`.
 4. No sound before a gesture. \`bus.unlock()\` runs from a click, a tap or a key, and never on load.
 5. A score written is read back on the board without a reload: \`store.save()\` then \`store.leaderboard()\`.
-6. No CDN link and no \`data:\` URI. Files live at \`/v1/pub/<owner>/…\` or in storage; art you can generate, generate.
+6. No CDN link and no \`data:\` URI. Files are stored at \`/v1/pub/<owner>/…\` or in storage; art you can generate, generate.
 
 ## Gotchas and Common Mistakes
 

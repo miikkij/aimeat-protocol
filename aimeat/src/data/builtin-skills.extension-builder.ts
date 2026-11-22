@@ -112,7 +112,7 @@ metadata:
 # Building AIMEAT server extensions
 
 An **extension** is sandboxed code that runs **on the node**, one script per action, reachable as
-\`POST /v1/ext/{name}/{action}\`. It is the answer when something cannot live in a browser: an
+\`POST /v1/ext/{name}/{action}\`. It is the answer when something cannot run in a browser: an
 outside call that needs a credential, work that must run when no tab is open, data only the node
 should compute, or a capability you intend to **sell**. An app never calls an extension directly:
 the app calls a cortex method, and the cortex calls the extension.
@@ -155,7 +155,7 @@ may already do it.
 \`owner\` (the installing account) and \`full_name\` (\`<account>/<name>\`). Every address keeps working
 with the name. The full name is the exact address: \`/v1/ext/<account>%2F<name>/{action}\` or
 \`AIMEAT.data.action('<account>/<name>', id)\`. When another account has removed an extension of the
-same name, a new install lands as \`<account>/<name>\`; when two accounts hold the same name, the bare
+same name, a new install is named \`<account>/<name>\`; when two accounts hold the same name, the bare
 name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 
 ## 3. Manifest essentials
@@ -219,10 +219,10 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   16) is answered 503 \`EXTENSION_RUNS_BUSY\` with \`Retry-After\`: an app or agent retries after it.
   \`ctx.memory.search(prefix)\` returns values too, so do not read each key
   again. Many workspace records go through \`ctx.workspace.publishRecords\` in one call.
-- The sandbox starts fresh for each call. All state lives in memory.
+- The sandbox starts fresh for each call. All state is stored in memory.
 - Check the caller in the script: \`ctx.caller.roles\` (an owner in person has \`['owner']\` and no
   scopes, an unattended run has \`['operator']\`), \`ctx.caller.scopes\` (what an agent's or app's
-  credential carries). The node also resolves \`ctx.caller.adult\` (\`{ verified, method, at }\`, never a
+  credential holds). The node also resolves \`ctx.caller.adult\` (\`{ verified, method, at }\`, never a
   birth date) and \`ctx.caller.subscriptions\` (the caller's running subscriptions to this
   extension's plans): gate adult and subscribed content on these, never on the input.
 - An action needs a signed-in caller unless the manifest says \`public: true\` on it. A public action
@@ -248,7 +248,7 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 ## 5. What an extension cannot do
 
 - **Act on the node in the caller's name.** There is no \`ctx.api\` and no \`ctx.task\`, and
-  \`ctx.fetch\` carries no session. An agent's task is created by the cortex in the person's session
+  \`ctx.fetch\` sends no session. An agent's task is created by the cortex in the person's session
   (\`POST /v1/agents/{name}/tasks\`); work the extension leaves for an agent goes into a workspace
   record with \`ctx.workspace\` (skill \`aimeat-workspace-contracts\`).
 - **Push data to an app.** An extension sends a signal, never the data: \`ctx.changed({ owners })\`
@@ -274,7 +274,7 @@ With \`instances: { supported: true, config_per_instance: { ... } }\`, one insta
 independent copies. Create one with \`POST /v1/extensions/{name}/instances\` \`{ id, config }\` (the
 installer or the operator). Call it at \`POST /v1/ext/{name}/{instanceId}/{action}\`. Calling an
 action asks \`ext:invoke\` of an agent or an app, and reading the instances asks \`ext:invoke\` or
-\`ext:write\` (node 4.0.0 refuses a call without the word; before that it works and says it is
+\`ext:write\` (node 4.0.0 refuses a call without that scope; before that it works and says it is
 deprecated), so an app that calls an extension through its cortex declares \`ext:invoke\`. Each instance
 has its own namespace, \`ext:{name}.{instanceId}\`, and the script reads \`ctx.instance.config\`. A
 \`type: secret\` field in the instance config is encrypted per instance: bring-your-own-key per tenant.
@@ -299,11 +299,11 @@ A schedule names an \`action\`; an action id has no special meaning. A manifest 
 extension, not per instance: an instance's schedule is created with \`aimeat_schedule_create\` (kind
 \`extension\`, with \`instance_id\`) or \`POST /v1/schedules\`. Creating, editing and running such a
 schedule asks \`ext:invoke\` of an agent or an app, as calling the action does, and each fire asks
-the schedule's maker again: a maker that was removed or lost the word does not run the action.
+the schedule's maker again: a maker that was removed or lost that scope does not run the action.
 
 ## 8. Money price and pacing
 
-Every action can carry two values, and they do different jobs:
+Every action can have two values, and they do different jobs:
 
 \`\`\`yaml
   - id: lookup
@@ -335,9 +335,9 @@ Every action can carry two values, and they do different jobs:
 
 ## 9. Secrets and files
 
-- A credential lives in a \`config:\` field with \`type: secret\`: encrypted at rest, decrypted only
+- A credential is stored in a \`config:\` field with \`type: secret\`: encrypted at rest, decrypted only
   inside the sandbox, \`undefined\` until somebody sets it. Or write a header as \`{{secret:NAME}}\` and
-  the node fills it from the caller's own vault on the way out; the script never holds the value.
+  the node fills it from the caller's own vault when it sends the request; the script never holds the value.
   This is how an extension other people call serves each of them with their OWN key (bring your
   own key): every caller keeps the credential in their own vault, and the extension holds nobody
   else's. Do not put other people's keys in the extension's \`type: secret\` config.
@@ -377,19 +377,19 @@ Every action can carry two values, and they do different jobs:
   the person's own allowlist asks the owner once per secret and host.
 - **Every refused first use asks the owner.** The \`SECRET_HOST\` text names a page
   (/v1/secret-allow?...) where the owner, signed in, allows that extension to send that secret to
-  that host with one press, and the owner gets the same question in the bell. Hand that address to
+  that host with one press, and the owner gets the same question in the bell. Give that address to
   the person. An approval does not bind the secret; it lets that extension, installed by that
   account, reach that host, and the owner withdraws it on the Access page.
   Never put a key in a script or a return value.
 - Files: a client uploads through the storage API and passes the keys; \`ctx.files\` reads and writes
   stored files by reference. Return references, not large payloads.
 - **A file linked from a workspace record opens to that workspace's members.** When a record that
-  carries \`/v1/pub/<owner>/<key>\` is written or published into a workspace, a private file of the
+  contains \`/v1/pub/<owner>/<key>\` is written or published into a workspace, a private file of the
   writer becomes readable by the workspace's members; a file of somebody else stays as it is.
   \`ctx.files.read\` answers \`visibility\` and \`workspaceRef\`, so an extension can tell the person
   when a file it links is still closed to the readers.
 - **A read with nobody present may be narrower than the same read with a person there.** A write
-  always lands in the owner's namespace under \`ext/{name}/\`, however the code was started. A READ on a schedule, an
+  always goes to the owner's namespace under \`ext/{name}/\`, however the code was started. A READ on a schedule, an
   \`@activate\` job or a workflow step is judged against whoever the owner chose: their own reach by
   default, which is every node's behaviour, or the reach of the principal that wrote the code when
   they set that per extension. So an unattended \`ctx.files.read\` of the owner's private file can be
@@ -412,7 +412,7 @@ then, and the account hears the answer. Names that start with \`aimeat-\` are ke
 ships: a new extension under such a name answers 409 NAME_RESERVED with another name to use. An app
 under an app grant cannot: \`ext:write\` is outside the grantable scopes, because an extension is
 persistent code that outlives the grant and can charge in the owner's name. An app may write a
-manifest and hand it over; the person or an authorised agent installs it. The node caps code at
+manifest and pass it on; the person or an authorised agent installs it. The node caps code at
 \`AIMEAT_EXT_MAX_CODE_SIZE_KB\` (256) per script and \`AIMEAT_EXT_MAX_INSTALLED\` (20) extensions.
 
 ## 11. When an extension is not enough: a service on Microservices Central
@@ -478,7 +478,7 @@ config:
 
 The script calls \`ctx.fetch('https://' + ctx.config.MSC_HOST + '/s/<service>/<path>', { headers: {
 authorization: 'Bearer ' + ctx.config.MSC_KEY, 'x-person': ctx.caller.owner } })\`. The service sees
-the app, not the person: \`x-person\` is the app's word, so the service keeps each person's data apart
+the app, not the person: \`x-person\` is the app's claim, so the service keeps each person's data apart
 and has a route that answers one person's data and one that deletes it.
 
 **The person's data stays theirs.** Add the service to the app's data map (\`aimeat_datamap_set\`): a

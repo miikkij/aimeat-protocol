@@ -145,7 +145,7 @@ export function validatePartInput(raw: unknown): PartInput {
       'illustration = art direction for the imagery pipeline; genre = one of the node\'s served page ' +
       'templates, shown and forked rather than adopted; ambient = the animated layer behind an app, ' +
       'proven on a look; effect = a post-process filter on the hero band, a figure or the ambient ' +
-      'layer, proven where it lands; component = markup and a stylesheet an app made by hand ' +
+      'layer, proven where it applies; component = markup and a stylesheet an app made by hand ' +
       'because the Book had nothing for it, every colour a page token and no script; ornament = an animated ' +
       'figure or a set of five the kit grows round elements; kit = a style kit, the whole look of an app ' +
       'that a person, an organism or the whole node starts new apps from.)');
@@ -153,12 +153,12 @@ export function validatePartInput(raw: unknown): PartInput {
 
   const title = typeof p.title === 'string' ? p.title.trim() : '';
   if (!title || title.length > 80) {
-    throw new DesignBookError('INVALID_TITLE', 'A part carries a title of 1-80 characters — the name the gallery shows.');
+    throw new DesignBookError('INVALID_TITLE', 'A part has a title of 1-80 characters — the name the gallery shows.');
   }
   const summary = typeof p.summary === 'string' ? p.summary.trim() : '';
   if (!summary || summary.length > 240) {
     throw new DesignBookError('INVALID_SUMMARY',
-      'A part carries a summary of 1-240 characters: what this arrangement is FOR, so a picker can choose without rendering it.');
+      'A part has a summary of 1-240 characters: what this arrangement is FOR, so a picker can choose without rendering it.');
   }
 
   const tags = Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === 'string').slice(0, 12) : [];
@@ -218,7 +218,7 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     if (kind === 'ambient') {
       if (o.ambient === 'none') {
         throw new DesignBookError('BODY_INVALID',
-          'An ambient part carries one of the presets. "none" is an arrangement\'s choice, not a part: to switch a look\'s ambient off, store { "ambient": { "preset": "none" } } on the app\'s arrangement.', 422);
+          'An ambient part has one of the presets. "none" is an arrangement\'s choice, not a part: to switch a look\'s ambient off, store { "ambient": { "preset": "none" } } on the app\'s arrangement.', 422);
       }
       if (typeof o.ambient !== 'string') throw new DesignBookError('BODY_INVALID', bodyShapeHint(kind), 422);
       const look = o.look === undefined ? undefined : lookNameOrRefuse(o.look);
@@ -245,7 +245,7 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
       const on = o.on === undefined ? defaultEffectTarget(o.effect) : o.on;
       if (!(EFFECT_TARGETS as readonly unknown[]).includes(on)) {
         throw new DesignBookError('BODY_INVALID',
-          `An effect part lands on one of ${EFFECT_TARGETS.join(', ')} ("on"); "${String(on)}" is none of them. The app frame is never a target: a filter on the frame makes it the containing block of every fixed control.`, 422);
+          `An effect part applies to one of ${EFFECT_TARGETS.join(', ')} ("on"); "${String(on)}" is none of them. The app frame is never a target: a filter on the frame makes it the containing block of every fixed control.`, 422);
       }
       const spec = { id: o.effect, ...(o.params !== undefined ? { params: o.params } : {}) };
       const provenOn = look ?? effectById(o.effect)?.fitsLooks[0];
@@ -270,7 +270,7 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     const tokens = validateSignatureTokens(o.tokens, typeof o.look === 'string' ? o.look : undefined);
     if (Object.keys(tokens).length === 0) {
       throw new DesignBookError('BODY_INVALID',
-        `A ${kind} part carries at least one token — an empty sheet changes nothing and proves nothing.`, 422);
+        `A ${kind} part has at least one token — an empty sheet changes nothing and proves nothing.`, 422);
     }
     if (kind === 'motion') {
       for (const name of Object.keys(tokens)) {
@@ -308,7 +308,7 @@ function bodyShapeHint(kind: PartKind): string {
     return `An ambient part's body is { ambient: one of ${AMBIENT_IDS.join(', ')}, alpha?, speed?, look?, tokens? } — the layer behind the app, proven on the look.`;
   }
   if (kind === 'effect') {
-    return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it lands.`;
+    return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it applies.`;
   }
   if (kind === 'avatar') return 'An avatar part\'s body is { svg: "<svg…>…</svg>" }: one SVG element, at most 256 kB, no DOCTYPE.';
   if (kind === 'ornament') return `An ornament part's body is { ornament: one of ${ORNAMENTS.filter((o) => !o.set).map((o) => o.id).join(', ')} or a set's figure such as art-deco-frame, params?, look? }: a figure the Atelier kit draws round an element; or { set: one of ${ORNAMENT_SET_IDS.join(', ')}, params?, look? }: five figures in one style.`;

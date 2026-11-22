@@ -73,7 +73,7 @@ export function versionLabelFindings(s: VersionLabelState): AppArtifactFinding[]
   if (!s.isUpdate || s.stated || s.fromPage || !s.carried || !s.changed) return [];
   return [{
     pitfall: PITFALL, severity: 'warn', url,
-    message: `This version still carries the display version "${s.carried}" from the previous one, while the page changed. `
+    message: `This version still has the display version "${s.carried}" from the previous one, while the page changed. `
       + `Name the version on the publish (version on aimeat_app_publish or aimeat_app_draft_publish), or put <meta name="${APP_VERSION_META}" content="…"> in the page's head and every publish reads it.`,
   }];
 }

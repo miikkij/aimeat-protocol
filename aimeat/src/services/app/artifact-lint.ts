@@ -270,7 +270,7 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
     const usesSection = /\bsection\s*\(/.test(html);
     if (daisyClasses && !usesSection) {
       out.push(finding('track-mixing', 'warn',
-        'This Atelier app carries daisyUI-style class markup and never uses the section escape '
+        'This Atelier app contains daisyUI-style class markup and never uses the section escape '
         + 'hatch. On the Atelier track the kit is the vocabulary; raw daisyUI belongs only inside a '
         + 'body the app fills itself via `AIMEAT.atelier.section(...)`. Move the markup into a '
         + 'section body, or express it with kit components.'));
@@ -425,7 +425,7 @@ function checkRegister(html: string): AppArtifactFinding[] {
   if (declared && !placeholder && !unnamedCustom) return [];
 
   const what = placeholder
-    ? 'This Atelier app still carries the shell\'s REPLACE-ME register line, so it names no register. '
+    ? 'This Atelier app still has the shell\'s REPLACE-ME register line, so it names no register. '
     : declared
       ? `This Atelier app names "${declared}" as its register, which is not a name. `
       : 'This Atelier app names no register. ';
@@ -625,7 +625,7 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
 
   return [finding('invented-lib-urls', 'critical',
     `This node answers 404 for ${dead.length === 1 ? 'an asset this app loads' : 'assets this app loads'}: `
-    + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
+    + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries are served under `
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
     + 'URLs from the build spec (GET /v1/prompts/build-app-atelier, with its platform section engines) rather than guessing one that looks right.'
     + (dead.some(p => p.startsWith('/v1/cortex/'))
@@ -765,7 +765,7 @@ function checkMetas(html: string): AppArtifactFinding[] {
   const scopeWords = declaredScopeWords(head);
   if (!has('aimeat-app')) missing.push('`aimeat-app` (your published filename — on an app subdomain the page cannot work it out, and AIMEATAgentFace.publish needs it)');
   if (!has('aimeat-scopes')) missing.push('`aimeat-scopes` (what sign-in asks the user to approve; without it the app gets the default grant only, so ai:use and memory:delete are unavailable)');
-  else if (scopeWords.length === 0) missing.push('`aimeat-scopes` (the tag is there with no words in it, which the sign-in reads as declaring nothing, so the app gets the default grant only)');
+  else if (scopeWords.length === 0) missing.push('`aimeat-scopes` (the tag is there with no scopes in it, which the sign-in reads as declaring nothing, so the app gets the default grant only)');
   if (!has('aimeat-locales')) missing.push('`aimeat-locales` (the languages you have — this is what draws the language switch in the login pill; declare one language and nothing renders)');
   if (missing.length) {
     out.push(finding('app-meta-declarations', 'warn',
@@ -798,8 +798,8 @@ function checkScopeVocabulary(html: string): AppArtifactFinding[] {
   if (!unknown.length) return [];
   return [finding('app-meta-declarations', 'critical',
     `\`<meta name="aimeat-scopes">\` asks for ${unknown.map(w => `\`${w}\``).join(', ')}, which this node `
-    + 'cannot grant. One word outside the vocabulary refuses the whole sign-in, so nobody can sign in '
-    + 'to this app, the owner included. Take the words from GET /v1/app-grants/scopes (file deletion '
+    + 'cannot grant. One scope outside the vocabulary refuses the whole sign-in, so nobody can sign in '
+    + 'to this app, the owner included. Take the scopes from GET /v1/app-grants/scopes (file deletion '
     + 'is storage:write; there is no storage:delete), then publish again.')];
 }
 
@@ -842,7 +842,7 @@ function checkAgentDataReads(html: string): AppArtifactFinding[] {
   return [finding('namespace-rule', 'warn',
     'This app reads memory and never writes any, and no read names a namespace — so every value it '
     + 'shows was written by something else. If that something else is one of the owner\'s agents, its '
-    + 'keys live under the agent\'s GAII and these reads return nothing: the owner signs in and sees an '
+    + 'keys are stored under the agent\'s GAII and these reads return nothing: the owner signs in and sees an '
     + 'empty app. Pass `{ ownerScope: true }` to cover the owner and all their agents, or `{ agent: '
     + '"name#owner@node" }` for one of them.')];
 }

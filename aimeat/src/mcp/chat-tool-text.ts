@@ -74,12 +74,12 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
         plain: { value: {}, patch: {}, visibility: { type: 'string' } },
     },
     aimeat_agent_propose: {
-        description: 'Propose a new agent; nothing exists until the person approves it. Read first what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in `purpose`. Send `crew_def` (the smallest that runs: {"agents":[{"role":"Reader","goal":"…","backstory":"…","tools":["memory"]}],"tasks":[{"id":"main","agent":"Reader","description":"… {{ctx.prompt}} …","expected_output":"…"}]}), the `scopes` the job needs (never more than you hold) and `schedule` for work on a clock. Give the person `approval_url` and `next_step` from the answer.',
+        description: 'Propose a new agent; nothing exists until the person approves it. Read first what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in `purpose`. Send `crew_def` (the smallest that runs: {"agents":[{"role":"Reader","goal":"…","backstory":"…","tools":["memory"]}],"tasks":[{"id":"main","agent":"Reader","description":"… {{ctx.prompt}} …","expected_output":"…"}]}), the `scopes` the job needs (never more than you hold) and `schedule` for work on a schedule. Give the person `approval_url` and `next_step` from the answer.',
     },
     // The plan, rules, checks and reading list a task may carry stay off the chat listing: a person
     // asking their chat for a task names what to do, and the agent plans it. A call may still send them.
     aimeat_task_create: {
-        description: 'Queue a task for one of the person\'s agents (yourself or another agent of the same owner). The person sees it on their dashboard. `files` hands the agent documents to work on, as references, never bytes.',
+        description: 'Queue a task for one of the person\'s agents (yourself or another agent of the same owner). The person sees it on their dashboard. `files` gives the agent documents to work on, as references, never bytes.',
         unlisted: ['rules', 'verification', 'todos', 'resources', 'parent_task_id'],
     },
     aimeat_skill_get: {

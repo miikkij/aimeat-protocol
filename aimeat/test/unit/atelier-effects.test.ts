@@ -353,7 +353,7 @@ describe('atelier-effects — validateEffectSpec and validatePostChain, the benc
     expect(validatePostChain([{ id: 'ripple', params: { amplitude: 0.6 } }, 'vhs'])).toEqual([{ id: 'ripple', params: { amplitude: 0.6 } }, 'vhs']);
     expect(validatePostChain([{ id: 'glitch' }])).toEqual(['glitch']);
     expect(refusal(() => validatePostChain(['kaleidoscope', 'ripple', 'vhs']))).toMatch(/at most 2/);
-    expect(refusal(() => validatePostChain(['vignette']))).toMatch(/lands on a block/);
+    expect(refusal(() => validatePostChain(['vignette']))).toMatch(/is applied to a block/);
     expect(refusal(() => validatePostChain(['kaleidoscop']))).toMatch(/Did you mean "kaleidoscope"/);
     expect(refusal(() => validatePostChain(['vhs', 'vhs']))).toMatch(/once/);
     expect(refusal(() => validatePostChain([{ id: 'ripple', params: { amplitude: 3 } }]))).toMatch(/from 0 to 1/);

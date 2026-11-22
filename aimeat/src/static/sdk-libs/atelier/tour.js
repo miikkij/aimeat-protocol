@@ -70,7 +70,7 @@ const DO_EVENTS = ['click', 'input', 'change'];
 const STRINGS = {
   en: {
     button: 'Tour', open: 'Start the tour', choose: 'Pick a tour', close: 'Close',
-    step: 'Step {n} of {total}', tryIt: 'Try it: press the lit place.', gotIt: 'Got it',
+    step: 'Step {n} of {total}', tryIt: 'Try it: press the highlighted place.', gotIt: 'Got it',
     inviteTitle: 'New here?', inviteText: 'Take a short tour of this app: {n} steps.',
     inviteStart: 'Start the tour', inviteLater: 'Not now',
   },

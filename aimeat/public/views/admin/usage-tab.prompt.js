@@ -43,10 +43,10 @@ Three totals appear in that payload and only one of them is mine.
   whose_money.own     other people's own provider accounts. Costs me nothing. Never call this a cost to me.
   whose_money.ledger  a THIRD count, off a different table, and the larger set. Report it as its own number and never add it to the other two.
 
-whose_money.ceiling_usd is the free grant times the number of accounts: the most the house key can cost me before somebody is refused. If drawn_usd is approaching it, say so — that is the one number on this page that turns into a decision.
+whose_money.ceiling_usd is the free grant times the number of accounts: the most the server's key can cost me before somebody is refused. If drawn_usd is approaching it, say so — that is the one number on this page that turns into a decision.
 
 == 3. Say what is missing ==
-When keys.chat.metered_here is false, every chat turn on this node is spent from one key handed to a child process, so NO total in this payload contains a cent of it. When it is true, the chat's calls are already in the totals above and nothing is missing. Whenever you report what AI cost me, say that this figure excludes the chat agent, and give me the provider's number for that key if you asked for it.
+When keys.chat.metered_here is false, every chat turn on this node is spent from one key passed to a child process, so NO total in this payload contains a cent of it. When it is true, the chat's calls are already in the totals above and nothing is missing. Whenever you report what AI cost me, say that this figure excludes the chat agent, and give me the provider's number for that key if you asked for it.
 
 models.unpriced explains the calls that carry no price: most are free or local models that have none, and estimated_missing_usd is what the rest would have cost at the average of the priced calls. Tell me which of those two it is rather than repeating the raw count.
 

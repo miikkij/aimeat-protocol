@@ -79,7 +79,7 @@ const COP_SECTION_TITLES: Record<string, string> = {
  *  same fact `marking.text_watermarking` states, said where a reader is looking for the scope of
  *  the signature rather than for the marking layers. */
 const COP_SECTION_1_DECLINED =
-  'This node does not run the generative models itself, so imperceptible watermarking of model '
+  'This server does not run the generative models itself, so imperceptible watermarking of model '
   + 'output is not a layer it is in a position to provide, and the operator would rather state that '
   + 'than commit to it.';
 
@@ -156,7 +156,7 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       by_id: `${b}/v1/provenance/{id}`,
       access: 'public, unauthenticated, rate-limited',
       // The rule a caller has to understand before reading an empty answer as an acquittal.
-      scope: 'Records describing content that is publicly readable on this node. Absence means UNSTATED, never "a human wrote it".',
+      scope: 'Records describing content that is publicly readable on this server. Absence means UNSTATED, never "a human wrote it".',
     },
     // The languages are the ones the node actually ships, not a list kept by hand. check:ai-disclosure
     // assertion 5 holds the other end: every aiLabel.* key exists in each of them, so this statement
@@ -169,7 +169,7 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
     correction: {
       how: `POST ${b}/v1/flags`,
       body: { targetType: 'ai_provenance | app | memory', targetId: '<record id, owner/filename, or gaii::key>', reason: 'undisclosed_ai' },
-      reaches: 'the node operator\'s moderation queue, and an organism admin for organism content',
+      reaches: 'the moderation queue of this server\'s operator, and an organism admin for organism content',
       appeal: `POST ${b}/v1/flags/{flagId}/appeal`,
       note: 'A visible AI label links to its own record; that record id is what to report.',
     },
@@ -218,15 +218,15 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
     '',
     '# AI transparency statement',
     '',
-    `This node is \`${config.nodeId}\`${op.legal_name ? `, operated by ${op.legal_name}` : ''}.`,
+    `This server is \`${config.nodeId}\`${op.legal_name ? `, operated by ${op.legal_name}` : ''}.`,
     '',
     '## What is marked',
     '',
-    `Content generated through this node carries an \`${marking.spec}\` provenance record: which model,`,
+    `Content generated through this server has an \`${marking.spec}\` provenance record: which model,`,
     'when, which principal, how much a human was involved, and a SHA-256 of the exact bytes the',
-    'statement is about. It is served on every surface this node serves that content on —',
+    'statement is about. It is served on every surface this server serves that content on —',
     `${(marking.surfaces as string[]).join(', ')} — in two independent layers:`,
-    'the mark travels with the document, and the record is separately addressable.',
+    'the mark stays with the document, and the record is separately addressable.',
     '',
     `- Record schema: ${marking.schema}`,
     `- Resolve a record: ${detection.by_id}`,
@@ -234,7 +234,7 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
     '',
     '## What is not',
     '',
-    'This node does **not** watermark text. It does not sample the tokens; that layer belongs to',
+    'This server does **not** watermark text. It does not sample the tokens; that layer belongs to',
     'whoever runs the model. What it does is record how content was made, attributably, and show it.',
     '',
     `An absent record means **unstated** — never "a human wrote it". ${detection.scope}`,
@@ -262,7 +262,7 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
     '',
     ams
       ? `AI Act market surveillance: **${ams.name}**${ams.url ? ` (${ams.url})` : ''}.`
-      : 'The AI Act market-surveillance authority for this node is **not stated**. It follows from where '
+      : 'The AI Act market-surveillance authority for this server is **not stated**. It follows from where '
         + 'the operator is established, and it is a different regulator from the data-protection authority.',
     '',
     `Machine-readable: ${b}/v1/ai-transparency`,
@@ -282,7 +282,7 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
 function buildLoggingPolicy(config: AimeatConfig): Record<string, unknown> {
   const b = config.baseUrl.replace(/\/+$/, '');
   return {
-    why: 'This node records how content was made so it can be labelled, and records model calls so '
+    why: 'This server records how content was made so it can be labelled, and records model calls so '
       + 'they can be metered. The provenance record is the marking layer; the usage ledger is the '
       + 'billing layer. They are joined by provenanceId and neither contains prompt text.',
     records: [
@@ -306,23 +306,23 @@ function buildLoggingPolicy(config: AimeatConfig): Record<string, unknown> {
         contains: 'agent, owner, model, provider, token counts, cost, source, and the provenance id',
         never_contains: 'prompt text, response text',
         retention: 'append-only; it is the billing source of truth',
-        who_can_read: 'you, and the node operator',
+        who_can_read: 'you, and the operator of this server',
         your_controls: [`See your own spend: GET ${b}/v1/ledger/usage`],
       },
       {
         what: 'Execution log (scheduled jobs and extension runs)',
         contains: 'timing, result, memory reads/writes',
         never_contains: 'prompt text',
-        retention: `pruned after ${config.executionLogRetentionDays} days on this node`,
-        who_can_read: 'you, and the node operator',
+        retention: `pruned after ${config.executionLogRetentionDays} days on this server`,
+        who_can_read: 'you, and the operator of this server',
         your_controls: ['Set by the operator via AIMEAT_EXECUTION_LOG_RETENTION_DAYS'],
       },
       {
         what: 'Consent audit',
         contains: 'who was granted what, and when',
         never_contains: 'content',
-        retention: `pruned after ${config.consentAuditRetentionDays} days on this node`,
-        who_can_read: 'you, and the node operator',
+        retention: `pruned after ${config.consentAuditRetentionDays} days on this server`,
+        who_can_read: 'you, and the operator of this server',
         your_controls: ['Set by the operator via AIMEAT_CONSENT_AUDIT_RETENTION_DAYS'],
       },
     ],
@@ -333,7 +333,7 @@ function buildLoggingPolicy(config: AimeatConfig): Record<string, unknown> {
     },
     // The honest limit. Saying it here costs nothing and stops the policy reading as a promise the
     // node cannot keep.
-    note: 'This node does not watermark text — it does not sample the tokens, and that layer belongs '
+    note: 'This server does not watermark text — it does not sample the tokens, and that layer belongs '
       + 'to whoever runs the model. What it does is record how content was made, attributably.',
   };
 }
@@ -355,7 +355,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
     res.json(success(config.nodeId, buildAiTransparency(config), [
       { description: 'The same statement as markdown', method: 'GET', url: '/v1/ai-transparency.md' },
       { description: 'The provenance record schema', method: 'GET', url: AI_PROVENANCE_SCHEMA_PATH },
-      { description: 'Ask whether this node produced some bytes', method: 'GET', url: '/v1/provenance/by-hash/{sha256}' },
+      { description: 'Ask whether this server produced some bytes', method: 'GET', url: '/v1/provenance/by-hash/{sha256}' },
     ]));
   });
 
@@ -390,7 +390,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
           items: detail.items.map(serveRow),
         },
       }, [
-        { description: 'The node\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },
+        { description: 'This server\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },
         { description: 'Report unlabelled AI content (signed in, with social:write)', method: 'POST', url: '/v1/flags' },
       ]));
     });
@@ -416,7 +416,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
         items: unlabelled.items.map(serveRow),
       },
     }, [
-      { description: 'What this node logs about a model call, and for how long', method: 'GET', url: '/v1/ai-transparency/logging-policy' },
+      { description: 'What this server logs about a model call, and for how long', method: 'GET', url: '/v1/ai-transparency/logging-policy' },
       { description: 'Report content that should carry a label and does not', method: 'POST', url: '/v1/flags' },
     ]));
   });

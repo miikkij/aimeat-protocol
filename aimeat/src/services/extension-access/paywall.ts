@@ -341,7 +341,7 @@ export async function enforcePaywall(args: {
       respondMembersOnly(config, res, shut.appId);
       return { ok: false };
     }
-    logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...upstream });
+    logger.debug('paywall skipped: settled upstream', { ext: ext.name, action: action.id, ...upstream });
     return { ok: true, upstream: true };
   }
   const soldFreeUpstream = upstream?.kind === 'unpriced';

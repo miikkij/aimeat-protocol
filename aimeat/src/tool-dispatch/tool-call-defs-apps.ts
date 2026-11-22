@@ -270,7 +270,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
             mime_type: { type: 'string', description: 'Defaults to text/html.' },
-            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish. Omit on update to carry them forward; [] clears.' },
+            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish. Omit on update to keep them; [] clears.' },
         },
         handler: ({ client }, input) => {
             // POST /v1/apps takes `content` BASE64-ENCODED and refuses plain text with a 400. A

@@ -253,7 +253,7 @@ export async function writeMemoryRecord(
     if (!privileged && !scopeIsCovered(caller.scopes, needed)) {
         return {
             ok: false, status: 403, code: 'SCOPE_DENIED',
-            message: `Writing this needs the "${needed}" permission, which this session does not carry.`,
+            message: `Writing this needs the "${needed}" permission, which this session does not have.`,
         };
     }
 

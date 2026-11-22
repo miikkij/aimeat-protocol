@@ -61,7 +61,7 @@ metadata:
 
 # Keeping the books on the node
 
-**What the person gets.** Their invoices, receipts and reports live next to the rest of their work,
+**What the person gets.** Their invoices, receipts and reports are stored next to the rest of their work,
 owned by them: an invoice is numbered and its totals computed by the node, every booking is kept and
 corrected only by a counter-booking, their accountant reads the books with their own account, and the
 exports are files any bookkeeping program reads.
@@ -108,7 +108,7 @@ from that record; a \`seller\` block in the draft wins over it.
    fixes the due date from the payment terms. A sent invoice never changes.
 4. **Paid:** \`POST /v1/finance/invoices/{id}/mark-paid\` (optionally \`paid_at\`). It books the income
    voucher, and a second call changes nothing. When the person takes payment with their own Stripe
-   account and the payment carries the invoice's reference, the node marks it paid by itself.
+   account and the payment includes the invoice's reference, the node marks it paid by itself.
 5. **Correct a sent invoice** with a credit note: \`POST /v1/finance/invoices/{id}/credit-note\`, then
    send the credit note like an invoice. The original then reads \`credited\`.
 
@@ -167,7 +167,7 @@ programs read it:
 - **The OData feed** is \`/v1/odata/{owner}/{name}\`: one entity set per table, with \`$metadata\`, and
   \`$select\`, \`$top\`, \`$skip\`, \`$filter\`, \`$orderby\`, \`$count\` and \`$format\`. Excel, Power BI
   and other OData clients read it directly. A table over 5 000 rows comes in pages: each answer
-  carries \`@odata.nextLink\` to the next one, and the clients follow it by themselves.
+  has \`@odata.nextLink\` to the next one, and the clients follow it by themselves.
   **It needs no sign-in**: it is as open as the package.
   Never publish anything private there, and tell the person that before you publish.
 - A package that is not public is read with a sign-in. A PRIVATE package, the person's own and

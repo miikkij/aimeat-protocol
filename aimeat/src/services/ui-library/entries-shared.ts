@@ -82,20 +82,20 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
             shape: 'AiLabel({ record, recordUrl, variant, class }) · AiInteractionNotice({ titleKey, bodyKey, recordUrl, class })',
             fields: { record: 'the provenance record', recordUrl: 'where the full record is', variant: "'inline' (default), 'block', or 'chip' (the app's corner mark)", titleKey: 'the notice title key', bodyKey: 'the notice body key' },
         },
-        useFor: ['Content made with AI that carries a record (EU AI Act, Article 50), and the start of a conversation with an AI.'],
+        useFor: ['Content made with AI that has a record (EU AI Act, Article 50), and the start of a conversation with an AI.'],
         variants: [{ name: 'chip', class: 'ai-label--chip', prop: "variant='chip'", when: 'content that fills the screen, an HTML page in full screen: the EU icon in a pill at the bottom-left, the statement above it on hover, focus or a tap, as on a served app' }],
         example: { variant: 'inline', recordUrl: '/v1/provenance/abc' },
     },
     {
         id: 'audience-badge', name: 'AudienceBadge', kind: 'component', status: 'active',
-        summary: 'Who can read one thing of the person\'s, in words on a tag: Private, "<organism> members", Signed-in, Anyone with the code (or the password), Anyone with the link, Public; the tooltip says it in a sentence. It wears the Tag, as wide as its words wherever it stands.',
+        summary: 'Who can read one thing of the person\'s, in words on a tag: Private, "<organism> members", Signed-in, Anyone with the code (or the password), Anyone with the link, Public; the tooltip says it in a sentence. It uses the Tag, as wide as its words wherever it stands.',
         module: '/components/AudienceBadge.js', sheet: '/css/components/audience-badge.css',
         data: {
             shape: 'AudienceBadge({ value, audience, app, organismName, onClick, expanded })',
             fields: {
                 value: "the stored audience as the API returns it: a visibility ('private', 'owner', 'members', 'public', 'organism:<id>', a board's 'shared'), an app's open_to, a share's access",
                 audience: 'a level already read with /js/audience.js (shareAudienceOf, exposureAudienceOf)',
-                app: 'an app as GET /v1/apps hands it to its owner: the code, open_to and the listing decide',
+                app: 'an app as GET /v1/apps returns it to its owner: the code, open_to and the listing decide',
                 organismName: 'the organism\'s name when the page has it; otherwise it is read from the organisms the person belongs to',
                 onClick: 'makes the tag the button that changes who can read it',
             },
@@ -116,7 +116,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         data: {
             shape: 'ClassificationBadge({ label, from, conflict, conflictTitle, excepted, exceptedTitle })',
             fields: {
-                label: 'a classification as the policy or the exposure report hands it: { id, name: { fi, en, es }, color }',
+                label: 'a classification as the policy or the exposure report returns it: { id, name: { fi, en, es }, color }',
                 from: "where it came from: 'own', or 'workspace' | 'organism' | 'board' | 'app' when a container raised it",
                 conflict: 'the thing is open to more people than its classification allows: the danger Status after the tag',
                 excepted: 'the owner\'s exception keeps it open more widely: the plain Status after the tag',
@@ -124,7 +124,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['Where classification is on: an item of the What others can see page beside its AudienceBadge, and the classification of an organism, a workspace, a board or an app on its own page.'],
         variants: [
-            { name: 'own', prop: "from='own'", when: 'the item carries the classification itself' },
+            { name: 'own', prop: "from='own'", when: 'the item has the classification itself' },
             { name: 'from a container', prop: "from='workspace' | 'organism' | 'board' | 'app'", when: 'a container raised it; the tooltip names which' },
             { name: 'conflict', prop: 'conflict', when: 'open to more people than the classification allows: the danger Status (poster.css) after the tag' },
             { name: 'exception', prop: 'excepted', when: 'the owner\'s exception keeps it open more widely: the plain Status (poster.css) after the tag' },
@@ -184,7 +184,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
             shape: 'InstructionBlock({ orgId })',
             fields: { orgId: 'the organism whose block it shows; the node writes the block from the organism\'s real structure, in the reader\'s language, and it is read again when the language changes' },
         },
-        useFor: ['Giving a person the text that tells their AI where things live in an organism, and where to paste it.'],
+        useFor: ['Giving a person the text that tells their AI where things are stored in an organism, and where to paste it.'],
         variants: [
             { name: 'formats', class: 'instruction-block-tabs', when: 'the three formats, one tab each; the chosen one decides the block and the line that says where it goes' },
             { name: 'loading or failed', class: 'instruction-block-note', prop: 'orgId', when: 'the block is still being read, or could not be read' },
@@ -264,7 +264,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'store-door', name: 'StoreDoor', kind: 'component', status: 'active',
-        summary: 'Every control that leads into the store, and the sentence that says the store is not open yet. While the store takes orders it is the link it always was, opening the store in a new tab; while site.store_status is "soon" the same place carries "Opens soon" in the same shape with no link. With a discount code set (site.store_soon_code) "Opens soon" can be pressed, and the press puts the code in its place with a copy button (StoreSoonCode). Without a store address everything draws nothing.',
+        summary: 'Every control that leads into the store, and the sentence that says the store is not open yet. While the store takes orders it is the link it always was, opening the store in a new tab; while site.store_status is "soon" the same place shows "Opens soon" in the same shape with no link. With a discount code set (site.store_soon_code) "Opens soon" can be pressed, and the press puts the code in its place with a copy button (StoreSoonCode). Without a store address everything draws nothing.',
         module: '/components/StoreDoor.js', sheet: '/css/poster.css', classes: ['store-soon', 'store-soon-ask', 'store-soon-code', 'store-soon-note'],
         data: {
             shape: 'StoreDoor({ class, label, newTab?, href?, soon?, code? }) · StoreSoonCode({ code }) · StoreSoonNote({ class, soon? })',
@@ -280,7 +280,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         useFor: ['Any "get your own", pricing or store link on a public page.', 'The store section\'s "opens soon" sentence (StoreSoonNote): the operator\'s note for the page\'s language, or the default.'],
         variants: [],
         example: { class: 'ld-sh-door showroom-door', label: 'Get your own →' },
-        note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a link\'s underline; nothing carries it while the store is open.',
+        note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a link\'s underline; nothing has it while the store is open.',
     },
     {
         id: 'fingerprint', name: 'Fingerprint', kind: 'component', status: 'active',

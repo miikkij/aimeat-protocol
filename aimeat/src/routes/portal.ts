@@ -235,14 +235,14 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
     // are always allowed and are a different question, so they are not mentioned here.
     aiTrainingClause: config.aiTraining === 'allow'
       ? {
-          en: 'This node allows third-party AI-training crawlers to read what you publish publicly, so public content may be used to train models this operator has no part in and cannot recall it from.',
-          fi: 'Tämä solmu sallii kolmansien osapuolten tekoälymallien koulutusrobottien lukea julkaisemasi julkisen sisällön, joten sitä voidaan käyttää mallien kouluttamiseen, joihin tällä ylläpitäjällä ei ole osuutta eikä keinoa poistaa sitä niistä.',
-          es: 'Este nodo permite que los rastreadores de entrenamiento de IA de terceros lean lo que publicas en abierto, de modo que ese contenido puede usarse para entrenar modelos ajenos a este operador, sin que pueda retirarlo de ellos.',
+          en: 'This server allows third-party AI-training crawlers to read what you publish publicly, so public content may be used to train models this operator has no part in and cannot recall it from.',
+          fi: 'Tämä palvelin sallii kolmansien osapuolten tekoälymallien koulutusrobottien lukea julkaisemasi julkisen sisällön, joten sitä voidaan käyttää mallien kouluttamiseen, joihin tällä ylläpitäjällä ei ole osuutta eikä keinoa poistaa sitä niistä.',
+          es: 'Este servidor permite que los rastreadores de entrenamiento de IA de terceros lean lo que publicas en abierto, de modo que ese contenido puede usarse para entrenar modelos ajenos a este operador, sin que pueda retirarlo de ellos.',
         }[locale]
       : {
-          en: 'This node refuses the third-party AI-training crawlers in robots.txt, which is a stated preference rather than an enforceable control: it keeps your public content out of what those models learn unaided, and it cannot stop somebody who ignores the file.',
-          fi: 'Tämä solmu kieltää kolmansien osapuolten tekoälymallien koulutusrobotit robots.txt-tiedostossa. Kyse on ilmaistusta tahdosta eikä teknisestä esteestä: se pitää julkisen sisältösi poissa siitä mitä nuo mallit oppivat itsestään, muttei estä sitä joka jättää tiedoston huomiotta.',
-          es: 'Este nodo rechaza en robots.txt los rastreadores de entrenamiento de IA de terceros. Es una preferencia declarada, no un control técnico: mantiene tu contenido público fuera de lo que esos modelos aprenden por su cuenta, pero no detiene a quien ignore el archivo.',
+          en: 'This server refuses the third-party AI-training crawlers in robots.txt, which is a stated preference rather than an enforceable control: it keeps your public content out of what those models learn unaided, and it cannot stop somebody who ignores the file.',
+          fi: 'Tämä palvelin kieltää kolmansien osapuolten tekoälymallien koulutusrobotit robots.txt-tiedostossa. Kyse on ilmaistusta tahdosta eikä teknisestä esteestä: se pitää julkisen sisältösi poissa siitä mitä nuo mallit oppivat itsestään, muttei estä sitä joka jättää tiedoston huomiotta.',
+          es: 'Este servidor rechaza en robots.txt los rastreadores de entrenamiento de IA de terceros. Es una preferencia declarada, no un control técnico: mantiene tu contenido público fuera de lo que esos modelos aprenden por su cuenta, pero no detiene a quien ignore el archivo.',
         }[locale],
   };
 }

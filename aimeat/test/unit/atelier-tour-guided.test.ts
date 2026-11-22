@@ -114,7 +114,7 @@ describe('the guided tour', () => {
     control('done', 'Done', 'Marks it done.', 300);
     const tr = kit.tour({ steps: [{ help: 'save', do: 'click' }, 'done'] });
     tr.start();
-    expect(part('hint').textContent).toBe('Try it: press the lit place.');
+    expect(part('hint').textContent).toBe('Try it: press the highlighted place.');
     save.click();
     await tick();
     expect(part('title').textContent).toBe('Done');

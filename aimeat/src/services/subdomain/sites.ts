@@ -90,7 +90,7 @@ async function checkTarget(storage: Storage, config: AimeatConfig, kind: string,
   }
   // A code or a payment only: an app that needs a sign-in is served at its own address against a grant.
   if (appNeedsCodeOrPayment(config, app)) {
-    return refuse(400, 'APP_RESTRICTED', 'An app that needs a code or a payment cannot sit at its own web address. Serve it from the main site instead.');
+    return refuse(400, 'APP_RESTRICTED', 'An app that needs a code or a payment cannot be served at its own web address. Serve it from the main site instead.');
   }
   return null;
 }

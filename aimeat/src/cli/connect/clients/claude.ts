@@ -115,7 +115,7 @@ export const claudeDesktopAdapter: ClientAdapter = {
             surface: target.surface,
             nextSteps: [
                 'Restart Claude Desktop, then check Settings > Developer for the aimeat server.',
-                'Desktop connects over the local connector (stdio), not the HTTP endpoint: its config file cannot carry a remote URL.',
+                'Desktop connects over the local connector (stdio), not the HTTP endpoint: its config file cannot hold a remote URL.',
                 `That connector serves the agent stored in ${target.home}.`,
             ],
         };

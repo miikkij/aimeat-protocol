@@ -489,9 +489,9 @@ export const SERVICE_OWNED_KEYS: readonly string[] = ['parties', 'datapkg-freshn
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['classification.policy.', 'a classification policy, and only the classification service writes or removes it. Read and change it with GET and PUT /v1/classification/policy or the aimeat_classification MCP tool.'],
-  ['commerce.hold.', 'a payment hold, and only the hold book writes it. Read holds with GET /v1/commerce/holds.'],
-  ['commerce.hold-in.', 'a payment hold, and only the hold book writes it. Read holds with GET /v1/commerce/holds?side=seller.'],
-  ['commerce.benefit.', 'a beneficiary share, and only the beneficiary book writes it. Read shares with GET /v1/commerce/beneficiary/obligations or /v1/commerce/beneficiary/earnings.'],
+  ['commerce.hold.', 'a payment hold, and only the hold service writes it. Read holds with GET /v1/commerce/holds.'],
+  ['commerce.hold-in.', 'a payment hold, and only the hold service writes it. Read holds with GET /v1/commerce/holds?side=seller.'],
+  ['commerce.benefit.', 'a beneficiary share, and only the beneficiary service writes it. Read shares with GET /v1/commerce/beneficiary/obligations or /v1/commerce/beneficiary/earnings.'],
   ['commerce.session.', 'an open checkout, and only the checkout service writes it. Use /v1/commerce/checkout-sessions.'],
   ['commerce.subscription.', 'a subscription, and only the subscription service writes it. Use /v1/commerce/subscriptions.'],
   ['identity.adult.', 'an adult verification, and only the verification service writes it.'],

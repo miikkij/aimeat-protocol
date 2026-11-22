@@ -207,7 +207,7 @@
           used.push(hit);
           var opens = hit.downloads || hit.opens || 0;
           cards.push(card(f.name, FI ? f.fi : f.en, appUrl(hit),
-            opens > 0 ? (FI ? opens + ' avausta' : opens + ' opens') : (FI ? 'astu sisään' : 'step right in')));
+            opens > 0 ? (FI ? opens + ' avausta' : opens + ' opens') : (FI ? 'kokeile' : 'try it')));
         } else if (f.url) {
           cards.push(card(f.name, FI ? f.fi : f.en, f.url, FI ? 'aina auki' : 'always open'));
         }

@@ -84,7 +84,7 @@ export async function answerPageOpen(
   res.setHeader('Cache-Control', 'no-store');
   if (!page.url) {
     if (!page.apexUrl) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'This page has no address on this node.'));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'This page has no address on this server.'));
       return;
     }
     res.json(success(config.nodeId, { url: page.apexUrl, expires_in: null }));

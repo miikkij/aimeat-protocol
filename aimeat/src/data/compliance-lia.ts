@@ -51,7 +51,7 @@ export const LIA_SECTIONS: readonly LiaSection[] = [
     id: 'basis',
     title: { en: '1. Is legitimate interests the fitting legal basis', fi: '1. Onko oikeutettu etu sopivin käsittelyperuste', es: '1. ¿Es el interés legítimo la base jurídica adecuada?' },
     asks: {
-      en: 'Why no other legal basis carries this processing.',
+      en: 'Why no other legal basis fits this processing.',
       fi: 'Miksi mikään muu käsittelyperuste ei sovi tähän käsittelyyn.',
       es: 'Por qué ninguna otra base jurídica cubre este tratamiento.',
     },

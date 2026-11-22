@@ -164,7 +164,7 @@ function loggedRefusal(code: string, statusCode: number, message: string, log: O
 export function sendFailedError(log: OutboundMessageRecord, noTransport: boolean): OutboundError {
   const reason = log.error ?? log.status;
   const repair = noTransport
-    ? 'This node has no mail transport set up: send through a connected mailbox (connection_id) or a company with its own mail server, or ask whoever runs the node to configure one.'
+    ? 'This server has no mail transport set up: send through a connected mailbox (connection_id) or a company with its own mail server, or ask whoever runs the server to configure one.'
     : 'The channel refused or failed it: read the reason before sending again, because a refusal from the recipient\'s side does not change on a retry.';
   return loggedRefusal('SEND_FAILED', noTransport ? 503 : 502,
     `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log as ${log.id}. ${repair}`,
@@ -493,7 +493,7 @@ async function resolveMailbox(
   const key = requireEncryptionKey(config);
   if (!key) {
     throw new OutboundError('NO_ENCRYPTION_KEY', 503,
-      'This node is not set up to keep secrets safely yet, so it cannot open a connected mailbox. Whoever runs it can switch that on.');
+      'This server is not set up to keep secrets safely yet, so it cannot open a connected mailbox. Whoever runs it can switch that on.');
   }
   const ctx: ConnectContext = { config, storage, providers: buildOutboundProviders(config), key };
   const sender = await resolveMailboxSender(ctx, callerGhii, connectionId, alias);

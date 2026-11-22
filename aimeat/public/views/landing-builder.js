@@ -152,7 +152,7 @@ function OtherAi({ idea }) {
     let out = idea.trim() ? IDEA_PREFIX + idea.trim() + '\n\n' + canonical : canonical;
     const docs = selected.map(pk => packDocs[pk.id]).filter(Boolean);
     if (docs.length) {
-      out += '\n## Selected capability packs (self-hosted on my node — use these, never a CDN)\n';
+      out += '\n## Selected capability packs (self-hosted on my AIMEAT — use these, never a CDN)\n';
       for (const doc of docs) {
         out += '\n### Pack: ' + doc.id + ' — ' + (doc.title || '') + '\n';
         out += 'Include (in order):\n' + (doc.include || []).join('\n') + '\n';
@@ -167,7 +167,7 @@ function OtherAi({ idea }) {
       <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it contains the build instructions, the AI gives you one HTML file, and you add that file here yourself.')}</p>
       ${selected.length ? html`<p class="ld-gen-contains">${tr('landing.genOtherPacks', 'Included for your idea')}: ${selected.map(pk => pk.title || pk.id).join(' · ')}.</p>` : ''}
       <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
-      <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>
+      <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this server…')}</div>
       <${CopyButton} text=${prompt} className="btn-outline ld-gen-action" disabled=${!prompt}
         label=${tr('landing.genOtherCopy', 'Copy the long prompt')} copiedLabel=${tr('common.copied', '✓ Copied')} />
       <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account, it takes a minute, then paste the code or upload the file. The app goes live at its own address and you get a link to share.')}</p>

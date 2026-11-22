@@ -372,7 +372,7 @@ export function validateEnv(): ValidationResult[] {
   if (aiProvenance === 'false') {
     // Not an error — a local dev node may legitimately want the noise off. But it is worth saying
     // plainly what it costs, because switching it off does NOT switch off the obligation.
-    results.push({ level: 'warning', variable: 'AIMEAT_AI_PROVENANCE', message: 'AI provenance recording is OFF. Generated content will carry no record, so "who made this?" becomes unanswerable after the fact — and a node that generates and publishes still owes the Article 50 marking. Intended for local development only.' });
+    results.push({ level: 'warning', variable: 'AIMEAT_AI_PROVENANCE', message: 'AI provenance recording is OFF. Generated content will have no record, so "who made this?" becomes unanswerable after the fact — and a node that generates and publishes still owes the Article 50 marking. Intended for local development only.' });
   }
   const provenanceDetail = env.AIMEAT_AI_PROVENANCE_DETAIL;
   if (provenanceDetail !== undefined && !['full', 'minimal'].includes(provenanceDetail)) {

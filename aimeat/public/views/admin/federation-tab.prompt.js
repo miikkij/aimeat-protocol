@@ -37,7 +37,7 @@ export function buildFederationPrompt({ url = '', peers = 0, standing = '' } = {
 Start with aimeat_admin_federation. Read \`needs\` before the counts: it is the list of things that are waiting on me, and an empty list is a real answer worth stating.
 
 == 2. Three things I probably have wrong ==
-  - A peer that was added and never switched on. Adding connects nothing; somebody has to press Activate. Tell me if one is sitting there, and how long.
+  - A peer that was added and never switched on. Adding connects nothing; somebody has to press Activate. Tell me if one is waiting, and for how long.
   - The sign-in policy. It is two decisions and both must say yes: the node-wide setting, and a switch on each peer. If \`signin.reaches_nobody\` is true I have a setting that looks configured and lets nobody in. If it is \`all_peers\`, say plainly how many accounts that actually is.
   - What this node gives. \`offer\` counts only things somebody ticked Federate on. If \`gives_nothing\` is true I am reading the federation and putting nothing back, which is almost never a decision anybody made on purpose.
 

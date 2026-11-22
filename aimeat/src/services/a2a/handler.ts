@@ -112,7 +112,7 @@ export class AimeatA2ARequestHandler implements A2ARequestHandler {
     if (scopeIsCovered(this.caller.scopes ?? [], scope)) return;
     logger.warn('[scope-denied] a2a', { principal: this.caller.sub, needs: scope, has: this.caller.scopes });
     throw new JsonRpcRequestMalformedError({
-      message: `Scope "${scope}" required for this method. Your credential does not carry it.`,
+      message: `Scope "${scope}" required for this method. Your credential does not include it.`,
     });
   }
 

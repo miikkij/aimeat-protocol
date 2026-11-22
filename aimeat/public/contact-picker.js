@@ -39,7 +39,7 @@
     filter: 'Filter…',
     empty: 'Nobody in your address book has a saved email address yet. Add a person on the Contacts tab of your profile.',
     signIn: 'Sign in to AIMEAT in this browser first, then open this window again.',
-    noOpener: 'This page is opened by an app. The app did not say where it was opened from, so nothing can be handed to it.',
+    noOpener: 'This page is opened by an app. The app did not say where it was opened from, so nothing can be given to it.',
     failed: 'Could not make that choice.',
     cancel: 'Cancel',
     foot: 'A choice lasts ten minutes. Removing the contact cancels it.',

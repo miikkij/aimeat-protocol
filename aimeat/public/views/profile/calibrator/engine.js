@@ -139,7 +139,7 @@ TASK: Apply the proposed fixes below to the instruction prompt below. Return the
 CRITICAL RULES:
 - You are editing the INSTRUCTIONS, not executing them
 - The prompt below tells AI models what to do. You must IMPROVE those instructions.
-- Do NOT generate the kind of output the prompt asks for (e.g., do NOT generate JSON blueprints, code, or data)
+- Do NOT generate the kind of output the prompt asks for (e.g., do NOT generate JSON plans, code, or data)
 - Do NOT add project-specific terms, names, APIs, or domain concepts
 - Each fix must be GENERIC — applicable to any prompt of this type
 - Return ONLY the full modified instruction prompt text

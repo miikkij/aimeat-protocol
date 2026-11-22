@@ -48,7 +48,7 @@ describe('what every connected agent is told about speaking to a person', () => 
         expect(t).toMatch(/what you already tried/i);
         expect(t).toMatch(/only they\s+can decide/i);
         expect(t).toMatch(/something else you can try/i);
-        expect(t, 'an error code and a question is the thing being replaced').toMatch(/never hand somebody an error code/i);
+        expect(t, 'an error code and a question is the thing being replaced').toMatch(/never give somebody an error code/i);
     });
 
     it('tells the agent it does not have to ask anyone to file a bug report', () => {

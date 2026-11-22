@@ -256,7 +256,7 @@ export function buildPlaybook(answers, mcpUrl) {
   }
   // Self-hosted on localhost? A cloud AI can't reach a localhost MCP address — point to the connector.
   if (/localhost|127\.0\.0\.1/.test(mcpUrl || '')) {
-    connect.items.push({ text: { k: 'start.pb.s2.localhost', f: "Running AIMEAT on your own machine (localhost)? A cloud AI like claude.ai can't reach a localhost address over MCP. Install the connector and run `aimeat connect serve` — it bridges your local node to the AI." }, code: 'aimeat connect serve' });
+    connect.items.push({ text: { k: 'start.pb.s2.localhost', f: "Running AIMEAT on your own machine (localhost)? A cloud AI like claude.ai can't reach a localhost address over MCP. Install the connector and run `aimeat connect serve` — it bridges your local AIMEAT to the AI." }, code: 'aimeat connect serve' });
   }
   connect.items.push({ text: { k: 'start.pb.s2.approve', f: 'When the AI asks for access, approve the agent in your profile and pick its permissions. No agent is ever created without your approval.' } });
   sections.push(connect);

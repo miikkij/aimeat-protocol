@@ -43,7 +43,7 @@ export interface ClosedNodeWarning {
   message: string;
 }
 
-const MESSAGE = 'This node shows its content to its signed-in accounts only, so this was saved for signed-in accounts and not as public.';
+const MESSAGE = 'This server shows its content to its signed-in accounts only, so this was saved for signed-in accounts and not as public.';
 
 /** The one warning, worded once. */
 export function closedNodeWarning(): ClosedNodeWarning {

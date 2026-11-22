@@ -36,8 +36,8 @@ import { handsOnKey } from '../services/data-map/data-map-access.js';
 
 /** Said the same way wherever a tally number is rendered, so the number is never read as complete. */
 const NOT_COVERED = [
-  'Counting started when this was switched on. A key written before that and never written since has no hands here, and never will.',
-  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and that is not a hand.',
+  'Counting started when this was switched on. A key written before that and never written since has no writers counted here, and never will.',
+  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and those writes are not counted.',
 ];
 
 export function memoryHandsRouter(config: AimeatConfig, storage: Storage): Router {

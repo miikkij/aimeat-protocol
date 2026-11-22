@@ -69,7 +69,7 @@ export const docsignTools = [
     },
     {
         name: 'aimeat_docsign_requests',
-        description: "The signing requests you are a party to or created, and those of the person you act for, newest first. `state`: open, complete, cancelled, or waiting-for-me (open and not yet signed by you). Each carries the document, the parties and the signatures given.",
+        description: "The signing requests you are a party to or created, and those of the person you act for, newest first. `state`: open, complete, cancelled, or waiting-for-me (open and not yet signed by you). Each has the document, the parties and the signatures given.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Signing Requests', readOnlyHint: true, openWorldHint: false },
@@ -119,7 +119,7 @@ export const docsignTools = [
     },
     {
         name: 'aimeat_docsign_delete',
-        description: 'Delete a signing request nobody has signed: a draft, a mistake or a test you created (or your agent created for you). It leaves every list, and the files the node stored for it go too (the PDF kept for wallet signing, a PDF a wallet returned and the node refused). A request that carries a signature is a record and is refused with HAS_SIGNATURES: cancel that one instead.',
+        description: 'Delete a signing request nobody has signed: a draft, a mistake or a test you created (or your agent created for you). It is removed from every list, and the files the node stored for it go too (the PDF kept for wallet signing, a PDF a wallet returned and the node refused). A request that has a signature is a record and is refused with HAS_SIGNATURES: cancel that one instead.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete an Unsigned Signing Request', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

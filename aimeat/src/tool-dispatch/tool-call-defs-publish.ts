@@ -22,7 +22,7 @@ export const publishCliTools: ConnectCliToolDefinition[] = [
     input: {
       request_id: { type: 'string', description: 'One request. Omit to list them all.' },
       decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
-      account: { type: 'string', description: 'The account where the request lives: an operator reads or answers a request waiting for the operators there, and the one who asked reads its own request there.' },
+      account: { type: 'string', description: 'The account that holds the request: an operator reads or answers a request waiting for the operators there, and the one who asked reads its own request there.' },
     },
     handler: ({ client }, input) => {
       const decision = optionalString(input, 'decision');

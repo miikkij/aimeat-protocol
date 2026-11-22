@@ -51,7 +51,7 @@ describe('conservation — nothing is created or destroyed', () => {
     }
   });
 
-  it('composed with the platform rake: price === fee + providerNet + shares', () => {
+  it('composed with the platform fee: price === fee + providerNet + shares', () => {
     for (const price of ADVERSARIAL) {
       for (const rake of [0, 1, 5, 12, 50]) {
         const fee = percentFee(price, rake);
@@ -104,7 +104,7 @@ describe('weights', () => {
     expect(r.lines.find(l => l.ghii === 'b@n')?.amount).toBe(250);
   });
 
-  it('largest remainder hands the leftover to whoever lost most to the floor', () => {
+  it('largest remainder gives the leftover to whoever lost most to the floor', () => {
     // 100 across three equal parties: 33.33 each, floors to 99, one unit left over.
     const r = computeSplit(100, split({
       poolPercent: 100,

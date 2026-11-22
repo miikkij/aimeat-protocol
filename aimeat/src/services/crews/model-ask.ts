@@ -70,7 +70,7 @@ export async function askOwnerForCrewModel(
       approval: {
         approver: 'owner',
         asks: `point ${whom} at the model address ${hosts.join(', ')}`,
-        why: `The crew sends your provider key (${keyEnv}) to that address when it thinks. An app set it, so you confirm the address first; until then the crew keeps the model it has.`,
+        why: `The crew sends your provider key (${keyEnv}) to that address when it calls the model. An app set it, so you confirm the address first; until then the crew keeps the model it has.`,
         // An agent of the owner sets any choice at once, so one holding memory:write may approve it.
         approve_scope: 'memory:write',
         // The answered notice says where the model is changed later: the agent's Crew tab.

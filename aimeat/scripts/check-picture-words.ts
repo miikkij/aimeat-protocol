@@ -29,6 +29,9 @@
  *   pnpm check:picture-words           (exit 1 on a new hit or a stale entry)
  *   pnpm check:picture-words --list    (every current hit with its key and text, always exit 0)
  * @version-history
+ *   v1.2.0 — 2026-11-22 — PICTURE_CODE: the families the open read of the prose in code replaced
+ *     (hand over and hand back, lives in and lands in, the far side, the paved path, the clock, the
+ *     ladder, the shelf, the floor, the vault, solmu), read in code strings and pages.
  *   v1.1.0 — 2026-11-22 — The words the Settings and admin pages were rewritten away from (turned
  *     away and torjua for refused, the federation book, rung, welcome mat, the paste, the eleven
  *     moments, miehistö, naapuri, kylvää, tarjoilla and the like), so a prompt, a tool description
@@ -61,6 +64,19 @@ const PICTURE = new RegExp('(?<![\\p{L}\\d_-])(' + [
   String.raw`käännyt\p{L}*|torju\p{L}*|torjun\p{L}*|naapuri\p{L}*|kylv\p{L}*|uudelleenkylv\p{L}*|tarjoil\p{L}*|parkissa|parkkeer\p{L}*|julkisivu\p{L}*|pohjapiirro\p{L}*|federaatiokirja(?!utu)\p{L}*|\p{L}*miehistö\p{L}*|käyttökirjanpi\p{L}*|sydänmuru\p{L}*|tervetuloamat\p{L}*|noodi\p{L}*|applikaatio\p{L}*`,
   String.raw`tripulaci(?:ón|ones)|peldaños?|felpudos?|alfombra de bienvenida|morsels? de corazón`,
 ].join('|') + ')(?![\\p{L}\\d_-])', 'iu');
+/**
+ * 2026-11-22, the open read of the prose in code: a hand that gives or returns, data that lives in or
+ * lands in a place, the supported way as a paved path, a schedule as a clock, tiers as a ladder, the
+ * platform fee as a rake, and the Finnish solmu. Read in code strings and pages only: the Markdown is
+ * a developer's text and was read for the families above. Words with a common real sense (floor,
+ * shelf, clock, vault, house, far end, lands on a page, goes live on) are left to the reader: in
+ * this codebase they are as often a game's floor, a shop's shelf, a real clock or the Vault page.
+ */
+const PICTURE_CODE = new RegExp('(?<![\\p{L}\\d_-])(' + [
+  String.raw`hand(?:s|ed|ing)? (?:it |them |you |this |that )?(?:over|back) to|hands? (?:it|them) to|gets hands|with (?:their|your|its) own hands`,
+  String.raw`lives in|lands in|landed in|paved paths?|on a clock|(?:price|readiness|offers?)[ -]ladder|cockpit|app wall|platform rake|two-hand rule|spring hand`,
+  String.raw`solmu\p{L}*`,
+].join('|') + ')(?![\\p{L}\\d_-])', 'iu');
 /** Code names that the word boundary alone does not catch: a `doors=` attribute, `${Doors}`, `.door`. */
 const CODE_NAME = /(?:\b(?:doors?|Doors?)\s*=|\$\{Doors?\}|\.doors?\b|class(?:Name)?=)/;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|[\\/]public[\\/]lib[\\/]|[\\/]public[\\/]data[\\/]|facts\.generated|[\\/]generated[\\/]/;
@@ -81,9 +97,9 @@ function keyOf(file: string, word: string, text: string): string {
   return `${file}::${word.toLowerCase()}::${h}`;
 }
 
-function linesOf(file: string, text: string, out: Hit[]): void {
+function linesOf(file: string, text: string, out: Hit[], code = true): void {
   for (const line of text.split('\n')) {
-    const m = line.match(PICTURE);
+    const m = line.match(PICTURE) ?? (code ? line.match(PICTURE_CODE) : null);
     if (!m || CODE_NAME.test(line)) continue;
     out.push({ file, word: m[1], text: line.trim(), key: keyOf(file, m[1], line) });
   }
@@ -113,7 +129,7 @@ function markdownHits(out: Hit[]): void {
       if (/^\s*```/.test(line)) { fence = !fence; return ''; }
       return fence ? '' : line.replace(/`[^`]*`/g, ' ').replace(/\]\([^)]*\)/g, ']');
     }).join('\n');
-    linesOf(file, visible, out);
+    linesOf(file, visible, out, false);
   }
 }
 

@@ -493,7 +493,7 @@ export function providerViolations(provider: DecisionProvider, state: unknown, q
       const n = Object.keys(q.criteria).length;
       if (n > provider.limits.maxChoiceOptions) {
         out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY', what: 'options', limit: provider.limits.maxChoiceOptions, count: n, ...who,
-          message: `${name} carries ${provider.limits.maxChoiceOptions} options; choice question '${id}' has ${n}. Use a provider that carries more, or walk the options in stages.` });
+          message: `${name} takes ${provider.limits.maxChoiceOptions} options; choice question '${id}' has ${n}. Use a provider that takes more, or ask about the options in stages.` });
       }
     }
     if (q.type === 'score' && Array.isArray(q.criteria)) {
@@ -501,7 +501,7 @@ export function providerViolations(provider: DecisionProvider, state: unknown, q
       const { min, max } = provider.limits.scoreLevels;
       if (n < min || n > max) {
         out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY', what: 'levels', limit: max, count: n, ...who,
-          message: `${name} carries score questions of ${min} to ${max} levels; '${id}' has ${n}.` });
+          message: `${name} takes score questions of ${min} to ${max} levels; '${id}' has ${n}.` });
       }
     }
   }

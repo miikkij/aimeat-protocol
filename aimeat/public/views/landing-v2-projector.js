@@ -197,7 +197,7 @@ const LINES = {
   'admin:agent-tasks': ['landing2.slideAdminAgentTasks', 'Every task in every agent\'s queue, and the one that failed twice.'],
   'admin:sharing-groups': ['landing2.slideAdminSharingGroups', 'Every part of memory someone shared with a group, and who can see it.'],
   'admin:capabilities': ['landing2.slideAdminCapabilities', 'Every capability registered on the server, with who vouched for it.'],
-  'admin:apps': ['landing2.slideAdminApps', 'Every app, the parked and the hidden included, and the reason each was hidden.'],
+  'admin:apps': ['landing2.slideAdminApps', 'Every app, the unlisted and the hidden included, and the reason each was hidden.'],
   'admin:email': ['landing2.slideAdminEmail', 'The emails the server sends, in three languages, edited in place.'],
   'admin:push': ['landing2.slideAdminPush', 'Push notifications to every device that asked, and the ones that bounced.'],
   'admin:consul': ['landing2.slideAdminConsul', 'One configuration exported, then imported on twenty servers.'],
@@ -434,7 +434,7 @@ export function Projector() {
           <span>${tr('landing2.projTitle1', 'Want to see everything?')}</span>
           <span class="ld-sh-accent">${tr('landing2.projTitle2', 'The slide projector.')}</span>
         </h2>
-        <p class="ld-sh-text ld-v2-proj-sub">${tr('landing2.projSub', 'Optional. This is for whoever wants to see the whole cockpit. Every slide is one page of Settings & Controls or Admin, and what it did for someone.')}</p>
+        <p class="ld-sh-text ld-v2-proj-sub">${tr('landing2.projSub', 'Optional. This is for whoever wants to see every setting and control. Every slide is one page of Settings & Controls or Admin, and what it did for someone.')}</p>
       </div>
       <div class="ld-v2-proj-grid">
         <div class="ld-v2-cloud ld-v2-cloud--settings" aria-label=${tr('nav.profile', 'Settings & Controls')}>

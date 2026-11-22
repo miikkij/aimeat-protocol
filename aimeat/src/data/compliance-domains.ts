@@ -122,7 +122,7 @@ export const COMPLIANCE_DOMAINS: readonly ComplianceDomain[] = [
     name: { fi: 'Viranomaisen tieto', en: 'Public authority records', es: 'Datos de autoridades públicas' },
     laws: ['Laki viranomaisten toiminnan julkisuudesta 621/1999', 'Laki julkisen hallinnon tiedonhallinnasta 906/2019'],
     minLabel: 'luottamuksellinen', dpiaRequired: false, externalAi: 'allowed', mayLeaveOrganism: false,
-    requires: 'Name the ground for secrecy for each secret document, and the security class when the document carries one.',
+    requires: 'Name the ground for secrecy for each secret document, and the security class when the document has one.',
     jurisdictions: ['fi'],
   },
   {
@@ -130,7 +130,7 @@ export const COMPLIANCE_DOMAINS: readonly ComplianceDomain[] = [
     name: { fi: 'Puolustus ja turvallisuusluokiteltu tieto', en: 'Defence and security-classified information', es: 'Defensa e información clasificada' },
     laws: ['Laki julkisen hallinnon tiedonhallinnasta 906/2019 18 §', 'VNA 1101/2019', 'Laki ulkomaisista ja kansainvälisistä tietoturvallisuusvelvoitteista 588/2004'],
     minLabel: 'erittain-luottamuksellinen', dpiaRequired: false, externalAi: 'refused', mayLeaveOrganism: false,
-    requires: 'Each document carries its TL or NATO class; readers need clearance and a need to know. This node is not an accredited system.',
+    requires: 'Each document has its TL or NATO class; readers need clearance and a need to know. This node is not an accredited system.',
     jurisdictions: ['fi', 'eu'],
   },
   {

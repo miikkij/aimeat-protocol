@@ -64,7 +64,7 @@ export const ATELIER_WORKBENCH_COMPONENTS: ReadonlyArray<{ id: string; summary: 
   },
   {
     id: 'promptPanel',
-    summary: 'The person\'s own AI helps: copy the prompt, paste the answer; expect "json" hands onResult the parsed object.',
+    summary: 'The person\'s own AI helps: copy the prompt, paste the answer; expect "json" passes the parsed object to onResult.',
     example: "AIMEAT.atelier.promptPanel({ target: panel, prompt: setupPrompt, expect: 'json', onResult: preview });",
   },
   {
@@ -79,7 +79,7 @@ export const ATELIER_WORKBENCH_COMPONENTS: ReadonlyArray<{ id: string; summary: 
   },
   {
     id: 'margins',
-    summary: 'Wide screens: the sides wear the home margin figure.',
+    summary: 'Wide screens: the sides show the home margin figure.',
     example: "AIMEAT.atelier.margins(AIMEAT.atelier.marginsOf(prefs));",
   },
 ];
@@ -88,7 +88,7 @@ export const ATELIER_WORKBENCH_COMPONENTS: ReadonlyArray<{ id: string; summary: 
 export function atelierLayoutRules(): string {
   return 'A SETTINGS PAGE AND A QUEUE PAGE HAVE RULES, and a wide screen is where they break. The '
     + 'kit\'s form fills its container and the page is as wide as the screen, so on a desktop every '
-    + 'field becomes a line across the room. Twelve rules, each from a design system or a usability '
+    + 'field becomes a line across the screen. Twelve rules, each from a design system or a usability '
     + 'study: (1) no input fills a wide page: a form field\'s `width` is short (a number), date, '
     + 'medium (a name or email) or long (a URL or a line of text, 32rem), full width only on a '
     + 'phone; (2) help text is at most 60ch per line; (3) one column, the label above its field, and '

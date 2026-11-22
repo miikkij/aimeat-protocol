@@ -207,17 +207,17 @@ metadata:
 
 An Atelier app is still a **single self-contained HTML file** the node hosts — but its head is
 eight lines and its UI is calls into the served component kit (\`AIMEAT.atelier\`), so the file
-carries your app's logic and almost nothing else. The ceremony every app used to copy — theme
+contains your app's logic and almost nothing else. The boilerplate every app used to copy — theme
 restore, login boot, mobile guards, designed loading/empty/error states, accessibility wiring,
-motion — lives in the kit and reaches your app from the node.
+motion — is in the kit and is served to your app by the node.
 
 **This track has its own spec. Fetch it first and follow it exactly:**
 
 \`\`\`
 GET /v1/prompts/build-app-atelier   ← the Atelier spec (re-fetch every time, it changes)
 GET /v1/designbook?kind=genre       ← the genres: complete pages in a committed register. A build STARTS here
-GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the physics)
-GET /v1/app-templates/genre-living  ← when the numbers stand on each other: the document is a record, not code
+GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the motion rules)
+GET /v1/app-templates/genre-living  ← when the numbers depend on each other: the document is a record, not code
 GET /v1/app-templates/shell-atelier ← the frame the genres are built on (read it for the structure; never publish it bare)
 GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired
 GET /v1/appdev/pitfalls             ← what bites app builders
@@ -227,12 +227,12 @@ GET /v1/appdev/pitfalls             ← what bites app builders
 specification: \`aimeat_handbook_get { tier: "build-app-atelier" }\` returns its first part, which
 names the others (\`genre\`, \`libraries\`, \`book\`, \`patterns\`, \`look\`); read \`libraries\` and \`patterns\` before you
 write code, and on the finest level \`genre\` and \`book\` too, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
-because one tool result cannot carry all of it. The genres: \`aimeat_designbook_search { kind:
+because one tool result cannot hold all of it. The genres: \`aimeat_designbook_search { kind:
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
 returns the page to fork; a genre is larger than one result, so it says how many parts it has and
 you ask for each with \`part\`. Pitfalls: \`aimeat_appdev_pitfall_list\`.
 
-A genre grown out of an app that is open only to some people (one organism, for instance) is listed
+A genre made from an app that is open only to some people (one organism, for instance) is listed
 and given only to the people that app admits. Fork only a genre the list gives you.
 
 **What only some apps need is a section of its own.** Part \`platform\` (\`aimeat_handbook_get {
@@ -269,20 +269,20 @@ guide and moved with the specification's section \`from-classic\`. The shell's
 
 **Every Atelier app on the level \`fine\` names its register** (a \`proto\` or \`plain\` page forks no
 genre, declares none, and the publish asks it for none). \`<meta name="aimeat-register" content="genre-<id>">\`
-is in every genre's head already, so a fork carries it; a page that commits to a look of its own
+is in every genre's head already, so a fork has it; a page that commits to a look of its own
 declares \`content="custom:<name>"\` (custom:game, custom:ledger; never "default"). The bare shell
-carries a REPLACE-ME line in that place and the publish refuses it: the shell is a frame, not a
+has a REPLACE-ME line in that place and the publish refuses it: the shell is a frame, not a
 page, and an Atelier app that names no register does not go live.
 
-**And says whether it keeps its own light.** A genre that hardcodes its palette carries
+**And says whether it keeps its own colours.** A genre that hardcodes its palette has
 \`<meta name="aimeat-light" content="fixed">\` beside its register line, which is what makes the
-login pill's light/dark control stand down instead of doing nothing; a fork inherits it, and
+login pill's light/dark control turn itself off instead of doing nothing; a fork inherits it, and
 deletes it (or writes \`content="follows"\`) the moment its colours become \`--ak-*\` tokens and
 the page follows the theme, or the reader is left with whatever their operating system decided.
 
-**Carry the spec token.** The spec response includes \`spec_token\` (an \`atelier-\` prefixed
+**Pass the spec token.** The spec response includes \`spec_token\` (an \`atelier-\` prefixed
 digest). Pass it on \`aimeat_app_publish\`; the publish answers \`spec_check\` so a spec that
-moved under you says so.
+changed after you fetched it says so.
 
 ## The shape of the work
 
@@ -352,7 +352,7 @@ moved under you says so.
    owner, filename }\`: what it is for, its screens, where its data lives, what was decided and what
    is open; after the publish, write it back with \`spec_set\`), **its structure page**
    (\`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose }\` when a new app
-   starts, and hand the person \`page_url\`; \`{ action: "structure" }\` before the screens, where a
+   starts, and give the person \`page_url\`; \`{ action: "structure" }\` before the screens, where a
    choice with state \`waiting\` is the person's layout or look to build), and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients,
    effects and ornaments (single figures, and sets of five in one style) that each passed their own bench. Called with nothing, the search answers the WHOLE
@@ -383,14 +383,14 @@ moved under you says so.
    bottom bar of the ungrouped or \`bottom: true\` entries, ending in a Menu sheet with every page,
    so build no More page of your own), statusBand, checkGrid,
    choiceCards, settingsGroup, progressFigure, callout, promptPanel for the person's own AI (copy
-   the prompt, paste the answer) and queueRow as a queue list's row part, and for anything a hand presses the
+   the prompt, paste the answer) and queueRow as a queue list's row part, and for anything a person presses, the
    controls that answer it: toggle, segmented, slider, menu, contextMenu, popover, tooltip,
    stateButton, and island for showing an agent's work where the person is looking) where the
    page needs them; the \`section\`
    component is the ONLY place your own raw markup goes. **In a genre fork the genre IS the
    look.** Do not put a look preset and a stack of components in its place: that is the default
    page every app looks like, a genre's name in the head does not change what it is, and it is
-   what gets sent back. Keep the genre's composition, its type and its physics, and let the
+   what gets sent back. Keep the genre's composition, its type and its motion rules, and let the
    components serve it where the page needs a live part. A look preset is for a screen that has
    no genre of its own, such as a settings page: one look via \`app({ look })\` —
    vivid unless the owner asked for something else; flat only on request. The look brings its
@@ -401,7 +401,7 @@ moved under you says so.
    \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
    nine, where each lands, and the knobs).
    **One top bar.** On a genre fork the genre's masthead is the only top bar, and the node's pill
-   always sits in it as it comes: its look and its functions stay, restyled only when the owner
+   is always in it as it comes: its look and its functions stay, restyled only when the owner
    asks. No header or sign-in control of your own; the work goes into the app, not the bar.
    **The working screen is a MOSAIC inside the genre.** The genre is the frame; the part of the
    page that is this app (the list, the numbers, the form, the history) is
@@ -410,7 +410,7 @@ moved under you says so.
    all: adopting a layout or a fill writes the app's STORED ARRANGEMENT, only a mosaic draws
    one, and a genre page without a mosaic ignores every part the Book holds. Take the
    \`fallback\` from a Book fill (\`aimeat_designbook_get\`), its <placeholders> replaced and its
-   \`look\` line out, carried in the page as data:
+   \`look\` line out, included in the page as data:
    \`<script type="application/json" id="aimeat-layout">\`, with the parts it came from named in
    \`<meta name="aimeat-book-parts" content="leiska-work-queue">\`. THE PUBLISH DOES THE REST,
    with nothing to call afterwards: it counts each named part as used, and on the first publish
@@ -421,7 +421,7 @@ moved under you says so.
    pages rather than one poster, so that genre IS \`app({ look: 'workbench', nav: 'side', logo })\`
    with the workbench pieces in \`a.main\`; keep its shell, its side column and its look, and swap
    the pages, the sources and the logo (a square mark: a small data:image of at most 8192 characters,
-   such as a 64px WebP, which travels with the app to every node it is installed on, or a storage URL).
+   such as a 64px WebP, which is copied with the app to every node it is installed on, or a storage URL).
    **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
    node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a
    language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put
@@ -462,7 +462,7 @@ moved under you says so.
    An app's own manual is \`handbook({ title, chapters, mode: 'side'|'dialog' })\`: a table of
    contents, one chapter at a time, a search, every word as a string or \`{ en, fi, es }\`, and on a
    chapter with a \`target\` a "Show me" that marks that place in the app (\`onGo\` lets the app bring
-   it on screen first). It also collects every element carrying \`data-ak-help="<id>"\` with
+   it on screen first). It also collects every element with \`data-ak-help="<id>"\` with
    \`data-ak-help-title\` and \`data-ak-help-text\`, so help written on the control is a chapter that
    points at it. \`app({ help: book })\` puts its button in the header. A guided tour (on a yes) is the
    page's \`#aimeat-tour\` block, 3–5 steps over the same help ids: its format is in the kit's TOUR text.
@@ -493,7 +493,7 @@ moved under you says so.
    \`<html>\` or \`<body>\`.
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
-   \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and
+   \`{ parts, slots, variants, tokens, fork }\` for the components that have the model, and
    \`describe()\` lists them; the answer is generated from each component's source and held to
    it by \`pnpm check:atelier-parts\`. The order, stopping at the first that works: a token
    (\`--ak-list-aside-size\` on your own element); a variant (\`variant: "dense"\`); a slot
@@ -502,7 +502,7 @@ moved under you says so.
    the whole row and keeps it keyed, entered and picked; and a fork, with \`describe(id).fork\`
    read first so you know what that one costs. Two rules survive all six: the \`.ak-*\` selectors
    stay the kit's, and the motion stays the kit's.
-5. **When the numbers stand on each other, write the record instead of the arithmetic.** A
+5. **When the numbers depend on each other, write the record instead of the arithmetic.** A
    calculation sheet, a survey, a dosing record, a reading log, a spec that recomputes — anything
    where moving one number should move the rest — is a LIVING DOCUMENT: fork
    \`GET /v1/app-templates/genre-living\` and write one JSON record on \`aimeat-living\`
@@ -514,9 +514,9 @@ moved under you says so.
    \`describe("formula")\` gives its inputs, options and a worked example, read out of the
    library's own source — and \`AIMEAT.living.validate(record)\` reads a document without running
    it and answers with every refusal in words: call it before you save. The spec's living section
-   carries the whole shape and a sheet you can copy.
+   contains the whole shape and a sheet you can copy.
 6. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
-   (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
+   (\`aimeat_image_generate\` → storage URL; the spec contains the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
 7. **Verify** — 390×844, 1280×900, 1280×460 and 1920×1080, both themes, and the phone and the
    desktop each as the layout the specification's part \`screens\` asks for (the desktop is never
@@ -532,15 +532,15 @@ moved under you says so.
    (Playwright MCP with Chrome), because it is what lets you see what you built.
    A MISSING BROWSER NEVER HOLDS A PUBLISH BACK: the published page
    is what gets verified, by you if you have a browser and by the owner if you do not. Publish,
-   hand over the address, and say in one line what you could not check yourself (a microphone, a
-   camera, a screen you cannot see). An app that sits unpublished waiting for a browser is an app
+   give the address, and say in one line what you could not check yourself (a microphone, a
+   camera, a screen you cannot see). An app that stays unpublished waiting for a browser is an app
    the owner asked for and did not get.
 8. **Accept it beside the genre it forked.** (A \`proto\` or \`plain\` page forked no genre: the
    seven measured checks below are its acceptance.) ONE SIZE MATRIX holds for every check here and
    in step 7, the specification's "Finishing" included: 390×844, 1280×900, 1280×460 and
    1920×1080, in both themes. An Atelier app is finished when its screenshots at 390×844 and 1280×900, in both themes,
    hold up NEXT TO the genre page it came from (open the genre at
-   \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at
+   \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre list at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question
    while looking: **would this pass beside the genre?** Element counts and a green matrix passed
    on pages the owner then rejected, so the picture is the evidence. Alongside it, seven measured
@@ -550,10 +550,10 @@ moved under you says so.
    duration is over 1 ms under reduced motion (a collapsed one stays in
    \`document.getAnimations()\` for a frame, so count the duration rather than the objects); zero
    console errors. A LIVING DOCUMENT is accepted the same way, beside \`genre-living\`, and it
-   carries one more measured check: move the control the sheet is built around and watch the
+   has one more measured check: move the control the sheet is built around and watch the
    figure, the printed maths, the sentence and the state all follow it in the same paint.
    AN APP THAT SHOWS WORK HAPPENING ON THE NODE (a task one of the owner's agents runs, a record
-   another device writes) carries one more as well: start that work and watch the screen follow
+   another device writes) has one more as well: start that work and watch the screen follow
    each stage within a few seconds. The specification's EVENTS FIRST, A TIMER LAST, in the mosaic
    section, says how; a state that waits for a timer to come round has not met it.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
@@ -563,13 +563,13 @@ moved under you says so.
    skill** (\`bound_skills_count\` above zero; written for the person who operates the app through
    their AI, and \`ai_path\` says what it holds and when an app tool is owed), the **data map** (\`data_map_present\`: write it
    with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,
-   for each family of keys or files, where it lives, who owns and reads it and one sentence on why
+   for each family of keys or files, where it is stored, who owns and reads it and one sentence on why
    there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`
    \`{ action: "spec_set" }\`). Write the two documents after the first publish and again after
-   any publish that changed the screens, the decisions or where data lives. The terms and privacy
+   any publish that changed the screens, the decisions or where data is stored. The terms and privacy
    pages are recommended, not owed: \`legal_pages\` names the missing ones and how to write them.
 10. **Write down why, and put nothing into the Design Book because the build is finished.** As
-   you choose, the page carries your reasons, one true sentence each, in
+   you choose, the page holds your reasons, one true sentence each, in
    \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this
    page, and what made it fit), \`passed\` (a part you looked at and left, and what made it NOT
    fit: the only place a part's weakness is ever written down), \`made\` (what you built by hand,
@@ -577,7 +577,7 @@ moved under you says so.
    reason; a good-sounding one that is not why you chose teaches the Book the wrong thing. The
    publish keeps them with the version. A count says an AI favoured a part, never that it is
    good, and an app is often rebuilt twice before its owner likes it, so a thrown-away version
-   must teach the Book nothing. Tell the owner in one line, when you hand the app over, that
+   must teach the Book nothing. Tell the owner in one line, when you deliver the app, that
    when they are happy with it they can say so. WHEN THE OWNER SAYS AN APP TURNED OUT WELL, in
    whatever words and in whichever conversation, record it: \`aimeat_designbook_keep { filename }\`.
    That is the moment what the app took and made starts to count, and its answer tells you to
@@ -602,12 +602,12 @@ ${APP_BUILDER_COMMON}## Never, on this track
 - daisyUI/Tailwind classes outside a \`section\` body.
 - A field for an API key. A key for an outside service is NAMED, in an extension's header or in
   a living document's trigger or source \`headers\`, as \`{{secret:NAME}}\`; the node fills it
-  from the signed-in person's vault on the way out and a missing name fails by name. The page
+  from the signed-in person's stored secrets when the request is sent and a missing name fails by name. The page
   tells the person the name and the host to store it for ("store NAME for host api.example.com",
   in the Secrets section of their Access page, or through their own AI with
   \`aimeat_secret_set { name, value, host }\`), and the living document's gear dialogs pick from
   the stored names.
-- Hand-written ARIA, focus management or animation code — the components carry them, and a
+- Hand-written ARIA, focus management or animation code — the components include them, and a
   hand-rolled control is an accessibility regression, not a shortcut.
 - A copied component. When one is nearly what you need, customise it in the four ways above
   (a token, a variant, a slot, a part selector) and it keeps the keyed reconcile, the designed
@@ -622,7 +622,7 @@ ${APP_BUILDER_COMMON}## Never, on this track
   look's, so a still register stays still from the same code; to change how springs feel, adopt
   one of the Design Book's motion parts (\`motion-spring-snappy\`, \`-soft\`, \`-heavy\`). \`app({ motion: false })\` is the only switch, and one block stands still
   with \`motion: false\` in its props.
-- **Arithmetic written into the page** when the person's numbers stand on each other. A number
+- **Arithmetic written into the page** when the person's numbers depend on each other. A number
   worked out by code you wrote is a number they cannot change without you, so the calculation goes
   in a \`formula\` node of a living record and the page mounts it with one line. That also keeps
   the units honest: the library carries them through multiplication and checks them on addition,
@@ -636,7 +636,7 @@ ${APP_BUILDER_COMMON}## Never, on this track
 - A filter of your own — the effects are the kit's nine (scanlines, vignette, duotone, recolour,
   distort, glitch, vhs, ripple, kaleidoscope), declared with bounds, refused where they would
   bend or recolour words, proven by the contrast matrix where they sit under them, and never
-  living on content: a loop belongs behind the words, on the ambient layer.
+  applied to content: a loop belongs behind the words, on the ambient layer.
 - The retired Classic build spec or its T1/T2/T3 shells. An app built on Classic is moved with the
   specification's section \`from-classic\`.
 

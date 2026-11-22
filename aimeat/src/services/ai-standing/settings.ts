@@ -192,7 +192,7 @@ export async function syncStandingAgents(deps: Deps, ownerGhii: string): Promise
         nodeContext().tunnel?.notifyScopesChanged(agent.gaii);
       }
     } catch (err) {
-      logger.warn(`[ai-standing] ${agent.gaii}: the Allow always words could not be written; the next change tries again: ${(err as Error).message}`);
+      logger.warn(`[ai-standing] ${agent.gaii}: the Allow always scopes could not be written; the next change tries again: ${(err as Error).message}`);
     }
   }
   if (Object.keys(done).length) {
@@ -239,7 +239,7 @@ export async function withStandingWords(
     });
     return [...held, ...add];
   } catch (err) {
-    logger.warn(`[ai-standing] ${gaii}: the Allow always words were not given at approval: ${(err as Error).message}`);
+    logger.warn(`[ai-standing] ${gaii}: the Allow always scopes were not given at approval: ${(err as Error).message}`);
     return [...held];
   }
 }

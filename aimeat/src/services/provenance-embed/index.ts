@@ -76,7 +76,7 @@ export async function embedProvenance(
   const file = await storage.getStorageFile(args.principal, args.storageKey);
   if (!file) throw new EmbedError('NOT_FOUND', 404, `No such file in your storage: ${args.storageKey}.`);
   const format = formatOf(file.data);
-  if (!format) throw new EmbedError('UNSUPPORTED_FORMAT', 415, 'Only a PNG, a JPEG, a PDF or a CBZ (ZIP of pages) can carry the provenance.');
+  if (!format) throw new EmbedError('UNSUPPORTED_FORMAT', 415, 'Only a PNG, a JPEG, a PDF or a CBZ (ZIP of pages) can contain the provenance.');
 
   // Every record must be the caller's own account's, or one anyone can resolve; refused before writing.
   const rows = await Promise.all(ids.map(id => storage.getAiProvenance(id)));

@@ -75,5 +75,5 @@ export function missedFire(job: ScheduledJobRecord, now: Date = new Date()): Mis
 
 /** The run-log text of a missed fire of a user schedule. */
 export function missedMessage(fireAt: string): string {
-  return `Missed: the node was not running at ${fireAt}, so this run did not happen. The next run happens at its time.`;
+  return `Missed: the server was not running at ${fireAt}, so this run did not happen. The next run happens at its time.`;
 }

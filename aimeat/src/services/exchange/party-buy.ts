@@ -243,7 +243,7 @@ export async function openPartyPurchase(
     const handlerId = typeof body.handler === 'string' ? body.handler : TEST_MONEY_HANDLER_ID;
     const handler = HANDLERS.includes(handlerId) ? getPaymentHandler(handlerId) : undefined;
     if (!handler || !handler.currencies.includes(o.currency ?? 'EUR')) {
-        return refuse(422, 'UNKNOWN_PAYMENT_HANDLER', `Pay with ${HANDLERS.filter(h => getPaymentHandler(h)).join(' or ') || 'a card'}: this node has no handler "${handlerId}" for ${o.currency}.`);
+        return refuse(422, 'UNKNOWN_PAYMENT_HANDLER', `Pay with ${HANDLERS.filter(h => getPaymentHandler(h)).join(' or ') || 'a card'}: this server has no handler "${handlerId}" for ${o.currency}.`);
     }
     // The card page is the provider's own Stripe account. Without one nothing can be paid, so the
     // purchase is refused here, before anything is written.
@@ -252,8 +252,8 @@ export async function openPartyPurchase(
         const others = HANDLERS.filter(h => h !== STRIPE_CHECKOUT_HANDLER_ID && getPaymentHandler(h)?.currencies.includes(o.currency ?? 'EUR'));
         return refuse(409, 'PROVIDER_TAKES_NO_CARD', 'The seller cannot take card payments yet, because they have not connected a Stripe account. '
             + (others.length
-                ? `This node also takes ${others.join(' or ')}: buy again with "handler": "${others[0]}".`
-                : 'This node has no other way to pay for it. Ask the seller to set up card payments, or to share the data with you by name.'));
+                ? `This server also takes ${others.join(' or ')}: buy again with "handler": "${others[0]}".`
+                : 'This server has no other way to pay for it. Ask the seller to set up card payments, or to share the data with you by name.'));
     }
 
     // The party: the renewing one, or the new one the body names.
@@ -412,7 +412,7 @@ export async function completePartyPurchase(
     if (late && !card) return EXPIRED();
     if (typeof input.handler === 'string' && input.handler !== stored.handler) return refuse(422, 'HANDLER_MISMATCH', `This purchase is paid with ${stored.handler}.`);
     const handler = getPaymentHandler(stored.handler);
-    if (!handler) return refuse(422, 'UNKNOWN_PAYMENT_HANDLER', `This node has no handler ${stored.handler} any more.`);
+    if (!handler) return refuse(422, 'UNKNOWN_PAYMENT_HANDLER', `This server has no handler ${stored.handler} any more.`);
     const found = await buyable(storage, stored.offeringId);
     if (!found.ok && !card) return found;
 
@@ -638,7 +638,7 @@ async function handOver(
     // The mark stays, so every later call reads the same answer rather than "complete".
     const gone = async (what: string): Promise<Refusal> => {
         await putBack();
-        return refuse(404, 'PURCHASE_ENDED', `The seller removed the ${what} this purchase made, so it cannot be handed over. `
+        return refuse(404, 'PURCHASE_ENDED', `The seller removed the ${what} this purchase made, so it cannot be delivered. `
             + `Contact the seller and give them the purchase id ${stored.id}.`);
     };
 
@@ -669,7 +669,7 @@ async function handOver(
         return { ok: true, data };
     } catch (err) {
         // Nothing was handed over: a key made for this answer goes again, and the next call tries anew.
-        logger.error('exchange-party-buy: handing a completed purchase over failed', { purchase: stored.id, error: String(err) });
+        logger.error('exchange-party-buy: delivering a completed purchase failed', { purchase: stored.id, error: String(err) });
         if (keyId && partyName) {
             const made = keyId;
             try {

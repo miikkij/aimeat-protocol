@@ -142,13 +142,13 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
   them.
 - **When you create a context, give it one to five short tags** in the person's language, lower
   case: what it is about and whom it belongs to ("travel", "family", "acme"). First look at the
-  tags their other contexts carry (the index you got on connecting names them after each key)
-  and reuse one that fits, so the contexts group together instead of drifting into near-twins
+  tags their other contexts have (the index you got on connecting names them after each key)
+  and reuse one that fits, so the contexts group together instead of splitting into near-duplicates
   such as "trip" beside "travel".
 - Change a tag when the person asks, or when a context's subject has plainly moved, and say
   what you changed.
 - **To find contexts by tag:** \`aimeat_memory_list\` with prefix \`context.\`, \`owner_scope: true\`
-  and \`tags\` (a context must carry every tag given). \`aimeat_memory_search\` also matches the
+  and \`tags\` (a context must have every tag given). \`aimeat_memory_search\` also matches the
   words of a tag.
 
 ## Concepts (the ontology)
@@ -213,13 +213,13 @@ told. **It adds nothing the context does not say**: no weekday the context does 
 purpose of a meeting, no "still" or "as usual", no detail that would make the note read better.
 If the reader needs something the context lacks, leave it out and tell the person what is
 missing. When the person wants a view kept up to date, add it to \`views\` with \`keep\` and write
-its newest text into \`last\`. For a view on a clock ("every Monday"), create a schedule of kind
+its newest text into \`last\`. For a view on a schedule ("every Monday"), create a schedule of kind
 \`ai\` over the context's key with \`aimeat_schedule_create\`, its prompt the view request, so the
 node writes the view even when no AI is connected.
 
 **The fingerprint** shows at a glance what a context is made of: which parts are fact, analysis,
-opinion, instruction, decision or narrative, and what each rests on (+ a source, ~ a named person,
-? nothing, x replaced). Make one when the person asks how solid a context is, or before you lean
+opinion, instruction, decision or narrative, and what each is based on (+ a source, ~ a named person,
+? nothing, x replaced). Make one when the person asks how solid a context is, or before you rely
 on a factual context for something that matters: \`aimeat_content_inspect\` with
 \`stages: ["profile"]\` on the context's key, after the person says yes, then
 \`aimeat_content_facts\` to read it. In a factual context a large share of ? is worth saying first;
@@ -259,7 +259,7 @@ condense, split or delete without their yes.
 - **Is it still sound?** \`aimeat_context_check\` checks it by machine: references that no longer
   open, included or composed contexts that are gone, and with an ontology module, source quotes
   no longer found in their records, ids that name nothing, replacement chains that loop. Run it
-  when the person asks how solid a context is, before you lean on it for something that matters,
+  when the person asks how solid a context is, before you rely on it for something that matters,
   and after a large rewrite. Tell the person what it found in plain words, and fix what you can
   only with their yes. A context whose statements all name their sources can be rebuilt from
   those sources when too much has gone wrong.
@@ -280,7 +280,7 @@ ready prompt. Never open the context itself to the internet; give them a view ma
    other people's material and anything the person did not agree to.
 3. Share that one page: \`aimeat_workspace_share\` with \`space\`, \`id\`, \`access: "open"\` and
    \`until\`.
-4. Hand the person two things to send: the page's plain-text address,
+4. Give the person two things to send: the page's plain-text address,
    \`<node>/v1/organisms/<org>/workspace/public/document?ws=<ws>&type=<space>&id=<id>&format=md\`,
    which any AI can read, and a short prompt: who this is from, what the reader's AI should do
    with it, and to answer by replying to the person's email.

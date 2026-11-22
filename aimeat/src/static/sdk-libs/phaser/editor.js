@@ -597,7 +597,7 @@ export function levelEditor(spec) {
   function copyAsJs() {
     const clip = navigator.clipboard;
     if (!clip || typeof clip.writeText !== 'function') {
-      say('This browser keeps the clipboard closed. The rows are in the text box below.');
+      say('This browser blocks the clipboard. The rows are in the text box below.');
       return;
     }
     clip.writeText(asJs()).then(function () {

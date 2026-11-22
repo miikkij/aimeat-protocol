@@ -123,7 +123,7 @@ is: \`whose_money.house\` is the operator's own bill, \`whose_money.own\` is oth
 accounts and costs them nothing, \`whose_money.ledger\` is a third count off a different table — never
 add the three together. \`ceiling_usd\` is the grant × the accounts: the most this server's own key can cost
 before somebody is refused. \`keys.chat.metered_here\` is false because every chat turn is spent from
-a key handed to a child process, so say that whenever you report a total, and pass ask_provider true
+a key given to a child process, so say that whenever you report a total, and pass ask_provider true
 to get the provider's own figure for it. Give \`report\` and it reads one usage report across the node
 instead, as GET /v1/admin/usage/summary does: \`tool\` for which tools are called and which refuse or
 fail, \`day\`, \`model\`, \`app\`, \`agent\`, \`user\` and the others it lists; add \`owner\` for one
@@ -182,7 +182,7 @@ usually nobody's decision. \`book.age_days\` says whether the directory is worth
 \`relay_claims.not_ready\` names the peers still relaying here without a signed claim: the default
 is required from 3.20.0, so this node refuses those relays unless it is set to optional. Tell the
 operator. \`aimeat_admin_federation_relay_claim_set\` keeps one such peer on optional until it
-updates, or holds one to required while the node is on optional. Each roster row says how the peer
+updates, or holds one to required while the node is on optional. Each row of the peer list says how the peer
 arrived (\`origin\`): a peer a package grant or an install set added without the operator is
 \`recorded\` with who asked. \`aimeat_admin_federation_peer_remove\` with \`emergency: true\` removes a peer
 at once and frees its node id, which is what to do when the Security page says a node id is held
@@ -191,7 +191,7 @@ settlements add morsels nobody here paid, so they fit in what is left of the nod
 on new morsels; one past it adds nothing and shows on the Security page. For a peer the operator
 trusts, \`aimeat_admin_federation_settlement_ceiling_set\` gives it a ceiling of its own or none.
 
-**Classification (operator).** Content on this node can carry a classification (public, internal,
+**Classification (operator).** Content on this node can have a classification (public, internal,
 confidential, highly confidential, or a level an owner or an organism adds), which decides which
 people and which AI may read it. The node's switch, \`classification.mode\`, is off (nothing is
 classified or checked), owner (each owner turns it on for their own content, and an organism's
@@ -212,11 +212,11 @@ organism or the operator makes for a label. \`exception_list\` at \`level: "node
 exceptions list: each act against a classification with its reason, a person's own exception (an
 item that may leave, or that an AI may send out) and an app's act the node recorded instead of
 refusing it. A person makes an exception in their own session, or an app does; never an AI, so you
-are refused (PERSON_REQUIRED). A label may carry \`maxAudience\` (public, link, signed-in, organism or
+are refused (PERSON_REQUIRED). A label may have \`maxAudience\` (public, link, signed-in, organism or
 private): content and containers under it are refused a wider level (LABEL_CAPS_AUDIENCE), and a
 label that rises lowers what is already wider and tells its owner; only the owner in person
 overrides it for one item, with an \`audience\` exception and a reason. A new node's default labels
-carry such limits from its first start (internal: signed-in; confidential and highly confidential:
+have such limits from its first start (internal: signed-in; confidential and highly confidential:
 organism). A node that ran before keeps its labels as they were; once classification is switched on
 (at once if it already is, never while it is off), it gets one Security page incident, type
 \`classification_default_caps\`, that offers each limit, decided there with Apply or Keep as it is: read it with
@@ -331,7 +331,7 @@ modes, the domains where \`local\` is suggested, and the marks of the period.
 whether this node runs a data intermediation service under the EU Data Governance Act: \`report\`
 (nothing refused), \`none\` (an offering that delivers data is not listed to everyone), \`node\` (the
 operator is the provider) or \`owners\` (an organism that declared itself a provider may list data to
-everyone). \`aimeat_compliance_report\` with \`scope: "node"\` carries it as \`data_intermediation\`:
+everyone). \`aimeat_compliance_report\` with \`scope: "node"\` contains it as \`data_intermediation\`:
 the findings, each a proposal with its reason and article, and the Article 12 rows with their
 evidence. Record the provider's notification and a person's decision on a finding with
 \`aimeat_compliance_register_write\` (\`part: "intermediation"\`, items of \`type\` notification or
@@ -342,13 +342,13 @@ this node or its organisms do the work the EU anti-money-laundering regulation (
 obliged entity: \`report\` (the default: nothing refused, the findings listed), \`none\` (an organism's
 new declaration that it is an obliged entity is refused with AML_NOT_OFFERED), \`owners\` (a declared
 organism does that work here; the node holds no funds) or \`node\` (the operator is an obliged entity
-itself). \`aimeat_compliance_report\` carries it as \`aml\`, section 13: the declarations, the findings
+itself). \`aimeat_compliance_report\` contains it as \`aml\`, section 13: the declarations, the findings
 (each a proposal with its reason and article, the mode proposal for the operator alone to make) and
 the obligations, where \`missing\` names what this node does not do yet. An obliged entity's
 declaration and a person's decision on a finding go through \`aimeat_compliance_register_write\`
 (\`part: "aml"\`, items of \`type\` declaration or review). When a person asks what AML, KYC, PEP,
 sanctions or a beneficial owner mean, read the settings explanations concept.aml, concept.kyc,
-concept.pep, concept.sanctions, concept.obliged-entity and concept.beneficial-owner: they carry the
+concept.pep, concept.sanctions, concept.obliged-entity and concept.beneficial-owner: they contain the
 official sources to point to. Say that it is a reading of the regulation, not legal advice. In a
 declared organism, on a node in mode \`owners\` or \`node\`, its staff do the customer due diligence
 with \`aimeat_kyc_customer\` (the customer cards, screened against the EU and UN sanctions lists),
@@ -428,7 +428,7 @@ existing accounts the organisation may adopt; optional organism its people join 
 paste it into the IdP now) · \`aimeat_admin_sso_update\` (domains, visibility in the sign-in modal,
 IdP-initiated acceptance, organism binding) · \`aimeat_admin_sso_delete\` (removes the connection only;
 accounts and their knowledge remain). The setup order that works, in SIX steps and not five: create
-→ hand the SP values to the IdP console → read the metadata back → decide listed or hidden → mint
+→ enter the SP values in the IdP console → read the metadata back → decide listed or hidden → mint
 the SCIM token → **have the operator turn on sso.enabled**, which is a node setting and none of
 your tools. Only then can a sign-in happen, so only then do last-login and last-SCIM-call turn real
 in \`aimeat_admin_sso_get\`. Read \`node.enabled\` and each connection's \`state\` from

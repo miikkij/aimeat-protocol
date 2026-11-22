@@ -60,22 +60,22 @@ import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 
 export const FULL_HANDBOOK = `# Working here with everything
 
-This surface carries every tool the node offers to a v2 client. Nothing has been narrowed for you,
+This surface has every tool the node offers to a v2 client. Nothing has been narrowed for you,
 which means nothing is missing and nothing is pointing you anywhere either.
 
 ## Start by knowing where you are
 
-Three grounds carry most of the work:
+Three areas hold most of the work:
 
 - **Memory** is the person's own knowledge. \`aimeat_memory_list\` takes a key prefix,
   \`aimeat_memory_search\` finds by content. A feature here is usually a memory record under a key
   prefix plus something that reads it, so look before you build.
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
-  \`url\` you hand the person. ${MODEL_QUALITY_ADVICE} Before you build one, load the skill
+  \`url\` you give the person. ${MODEL_QUALITY_ADVICE} Before you build one, load the skill
   \`node:aimeat-app-builder-atelier\`: every app is built and changed with the Atelier
   specification, \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts, and an app built on
   the retired Classic track is moved with its section \`from-classic\`. **A new app's first
-  message carries its structure page**: before your first question, call \`aimeat_app_manage\`
+  message contains its structure page**: before your first question, call \`aimeat_app_manage\`
   \`{ action: "structure_set", filename, name, purpose, proposals }\` with two or three layouts you
   drew for the app in \`proposals.layout\`, and give the person \`page_url\`; there they follow the
   build and pick a layout and a look by seeing them. **When the person
@@ -100,8 +100,8 @@ organisation's members), each with how to close it. Say what is open to everyone
 nothing without asking. When they ask what data they have shared and who reads it, call
 \`aimeat_dataproduct\` action \`shared\`: each package with who may read it, its licence, whether it is up
 to date, its shares (who, until) and its reads in 30 days. Offer to stop a share
-(\`aimeat_consent_revoke\`) or to run a product again (\`aimeat_dataproduct\` \`run\`), and do either only on
-their word.
+(\`aimeat_consent_revoke\`) or to run a product again (\`aimeat_dataproduct\` \`run\`), and do either only when
+they agree.
 
 **When the person wants to offer data as a table** ("make a data product of the municipal budget
 signals, update it every Monday and share it with Matti for Power BI for a month"), gather the whole
@@ -144,7 +144,7 @@ card. Their subscriptions to plans extensions offer are \`aimeat_subscription_li
 (capabilities, workflows, knowledge, documents, apps, skills, datasets, memory and more); a
 \`dataset\` entry is a published table with its row count and the addresses to read it from. \`mode: "map"\`
 is a cheap count of WHAT exists by type and tag; \`mode: "find"\` with \`q\`, \`type\` or \`tags\`
-returns the entries. It looks in one reach at a time: \`scope: "own"\` (the default) is the
+returns the entries. It looks in one scope at a time: \`scope: "own"\` (the default) is the
 person's own content, \`"shared"\` is what the organisms they belong to share with them, and
 \`"public"\` is what anyone can read. Something a colleague or a club wrote down is under
 \`"shared"\`, and no memory search will find it. Use the narrower tools once you know the domain.

@@ -358,7 +358,7 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     const reached = await reach(ctx, ownerName, remote, shape.value.bundle.groupId, { preview, installSet: true, version: shape.value.bundle.version });
     if (!reached.ok) return { ok: false, status: remote ? 502 : 404, code: 'BUNDLE_UNAVAILABLE', message: `The bundle could not be read. ${reached.message}` };
     const parsedBundle = bundleOfComponents(reached.components);
-    if (!parsedBundle) return { ok: false, status: 400, code: 'NOT_A_BUNDLE', message: `${shape.value.bundle.groupId} is a package, and it carries no install bundle (a memory component with spec "aimeat.install-bundle/1").` };
+    if (!parsedBundle) return { ok: false, status: 400, code: 'NOT_A_BUNDLE', message: `${shape.value.bundle.groupId} is a package, and it has no install bundle (a memory component with spec "aimeat.install-bundle/1").` };
     if (!parsedBundle.ok) return { ok: false, status: 400, code: 'INVALID_BUNDLE', message: parsedBundle.message };
     const bundle = parsedBundle.value;
     const full = parseInstallSet(input.installSet, bundle);

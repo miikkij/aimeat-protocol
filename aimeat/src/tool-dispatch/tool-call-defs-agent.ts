@@ -193,7 +193,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_tags_set',
-        description: "Replace the tag list on an agent: your own with no permission word, a same-owner sibling's with agent:write. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
+        description: "Replace the tag list on an agent: your own with no scope, a same-owner sibling's with agent:write. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
         input: {
             target_agent_name: { type: 'string', description: 'Agent whose tags to update.' },
             tags: { type: 'array', description: 'Replacement tag list. Empty array clears all tags. Max 20.' },
@@ -220,7 +220,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_run_mode_set',
-        description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and unwinds after), 'resident' (kept up), or null to take it back to nobody-has-said so a spawner leaves it alone. Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
+        description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and stops after), 'resident' (kept up), or null to take it back to nobody-has-said so a spawner leaves it alone. Works on ANY agent you own, whatever runs it — an agent whose behaviour is written in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose run mode to set.' },
             run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn', 'resident', or null to leave it unset." },
@@ -237,7 +237,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_runtime_report',
-        description: "Say what code runs this agent, so a run can be audited afterwards: the file, its hash, the commit and which runtime read it. A JSON crew is answerable through its definition on the node; a code-backed one has none, and without this nothing can say what ran. Recorded and never checked. `llm` says where the crew's model calls go. Your own needs no permission word; a sibling's needs agent:write.",
+        description: "Say what code runs this agent, so a run can be audited afterwards: the file, its hash, the commit and which runtime read it. A JSON crew is answerable through its definition on the node; a code-backed one has none, and without this nothing can say what ran. Recorded and never checked. `llm` says where the crew's model calls go. Your own needs no scope; a sibling's needs agent:write.",
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent this is about.' },
             kind: { type: 'string', required: true, description: "e.g. 'python' or 'crew-def'." },
@@ -515,7 +515,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agents_list',
-        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create. Each agent also carries default_scopes, scope_request (what it asked for at its last approval) and refusals (calls the node refused it for a permission it still lacks).",
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create. Each agent also has default_scopes, scope_request (what it asked for at its last approval) and refusals (calls the node refused it for a permission it still lacks).",
         input: {},
         handler: ({ client }, input) => client.get(`/v1/agents${query({ run_mode: optionalString(input, 'run_mode') })}`),
     },

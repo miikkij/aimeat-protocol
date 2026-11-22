@@ -165,7 +165,7 @@ export async function registerRemoteTools(
           // The far side's own words, with one sentence saying whose tool this is. Without that a
           // person reading their AI's transcript has no idea a call left this node.
           description: `${tool.description}\n\n(From "${server.title || server.slug}", a server `
-            + `attached to this account. This node holds the credential and spends it for you.)`,
+            + `attached to this account. This node holds the credential and uses it for you.)`,
           // The upstream schema, verbatim. A schema we rewrote is one that disagrees with the
           // server that will validate the call.
           inputSchema: toZodShape(tool.inputSchema),

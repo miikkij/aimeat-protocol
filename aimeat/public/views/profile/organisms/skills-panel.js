@@ -153,7 +153,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
   return html`
     <${Section} first title=${t('skills.wsPanelTitle') || 'Workspace skills'}
       doors=${html`<${Loud} control onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>+ ${t('skills.newSkill') || 'New skill'}<//>`}>
-      <${HeadDesc}>${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills travel with workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}<//>
+      <${HeadDesc}>${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills are included in workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}<//>
       ${editorOpen && html`
         <${Stack} below="large">
           <${TextArea} rows=${18} value=${editorMd} onInput=${setEditorMd} />

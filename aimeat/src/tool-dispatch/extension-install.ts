@@ -105,7 +105,7 @@ export function installCortexOverHttp(client: AimeatClient, input: CortexInstall
     if (input.update) {
       return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message:
         'update:true takes the inline manifest: send the manifest YAML and the libs map in this call. '
-        + 'To redeploy from a ZIP, call without update and upload the ZIP: one that carries the name of a cortex you installed replaces it in place.' } });
+        + 'To redeploy from a ZIP, call without update and upload the ZIP: one that has the name of a cortex you installed replaces it in place.' } });
     }
     return client.post('/v1/cortex', { mode: 'presigned' });
   }

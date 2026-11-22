@@ -128,7 +128,7 @@ export async function buildAppAgentContext(
   text += `- Its tasks, newest first: \`GET /v1/agents/${agent.name}/tasks\`. A finished task has \`status: "done"\`; one in progress is \`active\`, one that waits is \`queued\`, and \`failed\` or \`declined\` say the work did not happen.\n`;
   text += `- One task: \`GET /v1/agents/${agent.name}/tasks/<id>\` answers with the task and \`outcome\`, the agent's own words about what it did.\n`;
   text += `- A finished task's result is a memory record in the AGENT'S namespace (\`${gaii}\`), not in the owner's. The served library \`aimeat-agents\` reads it: \`AIMEAT.agents.deliverable("${agent.name}", taskId)\` uses the task's \`deliverableKey\` when it has one and otherwise the record tagged \`task:<id>\`. Load the library instead of writing these calls by hand; its document is in the libraries list (GET /v1/libs).\n`;
-  text += '- Read the work from the agent every time the app opens, and show what is there. The app keeps no copy: the agent\'s memory is the one place the work lives.\n';
+  text += '- Read the work from the agent every time the app opens, and show what is there. The app keeps no copy: the agent\'s memory is the one place the work is stored.\n';
   text += '- Say how old the newest work is, from the task\'s own time, so a person sees when the agent has produced nothing new. A task that is `active` or `queued` means new work is on its way.\n\n';
   if (shape) {
     text += '### What its latest finished result looks like\n';
@@ -139,7 +139,7 @@ export async function buildAppAgentContext(
     text += 'This agent has no finished work yet, so there is no structure to show. Read one finished task before you design the screens, or build a screen that shows any result as text and say that the first work has not arrived.\n\n';
   }
   text += '### State the tie in the data map\n';
-  text += `The app's data map carries one \`held\` row that names the agent. With it the agent's page lists this app and the app's page lists the agent. The row grants nothing; it is a statement. Add it to the map you write with \`aimeat_datamap_set\` (or PUT /v1/datamap/apps/<owner>/<filename>):\n`;
+  text += `The app's data map has one \`held\` row that names the agent. With it the agent's page lists this app and the app's page lists the agent. The row grants nothing; it is a statement. Add it to the map you write with \`aimeat_datamap_set\` (or PUT /v1/datamap/apps/<owner>/<filename>):\n`;
   text += '```json\n' + JSON.stringify(row, null, 2) + '\n```\n';
   text += 'Rewrite `holds` and `why` in your own words when the app does something else with the work. Keep `agent` and `madeFor` as they are.\n';
 

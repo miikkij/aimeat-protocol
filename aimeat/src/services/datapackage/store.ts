@@ -200,7 +200,7 @@ export async function publishPackage(
     if (!input.changes || !input.changes.trim()) {
         return {
             ok: false, code: 'INVALID_INPUT', issues: [],
-            message: 'changes is required: every version says what moved against the previous one and why. '
+            message: 'changes is required: every version says what changed since the previous one and why. '
                 + 'A version nobody explained is a version a consumer cannot decide about.',
         };
     }
@@ -281,7 +281,7 @@ export async function publishPackage(
         return {
             ok: false, code: 'QUALITY_GATE', issues,
             message: `${issues.length} row/column problem(s): the data does not validate against its own Table Schema, `
-                + 'so no version was written and the package still stands on its previous one.',
+                + 'so no version was written and the package stays on its previous one.',
         };
     }
 

@@ -82,7 +82,7 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'plan-steps', name: 'PlanSteps', kind: 'component', status: 'active',
-        summary: 'The steps of a plan the AI made, one under the other, each under the section rule: a head in a line (a tag, the title in bold, what stands after it), the lines about it, and its ways at its foot. A step done is dimmed a little and a step skipped more; a step to pick has a check box before its title; the grey line in italics says why.',
+        summary: 'The steps of a plan the AI made, one under the other, each under the section rule: a head in a line (a tag, the title in bold, what stands after it), the lines about it, and its actions at its foot. A step done is dimmed a little and a step skipped more; a step to pick has a check box before its title; the grey line in italics says why.',
         module: '/components/PlanSteps.js', sheet: '/css/components/plan-steps.css',
         data: {
             shape: 'PlanSteps({ children }) · PlanStep({ state, pick, before, title, after, doors, children }) · PlanNote({ children })',
@@ -115,7 +115,7 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
             shape: 'RunSteps({ children }) · RunStep({ num, name, right, done, open, onToggle, children }) · RunStepDoors({ children }) · RunCopies({ label, children }) · RunModel({ name, figure, tone, meta, children }) · RunChecks({ head, rows }) · RunColumns({ children }) · RunColumn({ label, children }) · RunProposals({ items }) · RunOutput({ label, children }) · RunApply({ note, children }) · RunPaste({ label, children })',
             fields: {
                 RunStep: 'one step as a fold row: num, name, the mono word at the right (right), done (its number in green), open and onToggle; the body under it while open',
-                RunStepDoors: 'the ways at a step\'s foot, under a dashed line',
+                RunStepDoors: 'the actions at a step\'s foot, under a dashed line',
                 RunCopies: 'a small typewriter label and the copy actions after it',
                 RunModel: 'one model\'s block: name, figure (the score) in tone fine | notice | dim, meta (a typewriter line); the children under the head',
                 RunChecks: 'head = [mark, checkpoint, expected, got, weight]; rows = [{ key, pass, name, description, expected, actual, weight }]',
@@ -180,7 +180,7 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'offer-map', name: 'Offer map', kind: 'component', status: 'active',
-        summary: 'Every offer at once, grouped by the need it answers, read four ways: columns (one per need), a grid (a row per agent, a column per need, scrolling inside when the page is narrow), blocks (one per need, wider the more it holds) or a tree (a flowchart). An offer is a framed tile that opens its own page in a new tab, with its title, a small "opens elsewhere" mark and its agent\'s tag; the frame and the mark turn coral under the pointer. A need\'s head carries its count in typewriter letters.',
+        summary: 'Every offer at once, grouped by the need it answers, read four ways: columns (one per need), a grid (a row per agent, a column per need, scrolling inside when the page is narrow), blocks (one per need, wider the more it holds) or a tree (a flowchart). An offer is a framed tile that opens its own page in a new tab, with its title, a small "opens elsewhere" mark and its agent\'s tag; the frame and the mark turn coral under the pointer. A need\'s head has its count in typewriter letters.',
         module: '/components/OfferMap.js', sheet: '/css/components/offer-map.css',
         data: {
             shape: 'OfferMap({ mode, groups, chart, onPick, agentLabel })',
@@ -239,14 +239,14 @@ export const WORK_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'week-rhythm', name: 'Week rhythm', kind: 'component', status: 'active',
-        summary: 'A week at a glance: one row per repeating job with its time in typewriter, its name as the way into it with a typewriter note, a mark on each day it fires and the last time it ran; the days as columns under their heads, today\'s column on a pale sun under a sun head. A mark is coral when an agent does the job and faint on a day it does not fire. On a narrow screen the last run and the note go.',
+        summary: 'A week at a glance: one row per repeating job with its time in typewriter, its name as the link to it with a typewriter note, a mark on each day it fires and the last time it ran; the days as columns under their heads, today\'s column on a pale sun under a sun head. A mark is coral when an agent does the job and faint on a day it does not fire. On a narrow screen the last run and the note go.',
         module: '/components/WeekRhythm.js', sheet: '/css/components/week-rhythm.css',
         data: {
             shape: 'WeekRhythm({ heads, days, rows })',
             fields: {
                 heads: '{ time, name, last }: the words over the time, name and last-run columns',
                 days: '[{ key, label, sub, today }]: the day columns, a weekday over its date; today on the sun',
-                rows: '[{ key, time, name, note, onOpen, openLabel, days, agent, last }]: days is seven true or false, one per column; agent marks an agent\'s job; onOpen makes the name the way into the job',
+                rows: '[{ key, time, name, note, onOpen, openLabel, days, agent, last }]: days is seven true or false, one per column; agent marks an agent\'s job; onOpen makes the name the link to the job',
             },
         },
         useFor: ['Which schedules fire on which days of this week.'],

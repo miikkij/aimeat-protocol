@@ -56,7 +56,7 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['ghii'],
         props: {},
         maxPerSurface: 1,
-        summary: 'Who the person is: their picture, their name, and the way into their settings.',
+        summary: 'Who the person is: their picture, their name, and the link to their settings.',
     },
     {
         // Present on every node and absent from almost every page: it draws only while nothing has
@@ -193,7 +193,7 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['agents', 'agent-tasks', 'apps', 'organisms'],
         props: {},
         maxPerSurface: 1,
-        summary: 'The account at a glance: computers, agents, apps, knowledge and offerings, what has gone quiet, and the way to the Overview.',
+        summary: 'The account at a glance: computers, agents, apps, knowledge and offerings, what has gone quiet, and the link to the Overview.',
     },
     {
         // Where a person makes an agent from one sentence and sees the ones at work. It reads

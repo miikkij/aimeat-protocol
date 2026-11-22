@@ -298,7 +298,7 @@ export function undeclaredSpaceRefusal(
     }
 
     const declareRoute = `PUT /v1/organisms/${ctx.organismId}/workspace?ws=${ctx.ws} with { add_object_types: [{ name, namespace, mode }], schemas }, or aimeat_workspace_update { organism_id, ws, add_spaces, schemas }`;
-    const declareWho = 'Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act. A member holding the contributor role adds the space with aimeat_workspace_space_add or POST /v1/organisms/{id}/workspace/spaces instead, where the workspace\'s rule decides whether it lands at once or waits for an approval.';
+    const declareWho = 'Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act. A member holding the contributor role adds the space with aimeat_workspace_space_add or POST /v1/organisms/{id}/workspace/spaces instead, where the workspace\'s rule decides whether it takes effect at once or waits for an approval.';
 
     const other = types.find(o => matches(o) && !isMemoryBackedSpace(o));
     if (other && audience === 'member') {
@@ -309,7 +309,7 @@ export function undeclaredSpaceRefusal(
                 ? `Append rows with aimeat_workspace_rows_append or POST /v1/organisms/${ctx.organismId}/workspace/rows/${other.name || space}?ws=${ctx.ws} instead.`
                 : 'Update the space to backing \'memory\' (aimeat_workspace_update); files and knowledge packages attach through workspace Sources or embedded document images.';
         return refusal(
-            `Nothing was written: space ${label} has backing '${other.backing}', so its data does not live in workspace records and no workspace read would list this one. ${how}`,
+            `Nothing was written: space ${label} has backing '${other.backing}', so its data is not stored in workspace records and no workspace read would list this one. ${how}`,
             { namespace: other.namespace ?? space, backing: String(other.backing), how_to_fix: how },
         );
     }
@@ -321,7 +321,7 @@ export function undeclaredSpaceRefusal(
     // Say so first: "declares no space notes" beside a list that shows notes reads as a node fault.
     const byName = audience === 'member' ? declared.find(d => d.name === space && d.namespace !== space) : undefined;
     if (byName) {
-        const how = `Use the namespace ${byName.namespace}: a memory key and a workspace record key carry the namespace, not the space's name.`;
+        const how = `Use the namespace ${byName.namespace}: a memory key and a workspace record key contain the namespace, not the space's name.`;
         return refusal(`Nothing was written: "${space}" is the name of a space in workspace ${ctx.ws}, and its namespace is ${byName.namespace}. ${how}`, { namespace: space, declared_spaces: declared, how_to_fix: how });
     }
     const how = `Declare the space, then write again: ${declareRoute}. ${declareWho}`;

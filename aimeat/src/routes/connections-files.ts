@@ -157,7 +157,7 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
         if (typeof b.filename !== 'string' || !b.filename) b.filename = loaded.name;
       } else if (typeof b.text === 'string') {
         if (Buffer.byteLength(b.text, 'utf8') > MAX_INLINE_TEXT) {
-          return res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'That is more text than one call carries. Store it as a file first, then write that file.', 413, { field: 'from_key' }));
+          return res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'That is more text than one call takes. Store it as a file first, then write that file.', 413, { field: 'from_key' }));
         }
         const mime = typeof b.mime_type === 'string' && /^[a-z]+\/[A-Za-z0-9.+-]{1,100}$/.test(b.mime_type) ? b.mime_type : 'text/plain; charset=utf-8';
         payload = { bytes: Buffer.from(b.text, 'utf8'), mimeType: mime };

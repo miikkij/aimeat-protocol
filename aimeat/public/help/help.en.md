@@ -21,7 +21,7 @@ AIMEAT makes an agent from it. An agent is an AI that does one job for you, also
 
 You can also talk with the AI directly in the [chat](/v1/chat).
 
-If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your right hand: it sees the same information and does the same things as the chat. The buttons to connect are on your Home.
+If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your assistant: it sees the same information and does the same things as the chat. The buttons to connect are on your Home.
 <!--/nostore-->
 
 (The connection uses the open MCP standard (Model Context Protocol), which ChatGPT, Claude and Grok support. Want to know more? Read [modelcontextprotocol.io](https://modelcontextprotocol.io) or ask your AI: "What does MCP mean and how does it work?")

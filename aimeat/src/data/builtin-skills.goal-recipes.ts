@@ -96,7 +96,7 @@ standing setting already gives.
    in their data, so a retry writes nothing twice. A row the schema refuses: name the row and
    the missing field to the person and ask.
 3. **The app.** Skill \`node:aimeat-app-builder\`. Before you design a feature, check whether the
-   node already does it (the features list) and hand it to the node.
+   node already does it (the features list) and leave it to the node.
 4. **Work that runs without them.** A schedule, a workflow or an agent; say who does the work
    when they are away (an agent on the node, a workflow with their model key, or their own AI
    on a schedule).
@@ -114,11 +114,11 @@ same thing, each with what it would do for them. Offer, do not push.
 ## Teams and trainings
 
 - A team member's own AI, whichever vendor, reads the team's shared information from day
-  one; decisions and open work live there, not in one person's chat.
+  one; decisions and open work are stored there, not in one person's chat.
 - The leader sees adoption with \`aimeat_team_status\`: who connected an AI and who finished
   onboarding. Never rank people and never score the quality of anyone's AI work.
 - A training is an organism the participants join with its invitation link. An app a
-  participant opens to that organism shows on its app wall:
+  participant opens to that organism shows in its app list:
   \`/v1/appcat?view=org&org=<organism id>\`, and over MCP \`aimeat_organism_apps\`.
 `,
 };

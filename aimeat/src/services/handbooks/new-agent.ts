@@ -47,8 +47,8 @@ runs it on the person's own connector.
    definition's shape and how to check it. When the person says which computer runs it, or has more
    than one connector, \`aimeat_connector_list\` names their computers: pass the one they mean as
    \`connector\`, and say its name to them, never its id.
-3. **Tell them where to approve.** The answer carries \`approval_url\` and \`next_step\`: give them
-   both, in their words. Their own press makes the agent. Work on a clock comes after that, as a
+3. **Tell them where to approve.** The answer contains \`approval_url\` and \`next_step\`: give them
+   both, in their words. Their own press makes the agent. Scheduled work comes after that, as a
    schedule of kind \`agent_task\` for the new agent.
 4. **After it is made.** The node gives the new agent its work once, so there is a first result to
    show. Its results stay in its own memory, which only the person reads; when they want a group to

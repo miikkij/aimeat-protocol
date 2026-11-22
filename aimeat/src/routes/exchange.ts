@@ -721,7 +721,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
         buyer: e.buyerGhii ?? null,
       })),
       count: entries.length,
-      note: 'Amounts are net of the platform rake, in the currency’s integer micro-units. `pending` means '
+      note: 'Amounts are net of the platform fee, in the currency’s integer micro-units. `pending` means '
         + 'booked as owed, not yet paid out — this surface reads the accrual, it does not settle it.',
     }, [
       { description: 'Who is using what you sell', method: 'GET', url: '/v1/exchange/offerings' },

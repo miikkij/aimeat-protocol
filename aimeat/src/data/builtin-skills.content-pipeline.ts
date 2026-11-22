@@ -60,7 +60,7 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   ends \`refused\` before that step (\`refusal.stoppedBefore\` names it). Chaining agents is giving them work, so a step that dispatches to an
   agent costs \`work:request\`: ask the owner for it before saving, or the save answers SCOPE_DENIED.
 - An extension step reads the run's vars, and nothing else, unless it names what it takes:
-  \`input_from: { proposal: "x.{ref}.proposal", decision: "x.{ref}.decision" }\` hands it an
+  \`input_from: { proposal: "x.{ref}.proposal", decision: "x.{ref}.decision" }\` gives it an
   earlier step's \`result_to_key\` or a person's \`answer_to_key\` as input fields. A key with no record
   arrives as null, so the extension must throw on a field it cannot act without. Naming keys there is
   a read of the owner's records, so the saver needs \`memory:read\`.

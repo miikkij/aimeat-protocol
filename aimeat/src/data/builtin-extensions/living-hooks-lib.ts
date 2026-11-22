@@ -293,7 +293,7 @@ function livingFetchFailure(host, err) {
   if (msg.indexOf('RESPONSE_TOO_LARGE:') === 0) {
     return { code: 'TOO_LARGE',
       message: 'The answer from ' + host + ' is larger than 4 MB, the most this node reads of one '
-        + 'answer. Ask the far end for a smaller answer.' };
+        + 'answer. Ask the remote server for a smaller answer.' };
   }
   return { code: 'UPSTREAM_FAILED', message: 'The call to ' + host + ' did not complete: ' + msg };
 }

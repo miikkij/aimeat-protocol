@@ -150,18 +150,18 @@ Read tools return an \`ai_provenance\` block beside the content — \`aimeat_mem
 
 **An absent block means the origin is UNSTATED.** It does not mean a person wrote it. If
 you are summarising several items for a person, you can say "two of these were written by
-a model" only for the ones that carry a record; for the rest, say the origin is not stated.
+a model" only for the ones that have a record; for the rest, say the origin is not stated.
 
-Each record carries a pre-rendered \`disclosure\` with the exact words the node uses, in
+Each record has a pre-rendered \`disclosure\` with the exact words the node uses, in
 every language it ships. Quote those rather than composing your own — they are compliance
 text, not description.
 
 ## What the publishing surfaces do with it
 
 - A public page renders the EU AI transparency label when the record says one is owed.
-- The served HTML carries machine-readable marks and a link to the addressable record at
+- The served HTML contains machine-readable marks and a link to the addressable record at
   \`/v1/provenance/<id>\`, which anyone can resolve without an account once the content is public.
-- Markdown faces carry the record in frontmatter and one human-readable line in the body.
+- Markdown versions have the record in frontmatter and one human-readable line in the body.
 - The record is joined to the exact bytes by a SHA-256 hash, so a third party holding the
   content can ask this node whether it produced them. One exception: a file uploaded straight to
   its store (\`aimeat_storage_upload { direct: true }\`) never passes through the node, so its
@@ -173,7 +173,7 @@ The node writes an observed record, with no declaration from you, for everything
 through it: a text completion (hash of the text), a picture from \`aimeat_image_generate\` or
 \`POST /v1/ai/image\` (hash of the image bytes), a transcript from \`POST /v1/ai/transcribe\`
 (hash of the transcript text), and a spoken reply (hash of the audio bytes). The REST answer
-carries it in \`meta.provenance\`. When you store or publish that output, attach the record you
+has it in \`meta.provenance\`. When you store or publish that output, attach the record you
 were given rather than declaring a new one.
 
 ## What never goes in a record
@@ -240,7 +240,7 @@ Three separate "routing" layers — identify which one the owner means:
    eu (the EU first, the rest elsewhere), eu-only (the EU alone, with speech, image generation,
    embeddings and the free models off; \`mode.limits\` says so) or own (no shared key: the owner adds
    their own OpenRouter key). When an owner asks where their data goes, read it and say it in their words.
-   Every answer carries \`route\`: who chose, who answered, each attempt; an OpenRouter answer's
+   Every answer has \`route\`: who chose, who answered, each attempt; an OpenRouter answer's
    \`answeredBy.region\` says where it was processed, and \`regionWanted\` the region it was meant for
    when it fell back. Spend history is
    \`GET /v1/ai/usage/history\`, where each failed attempt before a fallback is a line of its own.

@@ -566,7 +566,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       }
 
       const btn = /** @type {any} */ (document.getElementById('aimeat-go-btn'));
-      btn.textContent = isFederated ? (i.connectingHome || 'Connecting to home node...') : (i.working || 'Working...');
+      btn.textContent = isFederated ? (i.connectingHome || 'Connecting to your AIMEAT...') : (i.working || 'Working...');
       btn.disabled = true;
       try {
         // Email and federated GHII go over as typed; a local GHII goes as the bare name.

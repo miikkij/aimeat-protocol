@@ -94,7 +94,7 @@ STEP 3: Complete Hello Integration.
   After all steps pass, perform post-onboarding setup as described in SKILL.md "After Onboarding" section:
     - Register the actual owner-facing slash commands you can handle at agents.{{agent_name}}.commands. Use a flat array of { name, description, category }. Do not copy sample commands or list internal MCP tools as message commands.
     - Publish actual runtime/config artifacts under agents.config.*. If you only use aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
-    - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* keys for same-owner handoff notes, project state, queues, and team context. Write shared entries with visibility "owner" and tags ["<tag>"], then list with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
+    - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* keys for notes passed between same-owner agents, project state, queues, and team context. Write shared entries with visibility "owner" and tags ["<tag>"], then list with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
     - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms-full.txt, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* key as a substitute.
 
 STEP 4: Load EXTEND modules.

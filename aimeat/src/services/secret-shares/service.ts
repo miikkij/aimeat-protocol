@@ -71,7 +71,7 @@ function e2eFill(body: Record<string, unknown>, maxBytes: number): { ok: true; e
     && typeof (k as Record<string, unknown>).wrapped === 'string' && ((k as Record<string, unknown>).wrapped as string).length < 4096)
     .map(k => ({ ghii: k.ghii.toLowerCase(), keyId: k.key_id, wrapped: k.wrapped }));
   const salt = typeof body.code_salt === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(body.code_salt) ? body.code_salt : null;
-  if (!keys.length && !salt) return refuse(400, 'INVALID_E2E_KEYS', 'An end-to-end share carries a wrapped key for at least one recipient device (e2e_keys) or a code salt (code_salt).');
+  if (!keys.length && !salt) return refuse(400, 'INVALID_E2E_KEYS', 'An end-to-end share contains a wrapped key for at least one recipient device (e2e_keys) or a code salt (code_salt).');
   return { ok: true, envelope, keys, salt };
 }
 
@@ -124,7 +124,7 @@ export async function createShare(deps: ShareDeps, caller: CallerContext, body: 
   const depositors = await resolvePeople(deps, depositorsIn); if (!depositors.ok) return depositors;
   if (terms.organismId) {
     const m = await deps.storage.getMembership(terms.organismId, caller.owner);
-    if (!m || m.status !== 'active') return refuse(403, 'NOT_A_MEMBER', 'A share sits in an organism\'s vault only when its maker is an active member of that organism.');
+    if (!m || m.status !== 'active') return refuse(403, 'NOT_A_MEMBER', 'A share is stored in an organism\'s vault only when its maker is an active member of that organism.');
   }
   const key = getEncryptionKey(deps.config); if (!key) return noKey();
   const maxBytes = shareMaxBytes(deps.config);

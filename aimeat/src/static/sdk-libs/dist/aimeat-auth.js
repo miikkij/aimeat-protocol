@@ -482,7 +482,7 @@
   }
   function reportUngrantableScopes(r) {
     try {
-      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
+      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a scope") + ", which this node cannot grant, and one such scope refuses the whole sign-in. Take the scopes from GET /v1/app-grants/scopes and publish the app again.");
     } catch {
     }
   }
@@ -3486,7 +3486,7 @@
           /** @type {any} */
           document.getElementById("aimeat-go-btn")
         );
-        btn.textContent = isFederated ? i.connectingHome || "Connecting to home node..." : i.working || "Working...";
+        btn.textContent = isFederated ? i.connectingHome || "Connecting to your AIMEAT..." : i.working || "Working...";
         btn.disabled = true;
         try {
           await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
@@ -3851,7 +3851,7 @@
       out += '<p class="aimeat-ai-text">' + escHtml(power.payer === "node" ? fill(i.powerLeftNode || "{left} of your allowance left.", { left: money(power.remainingUsd, "USD") }) : fill(i.powerLeft || "{left} left today. Daily limit {limit}.", { left: money(power.remainingUsd, "USD"), limit: money(power.limitUsd, "USD") })) + (power.low ? " <strong>" + escHtml(i.powerLow || "Running low.") + "</strong>" : "") + "</p>";
     }
     if (power.payer) {
-      out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === "node" ? i.payerNode || "This node pays." : power.payer === "agent" ? i.payerAgent || "The agent's own key pays." : i.payerOwn || "You pay with your own key.") + "</p>";
+      out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === "node" ? i.payerNode || "This server pays." : power.payer === "agent" ? i.payerAgent || "The agent's own key pays." : i.payerOwn || "You pay with your own key.") + "</p>";
     }
     if (power.state !== "ok" && power.fix) out += '<p class="aimeat-ai-text">' + escHtml(power.fix) + "</p>";
     if (power.state !== "ok" && main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiOwnStill || "Your connected AI still works on its own subscription.") + "</p>";
@@ -4113,7 +4113,7 @@
       powerLeftNode: "{left} of your allowance left.",
       powerLow: "Running low.",
       payerOwn: "You pay with your own key.",
-      payerNode: "This node pays.",
+      payerNode: "This server pays.",
       payerAgent: "The agent's own key pays.",
       canHead: "What you can do now",
       needHead: "This app uses",
@@ -4154,7 +4154,7 @@
       aiOff: "Tekoälyä ei ole vielä yhdistetty",
       aiAgents: "Agentteja: {n}",
       aiLatest: "Viimeksi käytössä: {name}",
-      aiChat: "Tämän noden chat on valmis",
+      aiChat: "Tämän palvelimen chat on valmis",
       aiConnect: "Yhdistä tekoäly",
       aiShow: "Näytä yhteydet",
       aiOwnStill: "Yhdistetty tekoälysi toimii silti omalla tilauksellaan.",
@@ -4166,7 +4166,7 @@
       powerLeftNode: "Osuuttasi on jäljellä {left}.",
       powerLow: "Virta on vähissä.",
       payerOwn: "Maksat omalla avaimellasi.",
-      payerNode: "Node maksaa.",
+      payerNode: "Tämä palvelin maksaa.",
       payerAgent: "Agentin oma avain maksaa.",
       canHead: "Mitä voit tehdä nyt",
       needHead: "Tämä sovellus käyttää",
@@ -4207,7 +4207,7 @@
       aiOff: "Aún no hay ninguna IA conectada",
       aiAgents: "Agentes: {n}",
       aiLatest: "Activa por última vez: {name}",
-      aiChat: "El chat de este nodo está listo",
+      aiChat: "El chat de este servidor está listo",
       aiConnect: "Conecta tu IA",
       aiShow: "Ver conexiones",
       aiOwnStill: "Tu IA conectada sigue funcionando con su propia suscripción.",
@@ -4219,7 +4219,7 @@
       powerLeftNode: "Te quedan {left} de tu asignación.",
       powerLow: "Queda poca.",
       payerOwn: "Pagas con tu propia clave.",
-      payerNode: "Paga este nodo.",
+      payerNode: "Paga este servidor.",
       payerAgent: "Paga la clave propia del agente.",
       canHead: "Qué puedes hacer ahora",
       needHead: "Esta aplicación usa",

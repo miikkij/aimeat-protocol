@@ -13,7 +13,7 @@ export const APP_BACK_OFFICE = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
 name: Back office
 version: 1.0.0
-description: Where the shop is run: products, prices, what is on the shelf, the terms, the enquiries that came in, and the prompt that lets any AI chat do the same work.
+description: Where the shop is run: products, prices, what is in stock, the terms, the enquiries that came in, and the prompt that lets any AI chat do the same work.
 entry: index.html
 -->
 <!--
@@ -67,7 +67,7 @@ entry: index.html
     <div id="tabs" class="tabs tabs-bordered max-w-4xl mx-auto px-4 pt-3">
       <button class="tab tab-active" data-tab="home">To do</button>
       <button class="tab" data-tab="products">Products</button>
-      <button class="tab" data-tab="stock">Shelf</button>
+      <button class="tab" data-tab="stock">Stock</button>
       <button class="tab" data-tab="pages">Pages</button>
       <button class="tab" data-tab="enquiries">Enquiries</button>
     </div>
@@ -84,7 +84,7 @@ entry: index.html
   [
     {
       "agent_name": "shopkeeper",
-      "readme_md": "# Shopkeeper\\n\\nThe interview, run by an agent instead of by a form.\\n\\nIt asks what you sell and who buys it, one question at a time, in your language, and writes the answers straight into the shop as they land. It does not fill a blank with something that merely sounds right: what you did not say is left out, which matters most for delivery promises and anything a buyer would rely on.\\n\\n**It never touches money.** Attaching a card and publishing anything public stay with you.",
+      "readme_md": "# Shopkeeper\\n\\nThe interview, run by an agent instead of by a form.\\n\\nIt asks what you sell and who buys it, one question at a time, in your language, and writes the answers straight into the shop as they come in. It does not fill a blank with something that merely sounds right: what you did not say is left out, which matters most for delivery promises and anything a buyer would rely on.\\n\\n**It never touches money.** Attaching a card and publishing anything public stay with you.",
       "tags": ["businesslauncher", "shop", "interview"],
       "process": "sequential",
       "agents": [
@@ -134,14 +134,14 @@ entry: index.html
         {
           "id": "price",
           "description": "Write or update the shop's price lists from the owner's own words: {{ctx.prompt}}\\n\\nProduce a retail list, and a trade list only if the owner sells to trade. Emit JSON shaped {\\"lists\\":[{\\"id\\",\\"label\\",\\"currency\\",\\"validFrom\\",\\"rows\\":[{sku,amountMinor,unit}]}]}. Every row names a sku that exists in the catalogue. Say beside each list what the numbers are based on.",
-          "expected_output": "One JSON object with a lists array, plus a short plain sentence per list saying what its numbers rest on.",
+          "expected_output": "One JSON object with a lists array, plus a short plain sentence per list saying what its numbers are based on.",
           "agent": "Pricer"
         }
       ]
     },
     {
       "agent_name": "scout",
-      "readme_md": "# Scout\\n\\nFinds out what comparable things cost, and puts the source next to every number.\\n\\nA figure with no source is an opinion, and this one does not produce those. Where the node can contract a company-register capability it uses it; where it cannot, it says so instead of guessing.\\n\\nRuns on a clock only if you switch it on: it spends tokens, and that is your decision.",
+      "readme_md": "# Scout\\n\\nFinds out what comparable things cost, and puts the source next to every number.\\n\\nA figure with no source is an opinion, and this one does not produce those. Where the node can contract a company-register capability it uses it; where it cannot, it says so instead of guessing.\\n\\nRuns on a schedule only if you switch it on: it spends tokens, and that is your decision.",
       "tags": ["businesslauncher", "shop", "research"],
       "process": "sequential",
       "agents": [
@@ -338,8 +338,8 @@ entry: index.html
       var pages = await AIMEAT.shop.pages();
       if (!pages || !pages.terms) steps.push({ label: 'Write your terms', why: 'A buyer should be able to read them before they buy.', act: 'goto:pages' });
       var avail = await AIMEAT.shop.availability();
-      if (!avail) steps.push({ label: 'Say what is on the shelf', why: 'Without it the shop cannot hold anything for a buyer.', act: 'goto:stock' });
-      if (shopMeta && !shopMeta.contact) steps.push({ label: 'Open a way to get in touch', why: 'Until you do, the shop front shows no contact form and nothing can reach the Enquiries tab.', act: 'contact' });
+      if (!avail) steps.push({ label: 'Say what is in stock', why: 'Without it the shop cannot hold anything for a buyer.', act: 'goto:stock' });
+      if (shopMeta && !shopMeta.contact) steps.push({ label: 'Open the contact form', why: 'Until you do, the shop front shows no contact form and nothing can reach the Enquiries tab.', act: 'contact' });
 
       if (!steps.length) {
         say('<div class="alert alert-success">Your shop is open and has everything it needs.</div>');
@@ -494,8 +494,8 @@ entry: index.html
       var avail = await AIMEAT.shop.availability();
       var units = (avail && avail.units) || {};
       var itemsIn = (cat && cat.items) || [];
-      say('<h2 class="text-lg font-bold mb-1">Shelf</h2>' +
-        '<p class="opacity-70 text-sm mb-4">How many of each you have. A hold takes one off here the moment a buyer reaches for it.</p>' +
+      say('<h2 class="text-lg font-bold mb-1">Stock</h2>' +
+        '<p class="opacity-70 text-sm mb-4">How many of each you have. A hold takes one off here the moment a buyer starts to buy it.</p>' +
         (itemsIn.length
           ? itemsIn.map(function (it) {
             return '<div class="flex items-center gap-3 mb-2">' +

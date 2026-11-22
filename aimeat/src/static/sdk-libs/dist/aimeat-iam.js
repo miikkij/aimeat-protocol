@@ -234,10 +234,10 @@
       remove: "Remove",
       decline: "Decline",
       dismiss: "Seen it",
-      carried: "{n} / {of} carried",
-      carriedNone: "none carried",
-      usage: "{n} calls, {cost} carried",
-      carriedWarn: "{n} not carried",
+      carried: "{n} / {of} covered",
+      carriedNone: "none covered",
+      usage: "{n} calls, {cost} covered",
+      carriedWarn: "{n} not covered",
       payingTitle: "Paying customers: {n}",
       payingLead: "They took a contract and let themselves in. Nothing here is waiting for you.",
       payingNone: "No paying customers yet.",
@@ -1411,7 +1411,7 @@
         if (op === "assign") return nodeAssign(authFetch2, app, args || {});
         if (op === "revoke") return nodeRevoke(authFetch2, app, args || {});
         if (op === "decline") return nodeDecline(authFetch2, app, args || {});
-        return Promise.resolve({ ok: false, error: `"${op}" is not a node-roster operation; the capability vocabulary lives in the app's extension` });
+        return Promise.resolve({ ok: false, error: `"${op}" is not a node-roster operation; the capability vocabulary is in the app's extension` });
       }
       return callAdmin(authFetch2, state.ext, state.dialect, op, args);
     },

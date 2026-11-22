@@ -137,7 +137,7 @@ export function validateExchangeTerms(body: Record<string, unknown>, by: string)
     }
     const tollRaw = body.toll_morsels ?? body.tollMorsels;
     if (tollRaw !== undefined && tollRaw !== null && (typeof tollRaw !== 'number' || !Number.isInteger(tollRaw) || tollRaw < 0 || tollRaw > 100)) {
-        return refuse(400, 'INVALID_INPUT', 'toll_morsels is the pacing each read carries: a whole number of morsels from 0 to 100. It is not a price.');
+        return refuse(400, 'INVALID_INPUT', 'toll_morsels is the pacing each read takes: a whole number of morsels from 0 to 100. It is not a price.');
     }
     const usageRaw = (body.usage_terms ?? body.usageTerms) as Record<string, unknown> | undefined;
     if (exchange && (!usageRaw || typeof usageRaw !== 'object')) {

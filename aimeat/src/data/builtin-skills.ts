@@ -316,7 +316,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     visibility: 'public',
     skillMd: `---
 name: aimeat-node-guide
-description: Start here — how to work with this AIMEAT node. Covers what the node is, discovering its interfaces, human registration and login, connecting an AI agent, memory, loading skills and handbooks, building apps, and where every other feature's guide lives. Use when you first encounter an AIMEAT node or need the paved path to any of its features.
+description: Start here — how to work with this AIMEAT node. Covers what the node is, discovering its interfaces, human registration and login, connecting an AI agent, memory, loading skills and handbooks, building apps, and where every other feature's guide lives. Use when you first encounter an AIMEAT node or need the steps for any of its features.
 license: MIT
 metadata:
   audience: agent
@@ -336,7 +336,7 @@ Fetch these in order of depth; each is self-describing:
 1. \`GET /\` with \`Accept: application/json\` (or \`/?format=json\`) — the machine-readable
    getting-started guide: endpoints, auth options, current feature set.
 2. \`GET /llms-full.txt\` — the full agent-facing manual for everything on the node
-   (\`/llms.txt\` is its index, if you want the map first).
+   (\`/llms.txt\` is its index, if you want the overview first).
 3. \`GET /.well-known/aimeat\` — node id, type, public key, capabilities.
 4. \`GET /v1/spec\` — the complete OpenAPI contract; \`GET /.well-known/api-catalog\` links
    every machine interface; \`GET /.well-known/mcp.json\` describes the MCP server.
@@ -370,7 +370,7 @@ Fetch these in order of depth; each is self-describing:
 
 ## Agents: connect via device authorization (RFC 8628)
 
-Agents are never created implicitly. The paved path:
+Agents are never created implicitly. The steps:
 
 1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code. It names the
    owner by account name, or by the account's verified email; the email form is counted per
@@ -405,16 +405,16 @@ tools are named \`aimeat_*\`). New agents: run the onboarding checks
 ## Handbooks — the per-feature manuals
 
 - \`GET /v1/agents/me/handbook\` — your operating handbook: directives, task queue, economy.
-- \`GET /v1/agents/me/handbook/{module}\` — deep dives: tasks, messages, work, services,
+- \`GET /v1/agents/me/handbook/{module}\` — the detailed modules: tasks, messages, work, services,
   memory, activity, social, collaboration, appdev, mcp.
 - \`GET /v1/agents/me/handbook/offerings\` — publishing offers and workflow-compatible services.
 - MCP equivalent: \`aimeat_handbook_get\`.
 
-## Memory — where all data lives
+## Memory — where all data is stored
 
 Everything is a memory record under an identity, keyed by namespaced paths
 (\`settings.\`, \`agents.{name}.\`, \`organism.{org}.w.{ws}.\`). Read/write via
-\`GET|POST /v1/memory\` or \`aimeat_memory_read|write|list|search\`. Visibility ladder:
+\`GET|POST /v1/memory\` or \`aimeat_memory_read|write|list|search\`. Visibility levels:
 private < owner < group < workspace < members < public. Raise visibility only with the
 owner's explicit confirmation. A write that names no visibility gets the level this node gives new
 content, which its operator sets (private for a record unless the operator chose otherwise).
@@ -461,7 +461,7 @@ through what they contribute, and what their agents write and call draws on it
 ## Principles
 
 - Read before you write; propose before you change the owner's data.
-- Use the paved paths above instead of guessing endpoints — every list here is served
+- Use the documented calls above instead of guessing endpoints — every list here is served
   fresh by the node itself.
 `,
   },
@@ -479,7 +479,7 @@ metadata:
 
 # Manage my profile data
 
-## Where data lives
+## Where data is stored
 Everything is MEMORY records under the owner's identity (GHII) or their agents' identities
 (GAII). Keys are namespaced paths (e.g. \`settings.\`, \`agents.{name}.\`, \`organism.{id}.w.{ws}.\`).
 
@@ -487,7 +487,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
 - **What do I have?** \`aimeat_memory_list\` (prefix filters), \`aimeat_memory_search\` for
   content search, \`aimeat_discover\` for a cross-domain map.
 - **Read/write:** \`aimeat_memory_read\` / \`aimeat_memory_write\`.
-- **Visibility ladder** (low → high reach): private < owner < group < workspace < organism:<id> <
+- **Visibility levels** (low → high reach): private < owner < group < workspace < organism:<id> <
   members < public. \`organism:<id>\` is the active members of one organism the owner belongs to;
   \`members\` is every account signed in to this node. Neither leaves the node; \`public\` is
   federated — visible beyond this node. \`workspace\` is a REST-only tier today:
@@ -530,7 +530,7 @@ metadata:
 
 # Use app-bound skills
 
-An AI-boosted app's usage knowledge lives WITH the app as bound skills, not in your prompt.
+An AI-boosted app's usage knowledge is stored WITH the app as bound skills, not in your prompt.
 Before driving any app, check for them.
 
 ## Before operating an app
@@ -548,7 +548,7 @@ Before driving any app, check for them.
    the agent reading its own.
 
 ## Authoring app expertise
-Put the binding in the SKILL.md frontmatter so it travels with the skill:
+Put the binding in the SKILL.md frontmatter so it is part of the skill:
 
     ---
     name: my-app-guide
@@ -561,7 +561,7 @@ Publish with \`aimeat_skill_publish\`. A guide the app's public pages list needs
 \`visibility: "public"\`, and a NEW skill with a binding is public when you name no visibility (the
 answer's \`visibility_default\` says so; pass \`visibility: "owner"\` to keep it to your owner). When
 the node asks the owner before making something public, the answer
-carries \`publish_request\` and the skill becomes public once they approve at its \`approve_url\`.
+contains \`publish_request\` and the skill becomes public once they approve at its \`approve_url\`.
 On a node that shows its content to its signed-in accounts only, the skill is saved for the
 signed-in accounts (\`members\`) and the answer's \`warnings\` say so (PUBLIC_IS_SIGNED_IN_HERE).
 Owners can also attach/detach an existing skill from the profile Apps tab. The app catalog shows bound skills on the app's detail page.
@@ -615,7 +615,7 @@ skill discovery.)
 Write the files the same way, into the folder that agent reads Agent Skills from (for example
 \`~/.agents/skills/{name}/\`), and stamp the same two lines. Copy the node's text as it is: a rule
 of your own for this machine (its shell, its launcher) goes into a separate skill, never into the
-copy, so the copy can be replaced whole when the node's version moves on. A hand-edited copy is
+copy, so the copy can be replaced whole when the node's version changes. A hand-edited copy is
 the one that goes stale: it keeps its agent on instructions the node has replaced.
 
 ## Checking for updates
@@ -657,7 +657,7 @@ metadata:
    error and the next run goes ahead. A schedule that fails five times in a row is paused, and its
    owner is told in the notifications. A one-shot (max_runs 1) that fails is turned off at once and
    not retried: it keeps \`lastRunError\` and has no next run, and the owner turns it on again or runs
-   it now once the cause is fixed. A run that fell while the node was down is logged as skipped
+   it now once the cause is fixed. A run that was due while the node was down is logged as skipped
    with a message starting \`Missed:\` and is not made up. While the operator has deactivated the
    account, its schedules are logged as skipped with outcome \`stopped\` and a message that names
    the deactivation, its workflow triggers start nothing, and nothing is deleted: they run again at
@@ -676,7 +676,7 @@ metadata:
    a connected outside app, \`connections:use\` for a scheduled post), or the file a publishing schedule names is one its maker may no longer read. Each
    of these is logged as an error with that sentence, and nothing ran. The fix is the maker's
    permission or a schedule made again by someone who has it, never the cron. A schedule an app made
-   before 2026-10-05 carries no grant, so the node cannot tell which app made it and says so. A
+   before 2026-10-05 has no grant, so the node cannot tell which app made it and says so. A
    schedule older than the account itself was left by an earlier holder of the account name, does
    not run, and is deleted.
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
@@ -695,7 +695,7 @@ metadata:
    AI and which ai step did not start. When \`costCap.neededUsd\` is present, the run had not spent
    the limit: that step was expected to cost \`neededUsd\` (its \`estimateUsd\`, the most one attempt
    of it cost in the workflow's last ten finished runs), and that did not fit in what was left. Each
-   step carries its own \`costUsd\`, and \`signalCostUsd\` is what the node's model cost judging the
+   step has its own \`costUsd\`, and \`signalCostUsd\` is what the node's model cost judging the
    run's \`llm\` signals. An ai step whose earlier steps are done and that stays \`pending\` while a
    model call is open is waiting for room under the limit. A step's \`openCalls\` lists its calls
    still running, each with what it holds (\`reservedUsd\`) until it answers, even when the watchdog
@@ -709,16 +709,16 @@ metadata:
    started it (for a trigger's run, the saver), and the node asks that principal again before it
    starts each step. When it is gone, or no longer holds a permission that step needs, the step is
    not started, the steps not yet finished are skipped, and \`refusal.stoppedBefore\` names the step
-   that did not start. The owner is told once and has the same three ways on.
+   that did not start. The owner is told once and has the same three choices.
 7. **An ai step that failed on its provider:** the error names the refusal. 400
    \`AI_CAPABILITY_UNAVAILABLE\` lists each provider with the reason it was left out (\`untested\`,
    \`failing\`, \`no-key\`, \`no-model\`, \`capability-off\`, \`leaves-machine\`, and \`too-costly\` when the
    owner's routing sets a ceiling per call that the model's catalogue price exceeds); \`aimeat_ai_providers\`
    shows each provider's health, and \`aimeat_ai_provider_test\` checks one again. A provider that
-   failed three times in a row is gone round for five minutes while another can answer, and one
-   whose key was refused waits for the owner's test or a new key. The refusal's details carry
+   failed three times in a row is skipped for five minutes while another can answer, and one
+   whose key was refused waits for the owner's test or a new key. The refusal's details contain
    \`fix\`, the sentence to tell the owner, and \`settingsUrl\`, the link that opens their AI settings
-   at the provider to fix. An answer that did come carries \`route\`: when \`fellBack\` is true, the
+   at the provider to fix. An answer that did come contains \`route\`: when \`fellBack\` is true, the
    first provider failed and the attempts say why. A 402 \`QUOTA_EXHAUSTED\` on the node's key means
    the owner's allowance is spent and the operator's setting refuses, or a daily cap the operator
    set was reached, or the call would cost more than is left (the node prices a call before it
@@ -728,7 +728,7 @@ metadata:
    A step that named no model is answered by the free model instead only when the free model as the
    last resort is on for the owner (\`free_model\` on \`GET /v1/ai/routing\`); off, it gets this 402 too.
    A 402 \`AI_BALANCE_SPENT\` means the node's own key has reached the limit it was bought with (a
-   node from the store keeps its owner's AI allowance as that limit). Its details carry \`choices\`:
+   node from the store keeps its owner's AI allowance as that limit). Its details contain \`choices\`:
    buy more in the store, the owner's own key, or the free model, which only the owner's own rule
    turns on here (\`freeModelLastResort: true\`). A top-up is seen within a minute.
    A 400 \`AI_MODEL_NOT_IN_REGION\` means the step's model is not offered in the OpenRouter region the

@@ -118,7 +118,7 @@ entry: index.html
     function renderSetup() {
       const el = $app();
       el.innerHTML = '<h2 class="text-lg font-bold mb-2">Set up your signage</h2>' +
-        '<p class="opacity-70 mb-3 text-sm">Signage lives in your OWN organism so no one else can see or edit it. ' +
+        '<p class="opacity-70 mb-3 text-sm">Signage is stored in your OWN organism so no one else can see or edit it. ' +
         'This app cannot create the organism for you — paste the prompt below into your AIMEAT-connected AI (Claude, etc.) once, ' +
         'and it will provision your private signage workspace. Then reload this page.</p>' +
         '<div class="mockup-code text-xs whitespace-pre-wrap p-3" id="setup-box"></div>' +
@@ -248,7 +248,7 @@ entry: index.html
     // The AGENT face is a prompt, not code. Any MCP agent edits the SAME screen documents.
     function agentPrompt() {
       return [
-        'You manage digital signage that lives in an AIMEAT workspace. Use your AIMEAT MCP tools.',
+        'You manage digital signage that is stored in an AIMEAT workspace. Use your AIMEAT MCP tools.',
         '',
         'Workspace: organism_id "' + CTX.orgId + '", ws "' + CTX.wsId + '", document space "' + SPACE + '".',
         'A SCREEN is ONE document in that space. Its markdown body is a \`\`\`json fenced payload:',
@@ -522,7 +522,7 @@ entry: index.html
 export function digitalSignagePackage(): ExamplePackageDef {
   return {
     name: 'digital-signage',
-    description: 'Agent-faced digital signage: manage screens from the admin app OR from any AI chat/agent, and display them on a kiosk TV with no login. Each screen is one shared workspace document; content lives in your own private organism.',
+    description: 'Agent-faced digital signage: manage screens from the admin app OR from any AI chat/agent, and display them on a kiosk TV with no login. Each screen is one shared workspace document; content is stored in your own private organism.',
     category: 'iot',
     tags: ['signage', 'kiosk', 'display', 'agent-faced', 'announcements'],
     visibility: 'public',

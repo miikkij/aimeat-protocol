@@ -74,7 +74,7 @@ export async function runConnectionsPublishJob(
   const key = requireEncryptionKey(config);
   // No key means no credential can be read, so nothing could have been published anyway. A thrown
   // error puts it in the run log where an operator will see it, rather than passing silently.
-  if (!key) throw new Error('this node has no encryption key, so it cannot read a stored credential');
+  if (!key) throw new Error('this server has no encryption key, so it cannot read a stored credential');
 
   const out = await runOwnPublish(
     { config, storage, providers: buildOutboundProviders(config), key },

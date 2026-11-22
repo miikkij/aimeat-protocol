@@ -275,7 +275,7 @@ export class MailboxNotificationService {
       await this.emailTransport.sendMail({
         from: this.config.smtpFrom,
         to: email,
-        subject: tpl.subject ?? `AIMEAT: ${payload.pending_count} pending message(s) for your node`,
+        subject: tpl.subject ?? `AIMEAT: ${payload.pending_count} pending message(s) for your AIMEAT`,
         text: [
           tpl.body,
           '',

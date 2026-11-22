@@ -53,7 +53,7 @@ export const GUIDED_JOURNEY_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-guided-journey
-description: How to walk a person along their path on an AIMEAT node, one stage per conversation. First their profile (a short interview made into a business card that people and AIs can read), then a good AI of their own, that AI connected, sharing with someone, an organism where their work lives, apps, and agents that work while they are away. At each stage, say what they get and where it leads. Use when the handbook says the person has not walked the path, when they are new, when they ask what this place is for, what to do next or how something here works, and when a piece of work has just finished.
+description: How to walk a person along their path on an AIMEAT node, one stage per conversation. First their profile (a short interview made into a business card that people and AIs can read), then a good AI of their own, that AI connected, sharing with someone, an organism where their work is kept, apps, and agents that work while they are away. At each stage, say what they get and where it leads. Use when the handbook says the person has not walked the path, when they are new, when they ask what this place is for, what to do next or how something here works, and when a piece of work has just finished.
 license: MIT
 metadata:
   audience: agent
@@ -75,7 +75,7 @@ person when it is done, not what the feature is called.
 ## Read where they are first
 
 The end of your handbook (\`aimeat_handbook_get\`) lists the seven stages as done, open or declined,
-what the person said they want, and the answers from their profile interview. Their own words live
+what the person said they want, and the answers from their profile interview. Their own words are stored
 in one memory record, \`journey.state\`, in their own scope: read it with
 \`aimeat_memory_read { key: "journey.state", owner_scope: true }\`.
 
@@ -109,7 +109,7 @@ done is never written: the node works it out from what the account holds, so it 
 - **Say it once.** If they say no or not now, write the stage into \`declined\` with today's date and
   do not offer it again. They can ask for it any time.
 - **Do the stage with them.** A stage is finished when something exists that they can open: a link,
-  a record, a member, an agent that ran. Hand over the address.
+  a record, a member, an agent that ran. Give them the address.
 - **The page is for approving, paying and looking.** The list of what happens on the screen, with
   the links, is at the end of this skill. Everything else happens here, in the chat.
 - **Offer from what exists.** Once you know what they need, \`aimeat_handbook_get { tier:
@@ -136,7 +136,7 @@ they want to be quick; never ask two at once.
 2. What does a normal week look like: what takes most of your time?
 3. What are you trying to get done right now?
 4. What gets in the way, or keeps slipping?
-5. What do you do again and again that you would gladly hand to someone else?
+5. What do you do again and again that you would gladly pass to someone else?
 6. What feels unclear or complicated to you at the moment?
 7. What should other people, and their AIs, know about you: what you offer, what you look for, and
    how to reach you?
@@ -204,7 +204,7 @@ one that fits. The stage is done when someone else is in a shared place with the
 they asked or answered is solved. Experience Center: layer L5, Agents + apps together, and B6,
 EXCHANGE, for selling.
 
-### 5. An organism, where their work lives between conversations
+### 5. An organism, where their work is kept between conversations
 
 What they get: one place where they, the people they invite and all their AIs read and write the
 same notes, documents and decisions, and nothing goes out without a person. They need one when more

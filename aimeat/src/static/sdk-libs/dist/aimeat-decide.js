@@ -63,16 +63,16 @@
     const code = r && r.error && r.error.code || "UNKNOWN";
     const said = r && r.error && r.error.message;
     const human = {
-      DECIDE_DISABLED: "The decision model is turned off on this node.",
-      NO_API_KEY: "No TypeSafe key is set. The owner adds one in AI settings, or the operator gives the node one.",
+      DECIDE_DISABLED: "The decision model is turned off on this server.",
+      NO_API_KEY: "No TypeSafe key is set. The owner adds one in AI settings, or the operator gives the server one.",
       QUOTA_EXHAUSTED: "The AI budget or allowance is used up for now.",
       APP_QUOTA_EXHAUSTED: "This app has used its AI budget for today.",
       DATAMAP_REQUIRED: "This app must say in its data map that data goes to TypeSafe before it can ask.",
       RATE_LIMITED: "Too many decisions at once. Try again in a moment.",
       INVALID_REQUEST: "The questions do not fit the model limits.",
-      PROVIDER_CANNOT_CARRY: "The chosen decision provider cannot carry these questions. Use another provider, or ask fewer options.",
-      UNKNOWN_PROVIDER: "That decision provider is not available on this node.",
-      PRIVATE_EGRESS_REQUIRED: "The decision provider runs on this machine, and the operator has not allowed the node to reach it."
+      PROVIDER_CANNOT_CARRY: "The chosen decision provider cannot take these questions. Use another provider, or ask fewer options.",
+      UNKNOWN_PROVIDER: "That decision provider is not available on this server.",
+      PRIVATE_EGRESS_REQUIRED: "The decision provider runs on this machine, and the operator has not allowed the server to reach it."
     }[code];
     const err = (
       /** @type {Error & { code?: string, details?: any }} */

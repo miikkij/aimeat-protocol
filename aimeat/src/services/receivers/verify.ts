@@ -101,7 +101,7 @@ export async function verifyReceiverRequest(
 ): Promise<{ ok: true; ctx: ReceiverContext } | Refusal> {
     const refuse = (status: number, code: string, message: string): Refusal => ({ ok: false, status, code, message });
     if (rq.keyInAddress) {
-        return refuse(400, 'KEY_IN_ADDRESS', 'An incoming webhook\'s API key never travels in the address, where logs keep it. Send it as "Authorization: Bearer aimeat_rcv_…", and change this API key now: it has been written down somewhere.');
+        return refuse(400, 'KEY_IN_ADDRESS', 'An incoming webhook\'s API key is never sent in the address, where logs keep it. Send it as "Authorization: Bearer aimeat_rcv_…", and change this API key now: it has been written down somewhere.');
     }
     const header = rq.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';

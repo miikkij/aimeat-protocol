@@ -230,7 +230,7 @@ function gate(caller: ConsentCaller): ConsentRefusal | null {
     if (privileged || hasScope(caller.scopes, 'consent:manage')) return null;
     return {
         ok: false, status: 403, code: 'SCOPE_DENIED',
-        message: 'Changing who may read your data needs the "consent:manage" permission, which this session does not carry.',
+        message: 'Changing who may read your data needs the "consent:manage" permission, which this session does not have.',
     };
 }
 

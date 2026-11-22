@@ -133,7 +133,7 @@ export const EFFECTS: readonly AtelierEffect[] = [
     proof: 'overlay',
     params: [
       { name: 'pitch', kind: 'number', min: 2, max: 8, default: 3, unit: 'px', what: 'The distance from one line to the next.' },
-      { name: 'strength', kind: 'number', min: 0, max: 0.3, default: 0.12, what: 'How dark the lines are: the share of ink laid on each one. Under words, about a quarter is what every look carries; the matrix says per look.' },
+      { name: 'strength', kind: 'number', min: 0, max: 0.3, default: 0.12, what: 'How dark the lines are: the share of ink laid on each one. Under words, about a quarter is what every look uses; the matrix says per look.' },
     ],
     reads: ['--ak-ink'],
     fitsLooks: ['broadcast', 'terminal', 'neon-dense'],
@@ -151,7 +151,7 @@ export const EFFECTS: readonly AtelierEffect[] = [
     proof: 'overlay',
     params: [
       { name: 'size', kind: 'number', min: 0.4, max: 1, default: 0.75, what: 'How far from the centre the light reaches before the shadow begins, as a share of the box.' },
-      { name: 'strength', kind: 'number', min: 0, max: 0.7, default: 0.25, what: 'How dark the corners get: the share of ink at the very edge. Under words, about a quarter is what every look carries and a third is a world\'s limit; a picture takes the whole range.' },
+      { name: 'strength', kind: 'number', min: 0, max: 0.7, default: 0.25, what: 'How dark the corners get: the share of ink at the very edge. Under words, about a quarter is what every look uses and a third is a world\'s limit; a picture takes the whole range.' },
     ],
     reads: ['--ak-ink'],
     fitsLooks: ['gallery', 'stage', 'lounge', 'editorial'],
@@ -174,7 +174,7 @@ export const EFFECTS: readonly AtelierEffect[] = [
     ],
     reads: ['--ak-ink', '--ak-bg', '--ak-accent', '--ak-spectrum-2', '--ak-spectrum-3'],
     fitsLooks: ['riso', 'gallery', 'broadsheet', 'vivid'],
-    note: 'feColorMatrix (the luminance rows) → feComponentTransfer with a two-entry table per channel, shadow to light (a straight ramp between the two tokens, the same map duotoneSrgb() computes) → feComposite arithmetic mixing back toward the source by 1 − strength; color-interpolation-filters="sRGB" so the browser and the proof agree. A PICTURE effect, never a ground, and the matrix is why: it maps page, card, ink, dimmed ink and accent text through the same ramp (AK-FX colour), and measured on 2026-09-05 the dimmed ink lands in the middle of a two-colour ramp on 18 of 19 looks (as low as 1.2:1), because a ramp between two inks has half its range where secondary text sits. Words under a duotone are unreadable by construction; a hero image, a picture card or a figure is what it is for.',
+    note: 'feColorMatrix (the luminance rows) → feComponentTransfer with a two-entry table per channel, shadow to light (a straight ramp between the two tokens, the same map duotoneSrgb() computes) → feComposite arithmetic mixing back toward the source by 1 − strength; color-interpolation-filters="sRGB" so the browser and the proof agree. A PICTURE effect, never a ground, and the matrix is why: it maps page, card, ink, dimmed ink and accent text through the same ramp (AK-FX colour), and measured on 2026-09-05 the dimmed ink ends up in the middle of a two-colour ramp on 18 of 19 looks (as low as 1.2:1), because a ramp between two inks has half its range where secondary text sits. Words under a duotone are unreadable by construction; a hero image, a picture card or a figure is what it is for.',
   },
   {
     id: 'recolour',
@@ -207,7 +207,7 @@ export const EFFECTS: readonly AtelierEffect[] = [
     params: [
       { name: 'scale', kind: 'number', min: 2, max: 40, default: 12, unit: 'px', what: 'How far a pixel may be pushed: the warp\'s strength.' },
       { name: 'frequency', kind: 'number', min: 0.002, max: 0.05, default: 0.012, what: 'How fine the ripples are: low is a slow swell, high is a shimmer.' },
-      { name: 'octaves', kind: 'number', min: 1, max: 2, default: 1, what: 'How much fine detail the noise carries; two costs twice the paint.' },
+      { name: 'octaves', kind: 'number', min: 1, max: 2, default: 1, what: 'How much fine detail the noise has; two costs twice the paint.' },
       { name: 'duration', kind: 'number', min: 200, max: 1500, default: 700, unit: 'ms', what: 'How long a moment takes to swell to full scale and settle back; a still ignores it.' },
     ],
     reads: [],

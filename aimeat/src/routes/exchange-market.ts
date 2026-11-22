@@ -439,7 +439,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           method: 'POST', url: '/v1/exchange/work',
           body: `{ "offering_id": "${o.offeringId}", "input": { … } }`,
           auth: 'Your own AIMEAT token — the accepted contract authorises starting work; no separate API key.',
-          note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + rake against your budget).`,
+          note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + platform fee against your budget).`,
         },
         stats, tollMorsels,
       };

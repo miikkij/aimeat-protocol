@@ -457,7 +457,7 @@ footer a{text-decoration:none;border-bottom:2px solid var(--ink);color:var(--ink
 <h1>${esc(info.title)}</h1>
 <p class="meta">Published by ${esc(who)} for the app "${esc(appName)}". Updated ${esc(updated)}.</p>
 ${renderMarkdownLite(doc.content)}
-<footer>This page is written and published by the app's owner, ${esc(who)}, who answers for the app and for what this page says. The node it runs on, <a href="${esc(base)}/">${esc(base.replace(/^https?:\/\//, ''))}</a>, has its own <a href="${esc(base)}/v1/terms">terms</a> and <a href="${esc(base)}/v1/privacy">privacy notice</a>, which cover the node and not this app.</footer>
+<footer>This page is written and published by the app's owner, ${esc(who)}, who answers for the app and for what this page says. The AIMEAT server it runs on, <a href="${esc(base)}/">${esc(base.replace(/^https?:\/\//, ''))}</a>, has its own <a href="${esc(base)}/v1/terms">terms</a> and <a href="${esc(base)}/v1/privacy">privacy notice</a>, which cover that server and not this app.</footer>
 </main>
 </body>
 </html>

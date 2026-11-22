@@ -56,7 +56,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         module: '/components/ThreadList.js', sheet: '/css/components/thread-list.css',
         data: {
             shape: 'ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) · ThreadPerson({ expanded, onClick, children })',
-            fields: { threads: '[{ id, title, turns }]', activeId: 'the open one', onOpen: 'open a thread', onNew: 'start one', onDelete: 'delete one', onClose: 'the phone\'s way back', children: 'what goes under the list in the rail; in ThreadPerson, its words', expanded: 'the person\'s conversations are shown' },
+            fields: { threads: '[{ id, title, turns }]', activeId: 'the open one', onOpen: 'open a thread', onNew: 'start one', onDelete: 'delete one', onClose: 'the phone\'s back link', children: 'what goes under the list in the rail; in ThreadPerson, its words', expanded: 'the person\'s conversations are shown' },
         },
         useFor: ['The rail of the chat page, and its drawer on a phone.', 'Messages: your conversations with people, grouped by person (the rows as markup, .poster-thread-list).'],
         variants: [
@@ -176,7 +176,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'nudge', name: 'Nudge', kind: 'component', status: 'active',
-        summary: 'One suggestion, once, in a dashed frame, with the way out on the same line.',
+        summary: 'One suggestion, once, in a dashed frame, with the dismiss link on the same line.',
         module: '/components/Nudge.js', sheet: '/css/components/nudge.css',
         data: { shape: 'MobileNudge({ onDismiss })', fields: { onDismiss: 'stores "not now" with the person' } },
         useFor: ['The one nudge to put the chat on a phone, shown on a desktop when no device is subscribed.'],
@@ -241,7 +241,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
                 menuLabel: 'the ⋯ menu\'s name', actions: 'draft, comment, board: the page\'s actions under the words', children: 'Message: what stands under the words (link previews); Thread: the messages',
                 scrollRef: 'Thread: a ref the page holds to follow the newest message', capped: 'Thread: inside a page, it scrolls after 400px',
                 'Thread.tone': '"comments": the comments under a record or a document, under a hairline',
-                'ThreadDay.children': 'the day a run of messages was written', 'ThreadTop.children': 'the line at the top (the way to older messages)',
+                'ThreadDay.children': 'the day a run of messages was written', 'ThreadTop.children': 'the line at the top (the link to older messages)',
                 'ThreadForm.children': 'the form under a thread of comments', 'Listen.id': 'which message reads', 'Listen.text': 'what it reads',
                 useSpeechPhase: '(id) → "" | speaking | paused: the reader\'s phase for one message', flashMessage: '(domId): scroll a message into view and flash it',
             },
@@ -259,7 +259,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
             { name: 'flash', class: 'message--flash', prop: 'flashMessage(id)', when: 'a message a quote jumped to, for a moment' },
         ],
         example: { mine: false, who: 'mika', body: 'The client wants the coral **a little warmer**.', time: '10:42', marks: [{ text: 'AI wrote this', tone: 'ai' }] },
-        note: 'Built on 2026-09-26 from Messages\' MessageBubble (views/profile/inbox-tab), the suggested reply\'s dashed box, a workspace comment (comments.css, .pj-comment*) and a board reply (.bp-reply) as one component with tones. It wears turn.css (the chat\'s turn) under its own sheet.',
+        note: 'Built on 2026-09-26 from Messages\' MessageBubble (views/profile/inbox-tab), the suggested reply\'s dashed box, a workspace comment (comments.css, .pj-comment*) and a board reply (.bp-reply) as one component with tones. It uses turn.css (the chat\'s turn) under its own sheet.',
     },
     {
         id: 'message-file', name: 'MessageFile', kind: 'component', status: 'active',
@@ -370,13 +370,13 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'conversation-pane', name: 'ConversationPane', kind: 'component', status: 'active',
-        summary: 'The messenger\'s frame: the list of conversations beside the open one, and on a phone one pane at a time with a way back, the open one over the whole screen. The open pane\'s head says who (a picture, the name with its presence word), the subject and "sent by your agent", with its ways on as small action links whose words go when the pane is narrow. Over the composer stand the fields and the "replying to" bar; a read-only conversation says so in the composer\'s place; a strip across the pane holds an agent\'s commands, on the grey ground for a command to fill in.',
+        summary: 'The messenger\'s frame: the list of conversations beside the open one, and on a phone one pane at a time with a back link, the open one over the whole screen. The open pane\'s head says who (a picture, the name with its presence word), the subject and "sent by your agent", with its ways on as small action links whose words go when the pane is narrow. Over the composer stand the fields and the "replying to" bar; a read-only conversation says so in the composer\'s place; a strip across the pane holds an agent\'s commands, on the grey ground for a command to fill in.',
         module: '/components/ConversationPane.js', sheet: '/css/components/conversation-pane.css',
         data: {
             shape: 'Panes({ open, backLabel, onBack, side, head, label, framed, children }) · Pane({ empty, page, children }) · PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) · '
                 + 'PaneDoor({ mark, label, title, pressed, onClick }) · PaneFields({ children }) · ReplyBar({ label, text, onJump, cancelLabel, onCancel }) · PaneNote({ children }) · PaneScroll({ children }) · PaneStrip({ grey, children })',
             fields: {
-                open: 'Panes: a conversation is open (on a phone the open pane over the whole screen)', backLabel: 'the phone\'s way back', onBack: 'goes back to the list',
+                open: 'Panes: a conversation is open (on a phone the open pane over the whole screen)', backLabel: 'the phone\'s back link', onBack: 'goes back to the list',
                 side: 'Panes: the list of conversations; framed: the list\'s rows', empty: 'Pane: nothing is open, the words say what to do',
                 framed: 'Panes: the same two panes on a page, in one frame: a list beside the thing opened from it (the operator\'s System prompts page)',
                 head: 'Panes framed: what stands over the list (a search and its filters)', 'Panes.label': 'Panes framed: the list\'s name for a screen reader', page: 'Pane: a page\'s column (its height follows its words, no head)',

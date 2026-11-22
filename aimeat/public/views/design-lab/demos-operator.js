@@ -236,16 +236,16 @@ export const OPERATOR_DEMOS = {
 
   'store-door': { variants: [
     { name: 'store open', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${false}
-      class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />` },
+      class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Go to the store →" />` },
     { name: 'opens soon', render: () => html`<div>
       <${StoreSoonNote} soon=${true} />
       <${StoreDoor} href="https://store.example.com" soon=${true} code=""
-        class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />
+        class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Go to the store →" />
     </div>` },
     { name: 'a link, opens soon', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true} code=""
       class="ld-sh-door showroom-door" label="Get your own →" />` },
     { name: 'opens soon, with a code to press for', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true} code="EARLY20"
-      class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />` },
+      class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Go to the store →" />` },
     { name: 'the code, pressed', render: () => html`<${StoreSoonCode} code="EARLY20" />` },
   ] },
 

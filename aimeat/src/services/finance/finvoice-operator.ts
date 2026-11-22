@@ -93,7 +93,7 @@ function restOperator(config: AimeatConfig): FinvoiceOperator {
         // eslint-disable-next-line aimeat/no-silent-catch -- a non-JSON ack is handled by the missing-id error below; the raw body is already in that error's context
       } catch { /* non-JSON ack */ }
       if (!messageId) {
-        logger.warn('[finvoice] operator ack carried no message id', { ack: redactKeyShaped(text.slice(0, 200)) });
+        logger.warn('[finvoice] operator ack had no message id', { ack: redactKeyShaped(text.slice(0, 200)) });
         throw new FinanceError('OPERATOR_PROTOCOL', 502,
           'The e-invoice operator accepted the invoice but did not say how to follow it. The node operator can see its answer in the node log.');
       }

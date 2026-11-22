@@ -214,7 +214,7 @@ export function registerCoreDataPackageTools(
                     issues: out.issues.slice(0, 50),
                     issues_total: out.issues.length,
                     published: false,
-                    note: 'Nothing was written. The package still stands on its previous version.',
+                    note: 'Nothing was written. The package is still at its previous version.',
                 });
             }
             // The open page hears about it, the same domain POST /v1/datapackages emits.
@@ -239,7 +239,7 @@ export function registerCoreDataPackageTools(
                 note: out.unchanged
                     ? 'Identical content was already published — this is NOT a new version. Say "no change", not "updated".'
                     : 'Published. descriptor_url is permanent, needs no authentication and answers byte ranges: give it to '
-                        + 'DuckDB, pandas, frictionless-py, Excel or a person. Do not re-download the rows to hand them on.',
+                        + 'DuckDB, pandas, frictionless-py, Excel or a person. Do not re-download the rows to pass them on.',
             });
         },
     );
@@ -291,7 +291,7 @@ export function registerCoreDataPackageTools(
                         sheets: `=IMPORTDATA("${csvUrl}")`,
                         frictionless: `frictionless.Package('${opened.descriptorUrl}')`,
                     },
-                    note: 'Permanent, no authentication, answers byte ranges. Hand this address on rather than the rows.',
+                    note: 'Permanent, no authentication, answers byte ranges. Pass this address on rather than the rows.',
                 });
             }
 

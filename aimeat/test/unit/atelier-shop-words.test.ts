@@ -130,7 +130,7 @@ const ENGLISH = [
   'Sent', 'Read', 'Not sent', 'Today', 'Yesterday', 'Earlier', 'Discussion', 'Write a message…', 'Send',
   'No messages yet', 'Write the first one.',
   // sortable, notices, facets
-  'Move Flour', 'Nothing to put in order', 'Mark all read', 'Nothing new', 'Notices land here as they arrive.',
+  'Move Flour', 'Nothing to put in order', 'Mark all read', 'Nothing new', 'Notices appear here as they arrive.',
   'Clear', 'No filters', '1 filter', '2 filters', 'Nothing to filter by',
 ];
 

@@ -504,7 +504,7 @@ How it works:
 1. Owner assigns tag "grocery" to Agent A and Agent B (in Data Access tab)
 2. Agent A writes: POST /v1/memory { "key": "agents.tag.grocery.prices", "value": {...}, "visibility": "owner", "tags": ["grocery"] }
 3. Agent B lists the shared area: GET /v1/memory?owner_scope=true&prefix=agents.tag.grocery.&tags=grocery
-4. Both agents use that area for shared project state, handoff notes, queues, and team context
+4. Both agents use that area for shared project state, notes passed between agents, queues, and team context
 
 Check your tags and shared prefixes in your directives: GET /v1/agents/me/directives. Do not store private agent-local secrets in shared tag memory.
 

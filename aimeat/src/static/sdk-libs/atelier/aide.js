@@ -208,7 +208,7 @@ export function aide(spec) {
 
   function placesText(list) {
     if (!list.length) return 'This screen names no places: do not answer with "show".';
-    let text = 'PLACES on the screen you may light with "show" (ids exactly as written):\n';
+    let text = 'PLACES on the screen you may highlight with "show" (ids exactly as written):\n';
     for (const p of list) {
       const line = '- "' + p.id + '": ' + p.title + (p.text ? ' (' + p.text.replace(/\s+/g, ' ').slice(0, 160) + ')' : '') + '\n';
       if (text.length + line.length > PLACES_CHARS_MAX) break;
@@ -247,7 +247,7 @@ export function aide(spec) {
       'You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.',
       'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps, "show"?: ["<place id>", ...] }.',
       'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
-      'When the person asks how or where to do something on this screen, answer with "show": the place ids they press, in the order they press them (at most ' + SHOW_MAX + '). The app lights each place on the screen. Use only ids from the PLACES list.',
+      'When the person asks how or where to do something on this screen, answer with "show": the place ids they press, in the order they press them (at most ' + SHOW_MAX + '). The app highlights each place on the screen. Use only ids from the PLACES list.',
       placesText(onScreen),
       actionsText(),
       'DATA the screen shows right now:',

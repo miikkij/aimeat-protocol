@@ -260,7 +260,7 @@ export function registerWebVerifyRoutes(
         // Email gate: when the operator requires a verified email, an account cannot be created without one.
         if (config.emailConfirmationRequired && !(typeof email === 'string' && email.length > 0)) {
             res.status(400).json(error(config.nodeId, 'EMAIL_REQUIRED',
-                'This node requires a verified email to register. Provide an "email" or sign in with Google/Microsoft/Casdoor.'));
+                'This server requires a verified email to register. Provide an "email" or sign in with Google/Microsoft/Casdoor.'));
             return;
         }
 

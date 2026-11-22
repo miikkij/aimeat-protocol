@@ -198,7 +198,7 @@ function english(variant: WelcomeMatVariant, node: string, who: string): string[
         L.push('   - What does a normal week look like: what takes most of your time?');
         L.push('   - What are you trying to get done right now?');
         L.push('   - What gets in the way, or keeps slipping?');
-        L.push('   - What do you do again and again that you would gladly hand to someone else?');
+        L.push('   - What do you do again and again that you would gladly give to someone else?');
         L.push('   - What feels unclear or complicated to you at the moment?');
         L.push('   - What should other people, and their AIs, know about you: what you offer, what you');
         L.push('     look for, and how to reach you?');

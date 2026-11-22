@@ -282,13 +282,13 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
                 type: 'string',
                 default: '19 €/mo',
                 maxLength: 24,
-                description: 'The sticker on the picture: the lowest price a visitor can take one home for. Used only while the store has not published its own (see tiers).',
+                description: 'The sticker on the picture: the lowest price a visitor can get one for. Used only while the store has not published its own (see tiers).',
             },
             tiers: {
                 type: 'string',
                 default: 'Solo: 19 · Team: 59 · Office: 99 · Own machine: 179 · Compliance: 369 · Managed: from 2 000',
                 maxLength: 240,
-                description: 'The fallback price ladder as one line: "name: price" pairs separated by " · ", each price per month in euros (the € and "per month" are added on the page). The store is the source: when it publishes the public record ext:shop/tiers ({ from, tiers: [{ name, price }] }), the page shows that and this line is not read.',
+                description: 'The fallback price list as one line: "name: price" pairs separated by " · ", each price per month in euros (the € and "per month" are added on the page). The store is the source: when it publishes the public record ext:shop/tiers ({ from, tiers: [{ name, price }] }), the page shows that and this line is not read.',
             },
         },
         maxPerSurface: 1,
@@ -352,7 +352,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'Ten seconds under the hood: six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it.',
+        summary: 'Ten seconds of how it works: six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it.',
     },
     {
         id: 'portal.frame-projector',
@@ -362,7 +362,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['apps'],
         props: {},
         maxPerSurface: 1,
-        summary: 'The slide projector: one big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor.',
+        summary: 'The slideshow: one big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor.',
     },
     {
         id: 'portal.frame-signage',

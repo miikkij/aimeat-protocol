@@ -131,7 +131,7 @@ function noteFor(level: AppSizeLevel, h: AppSizeHealth, ceilingMb: number, fullP
     ? ` It has grown about ${human(h.per_day_bytes)} a day over the last ${Math.round(h.measured_days ?? 0)} days${fullPhrase}.`
     : '';
   const what = level === 'at-the-wall'
-    ? ' The next version may be refused. Move the images and other assets out of the file into storage and reference them by URL — that is usually most of the weight.'
+    ? ' The next version may be refused. Move the images and other assets out of the file into storage and reference them by URL — that is usually most of the size.'
     : level === 'warn'
       ? ' Move the images and other assets out of the file into storage and reference them by URL, and keep the sources split on your own machine with a build step that assembles the one file. Both are in the skill node:aimeat-app-workstation.'
       : ' Worth knowing now rather than at the ceiling: assets belong in storage rather than inlined, and past about a megabyte every AI edit pays for the whole file. The skill node:aimeat-app-workstation is the way that is worked.';

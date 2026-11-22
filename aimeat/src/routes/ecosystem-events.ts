@@ -64,7 +64,7 @@ const SubscriptionBody = z.object({
   event: z.string().min(1).max(120),               // outbound event name, or '*'
   match: z.record(z.string().max(120), z.string().max(400))
     .refine(m => Object.keys(m).length <= MATCH_FIELDS_MAX, {
-      message: `match names at most ${MATCH_FIELDS_MAX} fields; an event carries fewer, so a match with more never delivers. Name only the fields to filter on, such as key`,
+      message: `match names at most ${MATCH_FIELDS_MAX} fields; an event has fewer, so a match with more never delivers. Name only the fields to filter on, such as key`,
     })
     .optional(),
   transport: z.array(z.enum(['tunnel', 'webhook'])).min(1).optional(),

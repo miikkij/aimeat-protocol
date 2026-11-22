@@ -157,7 +157,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
   // panel's own title and count there: organism.css `.og-page .pj-section > .pj-section-head`). The
   // way to add a source stood in that hidden head; it is drawn here so the picker can be opened.
   return html`
-    <${HeadDesc}>${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}<//>
+    <${HeadDesc}>${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they are.'}<//>
     <${Actions}>
       <${Action} small expanded=${picking} onClick=${() => setPicking(p => !p)}>
         ${picking ? (t('organisms.close') || 'Close') : ('+ ' + (t('organisms.addSource') || 'Add source'))}

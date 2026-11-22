@@ -54,7 +54,7 @@
     }
     const s = auth.getSession();
     if (!s) {
-      throw new Error("Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER; another user's publish lands in their own namespace and is never served.");
+      throw new Error("Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER; another user's publish is written to their own namespace and is never served.");
     }
     return s;
   }

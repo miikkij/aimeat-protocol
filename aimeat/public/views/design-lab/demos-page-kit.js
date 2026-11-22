@@ -224,7 +224,7 @@ export const PAGE_KIT_DEMOS = {
   'tab-page': { variants: [
     { name: 'the page beside its rail', render: () => html`<${SettingsRoot}><${SettingsPage} title="Harbour Studio" railTitle="On this page"
         sections=${SECTIONS} pagesLabel="Pages" pages=${PAGES}>${files}<//><//>` },
-    { name: 'the current item, the way back, a mode', render: () => rail([
+    { name: 'the current item, the link back, a mode', render: () => rail([
       { back: true, label: 'Back to organisms', onClick: noop },
       { section: 'dl-pk-files', mark: '01', label: 'Files', count: 12, on: true },
       { mark: '·', label: 'As a tree', count: '→', onClick: noop },
@@ -321,7 +321,7 @@ export const PAGE_KIT_DEMOS = {
         <${FoldSection} inner title="Codex" open=${false} onToggle=${noop}>…<//>`) },
   ] },
   'sub-heading': { variants: [
-    { name: 'a block', render: () => html`<${SettingsRoot}><${SubHeading}>Your own TypeSafe key<//><${Note} kind="hint">A key of your own is used before the node's.<//><//>` },
+    { name: 'a block', render: () => html`<${SettingsRoot}><${SubHeading}>Your own TypeSafe key<//><${Note} kind="hint">A key of your own is used before this server's.<//><//>` },
     { name: 'a heading with its line', render: () => html`<${SettingsRoot}><${SubHeading} level=${3} id="dl-pk-sh" desc="Groups you share records with.">Sharing groups<//><//>` },
     { name: 'in a line', render: () => html`<${SettingsRoot}><p><${SubHeading} inline>Model<//> Claude Sonnet 4.5</p><//>` },
     { name: 'the line alone', render: () => html`<${SettingsRoot}><${HeadDesc}>Every device that is signed in to your account.<//><//>` },

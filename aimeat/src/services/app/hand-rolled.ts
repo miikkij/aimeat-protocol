@@ -77,7 +77,7 @@ export const HAND_ROLLED_RULES: Rule[] = [
     // calls at start to bring the kit into step with it: a live app does exactly that
     // (`A.i18n.setLang(AIMEAT.auth.getLang())`) and the first version of this rule flagged it.
     what: 'a language control of its own (`auth.setLang(` called from the page)', test: /\bauth\s*\.\s*setLang\s*\(/i, libs: [],
-    instead: 'the sign-in bar carries the language switch (`AIMEAT.auth.mountLoginButton`, or the Atelier shell): declare `aimeat-locales` with two languages and repaint on the change',
+    instead: 'the sign-in bar has the language switch (`AIMEAT.auth.mountLoginButton`, or the Atelier shell): declare `aimeat-locales` with two languages and repaint on the change',
   },
 ];
 

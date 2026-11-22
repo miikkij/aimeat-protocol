@@ -336,7 +336,7 @@ function dataAccess(input: OdpsProjectionInput, lang: string): Json {
   }
   ports.default = {
     name: localized(lang, 'Metered AIMEAT call'),
-    description: localized(lang, 'The accepted contract IS the access — the consumer calls with their own AIMEAT token and no separate API key is issued; each call is metered, charged and rake-split by the node.'),
+    description: localized(lang, 'The accepted contract IS the access — the consumer calls with their own AIMEAT token and no separate API key is issued; each call is metered and charged by the node, which takes the platform fee.'),
     outputPortType: 'API',
     format: 'JSON',
     authenticationMethod: 'Token',

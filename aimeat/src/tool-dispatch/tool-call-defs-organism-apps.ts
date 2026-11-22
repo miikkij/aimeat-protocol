@@ -18,7 +18,7 @@ export const organismAppsCliTools: ConnectCliToolDefinition[] = [
     name: 'aimeat_organism_apps',
     description: 'The apps members opened to one organism (a company, a team or a training), with what each is made of and how much it is used.',
     input: {
-      organism_id: { type: 'string', required: true, description: 'The organism whose app wall to read.' },
+      organism_id: { type: 'string', required: true, description: 'The organism whose app list to read.' },
       lang: { type: 'string', description: 'The language of the capability titles and team names: en, fi or es. Default en.' },
     },
     handler: ({ client }, input) => {

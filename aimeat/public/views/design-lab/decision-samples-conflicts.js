@@ -228,13 +228,13 @@ const WALLET_STEPS = [['Create a Stripe account and activate payments:', 'dashbo
   ['Reveal and copy the Secret key, which starts with sk_live_. To try things out first, use the test mode key, sk_test_.'], ['Paste the key into the field above and save.']];
 const CAL_PROPOSALS = ['Ask for the answer in one sentence first, then the reasons.', 'Name the reader the answer is for.', 'Drop the example that shows a list: the target output has none.'];
 const MCP_STEPS = ['Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.', 'Click + and then Add custom connector.',
-  'Fill the fields with the values below and click Add.', 'Sign in to this node in the tab that opens, with your own account.', 'Start a NEW conversation.'];
-const BASIC_AGENTS = [['Concierge', 'Always on', 'The first contact. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.'],
+  'Fill the fields with the values below and click Add.', 'Sign in to your AIMEAT in the tab that opens, with your own account.', 'Start a NEW conversation.'];
+const BASIC_AGENTS = [['Concierge', 'Always on', 'The first contact. Takes what arrives, works out what it is about, answers what it can, and passes the rest to whoever should have it.'],
   ['Workflow manager', 'On demand', 'Orders work from your other agents and keeps track of what came back.']];
 /** The words of a server's setup steps carry their own number (profile.nodes.setupStep1-4). */
 const NODE_STEPS = ['1. Open a WebSocket tunnel to the address above, sending your token in the Authorization header.', '2. Send a heartbeat message every 30 seconds. Without it the server is marked offline.',
   '3. When the server reconnects, whatever was waiting in its message queue is delivered to it.', '4. Confirm each message you receive with a mailbox_ack message.'];
-const ECO_STEPS = ['The app publishes fresh data on a schedule.', 'AIMEAT spots that data and hands it to your agent.', 'Your agent does the work and writes its insights back.',
+const ECO_STEPS = ['The app publishes fresh data on a schedule.', 'AIMEAT spots that data and passes it to your agent.', 'Your agent does the work and writes its insights back.',
   'You get the finished insights. Delivered to the app and reachable everywhere.'];
 const DECIDE_ORDER = ['Choose a decision provider above. A local decision model on this machine needs no key. For TypeSafe, set a key: your own above, or one for a single agent on that agent\'s page.',
   'Test it, if it takes a key.', 'Write a decision rule and try it on its sample.', 'Give the rule to an agent in the agent\'s Crew tab.',
@@ -289,7 +289,7 @@ export const CONFLICT_SAMPLES = {
     { id: 'nodes-setup', measure: '.pn-setup li', solo: '.pn-setup', render: () => pf(html`<div class="pn-setup open poster-row--thing"><ol>${items(NODE_STEPS)}</ol></div>`),
       after: toRows(NODE_STEPS.map((s) => s.replace(/^\d+\.\s*/, ''))) },
     { id: 'ecosystem-how', measure: '.pf-eco-auto-how-steps li', solo: '.pf-eco-auto-how', render: () => pf(html`<div class="pf-eco-auto-how">
-      <p class="poster-hint">The app and your agents never talk directly. AIMEAT sits in between. It runs top to bottom:</p>
+      <p class="poster-hint">The app and your agents never talk directly. AIMEAT is in between. It runs top to bottom:</p>
       <ol class="pf-eco-auto-how-steps">${items(ECO_STEPS)}</ol><p class="poster-hint pf-eco-auto-how-doc">The full description is in the guide for outside apps, under Automation: github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md</p></div>`),
       after: toRows(ECO_STEPS) },
     { id: 'ai-decide-order', measure: '.pf-dr-order li', solo: '.pf-dr-order', render: () => pf(html`<div class="pf-dr"><ol class="pf-dr-order">${items(DECIDE_ORDER)}</ol></div>`),

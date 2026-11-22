@@ -223,7 +223,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
     const key = requireEncryptionKey(config);
     if (!key) {
-      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this node cannot read stored credentials'));
+      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this server cannot read stored credentials'));
     }
     const ctx: ConnectContext = { config, storage, providers, key };
     const fresh = await ensureFreshCredential(ctx, connection.id);
@@ -306,7 +306,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     const key = requireEncryptionKey(config);
     if (!key) {
       return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY',
-        'This node is not set up to keep secrets safely yet. Whoever runs it can switch that on.'));
+        'This server is not set up to keep secrets safely yet. Whoever runs it can switch that on.'));
     }
 
     const stored = await storage.upsertPrincipalProviderClient({
@@ -586,7 +586,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     const provider = findProvider(providers, fresh.connection.provider);
     if (!provider) {
       await storage.updatePublishAttempt(gate.attempt.id, { status: 'failed', error: 'provider no longer configured' });
-      res.status(400).json(error(config.nodeId, 'PROVIDER_GONE', 'that provider is no longer configured on this node'));
+      res.status(400).json(error(config.nodeId, 'PROVIDER_GONE', 'that provider is no longer configured on this server'));
       return;
     }
     const outcome = await publishToProvider({
@@ -768,7 +768,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
     const key = requireEncryptionKey(config);
     if (!key) {
-      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this node cannot read stored credentials'));
+      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this server cannot read stored credentials'));
     }
 
     const ctx: ConnectContext = { config, storage, providers, key };

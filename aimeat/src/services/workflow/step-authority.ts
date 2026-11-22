@@ -240,7 +240,7 @@ export function stepScopeRefusal(missing: MissingStepScope[]): { status: 403; co
     return {
         status: 403, code: 'SCOPE_DENIED',
         needed: missing.map(m => m.scope),
-        message: `This workflow needs ${why.join(', ')}, and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. `
+        message: `This workflow needs ${why.join(', ')}, and this session does not have ${missing.length === 1 ? 'it' : 'them'}. `
             + 'A step does what its own endpoint does, so it costs the same permission. The owner grants it in the permissions of this agent or app.',
     };
 }

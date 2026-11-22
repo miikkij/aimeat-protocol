@@ -94,7 +94,7 @@ export function buildGettingStarted(
       } : {}),
 
       step_3_authenticate: {
-        description: 'Device authorization already handed you a token. This is the OTHER way to get one: when you hold an agent keypair (from POST /v1/agents), sign your identity and a timestamp for a JWT. No nonce is fetched.',
+        description: 'Device authorization already gave you a token. This is the OTHER way to get one: when you hold an agent keypair (from POST /v1/agents), sign your identity and a timestamp for a JWT. No nonce is fetched.',
         flow: [
           '1. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)',
           `2. POST ${base}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }`,

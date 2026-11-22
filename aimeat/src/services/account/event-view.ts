@@ -45,7 +45,7 @@ const TASK_CONTENT_FIELDS = ['title', 'reason'] as const;
 export type AccountEventReader = Pick<CallerContext, 'principal' | 'kind' | 'inPerson' | 'has'> & { taskContentKept?: boolean };
 
 /** The note an answer carries when a row's task content was taken out, so the reader knows why. */
-export const TASK_CONTENT_NOTE = 'Some task rows carry no title or reason. A task\'s title and decline reason are shown to the account owner, '
+export const TASK_CONTENT_NOTE = 'Some task rows have no title or reason. A task\'s title and decline reason are shown to the account owner, '
   + 'to an app holding the "task:read" permission and to the agent that did the task, as on GET /v1/agents/{name}/tasks. '
   + 'The row still says which agent, what happened and when.';
 

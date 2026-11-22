@@ -84,7 +84,7 @@ function validatePart(p: unknown, i: number, defects: MessageDefect[], field = '
     const f = (o.file && typeof o.file === 'object' && !Array.isArray(o.file)) ? o.file as Record<string, unknown> : null;
     if (!f) { defects.push({ field: `${at}.file`, reason: 'Required, and must be an object.' }); return null; }
     if (!isHttpUrl(f.uri)) {
-      defects.push({ field: `${at}.file.uri`, reason: 'Required: an http or https address for the file. A part carries a pointer, never bytes.' });
+      defects.push({ field: `${at}.file.uri`, reason: 'Required: an http or https address for the file. A part contains a pointer, never bytes.' });
       return null;
     }
     const file: { name?: string; mimeType?: string; uri: string } = { uri: f.uri as string };

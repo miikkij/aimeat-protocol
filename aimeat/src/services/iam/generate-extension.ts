@@ -284,7 +284,7 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     '    path: /roles',
     `    description: ${JSON.stringify(
       'The role vocabulary this gate enforces: every role with its capabilities, level and label, '
-      + 'which of them an owner may hand out, and what a signed-in stranger holds. Read this to build '
+      + 'which of them an owner may assign, and what a signed-in stranger holds. Read this to build '
       + 'an approval UI instead of hardcoding role names. Any signed-in caller: a vocabulary is not '
       + 'personal data, and who holds which role stays on the node roster. (This node authenticates '
       + 'every extension call, so that means "not owner-only", not "anonymous".)',

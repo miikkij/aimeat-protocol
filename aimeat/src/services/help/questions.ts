@@ -298,7 +298,7 @@ export async function threadView(deps: HelpDeps, caller: CallerContext, conversa
   if (off) return off;
   const route = await deps.storage.getHelpRouteByConversation(conversationId);
   const q = route ? await deps.storage.getHelpQuestion(route.questionId) : null;
-  if (!route || !q) return refuse(404, 'NOT_FOUND', 'No question lives in this thread.');
+  if (!route || !q) return refuse(404, 'NOT_FOUND', 'This thread has no question.');
   const me = caller.ownerGhii;
   if (route.helperGhii === me) {
     if (!caller.has(HELP_ANSWER_SCOPE)) return refuse(403, 'SCOPE_DENIED', `Reading this needs the permission ${HELP_ANSWER_SCOPE}.`);
@@ -323,5 +323,5 @@ export async function threadView(deps: HelpDeps, caller: CallerContext, conversa
     const names = await namesOf(deps, routes.map(r => r.helperGhii));
     return { ok: true, data: { role: 'asker', ...questionView(q, routes, names) } };
   }
-  return refuse(404, 'NOT_FOUND', 'No question lives in this thread.');
+  return refuse(404, 'NOT_FOUND', 'This thread has no question.');
 }

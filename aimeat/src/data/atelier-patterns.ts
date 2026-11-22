@@ -101,7 +101,7 @@ export const PATTERNS: readonly AtelierPattern[] = [
     looksLike: 'Thin ruled lines both ways — engineering graph paper.',
     evokes: 'Plans, workshops, notebooks — the desk things are designed on.',
     use: {
-      ground: 'THE default page whisper for tools and dashboards: order without decoration (the Pattern Dept. page stands on it).',
+      ground: 'THE default page whisper for tools and dashboards: order without decoration (the Pattern Dept. page uses it).',
       prop: 'A sketch area or an input zone.',
     },
     defaultSize: '44px',

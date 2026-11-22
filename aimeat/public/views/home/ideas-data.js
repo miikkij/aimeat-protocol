@@ -24,7 +24,7 @@ import { swallowed } from '/js/swallowed.js';
 export const STRIP_IDEAS = ['minutes', 'due', 'news'];
 
 /** When an idea works, in the words the home's agent list already uses (home.agents.when.*). */
-const WHEN_FALLBACK = { records: 'When something new arrives in a workspace', clock: 'By the clock', talk: 'When someone writes to it', ask: 'When I ask' };
+const WHEN_FALLBACK = { records: 'When something new arrives in a workspace', clock: 'On a schedule', talk: 'When someone writes to it', ask: 'When I ask' };
 export const whenText = (kind) => tOr('home.agents.when.' + kind, WHEN_FALLBACK[kind] ?? kind);
 
 const cache = new Map();

@@ -49,7 +49,7 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
             doc: { type: 'object', description: 'Start a trial: the definition to run once.' },
             prompt: { type: 'string', description: 'Start a trial: what the crew should do. Required with doc.' },
             try_id: { type: 'string', description: 'Continue waiting on a trial already started.' },
-            wait_seconds: { type: 'number', description: 'How long to wait before handing back the try_id (default 50, max 120).' },
+            wait_seconds: { type: 'number', description: 'How long to wait before returning the try_id (default 50, max 120).' },
         },
         handler: async ({ client }, input) => {
             const path = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/try`;
@@ -125,7 +125,7 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_crew_llm_set',
-        description: "Choose which model an agent uses, or clear it. Omit target_agent_name to set the owner's default for every agent. {kind:'node', role?} sends the crew's model calls through the node's /v1/llm, which picks the model and the key. A provider may NAME the environment variable holding the key and is refused if it carries one; the variable must be a provider key (ends in _API_KEY, not AIMEAT_) and every address public https.",
+        description: "Choose which model an agent uses, or clear it. Omit target_agent_name to set the owner's default for every agent. {kind:'node', role?} sends the crew's model calls through the node's /v1/llm, which picks the model and the key. A provider may NAME the environment variable holding the key and is refused if it contains one; the variable must be a provider key (ends in _API_KEY, not AIMEAT_) and every address public https.",
         input: {
             target_agent_name: { type: 'string', description: "The agent to set it for. Omit for the owner's default." },
             choice: { type: 'object', description: "{kind:'node', role?}, {kind:'profile', profile} or {kind:'model', label, provider}. Omit to clear." },

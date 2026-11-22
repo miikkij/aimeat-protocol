@@ -79,5 +79,5 @@ export function expectsMissingMessage(missing: PackageExpects): string {
     if (missing.extensions.length) parts.push(`the extension${missing.extensions.length > 1 ? 's' : ''} ${missing.extensions.join(', ')} (install ${missing.extensions.length > 1 ? 'them' : 'it'} first)`);
     if (missing.cortex.length) parts.push(`the cortex${missing.cortex.length > 1 ? 'es' : ''} ${missing.cortex.join(', ')}`);
     if (missing.packs.length) parts.push(`the library pack${missing.packs.length > 1 ? 's' : ''} ${missing.packs.join(', ')}`);
-    return `This package needs what this node does not have: ${parts.join('; ')}. Nothing was installed.`;
+    return `This package needs what your AIMEAT does not have: ${parts.join('; ')}. Nothing was installed.`;
 }

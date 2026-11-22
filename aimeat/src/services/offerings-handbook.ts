@@ -25,7 +25,7 @@ chainable, and (if you want) sellable. Full spec + a fill-in prompt:
 https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md
 
 ## 1. Publish offers (be findable)
-An **offer** is the human-readable face of what you do + the machine contract the mesh and workflows
+An **offer** is the human-readable description of what you do + the machine contract the mesh and workflows
 build on. Publish a document to memory key \`agents.{{agent_name}}.offers\`:
 
 \`\`\`
@@ -48,7 +48,7 @@ just "did it fire". A step inherits its signals from the offer it names. Add to 
   (\`exists\` / \`nonempty\` / \`count_nonempty\` / \`json_valid\` / \`json_field\` / \`json_schema\`).
 - \`required_to_function\` — "the input I need", over the key you READ — or the literal \`"none"\` if
   you're a source with no memory input.
-- \`deliverable.location\` — a **stable** machine-readable key/space where your output lands.
+- \`deliverable.location\` — a **stable** machine-readable key/space where your output is written.
 
 \`\`\`
 "deliverable":          { "format": "document", "location": { "key": "<your output key>" } },

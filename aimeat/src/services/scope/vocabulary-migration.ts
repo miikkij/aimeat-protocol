@@ -175,7 +175,7 @@ export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: str
     }
 
     if (changed) {
-        logger.info('Scope vocabulary migration: existing agents grandfathered onto the new words', {
+        logger.info('Scope vocabulary migration: existing agents grandfathered onto the new scopes', {
             agentsUpdated: changed,
             scopes: GRANDFATHERED_SCOPES.join(', '),
         });
@@ -187,7 +187,7 @@ export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: str
         // leaving the population to be discovered by a support ticket.
         logger.warn('Scope vocabulary migration: agents with no recorded scope list were left alone', {
             agents: noScopeList,
-            effect: 'they fall back to config.defaultAgentScopes, which carries none of these words',
+            effect: 'they fall back to config.defaultAgentScopes, which has none of these scopes',
         });
     }
     return changed;
@@ -275,7 +275,7 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
     }
 
     if (changed) {
-        logger.info('Scope vocabulary migration: live app grants grandfathered onto the new words', {
+        logger.info('Scope vocabulary migration: live app grants grandfathered onto the new scopes', {
             grantsUpdated: changed,
             scopes: GRANDFATHERED_SCOPES.join(', '),
         });

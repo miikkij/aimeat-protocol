@@ -62,9 +62,9 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'copy-button', name: 'CopyButton', kind: 'component', status: 'active',
-        summary: 'A button that copies a text and says so for a moment; it wears the class it is given (a classic button, an action link, a slab).',
+        summary: 'A button that copies a text and says so for a moment; it uses the class it is given (a classic button, an action link, a slab).',
         module: '/components/CopyButton.js', sheet: '/css/components/button.css', classes: ['copied'],
-        data: { shape: 'CopyButton({ text, className, label, copiedLabel, title })', fields: { text: 'what is copied', className: 'the look to wear', label: 'the words', copiedLabel: 'the words after copying' } },
+        data: { shape: 'CopyButton({ text, className, label, copiedLabel, title })', fields: { text: 'what is copied', className: 'the look to use', label: 'the words', copiedLabel: 'the words after copying' } },
         useFor: ['Anywhere a person copies a text into their own AI or elsewhere.'],
         variants: [], example: { text: 'Hello', label: 'Copy', copiedLabel: 'Copied' },
     },
@@ -83,7 +83,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
                 codeLine: 'a line of code at the foot', doors: 'the row of actions at the foot (never with onOpen)',
                 onOpen: 'the whole tile (or a panel\'s headline, or a figure) is one button: a press, Enter or Space opens it; openLabel is its tooltip',
                 title: 'section and panel: the headline', aside: 'section: what stands at the right of the title', note: 'panel: a grey typewriter line after the headline',
-                rule: 'panel: the thick rule on top', wide: 'section and panel: spans every column of its grid', inRow: 'section: stands inside a list row, row air and no margin',
+                rule: 'panel: the thick rule on top', wide: 'section and panel: spans every column of its grid', inRow: 'section: stands inside a list row, row space and no margin',
                 figure: 'figure: the number; name is its word', children: 'a field or a form inside a tile; the content of a section or a panel',
                 cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figures that open their tab, in a line) | strip (the tiles in one line that scrolls sideways, each at least 160px wide); three and two fold to one column under 860px',
                 subtitle: 'classic card: the line under the title', variant: 'classic card: "glass" for the glass ground',
@@ -429,7 +429,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         module: '/components/InboxLink.js', sheet: '/css/components/page-base.css',
         data: { shape: 'InboxLink({ to, subject, title, className, children })', fields: { to: 'the address', subject: 'the subject', className: 'the look the caller gives it' } },
         useFor: ['Wherever a person is invited to write to someone.'],
-        variants: [], example: {}, note: 'It draws no look of its own: it is a link that wears the caller\'s class.',
+        variants: [], example: {}, note: 'It draws no look of its own: it is a link that uses the caller\'s class.',
     },
     {
         id: 'json-view', name: 'JsonView', kind: 'component', status: 'active',
@@ -444,7 +444,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         summary: 'A card for a link in a message: its site, title and picture.',
         module: '/components/LinkPreview.js', sheet: '/css/components/link-preview.css', classes: ['link-preview'],
         data: { shape: 'LinkPreview({ url, onDismiss }) · MessageLinkPreviews({ msg })', fields: { url: 'the link' } },
-        useFor: ['Under a message that carries a link.'],
+        useFor: ['Under a message that has a link.'],
         variants: [], example: {},
     },
     {

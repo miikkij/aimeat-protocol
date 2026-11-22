@@ -65,7 +65,7 @@ export class PossiblePaymentError extends PaymentError {
   constructor(public reference: string, public possible: PossiblePayment) {
     super('X402_SETTLE_UNKNOWN', 502,
       'The payment service did not answer in time, so it is not known whether your stablecoin payment went through. '
-      + `Do not pay again yet. The seller and the people who run this node were told, with the reference ${reference}, `
+      + `Do not pay again yet. The seller and the people who run this server were told, with the reference ${reference}, `
       + 'and they can check whether the payment arrived.');
   }
 }

@@ -60,10 +60,10 @@ export function ineligible(app: AppRecord | null): OpeningFail | null {
   if (!app) return fail(404, 'NOT_FOUND', 'App not found');
   if (!/html/i.test(app.mimeType)) return fail(422, 'NOT_A_PAGE', 'Only an HTML app can be opened to the internet.');
   if (app.operatorHidden) return fail(403, 'APP_HIDDEN', 'An operator has taken this app down, so it cannot be opened to the internet.');
-  if (app.parked) return fail(409, 'APP_PARKED', 'This app is parked. Unpark it before opening it to the internet.');
+  if (app.parked) return fail(409, 'APP_PARKED', 'This app is unlisted. List it again before opening it to the internet.');
   if (app.accessCode) return fail(409, 'APP_HAS_ACCESS_CODE', 'This app asks for an access code. Remove the code before opening it to the internet.');
   if (appAccessOf(app) !== 'anyone') {
-    return fail(409, 'APP_NOT_OPEN_TO_ANYONE', 'This app\'s own setting lets only signed-in accounts or one organisation open it. Set who may open it to anyone first; the opening lifts the node\'s sign-in rule, not the app\'s own.');
+    return fail(409, 'APP_NOT_OPEN_TO_ANYONE', 'This app\'s own setting lets only signed-in accounts or one organisation open it. Set who may open it to anyone first; the opening lifts this server\'s sign-in rule, not the app\'s own.');
   }
   return null;
 }
@@ -80,7 +80,7 @@ export function checkDays(ctx: OpeningCtx, days: unknown): number | OpeningFail 
   const max = ctx.config.appInternetOpeningMaxDays ?? 90;
   if (days === undefined || days === null) return max;
   const n = Number(days);
-  if (!Number.isInteger(n) || n < 1 || n > max) return fail(400, 'INVALID_INPUT', `days is a whole number from 1 to ${max}, the longest this node keeps an app open.`);
+  if (!Number.isInteger(n) || n < 1 || n > max) return fail(400, 'INVALID_INPUT', `days is a whole number from 1 to ${max}, the longest this server keeps an app open.`);
   return n;
 }
 
@@ -107,8 +107,8 @@ export async function requestOpening(
   ctx: OpeningCtx, actor: OpeningActor, input: { filename: string; reason: unknown; days?: unknown },
 ): Promise<OpeningResult<{ opening: InternetOpening; outcome: OpeningOutcome }>> {
   const mode = openingMode(ctx.config);
-  if (mode === 'not-needed') return fail(409, 'NOT_NEEDED', 'This node shows its content to anyone already, so an app needs no opening.');
-  if (mode === 'off') return fail(403, 'OPENING_OFF', 'The operators of this node have switched opening apps to the internet off.');
+  if (mode === 'not-needed') return fail(409, 'NOT_NEEDED', 'This server shows its content to anyone already, so an app needs no opening.');
+  if (mode === 'off') return fail(403, 'OPENING_OFF', 'The operators of this server have switched opening apps to the internet off.');
   const reason = checkReason(input.reason);
   if (typeof reason !== 'string') return reason;
   const days = checkDays(ctx, input.days);

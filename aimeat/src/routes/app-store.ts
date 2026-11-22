@@ -278,7 +278,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             buyer_balance: (await storage.getGHIIByOwner(buyerOwner))?.morselBalance ?? 0,
             note: `Took "${purchase.appName}" (${licenseType} license) with ${purchase.tollMorsels} morsels of pacing. `
                 + (gate.withholdContent
-                    ? 'The app has an access code that this request did not carry, so the receipt holds no copy of it. Open it with the code (?code= or the X-Access-Code header): the licence lets you in.'
+                    ? 'The app has an access code that this request did not carry, so the receipt holds no copy of it. Open it with the code (?code= or the X-Access-Code header): the licence gives you access.'
                     : 'The full app content is included in this receipt.'),
         }, [
             { description: 'View purchase details', method: 'GET', url: `/v1/app-store/purchases/${txId}` },

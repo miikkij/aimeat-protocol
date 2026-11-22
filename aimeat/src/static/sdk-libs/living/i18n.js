@@ -152,14 +152,14 @@ export function langMapError(v) {
   if (typeof v === 'number' || typeof v === 'boolean') return null;
   if (!isPlainObject(v)) return 'is neither a line of text nor a language map';
   const keys = Object.keys(v);
-  if (!keys.length) return 'is an empty language map — it carries no language at all';
+  if (!keys.length) return 'is an empty language map — it has no language at all';
   const bad = keys.filter((k) => !LANG_KEY.test(k));
   if (bad.length === keys.length) {
     return 'is a language map with no language in it (' + bad.join(', ')
       + '); a key is a language tag such as "fi" or "en"';
   }
   if (bad.length) {
-    return 'is a language map carrying "' + bad.join('", "')
+    return 'is a language map that has "' + bad.join('", "')
       + '", which is not a language tag such as "fi" or "en"';
   }
   const notText = keys.filter((k) => typeof v[k] !== 'string');

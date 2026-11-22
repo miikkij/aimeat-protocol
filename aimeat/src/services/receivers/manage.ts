@@ -180,7 +180,7 @@ function sayCreated(r: ReceiverRecord, address: string, keyShown: boolean): stri
         : r.target.kind === 'prefix' ? `keys under ${r.target.prefix}. (at most ${r.target.maxKeys})`
             : `the row space ${r.target.space}`;
     const shape = r.schema ? ` Every message is checked against ${r.schema.csm} before it is stored.` : ' It takes any JSON; a CSM shape is recommended.';
-    const state = r.state === 'awaiting_operator' ? ' It starts working when the operator of this node approves it.' : '';
+    const state = r.state === 'awaiting_operator' ? ' It starts working when the operator of this server approves it.' : '';
     const key = keyShown ? ' The API key is shown only now: put it straight into the program\'s secret store.' : '';
     return `The program writes to ${address}, into ${where}.${shape}${state}${key}`;
 }
@@ -194,7 +194,7 @@ export async function createOrPropose(
 ): Promise<{ receiver: Record<string, unknown>; key?: string; say: string; approve_url?: string }> {
     if (opts.propose) needRead(caller); else needManage(caller, 'Making a receiver');
     const mode = receiversModeOf(deps.config);
-    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off.');
+    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this server has switched incoming webhooks off.');
     const input = normalizeReceiverInput(body);
     if (typeof input === 'string') throw new ReceiverError(400, 'INVALID_INPUT', input);
     await checkTarget(deps, caller, input.target);
@@ -246,7 +246,7 @@ export async function decideProposal(deps: ReceiverDeps, caller: CallerContext, 
         return { refused: true, say: `The proposed incoming webhook ${cur.displayName} was removed. Nothing was written.` };
     }
     const mode = receiversModeOf(deps.config);
-    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off.');
+    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this server has switched incoming webhooks off.');
     const k = mintReceiverKey();
     const now = new Date().toISOString();
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => (r.state !== 'proposed' ? UNCHANGED : {
@@ -353,7 +353,7 @@ export async function removeReceiver(deps: ReceiverDeps, caller: CallerContext, 
 
 async function needOperator(caller: CallerContext): Promise<void> {
     if (!(await caller.operator('operator:admin'))) {
-        throw new ReceiverError(403, 'OPERATOR_ONLY', 'Only the operator of this node sees and stops every incoming webhook.');
+        throw new ReceiverError(403, 'OPERATOR_ONLY', 'Only the operator of this server sees and stops every incoming webhook.');
     }
 }
 

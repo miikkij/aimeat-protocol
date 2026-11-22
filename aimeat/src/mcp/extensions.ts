@@ -357,7 +357,7 @@ export function registerExtensionsTools(
                 const minter = resolveCaller();
                 if (!(await canManageExtensionAs(storage, config, minter, minter.owner, { action: 'install', subject: '(upload)' }))) {
                     const byRole = await installRoleRefusal(storage, config, minter.owner);
-                    return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
+                    return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not have.' }], isError: true };
                 }
                 const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
                 // The caller's update/activate intent must survive into the token, or the upload
@@ -415,7 +415,7 @@ export function registerExtensionsTools(
             // checks it in the handler for the same reason.
             if (!(await canManageExtensionAs(storage, config, caller, callerOwner, { action: 'install', subject: built.record.name }))) {
                 const byRole = await installRoleRefusal(storage, config, callerOwner);
-                return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
+                return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not have.' }], isError: true };
             }
 
             const record = built.record;

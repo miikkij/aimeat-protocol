@@ -568,7 +568,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }
       return res.json(success(config.nodeId, {
         signed_out: server.slug,
-        note: 'The sign-in stored here is gone. Access you granted at the far side is still yours to revoke there.',
+        note: 'The sign-in stored here is gone. Access you granted on the other server is still yours to revoke there.',
       }));
     });
 
@@ -716,7 +716,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       return res.json(success(config.nodeId, {
         removed: server.slug,
         // Worth saying, because it is the thing a person cutting access actually cares about.
-        note: 'The credential stored here is gone. A token you created at the far side is still '
+        note: 'The credential stored here is gone. A token you created on the other server is still '
           + 'yours to revoke there.',
       }));
     });

@@ -39,10 +39,10 @@ The complete, current build specification for a new app is the Atelier track's. 
 
   GET {{node_url}}/v1/prompts/build-app-atelier
 
-It carries the interview, the data and sign-in rules, the client libraries, the design rules and the check an app passes before it is published. Read it before you ask the person anything, because it tells you what to ask.
+It contains the interview, the data and sign-in rules, the client libraries, the design rules and the check an app passes before it is published. Read it before you ask the person anything, because it tells you what to ask.
 
 How the app is delivered:
-- You are connected to this AIMEAT over MCP: read the specification in parts with aimeat_handbook_get { tier: "build-app-atelier" }, publish with aimeat_app_publish and hand the person the app's address.
+- You are connected to this AIMEAT over MCP: read the specification in parts with aimeat_handbook_get { tier: "build-app-atelier" }, publish with aimeat_app_publish and give the person the app's address.
 - You cannot connect: fetch GET {{node_url}}/v1/prompts/build-app-atelier?delivery=paste&format=txt instead, the same specification for an AI without a connection, and produce one self-contained HTML file. Its last section tells the person how to bring it back.
 
 Sign-in is the person's own, in the browser, as the document describes. An app needs no key and no password from the person, so ask for neither.
@@ -98,7 +98,7 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
 - Full Tier 1 agent access
 - Real-time SSE resource subscriptions
 - Automatic token management
-- All 18 MCP tools at your fingertips`,
+- All 18 MCP tools ready to use`,
     variables: ['node_url'],
     usedIn: ['/v1/portal/prompts/platform-mcp'],
   },

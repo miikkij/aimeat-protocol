@@ -91,12 +91,12 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
   classes: [
     {
       id: 'prohibited', label: 'Prohibited', severity: 40,
-      note: 'The Act forbids this outright. If a use case lands here, the question is whether to '
+      note: 'The Act forbids this outright. If a use case is in this class, the question is whether to '
         + 'stop it, not how to document it.',
     },
     {
       id: 'high', label: 'High risk', severity: 30,
-      note: 'Annex III territory. It carries duties well beyond transparency — risk management, '
+      note: 'This is Annex III. It brings duties well beyond transparency — risk management, '
         + 'record-keeping, human oversight, conformity assessment — and none of them are things '
         + 'this node does for you.',
     },
@@ -108,7 +108,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
     {
       id: 'minimal', label: 'Minimal', severity: 10,
       note: 'No specific duty found by these questions. That is the answer to these questions, not '
-        + 'a clean bill of health.',
+        + 'proof that no duty applies.',
     },
   ],
   defaultClass: 'minimal',

@@ -296,7 +296,7 @@ export async function dpiaDraft(deps: KycDeps, caller: CallerContext, org: strin
       + 'The records belong to the organism and are kept as records of this server, not of the member who wrote them.',
     necessity: 'The processing is a legal obligation of the organism as an obliged entity (AMLR art. 19-20 customer due diligence, art. 20(1)(d) and the sanctions regulations for screening, '
       + 'art. 42-46 politically exposed persons, art. 69 reporting suspicions, art. 77 five-year retention). Legal basis GDPR art. 6(1)(c); criminal-offence data under art. 10 as Union law authorises. '
-      + 'Proportionality: only the fields the regulation asks for are on the card; the risk rule is additive and every point carries a reason and a reference, so a person can check it; '
+      + 'Proportionality: only the fields the regulation asks for are on the card; the risk rule is additive and every point has a reason and a reference, so a person can check it; '
       + 'the depth of due diligence follows the risk class (simplified, standard, enhanced); a card is deleted after its retention. Answer for your firm: which fields you actually need, and why.',
     // One risk or one measure per line: the page shows each line as a row of its own.
     risks: [

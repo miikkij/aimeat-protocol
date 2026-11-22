@@ -47,7 +47,7 @@ export const NOTEBOOK_PLAN_TEMPLATE = [
   'Think step by step about the intent behind the note, then propose 0 to 5 enrichment steps. Use ONLY these step kinds:',
   '- "llm_reason": think/expand/draft using only what is in the note (e.g. outline how something might work, list open questions, draft a structure). "query" is the instruction for that reasoning.',
   '- "librarian_assess": find and summarise the user\'s OWN existing material relevant to the note (uses the structure above). "query" is the search query to run.',
-  '- "delegate": hand the work to one of the agent offers above (e.g. research the live web, generate an image, profile a company). Set "agent" and "offerId" to a pair from the catalogue, and "query" to the concrete request to send that agent. Only use this when an offer genuinely fits — never invent an agent or offer that is not listed.',
+  '- "delegate": pass the work to one of the agent offers above (e.g. research the live web, generate an image, profile a company). Set "agent" and "offerId" to a pair from the catalogue, and "query" to the concrete request to send that agent. Only use this when an offer genuinely fits — never invent an agent or offer that is not listed.',
   '',
   'Rules:',
   '- Only propose a step if it clearly helps. A trivial, already-complete note may need ZERO steps — return an empty "steps" array in that case.',

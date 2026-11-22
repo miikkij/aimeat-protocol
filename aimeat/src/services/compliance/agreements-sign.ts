@@ -233,7 +233,7 @@ async function checkSignedPdf(deps: Deps, a: Agreement, v: AgreementVersion, dat
   const tagged = bytesContain(data, `${a.id} v${v.n}`);
   checks.push({
     id: 'version', ok: incremental || tagged ? true : null,
-    note: incremental ? 'The file is this version\'s own PDF with the signature added after it.' : tagged ? 'The file carries this version\'s tag.' : 'The file could not be tied to this version by the node. Look at it before confirming.',
+    note: incremental ? 'The file is this version\'s own PDF with the signature added after it.' : tagged ? 'The file has this version\'s tag.' : 'The file could not be tied to this version by the node. Look at it before confirming.',
   });
   const expected = norm(party === 'controller' ? v.annexes.I.controller.signerName : v.annexes.I.processor.signerName);
   const names = valid.map(s => norm(s.signer?.commonName ?? s.signer?.name));
@@ -252,7 +252,7 @@ async function checkScan(deps: Deps, caller: CallerContext, a: Agreement, v: Agr
   const tag = versionTag(a, v);
   const prompt = [
     'You check a scanned, hand-signed copy of a data processing agreement against the version that was sent.',
-    `Every page of the sent version carries the footer "${tag} · <page>/<pages>".`,
+    `Every page of the sent version has the footer "${tag} · <page>/<pages>".`,
     `The expected signer is ${signer ? `"${signer}"` : 'not named'}.`,
     'Answer with JSON only, no prose: {"tag_on_every_page": true|false, "pages_seen": [numbers], "pages_total": number|null,',
     '"signature_present": true|false, "printed_name": string|null, "date_written": string|null, "date_clear": true|false,',

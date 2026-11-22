@@ -126,7 +126,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
     area: 'transmission',
     text: https
       ? L(lang, 'Kaikki liikenne kulkee HTTPS:n yli, ja palvelin lähettää HSTS-otsakkeen (max-age vuosi, alitunnukset mukaan lukien).', 'All traffic is carried over HTTPS, and the server sends an HSTS header (max-age one year, subdomains included).')
-      : L(lang, 'Noden osoite ei ole HTTPS. Salaus siirrossa riippuu edessä olevasta välityspalvelimesta.', "The node's address is not HTTPS. Encryption in transit depends on the proxy in front of it."),
+      : L(lang, 'Palvelimen osoite ei ole HTTPS. Salaus siirrossa riippuu edessä olevasta välityspalvelimesta.', "The server's address is not HTTPS. Encryption in transit depends on the proxy in front of it."),
   });
   if (config.encryptionKey || config.encryptionKey1) {
     out.push({ area: 'encryption', text: L(lang, 'Salaisuudet (rajapinta-avaimet, yhteystunnukset) salataan levyllä AES-256-GCM:llä.', 'Secrets (API keys, connection tokens) are encrypted at rest with AES-256-GCM.') });
@@ -148,7 +148,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
   }
   out.push({
     area: 'configuration',
-    text: L(lang, `Rekisteröityminen: ${config.registrationMode}. Federaatio muihin nodeihin: ${config.federationAuthPolicy}. Uusi data on oletuksena yksityistä.`, `Registration: ${config.registrationMode}. Federation with other nodes: ${config.federationAuthPolicy}. New data is private by default.`),
+    text: L(lang, `Rekisteröityminen: ${config.registrationMode}. Federaatio muihin AIMEAT-palvelimiin: ${config.federationAuthPolicy}. Uusi data on oletuksena yksityistä.`, `Registration: ${config.registrationMode}. Federation with other AIMEAT servers: ${config.federationAuthPolicy}. New data is private by default.`),
   });
   out.push({
     area: 'retention',
@@ -160,7 +160,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
   });
   out.push({
     area: 'accountability',
-    text: L(lang, 'Node pitää käsittelytoimien rekisteriä, tekoälyn käyttötapausten rekisteriä ja tekoälyn tuottaman sisällön alkuperätietueita.', 'The node keeps records of processing, a register of AI use cases and provenance records of AI-generated content.'),
+    text: L(lang, 'Palvelin pitää käsittelytoimien rekisteriä, tekoälyn käyttötapausten rekisteriä ja tekoälyn tuottaman sisällön alkuperätietueita.', 'The server keeps records of processing, a register of AI use cases and provenance records of AI-generated content.'),
   });
   return out;
 }
@@ -211,8 +211,8 @@ export async function generateAnnexes(deps: Deps, input: Pick<AgreementCreateInp
   for (const m of measures) sources[`III.${m.area}`] = 'evidence';
   const missing = MEASURE_AREAS.filter(a => !measures.some(m => m.area === a));
   const assistance = L(lang,
-    'Käsittelijä avustaa rekisteröityjen pyynnöissä noden vienti- ja poistotoiminnoilla, ja ilmoittaa tietoturvaloukkauksesta sovitussa ajassa.',
-    "The processor assists with data subject requests through the node's export and erasure functions, and reports a personal data breach within the agreed time.");
+    'Käsittelijä avustaa rekisteröityjen pyynnöissä palvelimen vienti- ja poistotoiminnoilla, ja ilmoittaa tietoturvaloukkauksesta sovitussa ajassa.',
+    "The processor assists with data subject requests through the server's export and erasure functions, and reports a personal data breach within the agreed time.");
   sources['III.assistance'] = 'evidence';
 
   const stored = (await readDoc(deps.storage, deps.config.nodeId, 'processors', { kind: 'node' })).items;

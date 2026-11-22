@@ -258,7 +258,7 @@ export async function startWalletSignature(ctx: DocsignCtx, caller: CallerContex
   const sha = documentHash(doc.bytes);
   if (sha !== expectedSha256) {
     throw new DocsignError('DOCUMENT_MISMATCH', 409, rec.walletDocument
-      ? 'This request already carries a wallet signature: sign the signed PDF (GET /v1/docsign/requests/{id}/signed-document), so every signature lands in one file.'
+      ? 'This request already has a wallet signature: sign the signed PDF (GET /v1/docsign/requests/{id}/signed-document), so every signature goes into one file.'
       : 'This file is not the document of the request: its SHA-256 differs.');
   }
   if (doc.bytes.subarray(0, 5).toString('latin1') !== '%PDF-') {

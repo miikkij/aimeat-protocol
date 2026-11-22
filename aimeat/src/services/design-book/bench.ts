@@ -189,7 +189,7 @@ export async function runPartBench(
   if (part.kind === 'genre' && isGrownGenreBody(part.body)) {
     return {
       ran: false,
-      reason: 'This genre is somebody\'s published app, and the node does not run an app\'s script on its own origin. What earned it the shelf is its owner\'s word, answered when it was proposed.',
+      reason: 'This genre is somebody\'s published app, and the node does not run an app\'s script on its own origin. What earned it a place in the Design Book is its owner\'s word, answered when it was proposed.',
       at: new Date().toISOString(),
     };
   }

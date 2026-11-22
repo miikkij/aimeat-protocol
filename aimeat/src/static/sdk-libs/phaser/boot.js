@@ -75,7 +75,7 @@ export function ensurePhaser() {
     };
     tag.onerror = function () {
       phaserPromise = null;
-      fail(new Error('The game engine could not be loaded from ' + src + '. This node serves it; '
+      fail(new Error('The game engine could not be loaded from ' + src + '. This server serves it; '
         + 'check that the address is reachable from where the page is running.'));
     };
     document.head.appendChild(tag);

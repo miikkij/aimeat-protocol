@@ -569,7 +569,7 @@ export async function readReport(
     subjects: opts.includeSubjects ? subjects : undefined,
     subjectsTruncated: truncated,
     reading: {
-      opens: 'An estimate. Mail apps fetch images on the reader\'s behalf (Apple Mail always, and it cannot be told apart from a person), so treat opens as a floor with machine noise in it.',
+      opens: 'An estimate. Mail apps fetch images on the reader\'s behalf (Apple Mail always, and it cannot be told apart from a person), so treat opens as a minimum with machine noise in it.',
       clicks: 'An act. Somebody chose the link, and known scanners are counted as machines instead.',
       ai: 'Named AI fetchers, split by why they came: a name ending in :asked means a person asked an AI something and it fetched this to answer.',
       geo: 'People only, and where their network is, which is not always where they are: a VPN or a mobile carrier moves a person to another city or country. ZZ is a visit whose place could not be told. No address is kept.',

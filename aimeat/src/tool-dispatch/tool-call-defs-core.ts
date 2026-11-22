@@ -445,7 +445,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
                     data: {
                         ...(layout.data as object),
                         available_blocks_unavailable: blocks.error?.message
-                            ?? 'The block catalogue is operator-only on this node, so this answer carries the layout without the vocabulary to change it.',
+                            ?? 'The block catalogue is operator-only on this node, so this answer has the layout without the vocabulary to change it.',
                     },
                 };
             }

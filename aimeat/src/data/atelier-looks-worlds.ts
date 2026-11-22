@@ -205,7 +205,7 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
   },
   {
     id: 'broadcast',
-    feel: 'the night gallery: display type that owns the room, exhibits under gallery light with hard offset shadows in the channel colours, one signal band for the loud action — a shelf staged as its own broadcast',
+    feel: 'the night gallery: display type that owns the room, exhibits under gallery light with hard offset shadows in the channel colours, one signal band for the loud action — a list staged as its own broadcast',
     imagery: '80s music television at night, neon channel colours on a dark stage, CRT glow, block display type, sprayed tags',
     structures: ['press-sheet'],
     dusk: {
@@ -597,6 +597,6 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-damping': '32',
       '--ak-spring-mass': '0.8',
     },
-    note: 'The machine-room world of the TDR family of apps (M-ROOM, DROP, LOOM, LINGUA, built on the aimeat-tdr cortex kit), taken in as one look on 2026-10-22: the kit\'s own page, ink and tones in both modes, IBM Plex Mono for every word, Michroma for titles, square corners, hairlines, no shadow, no gradient and no ambient. The operator-console structure sets the bar title and the labels in letter-spaced capitals, makes the hero a plate with two accent corner brackets, outlines the actions so they fill with the accent when touched, and rules lists with dashes. The accent is the palette\'s, or a Book look part\'s pair: the family\'s orange is "#d44500/#ff4d00" (the kit\'s light #e84a00 carries white words at 3.3, so the light half is the lightest orange on that line the matrix passes).',
+    note: 'The machine-room world of the TDR family of apps (M-ROOM, DROP, LOOM, LINGUA, built on the aimeat-tdr cortex kit), taken in as one look on 2026-10-22: the kit\'s own page, ink and tones in both modes, IBM Plex Mono for every word, Michroma for titles, square corners, hairlines, no shadow, no gradient and no ambient. The operator-console structure sets the bar title and the labels in letter-spaced capitals, makes the hero a plate with two accent corner brackets, outlines the actions so they fill with the accent when touched, and rules lists with dashes. The accent is the palette\'s, or a Book look part\'s pair: the family\'s orange is "#d44500/#ff4d00" (the kit\'s light #e84a00 gives white words a contrast of 3.3, so the light half is the lightest orange on that line the matrix passes).',
   },
 ];

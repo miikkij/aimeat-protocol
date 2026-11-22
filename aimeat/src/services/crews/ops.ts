@@ -204,7 +204,7 @@ function errorsOf(result: unknown): string[] | null {
 function unreadableVerdict(agent: AgentRecord, result: unknown): CrewRefusal {
   return {
     ok: false, status: 502, code: 'CREW_RUNTIME_ERROR',
-    message: `${agent.name}'s runtime answered in a shape this node does not understand. Update the runtime and try again.`,
+    message: `${agent.name}'s runtime answered in a shape this server does not understand. Update the runtime and try again.`,
     details: result,
   };
 }

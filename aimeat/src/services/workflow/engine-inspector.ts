@@ -60,7 +60,7 @@ export async function dispatchInspector(deps: InspectorDeps, ownerGhii: string, 
     title: `Inspect workflow "${run.workflowId}" — step "${stepId}" ${reason}`,
     description: [
       `A workflow step failed (${reason}).`,
-      `Read the full run record at owner memory key "${rk}" — it carries defSnapshot, every step's`,
+      `Read the full run record at owner memory key "${rk}" — it holds defSnapshot, every step's`,
       `state (green / input-red / output-red / timed-out / skipped), and per-leaf expected-vs-observed.`,
       `Failing step: "${stepId}" (agent: ${Array.isArray(failingAgents) ? failingAgents.join(', ') : failingAgents}).`,
       `Observed: ${JSON.stringify(failing?.outputObserved ?? failing?.inputObserved ?? {}).slice(0, 1000)}.`,

@@ -111,12 +111,12 @@ export function ShowroomHero({ navigate, picture = true }) {
       <p class="ld-sh-position">${tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those capabilities easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}</p>
       <div class="ld-sh-hero-cols">
         <p class="ld-sh-sub">
-          ${tr('landing.showSub', 'This is a fully working AIMEAT you can drive today, free. Build a whole system in an hour, bring every AI you already use under one roof, and let agents carry the repeat work. When you like what you see, take one home on an address with your name on it.')}
+          ${tr('landing.showSub', 'This is a fully working AIMEAT you can drive today, free. Build a whole system in an hour, bring every AI you already use into one place, and let agents do the repeat work. When you like what you see, get your own on an address with your name on it.')}
         </p>
         <div class="ld-sh-action">
           <${WishBox} navigate=${navigate} />
           <p class="ld-sh-lead">
-            ${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}
+            ${tr('landing.wishLead', 'Say what you need and press GO. You go to a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}
           </p>
           <div class="ld-sh-doors">
             <${StoreDoor} class="ld-sh-door showroom-door" label=${tr('landing.showGetOwn', 'Get your own →')} />
@@ -165,7 +165,7 @@ export function WallIntro({ money = true }) {
           <div class="ld-sh-box poster-aside">
             <span class="ld-sh-box-label">${tr('landing.moneyLabel', 'Money angle, said out loud:')}</span>
             ${' '}
-            ${tr('landing.moneyText', 'the payment rails are built in. Cards ride through Stripe (UCP), and x402 lets agents pay agents, so your own store or marketplace is up the same day.')}
+            ${tr('landing.moneyText', 'the payment rails are built in. Cards go through Stripe (UCP), and x402 lets agents pay agents, so your own store or marketplace is up the same day.')}
             ${hasSite('exchange') ? html`
               ${' '}${tr('landing.moneyProof', 'Live proof:')}${' '}
               <a href=${siteLink('exchange')} target="_blank" rel="noopener">${tr('landing.moneyProofLink', 'the marketplace →')}</a>` : ''}

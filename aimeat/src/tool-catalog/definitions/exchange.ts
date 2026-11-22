@@ -98,7 +98,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_exchange_accept',
-        description: 'Accept a contract on an offering → mint a durable METERED ENTITLEMENT for YOU (the caller\'s own identity is the consumer — you can never accept on someone else\'s behalf). The per-call PRICE is read AUTHORITATIVELY from the provider\'s extension action, so you cannot undercut the provider or be charged a price you did not accept; you choose only your BUDGET cap (your own spend ceiling) and a contract ref. Re-accepting the same capability carries prior spend forward (renegotiation, not a meter reset). Money is 6-decimal micro-units; a contract in morsels counts whole morsels of pacing, which pace use and are never a price. After this, calling /v1/ext/{ext}/{action} is metered against the budget.',
+        description: 'Accept a contract on an offering → mint a durable METERED ENTITLEMENT for YOU (the caller\'s own identity is the consumer — you can never accept on someone else\'s behalf). The per-call PRICE is read AUTHORITATIVELY from the provider\'s extension action, so you cannot undercut the provider or be charged a price you did not accept; you choose only your BUDGET cap (your own spend ceiling) and a contract ref. Re-accepting the same capability keeps prior spend (renegotiation, not a meter reset). Money is 6-decimal micro-units; a contract in morsels counts whole morsels of pacing, which pace use and are never a price. After this, calling /v1/ext/{ext}/{action} is metered against the budget.',
         caller: 'agent',
         visibility: agentEverywhere,
         // accept mints a durable metered entitlement (idempotent per (consumer, ext, action): re-accepting
@@ -121,7 +121,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_exchange_contracts',
-        description: 'List every METERED ENTITLEMENT (contract) YOU hold as the consumer — capability, provider, unit, per-call price, rake, contract ref, state (active/paused/revoked), and budget (cap / spent / remaining / calls). The consumer-side ledger of what you are contracted to consume and how much you have spent.',
+        description: 'List every METERED ENTITLEMENT (contract) YOU hold as the consumer — capability, provider, unit, per-call price, platform fee, contract ref, state (active/paused/revoked), and budget (cap / spent / remaining / calls). The consumer-side ledger of what you are contracted to consume and how much you have spent.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List My Exchange Contracts', readOnlyHint: true },
@@ -224,7 +224,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Before the first call to a tool, load the skill bound to its app (aimeat_skill_list with binding "app:<owner>/<filename>") and read the tool\'s inputSchema with aimeat_app_tools_get and `tool`: invalid input is refused before charging, and the refusal names every wrong and missing field, lists every field the tool accepts, and names the app\'s skills. Correct the input from that list; never resend the same input. Needs two scopes: exchange:write for the call, and ext:invoke because the tool runs its backing extension action with your token.',
+        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform fee), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Before the first call to a tool, load the skill bound to its app (aimeat_skill_list with binding "app:<owner>/<filename>") and read the tool\'s inputSchema with aimeat_app_tools_get and `tool`: invalid input is refused before charging, and the refusal names every wrong and missing field, lists every field the tool accepts, and names the app\'s skills. Correct the input from that list; never resend the same input. Needs two scopes: exchange:write for the call, and ext:invoke because the tool runs its backing extension action with your token.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -246,7 +246,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_exchange_work',
-        description: 'Start an async AGENT-WORK task under a contract you hold: the provider agent performs it out-of-band and DELIVERS later, and you are charged the per-task price ON DELIVERY (metered + rake). Requires an active contract for the agent-work offering (accept it first with aimeat_exchange_accept). Nothing is charged now. Track it with aimeat_exchange_work_list.',
+        description: 'Start an async AGENT-WORK task under a contract you hold: the provider agent performs it out-of-band and DELIVERS later, and you are charged the per-task price ON DELIVERY (metered + platform fee). Requires an active contract for the agent-work offering (accept it first with aimeat_exchange_accept). Nothing is charged now. Track it with aimeat_exchange_work_list.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Start Agent Work (async task)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -260,7 +260,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_exchange_work_deliver',
-        description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the rake, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the platform fee, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Deliver Agent Work (settle on delivery)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

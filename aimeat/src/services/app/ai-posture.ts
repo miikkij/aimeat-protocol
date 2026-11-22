@@ -284,7 +284,7 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
   if (inherited) {
     hints.push(
       'This app inherited its AI transparency posture from the version it replaces (or the app it '
-      + 'was forked from) because this source declares none. Restate it so it travels with the code: '
+      + 'was forked from) because this source declares none. Restate it so it stays with the code: '
       + '`<meta name="aimeat-ai" content="generates=' + (posture.generates.join(',') || 'text')
       + '; discloses=' + (posture.discloses ? 'yes' : 'no')
       + '; public-interest=' + (posture.publicInterest ? 'yes' : 'no')
@@ -306,7 +306,7 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
         + '`<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">`. '
         + 'If the app opens a chat, also call `AIMEAT.ai.chatNotice({ target: "#chat-top" })` so the '
         + 'first message says a model is on the other end. Anything the app stores or publishes '
-        + 'should carry the record: `AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. '
+        + 'should keep the record: `AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. '
         + 'The app is published either way — this is a warning, not a rejection.',
       at: new Date().toISOString(),
     };

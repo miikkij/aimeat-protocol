@@ -50,7 +50,7 @@ explosion, sparks, splash, confetti, portal, dust, smoke, footsteps, coin bursts
 (\`fx.kinds('at')\` lists them). Followers: trail, fire, smoke, dust, sparks, embers, bubbles,
 footsteps.
 Colours are theme words (\`colour: 'ok'\`) or numbers. Under the less-motion switch weather
-runs thin and slow, a burst becomes one puff and followers stand down; write nothing for it.
+runs thin and slow, a burst becomes one puff and followers stop; write nothing for it.
 
 ## Backdrops: parallax(scene, spec)
 
@@ -171,7 +171,7 @@ AIMEAT.phaser.fxDesigner({ target: '#tools', fx, scene: this, family: 'at', pres
 AIMEAT.phaser.parallaxDesigner({ target: '#tools', parallax: bg, preset: 'hills' });
 \`\`\`
 
-Both apply every change to the stage at once and hand back the result with Copy as JS
+Both apply every change to the stage at once and return the result with Copy as JS
 (\`fx.define(...)\` or the \`parallax(this, spec)\` call) or Export JSON. Needs
 \`/lib/aimeat-phaser.css\` on the page. The Design Book's Phaser page shows all of this
 running: fetch \`GET /v1/designbook\` and open the Phaser tab.
@@ -237,7 +237,7 @@ st.buffs.add('regen', { label: 'Regen', ms: 4000, tone: 'ok' });
 \`\`\`
 
 It sits around the HUD's corners (bars and the quest log in the left column, the row at the
-bottom). With a \`store\` (from \`AIMEAT.phaser.saves\`), bars, slots and quests live in ONE
+bottom). With a \`store\` (from \`AIMEAT.phaser.saves\`), bars, slots and quests are stored in ONE
 section of the player's one save key and come back on the next visit; cooldowns and buffs
 are timers and are not written.
 
@@ -254,7 +254,7 @@ ach.on('unlock', () => bus.synth('win'));
 AIMEAT.phaser.trophyRoom(this, ach, { title: 'Trophies' });   // closes on action, Escape or a tap outside
 \`\`\`
 
-A met condition unlocks once, slides a ribbon in at the top and lands in the store's
+A met condition unlocks once, slides a ribbon in at the top and is written to the store's
 \`achievements\` section; \`board: true\` also posts the stat to the leaderboard. A secret
 trophy lists as ??? until it is won. \`ach.progress(id)\` gives \`{ value, target, done }\`.
 

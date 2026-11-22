@@ -77,8 +77,8 @@ does not leave the machine (the node still removes personal data first). \`AIMEA
 and \`aimeat_decide_settings\` list the providers this account may use, each with its limits
 (\`max_choice_options\`, \`context_tokens\`) and a sentence saying where the content goes. Name one with
 \`provider\` on \`ask()\` or \`aimeat_decide\`; leave it out and the node picks: the rule's, the agent's,
-the owner's default, the node's. **Size the question to the provider**: a local model may carry 20
-options where Jev carries 240, and a question over the limit is refused before sending
+the owner's default, the node's. **Size the question to the provider**: a local model may take 20
+options where Jev takes 240, and a question over the limit is refused before sending
 (\`PROVIDER_CANNOT_CARRY\`), naming the provider and its number.
 
 ## 0. Check that this owner can use it, before designing anything
@@ -118,7 +118,7 @@ decision model card). An Atelier app gets all of this, and the answers with thei
 - **What you send is your responsibility.** Only the fields the questions need, the people the record
   mentions as \`names\`, TypeSafe declared in the app's data map, the app requests \`ai:use\`.
   The node removes e-mails, phones, identity codes, IBANs, street addresses and the owner's contacts,
-  in the keys of an object as well as in its values, except the classes the owner lets through in
+  in the keys of an object as well as in its values, except the classes the owner allows in
   their decision settings; the decision's \`scrub.allowed\` names those, so a \`total\` of 0 there is not
   "nothing found". The publish check reports departures as \`DECIDE:\` lines in \`ai_hints\`.
 
@@ -131,13 +131,13 @@ reads only the answers that branch needs.
 
 **Act, check, or ask a person (routing by confidence).** A pickOne for the intent. Below a floor, send
 it to a person. Low-stakes actions run above the floor; an action that moves money or deletes needs a
-higher bar, or the user's confirmation. Different actions, different thresholds.
+higher threshold, or the user's confirmation. Different actions, different thresholds.
 
 **Move a statechart when text arrives (a living document).** The model cannot design a state
 machine, but it can choose which transition one takes, because the options are the machine's own
 events. In a living document this is a \`decide\` node: its pickOne's options are the machine's events
 plus "NONE", the node offers only the events the current state accepts, sends the winner above the
-threshold, and hands anything below it to a person on the sheet, recording their verdict.
+threshold, and sends anything below it to a person on the sheet, recording their verdict.
 \`AIMEAT.living.describe("decide")\` has the fields; the page still loads aimeat-decide.js and the app
 still names TypeSafe in its data map.
 
@@ -230,7 +230,7 @@ floor is \`stop\`. Otherwise the result is the weakest certainty among the thres
 bands cut it: at or over \`act\` act, at or over \`ask\` ask a person, under it stop. So word every
 thresholded question so that a high value means "go ahead". Branch on \`outcome\`, and when
 \`proceed\` is false do not take the action. A yesNo's probability IS its certainty; a pickOne and a
-scale carry \`confidence\`, and the model may omit it. When no thresholded answer carried one,
+scale have \`confidence\`, and the model may omit it. When no thresholded answer had one,
 \`result\` is null and the outcome is \`ask\`: nothing was measured, so it is a person's call rather
 than a refusal.
 

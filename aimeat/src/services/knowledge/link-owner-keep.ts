@@ -117,7 +117,7 @@ export async function placeKnowledgeLinkOwnersOnce(
         actorGhii: securityOwner(config.nodeId),
         actorName: 'node start',
         source: 'knowledge_links',
-        detail: `${undecided.length} knowledge link row(s) written before link rows carried their owner could not be given one: `
+        detail: `${undecided.length} knowledge link row(s) written before link rows had their owner could not be given one: `
           + 'the source package is held by more than one record in the contributor\'s account, or only by another account. '
           + 'They stay as they are and show only as incoming links of their target until the owner adds them again '
           + `with POST /v1/knowledge/:id/link. ${shown.join('; ')}${more}.`,

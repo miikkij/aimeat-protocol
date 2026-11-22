@@ -95,7 +95,7 @@ HOW TO DO IT
 1. Call aimeat_company_list and find the company with id ${company.id}, so you are working from
    the current record rather than from this message.
 2. Ask me for the missing values. Ask in small batches — a few related fields at a time, not a
-   wall of twelve questions. If I give you a company registration number, you may look up what
+   long list of twelve questions. If I give you a company registration number, you may look up what
    is publicly known about it and offer the rest for me to confirm.
 3. Write what I confirm with aimeat_company_update, passing ONLY the fields I have given you.
    Fields you leave out keep their current value, so it is safe to call it several times as we go.
@@ -148,7 +148,7 @@ HOW IT SHOULD LOOK
   prefers-color-scheme block, rather than hardcoding one palette that breaks in the other mode.
 - Responsive: relative units, flexbox or grid, images capped at max-width 100%. Check that the
   page does not scroll horizontally at 390px wide.
-- No decorative emoji as UI furniture, and no stock-photo placeholders. If it needs an image and
+- No decorative emoji in the UI, and no stock-photo placeholders. If it needs an image and
   we do not have one, use type and layout instead.
 - Keep the whole file under 512KB.
 
@@ -221,7 +221,7 @@ HOW TO DO IT
 2. Ask me what I want: register a new company (aimeat_company_create — the name is enough to
    start, the address is claimed immediately), fill in one company's registered details
    (aimeat_company_update, ONLY with values I confirm — never invent a registration number,
-   VAT id, IBAN or BIC, because these land on real invoices), or set what a company's address
+   VAT id, IBAN or BIC, because these appear on real invoices), or set what a company's address
    serves (aimeat_company_front_page).
 3. When we are done, call aimeat_company_list once more and show me where things stand.
 

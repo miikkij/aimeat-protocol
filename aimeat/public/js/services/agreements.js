@@ -64,7 +64,7 @@ export async function sendSignedCopy(id, file, kind, party) {
   const mime = file.type || (kind === 'pdf' ? 'application/pdf' : 'application/octet-stream');
   const mint = await api('/v1/storage', { method: 'POST', body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }) });
   const uploadUrl = mint?.data?.upload_url;
-  if (!uploadUrl) throw new Error('The node gave no upload address.');
+  if (!uploadUrl) throw new Error('The server gave no upload address.');
   const resp = await fetch(uploadTarget(uploadUrl), { method: 'PUT', headers: { 'Content-Type': mime }, body: file });
   if (!resp.ok) throw new Error(`Upload failed (HTTP ${resp.status})`);
   return apiPost(`${at(id)}/signed-copy`, { storage_key: key, kind, ...(party ? { party } : {}) }).then((r) => r?.data);

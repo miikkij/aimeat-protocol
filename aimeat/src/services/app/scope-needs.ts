@@ -335,8 +335,8 @@ export async function undeclaredScopeFindings(
     pitfall: 'undeclared-scope-words', severity: 'warn', url: '/v1/appdev/pitfalls/undeclared-scope-words',
     message: `This app's code calls routes that need ${missing.map(w => `\`${w}\``).join(', ')}, and `
       + (declared ? 'its `<meta name="aimeat-scopes">` does not name them' : 'it declares no `aimeat-scopes`, so sign-in asks only for the default four')
-      + `. From node 4.0 a signed-in app without the word is refused with 403 SCOPE_DENIED there. Where: ${where}. `
-      + 'Add the words to aimeat-scopes (declaring replaces the default, so keep the words the app already uses); '
+      + `. From node 4.0 a signed-in app without the scope is refused with 403 SCOPE_DENIED there. Where: ${where}. `
+      + 'Add the scopes to aimeat-scopes (declaring replaces the default, so keep the scopes the app already uses); '
       + 'the person approves them at sign-in. An app published before its node moved to 4.0 kept them by itself, '
       + 'and aimeat_app_manage scope_allowance names them; a new app keeps nothing.'
       + (missing.some(publishOnly)

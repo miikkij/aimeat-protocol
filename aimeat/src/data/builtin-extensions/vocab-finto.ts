@@ -54,7 +54,7 @@ export const VOCAB_FINTO_MANIFEST = `extension: "1.0"
 metadata:
   name: "vocab-finto"
   version: "${VOCAB_FINTO_VERSION}"
-  description: "Look up concepts in Finto, the National Library of Finland's vocabulary service. Finds a term in YSO (a general Finnish ontology of about 30 000 concepts in Finnish, Swedish and English, CC BY 4.0), reads what a concept means and what sits above and below it, and turns a set of concepts you picked into a vocabulary you can save as your own. Nothing is stored on your behalf: what you keep, you keep in your own memory."
+  description: "Look up concepts in Finto, the National Library of Finland's vocabulary service. Finds a term in YSO (a general Finnish ontology of about 30 000 concepts in Finnish, Swedish and English, CC BY 4.0), reads what a concept means and what is above and below it, and turns a set of concepts you picked into a vocabulary you can save as your own. Nothing is stored on your behalf: what you keep, you keep in your own memory."
   author: "AIMEAT"
   license: "MIT"
 
@@ -149,7 +149,7 @@ actions:
     output:
       scheme:
         type: object
-        description: "A SKOS concept scheme, ready to hand to AIMEAT.onto.saveVocab."
+        description: "A SKOS concept scheme, ready to pass to AIMEAT.onto.saveVocab."
       fetched:
         type: integer
         description: "How many of the concepts had to be read from Finto rather than the stored copy."

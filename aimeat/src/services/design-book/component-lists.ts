@@ -84,9 +84,9 @@ export function summaryCounterRefusal(elements: ReadonlyArray<MarkupElement>, de
   if (!elements.some(e => e.name === 'summary')) return null;
   const reaches = declarations.find(d => d.property === 'counter-increment' && !(d.parts ?? []).some((_, at, parts) => countsListItemZero(parts, at)));
   if (!reaches) return null;
-  return `The markup carries a <summary>, which a browser makes a list item that counts 0, and the declaration "${quote(reaches)}" can reach it: a counter-increment replaces that 0, `
+  return `The markup contains a <summary>, which a browser makes a list item that counts 0, and the declaration "${quote(reaches)}" can reach it: a counter-increment replaces that 0, `
     + `so the <summary> is numbered ${AROUND}, and the page's items after it count on from it. `
-    + `Where the markup carries a <summary>, every counter-increment also writes "list-item 0": "counter-increment: ${prefix}-step list-item 0".`;
+    + `Where the markup contains a <summary>, every counter-increment also writes "list-item 0": "counter-increment: ${prefix}-step list-item 0".`;
 }
 
 /** Whether the markup carries a <ul>, <ol> or <menu>, a list whose items a browser numbers in it. */
@@ -115,8 +115,8 @@ const AROUND_ITEMS = 'as items of the page\'s own list around the component';
 export function listResetRefusal(elements: ReadonlyArray<MarkupElement>, declarations: ReadonlyArray<DeclarationRead>): string | null {
   const list = elements.find(e => LIST_PARENTS.has(e.name));
   if (!list) return null;
-  const carries = `The markup carries ${list.name === 'ol' ? 'an' : 'a'} <${list.name}>`;
-  const where = 'Where the markup carries a <ul>, <ol> or <menu>';
+  const carries = `The markup contains ${list.name === 'ol' ? 'an' : 'a'} <${list.name}>`;
+  const where = 'Where the markup contains a <ul>, <ol> or <menu>';
   for (const d of declarations) {
     if (d.keyword !== null && KEEPS_RESET.has(d.keyword)) continue;
     if (d.property === 'counter-reset' && !(d.parts ?? []).some(resetsListItem)) {

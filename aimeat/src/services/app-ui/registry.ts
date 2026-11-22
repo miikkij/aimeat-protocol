@@ -169,7 +169,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'statRow',
-    summary: 'The KPI strip; figures count up when the bound data changes. A tile carrying `trend: number[]` shows its short history as a sparkline under the number.',
+    summary: 'The KPI strip; figures count up when the bound data changes. A tile with `trend: number[]` shows its short history as a sparkline under the number.',
     props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
@@ -251,7 +251,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. funnel: stages losing people — { steps: [{ label, value }] }, the survival rate written at each step. treemap: shares as area when the donut\'s slices would not fit — { items: [{ label, value }] }. flow: where the quantity went — { nodes: [{ id, label }], links: [{ from, to, value }] }, ribbons as wide as their sums. radar: profiles on spokes — { axes: string[] (3–10), series: [{ label, values }], max? }, one polygon per series over a shared ring grid. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
+    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. funnel: stages losing people — { steps: [{ label, value }] }, the survival rate written at each step. treemap: shares as area when the donut\'s slices would not fit — { items: [{ label, value }] }. flow: where the quantity went — { nodes: [{ id, label }], links: [{ from, to, value }] }, ribbons as wide as their sums. radar: profiles on spokes — { axes: string[] (3–10), series: [{ label, values }], max? }, one polygon per series over a shared ring grid. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart fill the section instead of a tile.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -263,7 +263,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       emptyHint: text('The line under it.', 160),
       presentation: {
         type: 'enum', values: ['tile', 'mural'], default: 'tile',
-        description: 'tile: the chart lives in its card. mural: it becomes the section\'s full-bleed ground — the data as the decor.',
+        description: 'tile: the chart is shown in its card. mural: it becomes the section\'s full-bleed ground — the data as the decor.',
       },
     },
   },
@@ -299,7 +299,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'health',
-    summary: 'The "is everything up" wall: one row per watched thing — a tone lamp (ok / warn / err), the name, the latest reading. The source resolves to rows of { id, label, tone?, reading?, sub? }. The first block of every monitoring screen.',
+    summary: 'The "is everything up" panel: one row per watched thing — a tone lamp (ok / warn / err), the name, the latest reading. The source resolves to rows of { id, label, tone?, reading?, sub? }. The first block of every monitoring screen.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -309,7 +309,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'queue',
-    summary: 'Work with states: a count strip (waiting / running / done / failed) over the item list, each row wearing its state as a pill. The source resolves to rows of { id, title, state?, sub? }. The "what is the system doing" view every ops screen hand-rolls.',
+    summary: 'Work with states: a count strip (waiting / running / done / failed) over the item list, each row showing its state as a pill. The source resolves to rows of { id, title, state?, sub? }. The "what is the system doing" view every ops screen hand-rolls.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -319,7 +319,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'gauge',
-    summary: 'ONE value on a dial, bands turning the tone — the number that owns a wall (CPU, balance, fill rate). The source resolves to ONE record: { value, max?, min?, label?, unit?, bands?: [{ upTo, tone }] }. The needle draws in once; nothing moves at idle.',
+    summary: 'ONE value on a dial, bands turning the tone — the one number that matters most (CPU, balance, fill rate). The source resolves to ONE record: { value, max?, min?, label?, unit?, bands?: [{ upTo, tone }] }. The needle draws in once; nothing moves at idle.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -329,18 +329,18 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'console',
-    summary: 'The log vane: monospace lines with a time, a tone and the words, newest at the tail, capped so it never grows without bound. Follows the tail only while the reader is AT the tail. The source resolves to ONE record: { lines: [{ ts?, tone?, text }] }.',
+    summary: 'The log console: monospace lines with a time, a tone and the words, newest at the tail, capped so it never grows without bound. Follows the tail only while the reader is AT the tail. The source resolves to ONE record: { lines: [{ ts?, tone?, text }] }.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
-      cap: { type: 'number', min: 20, max: 2000, default: 400, description: 'How many lines the vane keeps before the oldest fall off.' },
+      cap: { type: 'number', min: 20, max: 2000, default: 400, description: 'How many lines the console keeps before the oldest fall off.' },
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },
   },
   {
     id: 'atlas',
-    summary: 'The data map, fully offline — country shapes ship on this node (Natural Earth), no tile server and no external host. The source resolves to ONE record: { regions?: [{ name (in English, e.g. "Finland"), value?, tone? }], markers?: [{ label?, lon, lat, tone? }] }. Regions fill with the accent at an intensity riding the value (or a tone); the view frames the data\'s extent on its own, so a Nordic dataset shows the Nordics.',
+    summary: 'The data map, fully offline — country shapes ship on this node (Natural Earth), no tile server and no external host. The source resolves to ONE record: { regions?: [{ name (in English, e.g. "Finland"), value?, tone? }], markers?: [{ label?, lon, lat, tone? }] }. Regions fill with the accent at an intensity that follows the value (or a tone); the view frames the data\'s extent on its own, so a Nordic dataset shows the Nordics.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -351,7 +351,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'steps',
-    summary: 'Where a process stands: the stations in order, done behind, current lit, the rest ahead — an order, an application, an onboarding at a glance. The source resolves to ONE record: { steps: [{ label, sub? }], current (index of the station under way) }.',
+    summary: 'Where a process stands: the steps in order, done behind, current lit, the rest ahead — an order, an application, an onboarding at a glance. The source resolves to ONE record: { steps: [{ label, sub? }], current (index of the step under way) }.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -399,7 +399,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'map',
-    summary: 'The REAL map: Leaflet over OpenStreetMap street tiles (the node serves Leaflet; the tiles carry their required attribution). The source resolves to ONE record: { markers: [{ label?, lon, lat, tone? }], center?: { lon, lat }, zoom? }. Two or more markers frame themselves; one centres on itself. Pins and popups ride the look\'s tokens, dark mode re-tones the tiles. When the owner says "a map", this is the block — the atlas is the offline country choropleth for data-by-country.',
+    summary: 'The REAL map: Leaflet over OpenStreetMap street tiles (the node serves Leaflet; the tiles carry their required attribution). The source resolves to ONE record: { markers: [{ label?, lon, lat, tone? }], center?: { lon, lat }, zoom? }. Two or more markers frame themselves; one centres on itself. Pins and popups use the look\'s tokens, dark mode re-tones the tiles. When the owner says "a map", this is the block — the atlas is the offline country choropleth for data-by-country.',
     props: {
       source: source(),
       title: text('The floating chip naming the map, and the block\'s name in tabs and decks.', 80),
@@ -410,7 +410,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'scene3d',
-    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }; "model" shows a loaded .glb/.gltf like a product shot; "globe" is the earth with places as dots and data travelling as lifted arcs. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
+    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the pointer; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }; "model" shows a loaded .glb/.gltf like a product shot; "globe" is the earth with places as dots and data travelling as lifted arcs. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
     props: {
       kind: { type: 'enum', values: ['orb', 'sky', 'bars', 'model', 'globe'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, data as terrain, a loaded 3D model shown like a product (kind "model": the source resolves to { url } — a .glb/.gltf address; it is fitted, grounded and studio-lit for you), or the earth (kind "globe": the source resolves to { points: [{ lat, lon, label? }], routes: [{ from: [lat, lon], to: [lat, lon] }] } — places as dots, data travelling as lifted arcs).' },
       source: {
@@ -425,7 +425,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'reveal',
-    summary: 'The fan: stacked panels that open and close on a real animated height — questions and answers, terms, a spec sheet, anything long that should arrive folded. The source resolves to rows of { id, title, sub?, text? }. The header is a real button carrying its own expanded state, so nothing about it is the app\'s to get right.',
+    summary: 'The accordion: stacked panels that open and close on a real animated height — questions and answers, terms, a spec sheet, anything long that should arrive folded. The source resolves to rows of { id, title, sub?, text? }. The header is a real button with its own expanded state, so nothing about it is the app\'s to get right.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -457,7 +457,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'auditTrail',
-    summary: 'The append-only trail from an organism row space, newest first: when, what, who. Needs the two-hand rule open (the organism names the app in the space; the person approves organism:rows), and shows the node\'s own refusal sentence with the rule beside it when it is not.',
+    summary: 'The append-only trail from an organism row space, newest first: when, what, who. Needs the two-person rule open (the organism names the app in the space; the person approves organism:rows), and shows the node\'s own refusal sentence with the rule beside it when it is not.',
     props: {
       org: requiredText('The organism id whose workspace holds the row space.', 80),
       ws: requiredText('The workspace id.', 80),
@@ -501,7 +501,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'countdown',
-    summary: 'The chart countdown: ranked rows with a big numeral, title and a sub line, votes when given, each row wearing the next channel colour. The source resolves to rows of { rank?, title, sub?, votes? } — omitted ranks count down from the top. For charts, standings with theatre, anything announced one at a time.',
+    summary: 'The chart countdown: ranked rows with a big numeral, title and a sub line, votes when given, each row using the next channel colour. The source resolves to rows of { rank?, title, sub?, votes? } — omitted ranks count down from the top. For charts, standings with theatre, anything announced one at a time.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -543,7 +543,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'poll',
-    summary: 'One question, live shares: each option a bar filled to its share, the picked one marked, a pick reported to the app which records the vote wherever votes live. The source resolves to one record: { question, options: [{ id, label, count? | share? }], picked? }.',
+    summary: 'One question, live shares: each option a bar filled to its share, the picked one marked, a pick reported to the app which records the vote wherever votes are stored. The source resolves to one record: { question, options: [{ id, label, count? | share? }], picked? }.',
     props: {
       source: source(),
       emptyTitle: text('What the empty state says.', 80),
@@ -562,7 +562,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   // ── v1.19.0: the parts that ride the motion libraries and the kit's own primitives ──
   {
     id: 'thread',
-    summary: 'A discussion: bubbles grouped by day in a well that scrolls smoothly to the newest, what this person said on the right in the accent tint, an agent squared the way the crew stack squares an agent, and a composer where Enter sends. The source resolves to one record: { messages: [{ id, who, label?, text, at, mine?, agent?, status? }] } (a bare array of messages works too). status is sent | read | failed.',
+    summary: 'A discussion: bubbles grouped by day in a pane that scrolls smoothly to the newest, what this person said on the right in the accent tint, an agent squared the way the crew stack squares an agent, and a composer where Enter sends. The source resolves to one record: { messages: [{ id, who, label?, text, at, mine?, agent?, status? }] } (a bare array of messages works too). status is sent | read | failed.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -573,7 +573,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'calendar',
-    summary: 'A month a hand turns: ISO weeks (Monday first), today outlined, days outside the month dimmed, and each day\'s events as tinted pips (three, then "+N"). Prev and next month sit under two buttons, and turning the month staggers the day cells in. The source resolves to one record: { month: \'YYYY-MM\', events: [{ id, date: \'YYYY-MM-DD\', title, tone? }] }.',
+    summary: 'A month you page through: ISO weeks (Monday first), today outlined, days outside the month dimmed, and each day\'s events as tinted pips (three, then "+N"). Prev and next month sit under two buttons, and turning the month staggers the day cells in. The source resolves to one record: { month: \'YYYY-MM\', events: [{ id, date: \'YYYY-MM-DD\', title, tone? }] }.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -584,7 +584,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'carousel',
-    summary: 'A strip of media cards you push along: each one a picture with a caption band (or a tinted card carrying the title when there is no picture), one of them current and standing a touch taller, moved by the arrows, the dots, the arrow keys or a swipe. For a set you look THROUGH rather than at — photos, covers, rooms, a week of shots. The source resolves to rows of { id, title?, sub?, image?, tone? }; tone is ok, warn or err and paints the caption edge.',
+    summary: 'A strip of media cards you push along: each one a picture with a caption band (or a tinted card with the title when there is no picture), one of them current and standing a touch taller, moved by the arrows, the dots, the arrow keys or a swipe. For a set you look THROUGH rather than at — photos, covers, rooms, a week of shots. The source resolves to rows of { id, title?, sub?, image?, tone? }; tone is ok, warn or err and paints the caption edge.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -594,7 +594,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'sortable',
-    summary: 'A list whose order is the point, and a hand can change it: each row carries a grip, the carried row rides the pointer while the rows it crosses spring out of its way, and the new order reaches the app on release (Alt+ArrowUp / Alt+ArrowDown on a focused grip does the same without a mouse). The source resolves to rows of { id, label, sub?, tone? }. For a priority list, a running order, a queue somebody decides.',
+    summary: 'A list whose order is the point, and a person can change it: each row has a grip, the dragged row follows the pointer while the rows it crosses spring out of its way, and the new order reaches the app on release (Alt+ArrowUp / Alt+ArrowDown on a focused grip does the same without a mouse). The source resolves to rows of { id, label, sub?, tone? }. For a priority list, a running order, a queue somebody decides.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
@@ -604,7 +604,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'notices',
-    summary: 'The notification centre: items under day headings (Today, Yesterday, then the date), the unread ones wearing an accent dot and a firmer face, the kind (info / ok / warn / err) as a bar on the left edge, the time on the right, and one "Mark all read" control. A tap opens the item. The source resolves to rows of { id, title, text?, at ("YYYY-MM-DDTHH:MM:SSZ"), kind?, read?, href? }. Items that arrive on a repaint stagger in; the ones already there stand still, which is what says something is new.',
+    summary: 'The notification centre: items under day headings (Today, Yesterday, then the date), the unread ones with an accent dot and a firmer face, the kind (info / ok / warn / err) as a bar on the left edge, the time on the right, and one "Mark all read" control. A tap opens the item. The source resolves to rows of { id, title, text?, at ("YYYY-MM-DDTHH:MM:SSZ"), kind?, read?, href? }. Items that arrive on a repaint stagger in; the ones already there stand still, which is what says something is new.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),

@@ -372,7 +372,7 @@ export async function validateWorkflow(
         // RETURNING, which is the covering fallback this whole target exists to remove: a producer
         // whose source was empty returns cleanly and the run reports success having produced nothing.
         if (!step.success_signal && !a.result_to_key) {
-          errors.push(`step "${step.id}": an extension step needs result_to_key or an explicit success_signal — with neither, the step greens whenever the script returns, whatever it produced`);
+          errors.push(`step "${step.id}": an extension step needs result_to_key or an explicit success_signal — with neither, the step passes whenever the script returns, whatever it produced`);
         }
         // The result key is the step's deliverable, exactly as answer_to_key is for a human-input
         // step: `fresh` clears it, `skip_done` greens on an existing one, and the synthesized signal
@@ -419,7 +419,7 @@ export async function validateWorkflow(
           errors.push(`step "${step.id}": an ai step needs prompt or prompt_key`);
         }
         if (!step.success_signal && !a.result_to_key) {
-          errors.push(`step "${step.id}": an ai step needs result_to_key or an explicit success_signal — with neither, the step greens whenever the model answers, whatever it said`);
+          errors.push(`step "${step.id}": an ai step needs result_to_key or an explicit success_signal — with neither, the step passes whenever the model answers, whatever it said`);
         }
         deliverableKey = a.result_to_key;
         // input_keys is checked with the rest: it is templated at run time exactly as the others

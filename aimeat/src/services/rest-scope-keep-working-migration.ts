@@ -436,10 +436,10 @@ async function tellOperator(storage: Storage, config: Pick<AimeatConfig, 'nodeId
     source: 'boot',
     detail: `On its first start as ${REST_SCOPE_GATES_ENFORCED_IN} or later the node gave ${result.agents.length} agent(s), `
       + `${result.ecosystemApps.length} ecosystem app(s) and ${result.apps.length} published app(s) of ${owners} owner(s) the `
-      + 'permission words that version started to check, so each keeps working as it did on 3.x. '
-      + `Agents and ecosystem apps per word: ${tally(changed)}. Published apps per word: ${tally(result.apps)}; `
-      + `${grants} live app grant(s) got the words. Each owner sees one line on the activity feed per kind. An agent `
-      + 'is narrowed in its settings or with aimeat_agent_scope_narrow; an app\'s kept words are removed by its owner with '
+      + 'scopes that version started to check, so each keeps working as it did on 3.x. '
+      + `Agents and ecosystem apps per scope: ${tally(changed)}. Published apps per scope: ${tally(result.apps)}; `
+      + `${grants} live app grant(s) got the scopes. Each owner sees one line on the activity feed per kind. An agent `
+      + 'is narrowed in its settings or with aimeat_agent_scope_narrow; an app\'s kept scopes are removed by its owner with '
       + 'aimeat_app_manage scope_allowance_remove, and the app\'s change log in the App Catalog says why each was kept.',
   });
 }

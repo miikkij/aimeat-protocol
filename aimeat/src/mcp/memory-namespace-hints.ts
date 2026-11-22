@@ -25,7 +25,7 @@
 
 /** How to obtain a credential that reads AND writes the owner's own records. */
 const APP_GRANT_ADVICE =
-    'Your own writes land in YOUR namespace and are shadowed by the owner\'s copy. To write the '
+    'Your own writes go to YOUR namespace and are shadowed by the owner\'s copy. To write the '
     + 'owner\'s records instead, ask for it: aimeat_memory_write { key, value, owner_scope: true }, '
     + 'which needs the memory:write-as-owner scope your owner grants per agent in Profile -> Agents. '
     + 'An app (not an agent) uses an app-grant credential instead (sub = the owner GHII, '

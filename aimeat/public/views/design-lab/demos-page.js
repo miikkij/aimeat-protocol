@@ -134,7 +134,7 @@ export const PAGE_DEMOS = {
         <${ErrorNoteFallback} onClick=${noop}>Show me a shorter prompt to try<//><//>` },
   ] },
   'action-row': { variants: [
-    { name: 'default', render: () => html`<${ActionRow}><button type="button" class="btn-primary">Here is my welcome mat</button>
+    { name: 'default', render: () => html`<${ActionRow}><button type="button" class="btn-primary">Here is my introduction page</button>
         <button type="button" class="btn-outline">Not now</button><//>` },
   ] },
   'hint': { variants: [{ name: 'default', render: (ex) => html`<${Hint}>${ex.children}<//>` }] },
@@ -170,7 +170,7 @@ export const PAGE_DEMOS = {
   'stat-line': { variants: [
     { name: 'number', render: () => html`<${StatLine} href="/v1/inbox">${statSentence('{n} unread, go have a look', '{n}', 7)}<//>` },
     { name: 'alert', render: (ex) => html`<${StatLine} href=${ex.href} tone="alert">${ex.children}<//>` },
-    { name: 'ok (dot)', render: () => html`<${StatLine} href="/v1/profile?tab=agents" tone="ok" dot=${true}>Your agent is home and well.<//>` },
+    { name: 'ok (dot)', render: () => html`<${StatLine} href="/v1/profile?tab=agents" tone="ok" dot=${true}>Your agent is running well.<//>` },
     { name: 'trouble (dot)', render: () => html`<${StatLine} href="/v1/profile?tab=agents" tone="trouble" dot=${true}>Your agent has hit a snag.<//>` },
   ] },
   'band': { variants: [
@@ -228,7 +228,7 @@ export const PAGE_DEMOS = {
   ] },
   'ink-foot': { flush: true, variants: [
     { name: 'default', render: () => html`<${InkFoot}><p>AI-made content carries its label.</p><p>Your data is yours: export it, delete it.</p><//>` },
-    { name: 'brand', render: () => html`<${InkFoot} brand="AIMEAT"><p>Apps made on this node, by its people and their agents.</p><p>Back up your apps as a zip, and restore them the same way.</p><//>` },
+    { name: 'brand', render: () => html`<${InkFoot} brand="AIMEAT"><p>Apps made on this server, by its people and their agents.</p><p>Back up your apps as a zip, and restore them the same way.</p><//>` },
   ] },
   'check-item': { variants: [
     { name: 'done', render: (ex) => html`<${CheckItem} done=${true} href=${ex.href}>${ex.children}<//>` },
@@ -251,7 +251,7 @@ export const PAGE_DEMOS = {
   ] },
   'archive': { variants: [
     { name: 'with more', render: (ex) => html`<${ArchiveSection} title=${ex.title} note=${ex.note}>
-        <${TimelineRow} category="system" text="The node was updated" when="2 Sep" /><${ArchiveMore} onClick=${noop}>${ex.more}<//><//>` },
+        <${TimelineRow} category="system" text="Your AIMEAT was updated" when="2 Sep" /><${ArchiveMore} onClick=${noop}>${ex.more}<//><//>` },
     { name: 'loading more', render: (ex) => html`<${ArchiveSection} title=${ex.title} note=${ex.note}><${ArchiveMore} disabled=${true} onClick=${noop}>Loading…<//><//>` },
     { name: 'error', render: (ex) => html`<${ArchiveSection} title=${ex.title} note=${ex.note}><${ArchiveError}>The older part could not be read. Try again later.<//><//>` },
   ] },

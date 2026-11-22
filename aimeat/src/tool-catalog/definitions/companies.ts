@@ -125,7 +125,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_company_portfolio_publish',
-        description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page. When the node asks the owner before making something public and the address serves nothing yet, the page is stored, the address stays as it is, and the answer carries publish_request.",
+        description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page. When the node asks the owner before making something public and the address serves nothing yet, the page is stored, the address stays as it is, and the answer contains publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

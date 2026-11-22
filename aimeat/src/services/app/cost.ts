@@ -146,7 +146,7 @@ export async function appCostView(
       contracts,
       // Billing posture is declared by the app's own tool manifest (apps.{appId}.tools) — the catalog
       // reads that alongside this; here we surface only the sourcing cost the app incurs.
-      note: 'EXCHANGE sourcing cost; end-user billing/recoup posture lives in the app tool manifest.',
+      note: 'EXCHANGE sourcing cost; end-user billing/recoup posture is set in the app tool manifest.',
     },
     links: [
       { description: 'App tool pricing manifest (recoup posture)', method: 'GET', url: `/v1/memory/apps.${appId}.tools` },

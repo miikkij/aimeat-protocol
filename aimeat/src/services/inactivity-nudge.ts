@@ -163,7 +163,7 @@ export function nudgeEmailContent(config: AimeatConfig, locale: 'en' | 'fi', dis
             heading: `Hei ${displayName}`,
             paragraphs: [
                 'Emme ole nähneet sinua vähään aikaan, eikä siinä ole mitään vikaa. Kotisi on yhä pystyssä ja kaikki mitä teit on tallessa.',
-                'Jos haluat tehdä jotain pienen hetken aikana, alla on kehote jonka voit kopioida omaan tekoälykeskusteluusi sellaisenaan. Se päivittää tervetulomattosi eli sen sivun jonka muut näkevät sinusta.',
+                'Jos haluat tehdä jotain pienen hetken aikana, alla on kehote jonka voit kopioida omaan tekoälykeskusteluusi sellaisenaan. Se päivittää esittelysivusi eli sen sivun jonka muut näkevät sinusta.',
             ],
             closing: `Kotisi on osoitteessa ${url}/v1/home`,
         };

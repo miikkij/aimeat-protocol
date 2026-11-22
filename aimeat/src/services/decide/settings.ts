@@ -207,7 +207,7 @@ export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise
  * overview), so an app is not built for a model its owner cannot reach.
  */
 export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean, keylessProvider = false): { available: boolean; reason: string | null } {
-  if (!config.decideEnabled) return { available: false, reason: 'The operator has turned the decision model off on this node.' };
+  if (!config.decideEnabled) return { available: false, reason: 'The operator has turned the decision model off on this server.' };
   // A provider that takes no key (a local decision model) answers without anyone's key.
   if (keylessProvider || hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
   // An instruction, not a bare error: what to set, where, and what comes next.

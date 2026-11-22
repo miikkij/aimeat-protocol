@@ -68,13 +68,13 @@ url: ${b}/v1/ns
 > \`${AIMEAT_NS}\` — what a record means when it says it is one of ours.
 
 This is a hub, not a catalogue. A domain vocabulary — an app's, a cortex's, an organism's shared
-sanasto — links to these classes and travels along these relations, and everything that already has
+sanasto — links to these classes and uses these relations, and everything that already has
 a standard name keeps it: SKOS for concepts and their hierarchy, PROV for where something came from,
 schema.org for people, places, offers and creative works. A term appears below only when no standard
 vocabulary says it.
 
 Every class is the machine-readable side of a term in the [glossary](${b}/v1/glossary), which is
-where its definition lives. There is no second copy.
+where its definition is written. There is no second copy.
 
 ## Prefixes that resolve without being declared
 

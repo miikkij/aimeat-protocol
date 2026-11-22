@@ -160,7 +160,7 @@ export function registerCortexTools(
                 if (!detail.ok) return { ...toolError(detail.code, detail.message) };
                 if (!include_source) return { content: [{ type: 'text' as const, text: JSON.stringify(detail.data, null, 2) }] };
                 if (!scopeIsCovered(scopes, 'cortex:write')) {
-                    return { ...toolError('SCOPE_DENIED', 'Reading a cortex\x27s source needs the "cortex:write" permission, the same word replacing it needs.') };
+                    return { ...toolError('SCOPE_DENIED', 'Reading a cortex\x27s source needs the "cortex:write" permission, the same scope replacing it needs.') };
                 }
                 const source = await cortexSource(storage, agentCaller(), name);
                 if (!source.ok) return { ...toolError(source.code, source.message) };

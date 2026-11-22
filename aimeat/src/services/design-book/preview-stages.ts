@@ -272,7 +272,7 @@ export function wornStage(on: 'hero' | 'figure', title: string, sub: string, loo
   const top = { ...band, props: { ...band.props, image: STAGE_PICTURE }, ...(on === 'hero' ? { effect } : {}) };
   const blocks: Array<Record<string, unknown>> = on === 'hero' ? [top]
     : [top, { id: 'fig', component: 'figure', props: { source: 'stage.fig', title: 'Figure' }, effect }];
-  return { v: 1, blocks, look, tokens, __stage: 'worn', ...night(look), __sources: { 'stage.fig': { value: 128, label: 'The block wearing the effect', sub: 'An effect on a figure lands on its picture or its numeral.' } } };
+  return { v: 1, blocks, look, tokens, __stage: 'worn', ...night(look), __sources: { 'stage.fig': { value: 128, label: 'The block that uses the effect', sub: 'An effect on a figure lands on its picture or its numeral.' } } };
 }
 
 /** The committed looks a shape is shown in when it names none, so a shelf of them is not one colour. */

@@ -58,7 +58,7 @@ export function buildPromptSessionSections(nodeUrl: string): string {
   body += 'if (!r.ok) { showProblem(r.error); return; }   // never silently render an empty state\n';
   body += 'render(r.data.items);\n';
   body += '```\n';
-  body += '`error.code === "SCOPE_DENIED"` means the owner\'s approval is missing a permission word: say that to the user and point them at re-approving the app. Retrying cannot fix it. `error.code === "UNDECLARED_SPACE"` (422) means the workspace\'s manifest does not declare the space the record was written or published into, and nothing was stored: show `error.message` to someone who can declare the space (the GROUP application section says who can), and do not retry until it is declared. If you write your own wrapper around session.fetch, it MUST pass the refusal through — a wrapper that returns `r.data` regardless makes every call site in the app fail silently. The result is already parsed, so never call `.json()` on it.\n\n';
+  body += '`error.code === "SCOPE_DENIED"` means the owner\'s approval is missing a scope: say that to the user and point them at re-approving the app. Retrying cannot fix it. `error.code === "UNDECLARED_SPACE"` (422) means the workspace\'s manifest does not declare the space the record was written or published into, and nothing was stored: show `error.message` to someone who can declare the space (the GROUP application section says who can), and do not retry until it is declared. If you write your own wrapper around session.fetch, it MUST pass the refusal through — a wrapper that returns `r.data` regardless makes every call site in the app fail silently. The result is already parsed, so never call `.json()` on it.\n\n';
 
   return body;
 }

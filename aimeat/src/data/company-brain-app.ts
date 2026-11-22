@@ -159,7 +159,7 @@ entry: index.html
 
     function renderNoCompany() {
       say('<h2 class="text-lg font-bold mb-2">Register your company first</h2>' +
-        '<p class="opacity-70 mb-3">This brain hangs off a company, because the company’s own ' +
+        '<p class="opacity-70 mb-3">This brain belongs to a company, because the company’s own ' +
         'details are the first thing it knows. A name is enough to start, and the address is ' +
         'reserved straight away.</p>' +
         '<a class="btn btn-primary px-4" href="/v1/profile?tab=companies" target="_top">Register a company</a>');
@@ -414,14 +414,14 @@ entry: index.html
       var job = scheduleById(s.schedule_id);
       // NAMED A CLOCK THAT IS NOT THERE. Worth saying out loud: the schedule was deleted, or the
       // id was never right, and either way this feed is waiting for something that will not come.
-      if (!job) return { text: 'It names a clock this account does not have.', bad: true };
-      if (!job.enabled) return { text: 'Its clock is switched off.', bad: true };
+      if (!job) return { text: 'It names a schedule this account does not have.', bad: true };
+      if (!job.enabled) return { text: 'Its schedule is switched off.', bad: true };
       if (job.lastRunResult === 'error') {
-        return { text: 'Its clock ran and failed' + (job.lastRunError ? ': ' + job.lastRunError : '.'), bad: true };
+        return { text: 'Its schedule ran and failed' + (job.lastRunError ? ': ' + job.lastRunError : '.'), bad: true };
       }
       var last = job.lastRunAt ? 'last ran ' + String(job.lastRunAt).slice(0, 10) : 'has not run yet';
       var next = job.nextRunAt ? ', next ' + String(job.nextRunAt).slice(0, 10) : '';
-      return { text: 'Its clock is running: ' + last + next + '.', bad: false };
+      return { text: 'Its schedule is running: ' + last + next + '.', bad: false };
     }
 
     function facts() { return records[NS.fact] || records.fact || []; }
@@ -597,7 +597,7 @@ entry: index.html
                 return '<div class="text-xs mt-0.5 opacity-60">A connected account. ' +
                   '<a class="link" target="_top" href="/v1/profile?tab=connections">Check it in your profile</a>.</div>';
               }
-              return '<div class="text-xs mt-0.5 opacity-60">No clock. You feed this by hand.</div>';
+              return '<div class="text-xs mt-0.5 opacity-60">No schedule. You feed this by hand.</div>';
             })() + '</div>' +
             '<span class="badge badge-sm ' + (s.status === 'broken' ? 'badge-error' : s.status === 'late' ? 'badge-warning' : 'badge-ghost') + '">' +
             esc(s.status || 'ok') + '</span></div></li>';
@@ -642,7 +642,7 @@ entry: index.html
         // Naming the clock is what makes "its clock stopped" possible on the next open. Offered as
         // the owner's OWN schedules rather than a text field, because an id typed from memory is a
         // pointer at nothing, and this page would then report that as a fault in the feed.
-        '<select id="s-sched" class="select select-bordered"><option value="">No clock</option>' +
+        '<select id="s-sched" class="select select-bordered"><option value="">No schedule</option>' +
         schedules.map(function (j) {
           return '<option value="' + esc(j.id) + '">' + esc(j.displayName || j.name || j.id) + '</option>';
         }).join('') + '</select>' +
@@ -652,7 +652,7 @@ entry: index.html
       // bar: it is a thing you do to this brain, not a thing about this page.
       html += '<div class="mt-6 pt-4 border-t border-base-300 flex items-center gap-3 flex-wrap">' +
         '<button class="btn btn-outline px-4" id="agent-prompt">Copy agent prompt</button>' +
-        '<span class="opacity-70 text-sm">Hand this to your own AI and it can feed this brain from any chat.</span>' +
+        '<span class="opacity-70 text-sm">Give this to your own AI and it can feed this brain from any chat.</span>' +
         '</div>';
 
       say(html);

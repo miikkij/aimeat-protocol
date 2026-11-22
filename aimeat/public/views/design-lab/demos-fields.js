@@ -48,7 +48,7 @@ const SHAPES = [
   { value: 'assistant', label: 'Assistant', hint: 'Answers when you ask, in your chat.' },
   { value: 'worker', label: 'Worker', hint: 'Takes tasks from a queue and reports back.' },
   { value: 'watcher', label: 'Watcher', hint: 'Looks at one thing on a schedule and tells you when it changes.' },
-  { value: 'crew', label: 'Crew', hint: 'Several agents that hand work to each other.' },
+  { value: 'crew', label: 'Crew', hint: 'Several agents that pass work to each other.' },
 ];
 const ROLES = [['member', 'Member'], ['editor', 'Editor'], ['owner', 'Owner']];
 
@@ -91,7 +91,7 @@ export const FIELD_DEMOS = {
     <//>`) },
     { name: 'three and four columns', render: () => root(html`<${Fields} cols=${3}>
       <${TextField} label="Temperature" type="number" size="short" value="0.7" onInput=${noop} />
-      <${Select} label="Process" value="sequential" options=${[['sequential', 'One after another'], ['hierarchical', 'A manager hands out']]} onChange=${noop} />
+      <${Select} label="Process" value="sequential" options=${[['sequential', 'One after another'], ['hierarchical', 'A manager assigns the work']]} onChange=${noop} />
       <${TextField} label="Max rounds" type="number" size="short" value="5" onInput=${noop} />
     <//>
     <${Fields} cols=${4}>
@@ -308,7 +308,7 @@ export const FIELD_DEMOS = {
   ] },
   'layout-sketch': { variants: [
     { name: 'a layout', render: () => root(html`<${LayoutSketch} label="Dashboard" rows=${SKETCH_DASHBOARD} />`) },
-    { name: 'a way of moving', render: () => root(html`<${LayoutSketch} label="Bottom bar" rows=${[{ height: 'l', cells: [{ w: 'full' }] }, { height: 's', cells: [{ w: 'side', tone: 'ink' }, { w: 'side' }, { w: 'side' }, { w: 'side' }] }]} />`) },
+    { name: 'navigation', render: () => root(html`<${LayoutSketch} label="Bottom bar" rows=${[{ height: 'l', cells: [{ w: 'full' }] }, { height: 's', cells: [{ w: 'side', tone: 'ink' }, { w: 'side' }, { w: 'side' }, { w: 'side' }] }]} />`) },
     { name: 'ink and sun', render: () => root(html`<${LayoutSketch} label="Work queue" rows=${[{ height: 'm', cells: [{ w: 'side', label: 'today' }, { w: 'side', label: 'open' }] }, { height: 'l', cells: [{ w: 'main', label: 'queue', tone: 'sun' }, { w: 'side', label: 'history' }] }]} />`) },
   ] },
   'look-sample': { variants: [

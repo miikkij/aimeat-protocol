@@ -151,7 +151,7 @@ call the endpoints in \`${b}/v1/spec\`.
   answers 403 naming the scope, never an empty result.
 - **Payment.** Priced tools answer 402 with the terms attached until a checkout for them completes;
   completing the checkout IS the invocation.
-- **Schemas.** Every tool carries a full input and output schema in the manifest, so nothing has to
+- **Schemas.** Every tool has a full input and output schema in the manifest, so nothing has to
   be inferred from the app source: \`${b}/v1/apps/${o}/${f}/webmcp\`
 
 ## Usage

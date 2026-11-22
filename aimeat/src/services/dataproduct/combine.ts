@@ -172,8 +172,8 @@ export function combineSources(def: DataProductDefinition, tables: SourceTable[]
     for (const o of outs) {
         if (!o.cols.length) {
             throw new DataProductError('NO_COLUMNS', o.t.personal.size
-                ? `Source ${o.t.id} hands on no columns: the data map marks ${[...o.t.personal].join(', ')} personal, and a personal column is left out unless \`columns\` names it with include: true.`
-                : `Source ${o.t.id} hands on no columns after the mapping.`, 400, o.t.id);
+                ? `Source ${o.t.id} passes no columns: the data map marks ${[...o.t.personal].join(', ')} personal, and a personal column is left out unless \`columns\` names it with include: true.`
+                : `Source ${o.t.id} passes no columns after the mapping.`, 400, o.t.id);
         }
     }
     let resources: Array<{ name: string; rows: Row[]; cols: OutColumn[] }>;

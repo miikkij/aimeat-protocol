@@ -70,17 +70,17 @@ export function meteredRefusalText(outcome: Refusal, label: string, config?: Aim
         ? `${g.capCarriedUnits} ${outcome.entitlement.currency ?? ''}`.trim()
         : `${g.capCarriedUnits}-morsel pacing`;
       return { status: 402, code: 'GRANT_EXHAUSTED',
-        message: `Your access to ${label} is carried by the provider, and that grant has reached the `
+        message: `Your access to ${label} is covered by the provider, and that grant has reached the `
           + `${ceiling} ceiling they set. Ask them to extend it, or take a contract of your own.` };
     }
     case 'insufficient':
       return { status: 402, code: 'INSUFFICIENT_MORSELS',
         message: outcome.carried
-          ? `This call carries ${outcome.needed} morsels of pacing, which the provider carries for you `
+          ? `This call needs ${outcome.needed} morsels of pacing, which the provider covers for you `
             + 'under their grant, and their balance does not cover it right now. Morsels replenish daily.'
           : config
             ? insufficientMorselsMessage(config, outcome.needed)
-            : `This call carries ${outcome.needed} morsels of pacing and the balance does not cover it. Morsels `
+            : `This call needs ${outcome.needed} morsels of pacing and the balance does not cover it. Morsels `
               + 'replenish daily; pacing bounds how fast a capability can be used, and it is not a price.' };
     case 'scope_required':
       return { status: 403, code: 'SCOPE_DENIED',

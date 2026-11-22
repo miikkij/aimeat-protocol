@@ -87,8 +87,8 @@ export async function notifyGrantIssued(
   try {
     await notify(storage, `${consumerOwner}@${config.nodeId}`, {
       type: 'app_member_approved',
-      title: input.appId ? `You were approved for ${input.appId.split('/').pop()}` : `${input.providerOwner} is carrying your calls`,
-      body: `${input.providerOwner} approved you, so ${input.capabilityLabel} is free for you. They carry the cost.`,
+      title: input.appId ? `You were approved for ${input.appId.split('/').pop()}` : `${input.providerOwner} is paying for your calls`,
+      body: `${input.providerOwner} approved you, so ${input.capabilityLabel} is free for you. They pay the cost.`,
       link: targetLink(input.appId),
       i18n: {
         key: input.appId ? 'app_member_approved' : 'app_member_approved_provider',
@@ -138,8 +138,8 @@ export async function notifyGrantsRevoked(
     try {
       await notify(storage, `${m.consumerOwner}@${config.nodeId}`, {
         type: 'app_member_revoked',
-        title: m.appId ? `Your free access to ${m.appId.split('/').pop()} ended` : `${input.providerOwner} stopped carrying your calls`,
-        body: `${input.providerOwner} withdrew the free access they were carrying${m.count > 1 ? ` (${m.count} capabilities)` : ''}. You can still call, at list price.`,
+        title: m.appId ? `Your free access to ${m.appId.split('/').pop()} ended` : `${input.providerOwner} stopped paying for your calls`,
+        body: `${input.providerOwner} withdrew the free access they were paying for${m.count > 1 ? ` (${m.count} capabilities)` : ''}. You can still call, at list price.`,
         link: targetLink(m.appId),
         i18n: {
           key: `${m.appId ? 'app_member_revoked' : 'app_member_revoked_provider'}${m.count > 1 ? '_many' : ''}`,

@@ -129,7 +129,7 @@ export function registerAiImageTool(
                             ...(r.publishRequest ? { publish_request: r.publishRequest } : {}),
                             ...(r.warnings?.length ? { warnings: r.warnings } : {}),
                             note: r.visibility === 'public'
-                                ? 'Stored and publicly readable, so the URL can be handed to a vision model or used in an app.'
+                                ? 'Stored and publicly readable, so the URL can be passed to a vision model or used in an app.'
                                 : r.publishRequest
                                     ? 'Stored privately until your owner approves making it public; the URL loads for anyone once they do. publish_request.next_step says what to tell them.'
                                     : 'Stored privately. Pass public: true if a model or a page has to fetch it by URL.',

@@ -115,7 +115,7 @@ export async function runVisitRetentionJob(storage: Storage, now: Date = new Dat
   }
 
   if (total.hotRows + total.archiveRows + total.rollupRows > 0) {
-    logger.info('visit-retention: folded the account out of old app visits', { beforeDay, ...total });
+    logger.info('visit-retention: removed the account from old app visits', { beforeDay, ...total });
   }
   return { ...total, beforeDay, guestsForgotten };
 }

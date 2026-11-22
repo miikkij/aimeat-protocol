@@ -129,7 +129,7 @@ import { sendMail } from '../../services/mail-gate.js';
 import { accountMadeBy } from '../../services/key-credentials.js';
 
 /** Why the key mail draws on no account count (mail-gate.ts third-party). */
-const KEY_MAIL_BOUND = 'Only an owner of the organism mints a key, under the route\'s rate limit (30 in ten minutes); the mail carries the key it made.';
+const KEY_MAIL_BOUND = 'Only an owner of the organism mints a key, under the route\'s rate limit (30 in ten minutes); the mail contains the key it made.';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {

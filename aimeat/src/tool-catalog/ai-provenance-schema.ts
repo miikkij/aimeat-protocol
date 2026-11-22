@@ -67,10 +67,10 @@ export const AiProvenanceBlockSchema = z.object({
   provider: z.string().max(INPUT_LIMITS.title).optional().describe(
     "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
     + "someone else's model. Say it when you route through an intermediary, because 'which model' "
-    + 'and "who ran it" are different questions and a reader chasing an output needs both.'),
+    + 'and "who ran it" are different questions and a reader tracing an output needs both.'),
   media_kind: z.enum(AI_MEDIA_KINDS).optional().describe(
     "What kind of thing this is: text | image | audio | video | code | data. It decides the label's "
-    + 'words (a picture is not "this text") and whether the deep-fake rule applies, which reaches '
+    + 'words (a picture is not "this text") and whether the deep-fake rule applies, which covers '
     + 'image, audio and video only. Omitted: the node states text for text it stores, and nothing '
     + 'for bytes.'),
   media_type: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'media_type must be an IANA media type such as audio/mpeg')

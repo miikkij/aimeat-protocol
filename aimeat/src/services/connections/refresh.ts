@@ -172,7 +172,7 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
   }
   const provider = findProvider(ctx.providers, conn.provider);
   if (!provider) {
-    return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
+    return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this server' };
   }
 
   // BEFORE the refresh-token guard below, and that order is load-bearing: a session-shaped
@@ -200,7 +200,7 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
 
   const endpoints = provider.endpoints(conn.instance, client.tenant);
   if (!endpoints) {
-    return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
+    return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this server' };
   }
 
   // Same builder as the first exchange. A refresh that authenticated differently from the exchange

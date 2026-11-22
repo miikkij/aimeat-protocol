@@ -28,8 +28,8 @@ export const HELP_RESPOND_FIELDS = ['action', 'answer', 'to', 'keep_allowed'] as
 export const HELP_CLOSE_FIELDS = ['action', 'helper', 'thanks', 'keep', 'days'] as const;
 export const HELP_REPORT_WRITE_FIELDS = ['text', 'suggestions', 'decisions', 'dry_run'] as const;
 
-const ASK_NOTE = 'Needs help:ask, which no wildcard carries: the owner ticks it per agent. The skill aimeat-ask-someone-who-knows has the whole way of working.';
-const ANSWER_NOTE = 'Needs help:answer, which no wildcard carries: the owner ticks it per agent. The skill aimeat-ask-someone-who-knows has the whole way of working.';
+const ASK_NOTE = 'Needs help:ask, which no wildcard includes: the owner ticks it per agent. The skill aimeat-ask-someone-who-knows has the whole way of working.';
+const ANSWER_NOTE = 'Needs help:answer, which no wildcard includes: the owner ticks it per agent. The skill aimeat-ask-someone-who-knows has the whole way of working.';
 
 const topics = { type: 'array', description: 'Topics in plain words, such as "Entra" or "invoicing report". At most 40.', zod: z.array(z.string().max(60)).max(40) } as const;
 const questionId = { type: 'string', required: true, description: 'The question\'s id (hq_…), from aimeat_help_inbox or the answer of aimeat_help_ask.', zod: z.string().max(INPUT_LIMITS.id) } as const;
@@ -71,7 +71,7 @@ export const helpTools = [
             helpers: { type: 'number', description: '1 (the default) or 2: how many matching helpers get it at once.', zod: z.number().int().min(1).max(2) },
             to_board: { type: 'boolean', description: 'Put it on the shared list instead, where any helper can take it.' },
             attachments: {
-                type: 'array', description: 'Files to send with it, as a direct message carries them.',
+                type: 'array', description: 'Files to send with it, in the form a direct message uses.',
                 zod: z.array(z.object({ storage_key: z.string().max(512), mime: z.string().max(128), size: z.number().int().nonnegative(), kind: z.enum(['image', 'audio', 'video', 'file']), name: z.string().max(256).optional() })).max(10),
             },
         },

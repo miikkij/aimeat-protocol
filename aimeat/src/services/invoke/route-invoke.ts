@@ -124,7 +124,7 @@ export async function invokeRouteCapability(
       if (body === null) {
         return {
           ok: false, status: 502, code: 'ANSWER_TOO_LARGE',
-          message: `The route answered more than ${MAX_BODY / (1024 * 1024)} MB, which invoke does not carry. Narrow the request with the route's own query values.`,
+          message: `The route answered more than ${MAX_BODY / (1024 * 1024)} MB, which invoke does not return. Narrow the request with the route's own query values.`,
         };
       }
       const text = body.toString('utf8');

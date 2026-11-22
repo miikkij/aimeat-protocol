@@ -104,7 +104,7 @@ export async function recordBookParts(
     // the layout as data, and one of the three named the part. The layout without the name is a
     // use the Book never hears about, and the publish answer is the one text a builder acts on.
     if (declared && !ids.length) {
-      result.notes.push('This page carries its arrangement (#aimeat-layout) and names no Design Book part. If the arrangement started from one, '
+      result.notes.push('This page has its arrangement (#aimeat-layout) and names no Design Book part. If the arrangement started from one, '
         + 'name it and publish again, so the Book knows the part is used: <meta name="aimeat-book-parts" content="<part id>">. '
         + 'If you arranged it from nothing, say so in the build notes (`made`, with why no fill in the Book was near): it is a fill the next app could start from, '
         + 'and it is offered to the Book when the owner is satisfied with this app, not because the build is finished.');

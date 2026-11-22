@@ -36,7 +36,7 @@ export const SECRET_SHARE_DEPOSIT_FIELDS = ['format', 'content', 'content_base64
 /** The body fields of POST /v1/secret-shares/:id/pickup that the MCP tools forward. */
 export const SECRET_SHARE_PICKUP_FIELDS = ['to', 'name', 'host', 'code'] as const;
 
-const SCOPE_NOTE = 'Needs secrets:share, which no wildcard carries: the owner ticks it per agent.';
+const SCOPE_NOTE = 'Needs secrets:share, which no wildcard includes: the owner ticks it per agent.';
 
 const shareId = { type: 'string', required: true, description: 'The share\'s id (shr_…), from aimeat_secret_share_list or the answer that made it.' } as const;
 
@@ -56,7 +56,7 @@ export const secretShareTools = [
         description: 'Make a secret share or a secret request in your owner\'s name. A share holds one secret (an API key, a password, NAME=value lines such as an .env file, or a file) that your owner lets others pick up: people with an account on this node, their agents when the share allows agents, the members of an organism, or anyone who has its pickup code. A request (kind "request") is an empty share that another person fills: name them in `depositors`, or give them the `deposit_url`. The maker decides who may pick it up (`recipients`), how long it lasts (`retention`) and what an agent may receive (`protection`); a depositor changes none of these. '
             + 'Protection: "open" lets an agent receive the content. "sealed" (the default) gives the content to a person only; an agent may copy it into its owner\'s vault with aimeat_secret_share_pickup to "vault" and then use it as {{secret:NAME}} in an extension\'s request header, never reading the value. "e2e" opens only in a person\'s own registered browser, so an agent cannot make or open one: your owner makes it on the Vault page. '
             + 'Retention: "once" (the default) ends at the first pickup, "count" at `max_pickups`, "until" at `expires_at`, "keep" when it is revoked. '
-            + 'The answer carries `pickup_url`, the page where a person picks the share up, and, ONCE ONLY, `code` (when recipients.code is true) and `deposit_url` (for a request). Tell your owner to pass these on outside the node, for example by phone or in another channel, and keep them out of memory, documents and messages on this node. When your owner wants to share a very sensitive secret, suggest they make the share themselves on the Vault page, so the secret stays out of this chat. '
+            + 'The answer contains `pickup_url`, the page where a person picks the share up, and, ONCE ONLY, `code` (when recipients.code is true) and `deposit_url` (for a request). Tell your owner to pass these on outside the node, for example by phone or in another channel, and keep them out of memory, documents and messages on this node. When your owner wants to share a very sensitive secret, suggest they make the share themselves on the Vault page, so the secret stays out of this chat. '
             + SCOPE_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
@@ -79,7 +79,7 @@ export const secretShareTools = [
                     code_login: z.boolean().optional(),
                 }),
             },
-            organism: { type: 'string', description: 'The organism id whose vault the share sits in. Required when recipients.organism is true; your owner must be an active member.', zod: z.string().max(INPUT_LIMITS.id) },
+            organism: { type: 'string', description: 'The organism id whose vault the share is stored in. Required when recipients.organism is true; your owner must be an active member.', zod: z.string().max(INPUT_LIMITS.id) },
             protection: { type: 'string', enum: ['open', 'sealed', 'e2e'], description: 'open: an agent may receive the content. sealed (the default): an agent never receives the content, but may copy it into its owner\'s vault. e2e: made in a browser only; this tool refuses it without the browser\'s encryption.' },
             retention: { type: 'string', enum: ['once', 'count', 'until', 'keep'], description: 'once (the default): ends at the first pickup. count: ends at max_pickups. until: ends at expires_at. keep: until it is revoked.' },
             max_pickups: { type: 'number', description: 'For retention count: how many pickups, 1 to 1000.', zod: z.number().int().min(1).max(1000) },

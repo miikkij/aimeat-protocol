@@ -57,7 +57,7 @@ export function HomeHeader({ name, owner, identity, plate, onOpenSettings }) {
   const avatarSvg = minidenticon(typeof owner === 'string' && owner ? owner : (name || 'user'));
   return html`
     <${Masthead} avatarSvg=${avatarSvg} name=${name} identity=${identity} plate=${plate}
-      identityTitle=${tr('home.identityHint', 'GHII: your permanent address. People, homes and agents everywhere find you by it.')}>
+      identityTitle=${tr('home.identityHint', 'GHII: your permanent address. People, servers and agents everywhere find you by it.')}>
       ${/* The door to everything behind the home. The header carries the same link, but a person
             reading the nameplate is not reading the header, and the relationship (home in front,
             controls behind) has to be visible on the page itself. */''}

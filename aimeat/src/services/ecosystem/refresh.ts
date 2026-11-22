@@ -86,7 +86,7 @@ export async function ecosystemRefreshDecision(input: {
   if (chainEndsAt <= nowS) {
     return {
       ok: false, status: 401, code: 'ECO_REAPPROVAL_REQUIRED',
-      message: 'The owner approved this app more than a year ago, and an approval carries its renewals for one year. '
+      message: 'The owner approved this app more than a year ago, and an approval covers its renewals for one year. '
         + 'Connect again with POST /v1/ecosystem-apps/hello; the owner then sees the app and its permissions and '
         + 'approves it again.',
     };

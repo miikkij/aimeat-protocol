@@ -145,7 +145,7 @@ function LangChoice() {
 function AgentHelp({ prompt, loading, error }) {
   return html`
     <div class="hlp-agent">
-      <p class="hlp-desc">${tr('help.description', 'If your AI assistant is having trouble connecting to or using this node, copy the prompt below and paste it into your AI chat. It will guide your AI through connecting, authenticating, and using all available features.')}</p>
+      <p class="hlp-desc">${tr('help.description', 'If your AI assistant is having trouble connecting to or using this server, copy the prompt below and paste it into your AI chat. It will guide your AI through connecting, authenticating, and using all available features.')}</p>
 
       ${loading && html`<div class="hlp-loading"><${Spinner} /></div>`}
       ${error && html`<p class="hlp-error">${t('help.loadError')}</p>`}

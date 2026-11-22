@@ -233,7 +233,7 @@ export function designSpecHint(input: { stamp: AppDesignSpecStamp | undefined; n
     if (!input.shared) return undefined;
     return 'This app is built by more than one person and has no design spec yet. Write one with '
       + 'aimeat_app_manage { action: "spec_set", owner, filename, markdown }: what the app is for, its screens, '
-      + 'where its data lives, the decisions made and what is open. The people building it with you read it '
+      + 'where its data is stored, the decisions made and what is open. The people building it with you read it '
       + 'before they change anything; the action "spec" answers an outline to start from.';
   }
   if (!isDesignSpecStale(input.stamp, input.newVersion)) return undefined;
@@ -246,7 +246,7 @@ export function designSpecHint(input: { stamp: AppDesignSpecStamp | undefined; n
 export function designSpecMeaning(spec: AppDesignSpec | null, appVersion: number): string {
   if (!spec) {
     return 'Nobody has written one yet. A write with `markdown` starts it; `template` is the outline to start from. '
-      + 'Say what the app is for, its screens, where its data lives, what was decided and what is open.';
+      + 'Say what the app is for, its screens, where its data is stored, what was decided and what is open.';
   }
   if (isDesignSpecStale(spec, appVersion)) {
     return `Written against version ${spec.version}; the app is at version ${appVersion}. Read it, then confirm it `

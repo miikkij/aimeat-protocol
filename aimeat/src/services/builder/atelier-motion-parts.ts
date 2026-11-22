@@ -59,15 +59,15 @@ export const ATELIER_MOTION_COMPONENTS: ReadonlyArray<{ id: string; summary: str
 
 /** The paragraph the specification carries after the motion section. */
 export function atelierMotionParts(): string {
-  return 'CONTROLS THAT ANSWER THE HAND are the kit\'s, so never draw your own switch, menu, '
+  return 'CONTROLS THAT ANSWER A TOUCH OR A CLICK are the kit\'s, so never draw your own switch, menu, '
     + 'popover, segmented control or busy button: `toggle`, `segmented`, `slider`, `menu`, '
     + '`contextMenu`, `popover`, `tooltip`, `island` and `stateButton` move on the look\'s spring, '
-    + 'carry the keyboard and the screen-reader wiring, and stand still under reduced motion. The '
+    + 'include the keyboard and the screen-reader wiring, and stand still under reduced motion. The '
     + 'tab row\'s chosen fill already travels, chart lines draw when seen, and `palette` grows from '
     + 'its button (`anchor`) and turns into the toast for an item with `done`. The feel of every '
     + 'one of them is three numbers, `--ak-spring-stiffness`, `--ak-spring-damping` and '
     + '`--ak-spring-mass`, which the layout\'s `tokens` may set and which the Design Book\'s '
-    + 'motion parts `motion-spring-snappy`, `motion-spring-soft` and `motion-spring-heavy` carry '
+    + 'motion parts `motion-spring-snappy`, `motion-spring-soft` and `motion-spring-heavy` hold '
     + 'ready: pick one of those for the app instead of tuning a number.\n\n'
     + ATELIER_MOTION_COMPONENTS.map((c) => '- `' + c.id + '`: ' + c.summary + '\n  `' + c.example + '`').join('\n')
     + '\n\n';

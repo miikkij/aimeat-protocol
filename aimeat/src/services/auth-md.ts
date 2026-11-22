@@ -199,7 +199,7 @@ External applications connect with the same consent guarantees:
 \`POST ${b}/v1/ecosystem-apps/hello\` → the owner approves (scopes + data-area allowlist)
 → \`POST ${b}/v1/ecosystem-apps/token\`. The app renews at \`POST ${b}/v1/auth/refresh\` with its
 Bearer and \`{ "timestamp", "signature" }\`: an Ed25519 signature of \`geai + timestamp\` by the key it
-sent at hello. One approval carries one year of renewals; then the app says hello again.
+sent at hello. One approval covers one year of renewals; then the app says hello again.
 Full guide: the node's llms-full.txt.
 
 ## Error handling

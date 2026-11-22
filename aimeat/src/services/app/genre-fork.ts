@@ -91,7 +91,7 @@ export function designBookStep(html: string): string | undefined {
   const own = ownClassNames(html);
   if (own.length < OWN_PARTS_MIN) return undefined;
   const shown = own.slice(0, 6).map(n => '.' + n).join(', ');
-  return `This app carries ${own.length} styles of its own beyond the kit and the genre it forked (${shown}${own.length > 6 ? ', …' : ''}). `
+  return `This app has ${own.length} styles of its own beyond the kit and the genre it forked (${shown}${own.length > 6 ? ', …' : ''}). `
     + 'WRITE DOWN WHY, NOW, while you know: for each thing you made by hand, one row in the page\'s build notes '
     + '(<script type="application/json" id="aimeat-build-notes">, list `made`: { "name", "what", "why" }, where `why` is why the Design Book had nothing for it), '
     + 'and publish again so the node keeps it with this version. DO NOT PROPOSE IT TO THE BOOK BECAUSE THE BUILD IS FINISHED: a finished build is often thrown away and rebuilt, '
@@ -115,9 +115,9 @@ export function genreForkFindings(html: string): AppArtifactFinding[] {
   return [{
     pitfall: PITFALL,
     severity: 'warn',
-    message: `The head names genre-${register}, and the page carries ${Math.round(share * 100)} % of that genre's own styles, so it was not forked from it: `
+    message: `The head names genre-${register}, and the page has ${Math.round(share * 100)} % of that genre's own styles, so it was not forked from it: `
       + 'a genre\'s name over a look preset with components stacked in it is the default page every app looks like. Fork the genre '
-      + `(\`aimeat_app_template_get { id: "genre-${register}" }\`), keep its composition, its type and its physics, and change the words, `
+      + `(\`aimeat_app_template_get { id: "genre-${register}" }\`), keep its composition, its type and its motion rules, and change the words, `
       + 'the sources and the images. If this page has a look of its own, say so instead: `content="custom:<name>"`. Then put it beside '
       + 'the genre at 390×844 and 1280×900 and ask whether it holds up.',
     url: `/v1/appdev/pitfalls/${PITFALL}`,

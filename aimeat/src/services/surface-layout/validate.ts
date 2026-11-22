@@ -77,7 +77,7 @@ export function refuseMarkup(body: string, where: string): void {
     for (const { re, why } of MARKUP_REFUSALS) {
         if (re.test(body)) {
             throw new SiteError('FREEFORM_MARKUP',
-                `${where}: this block is written in Markdown and cannot carry ${why}. `
+                `${where}: this block is written in Markdown and cannot contain ${why}. `
                 + 'Use Markdown for headings, links and emphasis; a page that needs its own HTML is the portal template.', 422);
         }
     }

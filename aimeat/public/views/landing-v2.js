@@ -88,7 +88,7 @@ const STEPS = [
   ['landing2.step1Title', 'Bring the AI you already pay for',
     'landing2.step1Body', 'Claude or ChatGPT on a paid plan, or any other AI chat that supports MCP. You keep using the one you have.'],
   ['landing2.step2Title', 'Plug it into AIMEAT',
-    'landing2.step2Body', 'One connection, made once. Your AI gets hands, a memory and your own AIMEAT to work in. It is yours, and nothing happens there without your permission.'],
+    'landing2.step2Body', 'One connection, made once. Your AI gets tools, a memory and your own AIMEAT to work in. It is yours, and nothing happens there without your permission.'],
   ['landing2.step3Title', 'Then ask for what you need',
     'landing2.step3Body', 'You work in the chat you already use. There is no new interface to learn.'],
 ];

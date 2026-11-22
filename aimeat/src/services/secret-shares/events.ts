@@ -27,6 +27,6 @@ export async function record(
       detail,
     });
   } catch (err) {
-    logger.warn('secret share: an event did not land', { shareId, kind, error: String(err) });
+    logger.warn('secret share: an event was not recorded', { shareId, kind, error: String(err) });
   }
 }

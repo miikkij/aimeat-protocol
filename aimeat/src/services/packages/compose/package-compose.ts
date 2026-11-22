@@ -386,7 +386,7 @@ export async function planComposeFromApps(
     if (expects.extensions.length > 0 && input.allowExpectations !== true) {
         return {
             ok: false, status: 400, code: 'EXTENSION_NOT_PACKAGED',
-            message: `These apps call extensions this package cannot carry: ${expects.extensions.join(', ')}. `
+            message: `These apps call extensions this package cannot include: ${expects.extensions.join(', ')}. `
                 + 'Install them on the target node first, then compose again with allow_expectations to record them as requirements.',
         };
     }
@@ -400,10 +400,10 @@ export async function planComposeFromApps(
         notes.push(`Expects cortexes this node ships: ${shipped.join(', ')}`);
     }
     if (heldByOthers.size > 0) {
-        notes.push(`Expects cortexes other accounts keep private or inactive, which travel only with their own author's package: ${[...heldByOthers].join(', ')}`);
+        notes.push(`Expects cortexes other accounts keep private or inactive, which come only with their own author's package: ${[...heldByOthers].join(', ')}`);
     }
     if (carriedFromOthers.size > 0) {
-        notes.push(`Carries public cortexes other accounts installed: ${[...carriedFromOthers].map(([n, by]) => `${n} (by ${by})`).join(', ')}`);
+        notes.push(`Includes public cortexes other accounts installed: ${[...carriedFromOthers].map(([n, by]) => `${n} (by ${by})`).join(', ')}`);
     }
     if (expects.packs.length > 0) {
         notes.push(`Expects library packs the node serves: ${expects.packs.join(', ')}`);
@@ -412,7 +412,7 @@ export async function planComposeFromApps(
         notes.push(`Expects extensions installed separately: ${expects.extensions.join(', ')}`);
     }
     if (skillComponents.length > 0) {
-        notes.push(`Carries the skills bound to these apps: ${skillComponents.map(s => s.label).join(', ')}. `
+        notes.push(`Includes the skills bound to these apps: ${skillComponents.map(s => s.label).join(', ')}. `
             + 'Installing publishes each in the installer\'s own skills, bound to their copy of the app.');
     } else if (!includeSkills) {
         notes.push('Skills bound to these apps stay behind (include_skills was false).');

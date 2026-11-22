@@ -127,7 +127,7 @@ function aboutTool(ref, surface, toolCount) {
   if ((s.bundled_agents || []).length) parts.push(s.bundled_agents.length + ' bundled agent' + (s.bundled_agents.length === 1 ? '' : 's'));
   const offers = ((s.exchange || {}).offerings || []).length;
   if (offers) parts.push(offers + ' EXCHANGE listing' + (offers === 1 ? '' : 's'));
-  const carries = parts.length ? ' Carries ' + parts.join(', ') + '.' : '';
+  const carries = parts.length ? ' Has ' + parts.join(', ') + '.' : '';
   return {
     name: 'about-this-app',
     description: 'What "' + label + '" (' + ref.owner + '/' + ref.appId + ') offers an agent: its app id, '

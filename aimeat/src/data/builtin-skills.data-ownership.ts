@@ -232,9 +232,9 @@ What an export leaves out, and why:
   saved, workspace writes, extensions and scheduled jobs. An app the person signed in to is named as the
   app (\`eco:<app>#<person>@<node>\`), not as the person, from 2026-10-31. The answer's \`not_covered\` says what it
   cannot see: writes from before counting started, and writes the node makes on its own behalf.
-  An agent without \`memory:read-as-owner\` sees the hands only on records it may read; the answer's
+  An agent without \`memory:read-as-owner\` sees who wrote only on records it may read; the answer's
   \`note\` then says so.
-- **Whether a model wrote it:** a record written by an AI carries an AI provenance record; reading the
+- **Whether a model wrote it:** a record written by an AI has an AI provenance record; reading the
   record returns it under \`meta.provenance\`, and \`GET /v1/provenance/{id}\` shows the level (original,
   assisted, synthesized, ai-generated), the model and how much a person was involved. When you write
   for the person, declare it (\`ai_provenance\` on the write); the skill \`ai-transparency\` says how.
@@ -271,8 +271,8 @@ What an export leaves out, and why:
 - A record that went into the bin PUBLIC comes back out through the same visibility rules a write
   passes, so putting it back can be refused where deleting it was not. \`PUBLISH_NOT_ALLOWED\` means
   this node asks the person before anything of theirs goes public and you are not one of the
-  principals it lets decide: the record stays in the bin for the rest of its window, and the two ways
-  on are the person restoring it themselves or you writing the content again, which files a request
+  principals it lets decide: the record stays in the bin for the rest of its window, and the two options
+  left are the person restoring it themselves or you writing the content again, which files a request
   they approve. \`LABEL_CAPS_AUDIENCE\` means its classification label does not allow that audience,
   and that one refuses the person too. On a node closed to strangers a public record comes back at
   \`members\` instead of public, with no refusal. Say which of these happened; none of them is a
@@ -322,7 +322,7 @@ A delete in a team's workspaces (a record, rows, a whole workspace or the team i
 for waits for one of the team's leads while the team's approval gate is on, which it is by default.
 You get \`TEAM_APPROVAL_REQUIRED\` with the approval's id and where a lead decides it, and nothing is
 deleted. Tell the person; after a lead approves, make the same call again with the same input, and
-it runs. \`TEAM_APPROVAL_DECLINED\` means a lead said no. The person deleting with their own hands is
+it runs. \`TEAM_APPROVAL_DECLINED\` means a lead said no. The person who deletes it themselves is
 never held.
 
 ## 5. How knowledge goes stale here
@@ -352,10 +352,10 @@ let knowledge age, and you should offer them, not wait to be asked:
   (\`retention: { maxRows, maxDays }\` in the workspace's manifest); older rows go as new ones arrive.
   Right for logs, readings and event streams.
 - **A table says whether it is up to date.** \`GET /v1/datapackages/{owner}/{name}\` and the
-  dataset entries of \`aimeat_discover\` carry \`freshness\`: fresh, late, stale (three promised
+  dataset entries of \`aimeat_discover\` include \`freshness\`: fresh, late, stale (three promised
   updates missed) or unscheduled (nothing promised, never called fresh), against the data product's
   schedule or the producer's. When the person asks "is any of my data out of date?", answer per table
-  with the state and its reason; a stale one also rang their bell once. The versions list
+  with the state and its reason; a stale one also sent them one notification. The versions list
   (\`GET /v1/datapackages/{owner}/{name}/versions\`) tells the person which versions a named share
   pins, which an outside party read in the last 30 days, and which the retention policy removes next;
   a version a share pins is never removed. Offer to withdraw a table nobody reads and nobody updates.
@@ -366,7 +366,7 @@ let knowledge age, and you should offer them, not wait to be asked:
 ## 6. Leave
 
 - **A group:** \`aimeat_organism_leave\`. Their records in it stay with the group, and the creator
-  cannot leave (they hand ownership over first, \`POST /v1/organisms/{id}/transfer\`). Leaving also
+  cannot leave (they transfer ownership first, \`POST /v1/organisms/{id}/transfer\`). Leaving also
   removes the person's agents from the group and the workspace roles given to them, from the tool
   and from the organism page alike.
 - **The node.** First the account export (section 1), the apps backup, and an export of each organism
@@ -389,7 +389,7 @@ let knowledge age, and you should offer them, not wait to be asked:
   namespace or a group's workspace, that record's count stays with a pseudonym as its maker. The
   content risk marks of what they wrote into someone else's place (a message, a post, a comment, a
   workspace document) stay with the content, naming a pseudonym as the writer (and as who accepted
-  marks in a workspace they ran), and hold no words of it. A notification in another person's inbox stays, as that person's own
+  marks in a workspace they ran), and contain none of its words. A notification in another person's inbox stays, as that person's own
   copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a
@@ -402,8 +402,8 @@ let knowledge age, and you should offer them, not wait to be asked:
   on its first visit, so the new page never sees it.
 - **A group they alone own** cannot be left without an owner, and an erasure cannot ask. It goes to
   the first admin, or else to the first member, and that person becomes its creator. When nobody at
-  all is left, nobody holds it and the people who run the node seat a new owner. Tell the person
-  which groups this will happen to before they erase, and say they can hand a group over first
+  all is left, nobody holds it and the people who run the node appoint a new owner. Tell the person
+  which groups this will happen to before they erase, and say they can transfer a group first
   (\`POST /v1/organisms/{id}/transfer\`) if they want to choose who gets it.
 - **Moving to another AIMEAT node.** There is no one-step move today: export here, import there
   (memory, organisms, apps, agents), connect their AI to the new node, and then erase here.

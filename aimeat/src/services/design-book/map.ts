@@ -48,7 +48,7 @@ const KINDS: Array<[string, string]> = [
   ['genre', 'GENRES: a whole page in a committed look. A build STARTS by forking one (`aimeat_app_template_get`), never by adopting it.'],
   ['layout', 'LAYOUTS: a complete arrangement of a screen, with its blocks placed. Adopt one instead of arranging blocks yourself.'],
   ['fill', 'FILLS: a starting shape for ONE screen or dialog, with the words and the states already thought through.'],
-  ['component', 'COMPONENTS: a piece of page another app made by hand and its owner was satisfied with: markup and a stylesheet, no script, wearing your page\'s tokens. Take one with `aimeat_designbook_adopt` (it answers the two texts and how to wire them) instead of making it again.'],
+  ['component', 'COMPONENTS: a piece of page another app made by hand and its owner was satisfied with: markup and a stylesheet, no script, using your page\'s tokens. Take one with `aimeat_designbook_adopt` (it answers the two texts and how to wire them) instead of making it again.'],
   ['look', 'LOOKS: a proven token sheet (colour pair, type, corners) for a screen that has no genre of its own.'],
   ['motion', 'MOTION: how things arrive and change. A sheet of motion tokens, adopted whole.'],
   ['ambient', 'AMBIENTS: the one layer allowed to move at idle, behind the words.'],
@@ -69,7 +69,7 @@ function lead(summary: string, max: number): string {
 function render(rows: MapRow[], opts: MapOptions, max: number): string {
   const base = opts.baseUrl.replace(/\/+$/, '');
   let out = '## What the Design Book holds\n\n'
-    + 'Every part here passed its own bench before it was published. Read this list before you compose anything: '
+    + 'Every part here passed its own tests before it was published. Read this list before you compose anything: '
     + 'open ONE part with `aimeat_designbook_get { id }`, take it into your app with `aimeat_designbook_adopt { id, filename }`, '
     + 'see any part as a real page at ' + base + '/v1/designbook/<id>/preview, and search by word with '
     + '`aimeat_designbook_search { q }`. What you make that is not here, propose back with `aimeat_designbook_propose`.\n\n';

@@ -52,7 +52,7 @@ export const EVENTS_FIRST_DOMAINS =
   '`memory` (memory:read), `agent-tasks` (task:read), `files` (storage:read), `organisms` '
   + '(organism:read), `workflows` and `scheduler` (workflow:read), `messages` (messages:read), '
   + '`boards` and `realtime-rooms` (social:read), `wallet` (wallet:read), `knowledge` and `packages` '
-  + '(knowledge:read). `realtime-rooms` says the realtime room list moved: a room opened or closed, a '
+  + '(knowledge:read). `realtime-rooms` says the realtime room list changed: a room opened or closed, a '
   + 'player came or went. Data other accounts write: `workspace:<org>/<ws>` (organism:read), never `memory`';
 
 /** The three places a timer belongs, the same words in both specifications. */
@@ -67,7 +67,7 @@ const TIMER_CASES =
 const EVENT_SHAPE =
   'An event names the domain and never the record, so every change in that domain on the account '
   + 'wakes the page: read while your app has something under way, and re-read the one source that '
-  + 'moved. A delete emits its domain as a write does; the aimeat-live description names the few '
+  + 'changed. A delete emits its domain as a write does; the aimeat-live description names the few '
   + 'that emit nothing. ';
 
 /**
@@ -75,9 +75,9 @@ const EVENT_SHAPE =
  * @returns the paragraph, ending in a blank line
  */
 export function atelierEventsFirst(): string {
-  return 'EVENTS FIRST, A TIMER LAST. Data that lives on the node reaches the screen because the '
+  return 'EVENTS FIRST, A TIMER LAST. Data that is stored on the node reaches the screen because the '
     + 'node said it changed. Before you write `setInterval` around a read, name the event that '
-    + 'says this data moved. The owner\'s records: the `live` map above with a `keyPrefix`. Work '
+    + 'says this data changed. The owner\'s records: the `live` map above with a `keyPrefix`. Work '
     + 'an agent does for the app (each stage line of a task, done, failed, a task a schedule '
     + 'created): `live: { jobs: { domains: [\'agent-tasks\'] } }`, which needs no prefix, and for '
     + 'one task `AIMEAT.agents.watch(agent, taskId, onUpdate)`. The domains an app may hear, each '
@@ -93,8 +93,8 @@ export function atelierEventsFirst(): string {
  * @returns the section, heading included, ending in a blank line
  */
 export function classicLiveUpdatesSection(): string {
-  let body = '### Live updates without a firehose (aimeat-live.js)\n';
-  body += '**Events first, a timer last.** Data that lives on the node reaches the screen because the node said it changed. Before you write `setInterval` around a read, name the event that says this data moved, and subscribe: `AIMEAT.live.subscribe(["agent-tasks"], reload, { minIntervalMs: 3000 })` for work an agent does for the app (each stage line of a task, done, failed, a task a schedule created), `AIMEAT.agents.watch(agent, taskId, onUpdate)` for one task, and the `memory` form below for the owner\'s records. The domains an app may hear, each with the permission that opens it: ' + EVENTS_FIRST_DOMAINS + '. ' + EVENT_SHAPE + TIMER_CASES + ' Check it the way a person meets it: start the work and watch the screen follow each stage within a few seconds.\n\n';
+  let body = '### Live updates without too many events (aimeat-live.js)\n';
+  body += '**Events first, a timer last.** Data that is stored on the node reaches the screen because the node said it changed. Before you write `setInterval` around a read, name the event that says this data changed, and subscribe: `AIMEAT.live.subscribe(["agent-tasks"], reload, { minIntervalMs: 3000 })` for work an agent does for the app (each stage line of a task, done, failed, a task a schedule created), `AIMEAT.agents.watch(agent, taskId, onUpdate)` for one task, and the `memory` form below for the owner\'s records. The domains an app may hear, each with the permission that opens it: ' + EVENTS_FIRST_DOMAINS + '. ' + EVENT_SHAPE + TIMER_CASES + ' Check it the way a person meets it: start the work and watch the screen follow each stage within a few seconds.\n\n';
   // Live updates — the firehose trap. Correct-looking code that makes the app poll forever
   // and repaint over the user, on any account with more than a couple of active agents.
   body += '`AIMEAT.live.subscribe(["memory"], reload)` means "call me whenever ANY of this owner\'s memory changed". On an account with an active agent fleet that is near-continuous, so a handler that re-fetches a full listing turns one agent\'s activity into a permanent poll. Gate it:\n';
@@ -103,7 +103,7 @@ export function classicLiveUpdatesSection(): string {
   body += 'AIMEAT.live.subscribe(["memory"], reload, { keyPrefix: "crews.", ownerScope: true });\n';
   body += 'AIMEAT.live.subscribe(["memory"], reload, { minIntervalMs: 10000 });   // or just rate-limit\n';
   body += '```\n';
-  body += 'The change frame carries a DOMAIN name, never the key that changed, so `keyPrefix` is a client-side count gate: it catches a NEW key, not an in-place update of an existing one. Use `minIntervalMs` for update-sensitive views.\n';
+  body += 'The change frame contains a DOMAIN name, never the key that changed, so `keyPrefix` is a client-side count gate: it catches a NEW key, not an in-place update of an existing one. Use `minIntervalMs` for update-sensitive views.\n';
   body += '**Never let a live event repaint a surface the user is currently reading.** If a dialog/detail view is open, refresh its data in the background and leave the visible content alone — only an explicit user action should replace it. Rebuilding a list or blanking a pane to "Loading…" on every event is what makes an app flicker, and it looks like a crash, not a refresh. Also: render into a detached element and swap it in one operation instead of clearing then filling.\n\n';
   return body;
 }

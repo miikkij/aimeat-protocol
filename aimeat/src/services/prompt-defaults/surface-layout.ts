@@ -81,7 +81,7 @@ rather than merging into it, so include every block that should stay.
 Each block is \`{ "id", "key" }\`. The key is that block's own name within the page; use the
 id unless the same block appears twice, and then give each one a key of its own. \`props\`
 holds only the settings that block declares. \`titles\` gives it your own heading, per
-language: \`{ "en": "Who to ask", "fi": "Keneltä kysyt" }\`. \`hidden: true\` parks a block
+language: \`{ "en": "Who to ask", "fi": "Keneltä kysyt" }\`. \`hidden: true\` hides a block
 without losing its settings.
 
 ## Writing your own words on the page

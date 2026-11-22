@@ -63,7 +63,7 @@ describe('events first, a timer last', () => {
 
   it('kept the firehose text of the section that moved', () => {
     const section = classicLiveUpdatesSection();
-    expect(section.startsWith('### Live updates without a firehose (aimeat-live.js)\n')).toBe(true);
+    expect(section.startsWith('### Live updates without too many events (aimeat-live.js)\n')).toBe(true);
     expect(section).toContain('AIMEAT.live.subscribe(["memory"], reload, { keyPrefix: "crews.", ownerScope: true });');
     expect(section).toContain('AIMEAT.live.subscribe(["memory"], reload, { minIntervalMs: 10000 });   // or just rate-limit');
     expect(section).toContain('**Never let a live event repaint a surface the user is currently reading.**');

@@ -149,7 +149,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // contract is still contract:spend with its per-app ceiling; this word only opens or changes them.
   'exchange:invoke': 'Call app tools under the contracts you already have; it opens no new contract',
   'exchange:write': 'Make and end marketplace contracts within a budget you set, post needs and bids, deliver work, and list what you sell',
-  'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
+  'exchange:grant': 'Give and withdraw free access to capabilities you sell (you pay the cost)',
   // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
   // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,
   // so an app that arranges revenue sharing asks for it rather than inheriting it from selling.

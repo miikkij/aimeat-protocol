@@ -57,7 +57,7 @@ export function trackDriftFindings(input: TrackDriftInput): AppArtifactFinding[]
     'This is a new app that is not an Atelier app: it loads no Atelier kit and does not declare the track. Every app is '
     + 'built with the Atelier specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, skill '
     + '`node:aimeat-app-builder-atelier`): forked from a genre, or started from `shell-atelier`, with the served component '
-    + 'kit carrying the header, the sign-in and the loading, empty and error states. A page with a look or an engine of its '
+    + 'kit providing the header, the sign-in and the loading, empty and error states. A page with a look or an engine of its '
     + 'own goes inside the Atelier shell and names its register as `custom:<name>`. The Classic track that built pages like '
-    + 'this one was retired on 2026-11-19. Tell the owner, and move the page to the shell before you hand it over.')];
+    + 'this one was retired on 2026-11-19. Tell the owner, and move the page to the shell before you deliver it.')];
 }

@@ -305,7 +305,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
             (isCreator && m.role === 'admin') && { label: t('organisms.removeAdmin') || 'Remove admin', onClick: () => demoteAdmin(m.ghii) },
             wsOptions.length > 0 && { label: t('organisms.editAccess') || 'Edit access', icon: '🔑', onClick: () => setAccessEditFor(f => f === bare ? null : bare) },
             isCreator && { label: t('organisms.addOwner') || 'Make owner too', icon: '👑', onClick: () => addOwner(m.ghii) },
-            isCreator && { label: t('organisms.makeCreator') || 'Hand over and step back', onClick: () => transfer(m.ghii) },
+            isCreator && { label: t('organisms.makeCreator') || 'Transfer and step back', onClick: () => transfer(m.ghii) },
             { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => remove(m.ghii, false) },
             { label: t('organisms.block') || 'Block', danger: true, onClick: () => remove(m.ghii, true) },
           ].filter(Boolean) : []));

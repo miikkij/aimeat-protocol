@@ -212,7 +212,7 @@ export function registerOrganismWorkspaceRowRoutes(
         // No cutoff means no delete. A bare DELETE on a collection that emptied it would be one
         // typo away from destroying a space, and nothing here needs that shape.
         res.status(400).json(error(config.nodeId, 'BEFORE_REQUIRED',
-          'Name the cutoff with ?before=<ISO timestamp>. It matches when a row LANDED here, not when the event happened.'));
+          'Name the cutoff with ?before=<ISO timestamp>. It matches when a row was STORED here, not when the event happened.'));
         return;
       }
       try {

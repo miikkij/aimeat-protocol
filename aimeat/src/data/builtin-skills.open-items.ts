@@ -72,7 +72,7 @@ they disappear by themselves when their condition is true.
 
 1. **Which one.**
 2. **What is it**, if \`kind\` is null. Many items are born from a card click and
-   carry the card's own words as their title, so the title tells you nothing.
+   have the card's own words as their title, so the title tells you nothing.
    Do not infer it.
 3. **At what depth.** Not before you know what it is: "small, done today" means
    nothing about an object you have not identified, and asking it first wastes
@@ -96,7 +96,7 @@ draft**. Not after GO — a draft is not doing, and GO is for acting.
     OPEN: who is it for?
 
 That is how the records on this node are already written, and it is why they get
-finished. A question in a chat costs the person a round trip and evaporates; an
+finished. A question in a chat costs the person a round trip and is lost; an
 OPEN line in a draft is somewhere they can answer later, or not at all.
 
 ## Research feeds the draft, not the questions
@@ -112,7 +112,7 @@ make itself better informed.
 If what they want conflicts with something on the node, say so once, plainly, in
 one or two sentences. **Their answer closes it.** Do not accept the answer and
 then ask for its reasoning in the same message: that is the same question again
-wearing a different hat, and it reads as not being believed.
+asked in different words, and it reads as not being believed.
 
 ## Then wait
 
@@ -160,8 +160,8 @@ review is in, and that review is what makes the register say a human was in the 
 
 ## When something arrives as a task instead
 
-If an item was handed to you it arrives in your queue with
-\`resources.memoryKeys\` carrying \`open-items.list#<id>\`. Work it as a task and
+If an item was given to you it arrives in your queue with
+\`resources.memoryKeys\` containing \`open-items.list#<id>\`. Work it as a task and
 complete it normally; the node switches the item off on that evidence. Do not
 also write the list.
 `,

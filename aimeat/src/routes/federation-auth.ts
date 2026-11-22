@@ -102,7 +102,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
                 }
                 return null;
             },
-            admit: (peer) => linkCarriesSignIn(peer) ? null : { status: 403, code: 'FEDERATION_AUTH_NOT_ALLOWED', message: 'This link does not carry sign-ins' },
+            admit: (peer) => linkCarriesSignIn(peer) ? null : { status: 403, code: 'FEDERATION_AUTH_NOT_ALLOWED', message: 'This link does not allow sign-ins' },
             unsigned: { when: 'not-text', message: 'The request is not signed by the requesting node' },
             signed: (req) => {
                 const { username, requesting_node, timestamp } = bodyOf(req) as Record<string, string>;
@@ -132,7 +132,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             // One answer for a missing consent, a missing account and a wrong password: the caller
             // learns whether the password is right only together with a consent that lets it ask.
             const failed = () => res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED',
-                'Sign-in failed. Check the password, and that your home node lets this node sign you in.'));
+                'Sign-in failed. Check the password, and that your home server lets this server sign you in.'));
 
             // --- Check for auth consent, before the password ---
             // The user must have an active consent granting auth access to the requesting node.

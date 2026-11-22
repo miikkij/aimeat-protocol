@@ -342,7 +342,7 @@ const STAGE_LINE: Record<JourneyStageId, string> = {
     'first-result': 'their profile: a short interview about their work, made into a one-page business card that people and AIs can read, published as their welcome page',
     ai: 'a good AI of their own',
     connect: 'that AI connected to this node',
-    organise: 'an organism with a workspace, where their work lives between conversations',
+    organise: 'an organism with a workspace, where their work is kept between conversations',
     apps: 'an app or an installed package, used once from the chat',
     agents: 'an agent that works on its own while they are away',
     share: 'something shared with another person, published or priced',
@@ -359,8 +359,8 @@ export function journeyHandbookSection(journey: Journey): string | null {
     return [
         '## Where this person is on their path',
         '',
-        'This person has not walked the whole path here yet. Load the skill `aimeat-guided-journey` '
-        + 'when they ask what this place is for, what to do next, or how something works, and when a '
+        'This person has not finished every step here yet. Load the skill `aimeat-guided-journey` '
+        + 'when they ask what AIMEAT is for, what to do next, or how something works, and when a '
         + 'piece of work has just finished. Work on what they asked first.',
         '',
         ...lines,
@@ -369,7 +369,7 @@ export function journeyHandbookSection(journey: Journey): string | null {
         + (journey.want ? ` They said they want: "${journey.want}".` : '')
         + (journey.road ? ` How their AI connects: ${journey.road}.` : ''),
         ...profileLines(journey.profile),
-        `Their own words live at \`${JOURNEY_KEY}\` in their memory (owner scope).`,
+        `Their own words are stored at \`${JOURNEY_KEY}\` in their memory (owner scope).`,
     ].join('\n');
 }
 

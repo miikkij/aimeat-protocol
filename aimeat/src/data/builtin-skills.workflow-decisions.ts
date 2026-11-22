@@ -51,7 +51,7 @@ the run goes on from there. Nothing is published, sent or bought on a guess.
 
 A workflow is a definition of steps saved with \`aimeat_workflow_save\` (the building and scheduling
 are in the skill \`set-up-content-pipeline\`). One kind of step, \`action.kind: "human-input"\`, asks a
-question and parks the run until it has an answer.
+question and puts the run on hold until it has an answer.
 
 ## 1. Put a decision step into a workflow
 
@@ -152,7 +152,7 @@ workflow), and the node asks it again before it starts each step, the step after
 When that agent or app was removed or lost a permission the next step needs, the run ends
 \`refused\`: its open steps are skipped, a question still waiting goes with them (an answer then gets
 409 \`WORKFLOW_STEP_NOT_WAITING\`), and \`refusal.stoppedBefore\` names the step that did not start. The
-person's answer is kept on the run. Tell the person, and point them to the ways on in skill
+person's answer is kept on the run. Tell the person, and point them to the next steps in skill
 \`diagnose-a-workflow\`, step 6.
 
 ## The rule underneath

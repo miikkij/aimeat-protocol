@@ -43,7 +43,7 @@ export async function applyExtensionDecision(
   try {
     parsed = JSON.parse(input) as Record<string, unknown>;
   } catch {
-    return { ok: false, reason: 'the input this request carries does not parse' };
+    return { ok: false, reason: 'the input in this request does not parse' };
   }
   // The code the person was asked about, and nothing else: a changed action runs nothing.
   const now = await resolveExtensionForCall(ctx.storage, extension, ownerName);

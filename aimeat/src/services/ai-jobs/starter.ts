@@ -119,9 +119,9 @@ export function starterMayInvokeExtensions(s: AiJobStartedBy | undefined): boole
  * app's author is told what to change. An agent is told to ask its owner, who grants agent words.
  */
 export function onDoneScopeRefusal(s: AiJobStartedBy | undefined): string {
-    const need = 'on_done runs one of the owner\'s extension actions when the job is done, and that needs the "ext:invoke" permission, which this sign-in does not carry. ';
+    const need = 'on_done runs one of the owner\'s extension actions when the job is done, and that needs the "ext:invoke" permission, which this sign-in does not have. ';
     if (s?.app) {
-        return need + `The app's author adds ext:invoke to the app's <meta name="aimeat-scopes"> (keeping the words it already asks for) and publishes it again; `
+        return need + `The app's author adds ext:invoke to the app's <meta name="aimeat-scopes"> (keeping the scopes it already asks for) and publishes it again; `
             + 'the person approves the word at their next sign-in. Until then, start the job without on_done and read the answer with AIMEAT.ai.job.waitFor.';
     }
     return need + 'Ask the owner to give this agent ext:invoke, or start the job without on_done and read the answer when the job is done.';

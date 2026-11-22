@@ -265,14 +265,14 @@ export const capabilitiesGroupsSkillsTools = [
             purpose: { type: 'string', required: true, description: 'Human-readable purpose for this consent.' },
             ttl_hours: { type: 'number', description: 'Expiry in hours from now (omit for indefinite; a share to a party gets the node\'s longest share).' },
             pinned_version: { type: 'string', description: 'For a party recipient: share one version of the package (sha256:<hex>) instead of the newest.', zod: z.string().max(80) },
-            allow_url_key: { type: 'boolean', description: 'For a party recipient: the CSV address may carry the party key (Google Sheets). Off by default.' },
+            allow_url_key: { type: 'boolean', description: 'For a party recipient: the CSV address may contain the party key (Google Sheets). Off by default.' },
             terms_required: { type: 'boolean', description: 'For a party recipient: the party accepts the terms before the first read. Default true for a person, false for a program.' },
             role: { type: 'string', description: 'What the recipient may do: read (the default) or write. Write is the contributor role on ONE workspace (data_pattern organism.<organism>.w.<workspace>.**) for ONE person on this node (target_gaii ghii:<name>@<this node>), and only the workspace\'s creator gives it with a consent, signed in as themselves; any other write is refused with WRITE_NOT_SUPPORTED and the reason. An agent gives a member write with aimeat_workspace_member_grant. The purpose text never decides the role.', zod: z.enum(['read', 'write']) },
         },
     },
     {
         name: 'aimeat_consent_list',
-        description: 'List the consent records you hold (data pattern, recipient, purpose, scope, expiry, and status including revoked ones): an agent sees the consents it granted itself; with consent:read-as-owner, which no wildcard carries, it sees every consent of its owner\'s account, the owner\'s own and the other agents\', as the owner does. Use to review who has been authorized before granting more (aimeat_consent_grant) or revoking (aimeat_consent_revoke).',
+        description: 'List the consent records you hold (data pattern, recipient, purpose, scope, expiry, and status including revoked ones): an agent sees the consents it granted itself; with consent:read-as-owner, which no wildcard includes, it sees every consent of its owner\'s account, the owner\'s own and the other agents\', as the owner does. Use to review who has been authorized before granting more (aimeat_consent_grant) or revoking (aimeat_consent_revoke).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Consents', readOnlyHint: true },
@@ -285,7 +285,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_access_list',
-        description: "Who holds a key to your owner's account, and how far each key reaches, in one answer: the apps that act in their name with the rights each one has, the tokens they minted (label, level, expiry, last use; never the token itself), the accounts connected at other services, and the sign-in state (password set, two-step on or off, passkeys, the open sessions by device and by agent). The same read the Access page shows. Read-only: nothing here revokes; the person does that on the page. Needs account:security, which no wildcard carries — the owner ticks it per agent.",
+        description: "Who holds a key to your owner's account, and how far each key reaches, in one answer: the apps that act in their name with the rights each one has, the tokens they minted (label, level, expiry, last use; never the token itself), the accounts connected at other services, and the sign-in state (password set, two-step on or off, passkeys, the open sessions by device and by agent). The same read the Access page shows. Read-only: nothing here revokes; the person does that on the page. Needs account:security, which no wildcard includes — the owner ticks it per agent.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Access: Who Holds a Key', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -299,7 +299,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_secret_list',
-        description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, which extensions have used it in the last 30 days, the host it may be sent to, and who bound it there (`hostBinding`: set with the secret, or the principal and extension of its first use). NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard carries — the owner ticks it per agent.",
+        description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, which extensions have used it in the last 30 days, the host it may be sent to, and who bound it there (`hostBinding`: set with the secret, or the principal and extension of its first use). NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard includes — the owner ticks it per agent.",
         caller: 'agent',
         visibility: agentEverywhere,
         // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
@@ -320,7 +320,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_secret_set',
-        description: "Store a key or password in your owner's vault under a name, or replace what is there (same call either way — replacing keeps the date it was first stored). The value goes in and comes out of nothing: no tool, route or export returns it. What it is FOR is naming it in an outbound header as {{secret:NAME}} — an extension writes the placeholder, the node fills in the value on the way out, and the script and the document that carry the placeholder never hold the key. Name: letters, digits, underscore and hyphen, up to 64. Value: up to 4 kB. Needs secrets:manage, which no wildcard carries.",
+        description: "Store a key or password in your owner's vault under a name, or replace what is there (same call either way — replacing keeps the date it was first stored). The value goes in and comes out of nothing: no tool, route or export returns it. What it is FOR is naming it in an outbound header as {{secret:NAME}} — an extension writes the placeholder, the node fills in the value when it sends the request, and the script and the document that contain the placeholder never hold the key. Name: letters, digits, underscore and hyphen, up to 64. Value: up to 4 kB. Needs secrets:manage, which no wildcard includes.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Store a Secret', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -334,7 +334,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_secret_delete',
-        description: "Remove one secret from your owner's vault by name. Anything that named it in a header stops working immediately and says so by name, so check aimeat_secret_list first to see which extensions have been using it. Answers a plain not-found when the owner holds no secret of that name. Needs secrets:manage, which no wildcard carries.",
+        description: "Remove one secret from your owner's vault by name. Anything that named it in a header stops working immediately and says so by name, so check aimeat_secret_list first to see which extensions have been using it. Answers a plain not-found when the owner holds no secret of that name. Needs secrets:manage, which no wildcard includes.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Remove a Secret', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -449,7 +449,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_share_create',
-        description: 'Let a sharing group read a key space of your owner\'s memory. The group says WHO, this says WHAT: give a key or a pattern ("deliveries.abc.**"), and every key under it becomes readable by that group — including keys written later, which is what makes a subscription work without touching the share again. `*` is one segment, `**` is the whole subtree. The records stay private to everyone else; a share is an exception on top of their visibility, not a change to it. Needs the share:manage permission, which no wildcard carries. Withdraw with aimeat_share_revoke.',
+        description: 'Let a sharing group read a key space of your owner\'s memory. The group says WHO, this says WHAT: give a key or a pattern ("deliveries.abc.**"), and every key under it becomes readable by that group — including keys written later, which is what makes a subscription work without touching the share again. `*` is one segment, `**` is the whole subtree. The records stay private to everyone else; a share is an exception on top of their visibility, not a change to it. Needs the share:manage permission, which no wildcard includes. Withdraw with aimeat_share_revoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Idempotent: the same pattern to the same group returns the share that already exists rather
@@ -598,7 +598,7 @@ export const capabilitiesGroupsSkillsTools = [
         description: 'Record a pitfall learned while building an app ON AIMEAT (apps/extensions/cortex — never node development): what broke, what fixed it, and WHICH MODEL hit it (model is required, self-reported, indicative). Call at the end of a build for anything the next builder should know. Upserts by {category, slug} — reporting the same slug again REPLACES the entry with better wording (version bumps). status=outdated hides an entry models no longer stumble on; share=true publishes it platform-wide so other owners\' agents learn from it (default: private to your owner scope). Stored in the reserved knowledge package appdev-pitfalls. '
             + 'A NEW entry close to one already there (own, shared or curated, active or outdated) is refused as SIMILAR_ENTRY with the matches: open them, then report again with supersedes: "<ref>" (an own entry is updated in place, a retired one comes back) or confirm_new: true. '
             + 'category is one of app, publish, auth, data, ext, cortex, ai, ui, mobile, atelier, realtime, iam, games; other topic words go to tags. Give evidence (file:line, doc URL or reproduction) and seen_version. '
-            + 'A learned entry is stored at most warn; critical waits for a node operator. An entry about one app (app_ref) stays private: its lesson belongs in App Development Notes. kind platform-defect: the platform could prevent it; the answer carries a ready wish text.',
+            + 'A learned entry is stored at most warn; critical waits for a node operator. An entry about one app (app_ref) stays private: its lesson belongs in App Development Notes. kind platform-defect: the platform could prevent it; the answer contains a ready wish text.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -625,13 +625,13 @@ export const capabilitiesGroupsSkillsTools = [
             tags: { type: 'array', description: 'Free topic words (webgl, kanban, i18n...); the category stays one of the fixed list.', zod: z.array(z.string().max(40)).max(8) },
             supersedes: { type: 'string', description: 'An entry this report replaces: an own entry\'s key or category/slug (updated in place, a retired one comes back), a curated id, or a shared entry\'s key.', zod: z.string().max(300) },
             confirm_new: { type: 'boolean', description: 'true after reading the SIMILAR_ENTRY matches: this is a different trap and gets its own entry.' },
-            kind: { type: 'string', enum: ['pitfall', 'platform-defect'], description: 'platform-defect = the platform could prevent this; the answer carries a ready wish text for the platform owner.' },
+            kind: { type: 'string', enum: ['pitfall', 'platform-defect'], description: 'platform-defect = the platform could prevent this; the answer contains a ready wish text for the platform owner.' },
             retired_by: { type: 'string', description: 'With status outdated: what retired it (a commit hash, a lint rule id, or an SDK or library version).', zod: z.string().max(200) },
         },
     },
     {
         name: 'aimeat_appdev_pitfall_list',
-        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Every row carries `open`, the exact call that opens it in full (aimeat_memory_read for your own entry, aimeat_memory_read_public with its owner for a shared one, a GET address for a curated one).',
+        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your own entries) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Every row has `open`, the exact call that opens it in full (aimeat_memory_read for your own entry, aimeat_memory_read_public with its owner for a shared one, a GET address for a curated one).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List AppDev Pitfalls', readOnlyHint: true },
@@ -743,7 +743,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack in the Agent Skills format (agentskills.io; YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus any other files of the skill folder (scripts/, references/, assets/, a LICENSE.txt …; a path stays inside the folder). A NEW skill must follow the standard\'s hard rules: no two hyphens in a row in the name and compatibility at most 500 characters, or it is refused with NOT_STANDARD; a skill already in the registry publishes, and every answer lists what breaks the standard (those two, a top-level field it does not define, a metadata value that is not a string) in skill.standardIssues. A skill bound to an app (metadata.binding) writes its calls as `tool_name { field, field: value }`: the answer\'s skill.toolFieldIssues names each field such a call sends that the app\'s tool does not accept, so correct the skill before anyone follows it. skill.ownerScopeIssues names each paragraph that writes the app\'s keys with aimeat_memory_write and no owner_scope (an agent\'s write then lands in its own namespace, where the app does not read it). Pass skill_md inline (files as text, or { content, encoding: "base64" } for an image or other binary file; keep_files=true keeps the files the skill already holds that you do not send); omit skill_md to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages. When the node asks the owner before making something public, a user skill published as public keeps the level it had (owner when new) and the answer carries publish_request: tell the owner what waits and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack in the Agent Skills format (agentskills.io; YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus any other files of the skill folder (scripts/, references/, assets/, a LICENSE.txt …; a path stays inside the folder). A NEW skill must follow the standard\'s hard rules: no two hyphens in a row in the name and compatibility at most 500 characters, or it is refused with NOT_STANDARD; a skill already in the registry publishes, and every answer lists what breaks the standard (those two, a top-level field it does not define, a metadata value that is not a string) in skill.standardIssues. A skill bound to an app (metadata.binding) writes its calls as `tool_name { field, field: value }`: the answer\'s skill.toolFieldIssues names each field such a call sends that the app\'s tool does not accept, so correct the skill before anyone follows it. skill.ownerScopeIssues names each paragraph that writes the app\'s keys with aimeat_memory_write and no owner_scope (an agent\'s write then goes to its own namespace, where the app does not read it). Pass skill_md inline (files as text, or { content, encoding: "base64" } for an image or other binary file; keep_files=true keeps the files the skill already holds that you do not send); omit skill_md to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, goes with workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages. When the node asks the owner before making something public, a user skill published as public keeps the level it had (owner when new) and the answer contains publish_request: tell the owner what waits and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -821,7 +821,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_update',
-        description: 'Change who may read a skill without publishing it again: owner (you and your agents), members (every signed-in identity on this node) or public (readable from other nodes too, and listed in the public skill index). The registry version stays as it is and nothing is snapshotted. Your owner\'s own user-scope skills; node scope is for operators. A workspace skill is always workspace-visible and is refused here. When the node asks the owner before making something public, public keeps the level the skill has and the answer carries publish_request: tell the owner what waits and give them its approve_url.',
+        description: 'Change who may read a skill without publishing it again: owner (you and your agents), members (every signed-in identity on this node) or public (readable from other nodes too, and listed in the public skill index). The registry version stays as it is and nothing is snapshotted. Your owner\'s own user-scope skills; node scope is for operators. A workspace skill is always workspace-visible and is refused here. When the node asks the owner before making something public, public keeps the level the skill has and the answer contains publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Change Skill Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

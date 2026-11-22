@@ -236,7 +236,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
             'a fork the spec does not price is a fork a builder takes for free');
         // The five patterns, each a call a builder can paste.
         for (const title of ['A LIST THAT ARRIVES', 'A PANEL THAT CHANGES', 'A SCREEN THAT SWITCHES',
-            'A FORM THAT LANDS', 'A NEARLY-RIGHT ROW']) {
+            'A FORM THAT SUBMITS', 'A NEARLY-RIGHT ROW']) {
             assert(spec.includes(title), `the spec must carry the pattern "${title}"`);
         }
         assert(spec.includes('AIMEAT.atelier.toast(') && spec.includes('AIMEAT.atelier.dialog('),

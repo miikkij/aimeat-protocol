@@ -117,7 +117,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     tucked: { type: 'boolean', description: 'For marks: true starts the optional marks tucked away until the pointer nears the corner; false starts them in view (the default). The AI label and the cookie mark are never tucked; a visitor\'s own choice wins.' },
     // legal
     kind: { type: 'string', enum: ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support'], description: 'For legal: which page. Omit to read where the app stands.' },
-    format: { type: 'string', enum: ['markdown', 'html', 'url'], description: 'For legal: markdown (rendered with every character escaped), html (served as written on the app\'s own origin) or url (a link to where the page lives).' },
+    format: { type: 'string', enum: ['markdown', 'html', 'url'], description: 'For legal: markdown (rendered with every character escaped), html (served as written on the app\'s own origin) or url (a link to where the page is).' },
     content: { type: 'string', description: 'For legal: the page text, the HTML document, or the absolute https URL.' },
     remove: { type: 'boolean', description: 'For legal: true removes the named page.' },
     // audit
@@ -143,7 +143,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     access_code: { type: 'string', description: 'For settings: a code visitors must type to open the app. An empty string removes it. Never read back.' },
     open_to: { type: 'string', description: 'For settings: who may OPEN the app (listing is only who sees it in a list). "anyone": the link opens it. "signed-in": only people signed in to this node; others are asked to sign in first. "organism:<organism id>": only the members of that organism (you must be a member). Ask the person which one they want before setting it.' },
     screenshot_public: { type: 'boolean', description: 'For settings: true shows the app\'s screenshot to everyone, also to people the app does not open for. false (the default) shows it only to the people who may open the app. It changes nothing for an app anyone may open. The app\'s icon is always public.' },
-    tour_invite: { type: 'boolean', description: 'For settings: for an app whose published version has a guided tour (its aimeat-tour block), true (the default) invites a person who opens the app for the first time to the tour, once; false invites nobody. The tour button stays in the app\'s header either way. The answer carries tour_invite and has_tour.' },
+    tour_invite: { type: 'boolean', description: 'For settings: for an app whose published version has a guided tour (its aimeat-tour block), true (the default) invites a person who opens the app for the first time to the tour, once; false invites nobody. The tour button stays in the app\'s header either way. The answer includes tour_invite and has_tour.' },
     protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.', zod: z.record(z.string(), z.boolean()) },
     // screenshot_upload
     screenshot: { type: 'string', description: 'For screenshot_upload: the image as base64, at most 2 MB.' },
@@ -173,10 +173,10 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     roles: { type: 'object', description: 'For member_plan_set: each role and the offering ids a member in that role uses free, { "member": ["<offering id>"] }. A role with no entry gives nothing free.', zod: z.record(z.string(), z.array(z.string().max(INPUT_LIMITS.id))) },
     seats: { type: 'object', description: 'For member_plan_set: each role and how many people may hold it at once, { "editor": 3 }. A role with no entry has no limit.', zod: z.record(z.string(), z.number().min(0)) },
     terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.', zod: z.record(z.string(), z.object({ days: z.number().positive().optional(), renewal: z.enum(['manual', 'self-serve', 'none']).optional() })) },
-    access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members get in at all.' },
+    access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members have access at all.' },
     roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
     manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
-    email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, valid 7 days, with a sign-up link: opening it makes the account with that address and a member at once. When no email could leave, the answer carries acceptUrl, the link to pass on yourself. Open invitations are listed by members and cancelled with member_invite_cancel, which also stops the link.' },
+    email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, valid 7 days, with a sign-up link: opening it makes the account with that address and a member at once. When no email could leave, the answer includes acceptUrl, the link to pass on yourself. Open invitations are listed by members and cancelled with member_invite_cancel, which also stops the link.' },
     locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
     q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.', zod: z.string().max(100) },
     offset: { type: 'number', description: 'For members and parties: how many people to skip, for the next page. Default 0.', zod: z.number().int().min(0) },
@@ -185,12 +185,12 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number deletes, so it takes the account:security permission: without it the number is refused, and the account holder sets it on the app page, signed in.', zod: z.string().max(20) },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
     // the app's users without an account (routes/app-parties.ts; plan doc-mvwxcas3dom3, D4)
-    party: { type: 'string', description: 'For member_set, instead of account or email: an outside party of the app\'s owner, party:<owner>/<name>@<node> (a person registered to the app, or a party of aimeat_party). The role carries no free access, because a party has no account.', zod: z.string().max(INPUT_LIMITS.id) },
+    party: { type: 'string', description: 'For member_set, instead of account or email: an outside party of the app\'s owner, party:<owner>/<name>@<node> (a person registered to the app, or a party of aimeat_party). The role gives no free access, because a party has no account.', zod: z.string().max(INPUT_LIMITS.id) },
     party_name: { type: 'string', description: 'For party_remove, party_stop and party_resume: the name of a person registered to the app (ap-..., from parties).', zod: z.string().max(40) },
     open: { type: 'boolean', description: 'For party_registration_set: true lets people without an account register to the app (when this server allows it), false closes the signup.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
-    words: { type: 'array', description: 'For scope_allowance_remove: the permission words to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+    words: { type: 'array', description: 'For scope_allowance_remove: the scopes to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
     expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
     // the app's structure and plan (routes/apps/structure.ts)
     purpose: { type: 'string', description: 'For structure_set: who the app is for and the one job it does for them, in the person\'s words, at most 800 characters. An empty string clears it.', zod: z.string().max(800) },
@@ -245,15 +245,15 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
     member_me: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'your own standing in an app, yours or somebody else\'s: your role, whether you are the owner, and your request to join and its state' },
     member_request: { fields: F(['filename', 'owner'], ['note']), scope: 'social:write',
-        summary: 'ask the owner of somebody else\'s app to let you in. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
+        summary: 'ask the owner of somebody else\'s app to make you a member. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
     parties: { fields: F(['filename'], ['limit', 'offset']), scope: 'app:write',
         summary: 'the people without an account who registered to the app (outside parties of yours), a page at a time, each with their e-mail address, state and role; whether the signup is open; and `limit`: how many people the app holds against the server\'s limit per app, and how many more it takes before a signup is refused. Owner only' },
     party_remove: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
         summary: 'remove one registered person: their sign-in ends at once, they leave the roster, and everything they kept in the app is deleted. Owner only' },
     party_stop: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
-        summary: 'stop one registered person: their sign-in is refused at once and no new sign-in link is mailed, while their role and what they kept in the app stay. party_resume lets them in again. Owner only' },
+        summary: 'stop one registered person: their sign-in is refused at once and no new sign-in link is mailed, while their role and what they kept in the app stay. party_resume lets them sign in again. Owner only' },
     party_resume: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
-        summary: 'let a stopped registered person in again, with the role and the data they had. A person who never opened the mailed link stays waiting for it. Owner only' },
+        summary: 'let a stopped registered person sign in again, with the role and the data they had. A person who never opened the mailed link stays waiting for it. Owner only' },
     party_registration_set: { fields: F(['filename', 'open'], ['role']), scope: 'app:manage',
         summary: 'open or close the app\'s signup for people without an account, and with role the roster role they get. When this server asks its operator first (apps-ask), opening files a request and the signup opens when the operator approves. Owner only' },
 };
@@ -268,7 +268,7 @@ const BUILDER_ACTION_SPECS: Record<string, AppManageAction> = {
     builders: { fields: F(['filename'], []), scope: 'app:write',
         summary: 'who, other than you, may build the app, at which level, and who may build every app of yours; the answer gives the settings page where the owner sees and takes back these rights. Owner only' },
     builder_set: { fields: F(['filename', 'account', 'dev_level'], ['note']), scope: 'app:manage',
-        summary: 'give a person the right to build the app with their own AI, or change their level. Use it when the owner asks to let somebody develop, edit or work on the app. The person is notified, every agent of theirs is covered, and the answer says what their AI does next and gives the settings page to hand the owner. A right over every app of the owner at once is the account holder\'s own act on that page, never this tool. Owner only' },
+        summary: 'give a person the right to build the app with their own AI, or change their level. Use it when the owner asks to let somebody develop, edit or work on the app. The person is notified, every agent of theirs is covered, and the answer says what their AI does next and gives the settings page to pass to the owner. A right over every app of the owner at once is the account holder\'s own act on that page, never this tool. Owner only' },
     builder_remove: { fields: F(['filename', 'account'], []), scope: 'app:manage',
         summary: 'take the right to build the app back. A membership the person holds stays. Owner only' },
 };
@@ -281,16 +281,16 @@ const BUILDER_ACTION_SPECS: Record<string, AppManageAction> = {
  */
 const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
     spec: { fields: F(['filename'], ['owner']), scope: 'app:write',
-        summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data lives, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
+        summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data is stored, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
     spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
     // The permissions the app kept when the node moved to 4.0 (services/app/scope-allowance.ts).
     scope_allowance: { fields: F(['filename'], ['owner']), scope: 'app:write',
-        summary: 'the permissions the app kept when this server moved to 4.0 because its code calls routes its aimeat-scopes declaration does not name: the words, the code that needs each, and the words its owner removed. The owner and everybody who may build the app' },
+        summary: 'the permissions the app kept when this server moved to 4.0 because its code calls routes its aimeat-scopes declaration does not name: the scopes, the code that needs each, and the scopes its owner removed. The owner and everybody who may build the app' },
     scope_allowance_remove: { fields: F(['filename', 'words'], ['owner']), scope: 'app:manage',
-        summary: 'take kept permissions away from the app: they leave every live grant of the app and stay removed. Owner only. Declaring the word in the app\'s aimeat-scopes is the other way to end the need for the list' },
+        summary: 'take kept permissions away from the app: they leave every live grant of the app and stay removed. Owner only. Declaring the scope in the app\'s aimeat-scopes is the other way to end the need for the list' },
 };
 
 /**
@@ -423,7 +423,7 @@ export function checkAppManageInput(input: Record<string, unknown>, extra: strin
 
 const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, forks, cost, bundled agents, members, who else may build it, and backup, in one tool. Two member actions work on somebody else\'s app: member_me reads your standing and member_request asks to join. Pick `action`; each action takes only its own fields, and a call with a missing or foreign field is refused with every problem named at once, so nothing is charged or changed. Actions:\n'
     + APP_MANAGE_ACTION_NAMES.map(n => `- ${n} (${fieldList(APP_MANAGE_ACTIONS[n]!)}): ${APP_MANAGE_ACTIONS[n]!.summary}.`).join('\n')
-    + '\nPermissions are checked per action: an action needs the word shown by the refusal, so an agent without app:write can still read versions, lineage and agent status.'
+    + '\nPermissions are checked per action: an action needs the scope shown by the refusal, so an agent without app:write can still read versions, lineage and agent status.'
     + AI_PROVENANCE_TOOL_NOTE;
 
 export const appManageTools = [

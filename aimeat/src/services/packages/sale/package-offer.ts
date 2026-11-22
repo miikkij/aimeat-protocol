@@ -117,7 +117,7 @@ export function validateTerms(raw: unknown, now: string, id: string): OfferTerms
         if ('ok' in p) return p;
         price = p;
     } else if (t.price !== undefined && t.price !== null) {
-        return fail(400, 'INVALID_INPUT', `An offer granted on ${grant === 'approval' ? 'approval' : 'request'} carries no price; leave price out or null.`);
+        return fail(400, 'INVALID_INPUT', `An offer granted on ${grant === 'approval' ? 'approval' : 'request'} has no price; leave price out or null.`);
     }
     const u = (t.updates && typeof t.updates === 'object' ? t.updates : {}) as Record<string, unknown>;
     const included = u.included_days ?? 30;

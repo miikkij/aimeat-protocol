@@ -63,7 +63,7 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
       return;
     }
     if (req.auth.roles.includes('app')) {
-      deny403(req, res, 'ACCESS_DENIED', 'An app grant cannot carry operator functions');
+      deny403(req, res, 'ACCESS_DENIED', 'An app grant cannot include operator functions');
       return;
     }
     // The operator in person passes; anything acting for an operator account passes on the exact word.
@@ -77,7 +77,7 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
     if (!answer.ok) {
       logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
       denyScope403(req, res, [scope], `Scope "${scope}" required. The node operator grants it per agent, `
-        + 'and no wildcard carries it.');
+        + 'and no wildcard includes it.');
       return;
     }
     next();

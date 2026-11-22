@@ -65,7 +65,7 @@ export function checkRiskLayer(cur: RiskLayer | undefined, patch: unknown, opts:
         if (typeof v !== 'boolean') throw refuse('risk.enabled must be true or false.');
         next.enabled = v; break;
       case 'locked':
-        if (!opts.allowLock) throw refuse('risk.locked is set by an organism or a workspace: it makes their values a floor for the layers under them. A person\'s choice is a floor for nobody.');
+        if (!opts.allowLock) throw refuse('risk.locked is set by an organism or a workspace: it makes their values a lower limit for the layers under them. A person\'s choice is a lower limit for nobody.');
         if (typeof v !== 'boolean') throw refuse('risk.locked must be true or false.');
         next.locked = v; break;
       case 'detect':

@@ -31,7 +31,7 @@ export const PARTIES_PACKS: LibraryPack[] = [
     aiDoc: [
       'For an app whose users are NOT AIMEAT accounts: the buyers of a market place, the members of a club,',
       'the customers of a shop. Each registers with an e-mail address and becomes an outside party of the',
-      "app's owner. The node decides everything; this library carries the calls.",
+      "app's owner. The node decides everything; this library makes the calls.",
       '',
       'THE FLOW:',
       '  await AIMEAT.parties.ready();                       // opens a mailed link the page was loaded with',
@@ -60,7 +60,7 @@ export const PARTIES_PACKS: LibraryPack[] = [
       '5. The people are personal data the owner holds. The data map says so: "registers-parties" in',
       '   machinery, or "registers": { "who": "...", "keeps": ["e-mail address", ...] }.',
       '6. ONE APP HOLDS A LIMITED NUMBER OF PEOPLE: the node\'s consent.app_party_max, 10 000 unless its',
-      '   operator set another (1 to 1 000 000). A signup waiting for its link counts until its place runs',
+      '   operator set another (1 to 1 000 000). A signup waiting for its link counts until its reservation runs',
       '   out. A full app answers signUp() with 429 TOO_MANY_PARTIES: tell the person the app is full now.',
       '   Before you build for a large audience, read the limit: GET /v1/apps/{owner}/{app}/parties with',
       '   the owner\'s session answers limit { max, used, left } (aimeat_app_manage action parties). Say it',

@@ -121,7 +121,7 @@ export default function PublicActivityFeed() {
 
   return html`
     <section class="pa">
-      <h2 class="pa-title">${tr('landing.feedTitle', 'Happening on this node')}</h2>
+      <h2 class="pa-title">${tr('landing.feedTitle', 'Happening here')}</h2>
       <p class="pa-sub">${tr('landing.feedSub', 'Public apps, organisms and agent materials as they are published. Click a row for details.')}</p>
       <div class="pa-tabs" role="tablist">
         ${CATEGORIES.map(cat => html`

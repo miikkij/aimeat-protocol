@@ -313,7 +313,7 @@ export function ConnectionsSection({ showToast, inRow }) {
     confirm(t('profile.access.cxOwnRemoveAsk') || 'Remove your own app for this service?', async () => {
       try {
         await apiDelete('/v1/connections/clients/' + encodeURIComponent(providerId));
-        showToast(t('profile.access.cxOwnRemoved') || 'Removed. This service falls back to the node app.');
+        showToast(t('profile.access.cxOwnRemoved') || 'Removed. This service falls back to the app this server provides.');
         await load();
       } catch (err) {
         swallowed('connections-own-client-remove', err);
@@ -362,7 +362,7 @@ export function ConnectionsSection({ showToast, inRow }) {
     <${ConfirmUI} />
     ${inRow ? null : html`<${SubHeading} level=${3}>${t('profile.access.cxTitle') || 'Connected accounts'}<//>
       <${Note}>${t('profile.access.cxIntro')
-        || 'Accounts you have connected at other services. The credential stays on this node — an app is only ever told which account it may use, never the account itself.'}<//>`}
+        || 'Accounts you have connected at other services. The credential stays on this server — an app is only ever told which account it may use, never the account itself.'}<//>`}
 
     <${List} cols="name-state" keepCols empty=${t('profile.access.cxEmpty') || 'No connected accounts yet.'}>
       ${connections.map(c => html`
@@ -488,7 +488,7 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
       <${Line} gap="small" wrap>
         ${nodeless && html`
           <${Note} inline>${t('profile.access.cxOwnRequired')
-            || 'This node has no app registered at this service. Bring your own and it works anyway.'}<//>
+            || 'This server has no app registered at this service. Bring your own and it works anyway.'}<//>
         `}
         <${Action} small onClick=${onToggle} expanded=${open}>
           ${open

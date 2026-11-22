@@ -81,7 +81,7 @@ function onePartOf(base: { id: string; source: string; content: string } & Recor
     content: pieces[wanted - 1],
     part: wanted,
     parts: pieces.length,
-    how_to_read: `The file is ${base.content.length} characters, more than one answer carries, so \`content\` is part ${wanted} of ${pieces.length}. `
+    how_to_read: `The file is ${base.content.length} characters, more than one answer holds, so \`content\` is part ${wanted} of ${pieces.length}. `
       + `Ask again with part: 2${pieces.length > 2 ? ` up to part: ${pieces.length}` : ''}, and join the \`content\` values in order with nothing between them: the cuts are at line ends.`,
   };
 }

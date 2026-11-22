@@ -49,7 +49,7 @@ const PADDING = 2;
  */
 async function loadSource(item) {
   const key = item && item.key ? String(item.key) : '';
-  if (!key) refuse('every image handed to packAtlas() needs a key: it becomes the frame name.');
+  if (!key) refuse('every image given to packAtlas() needs a key: it becomes the frame name.');
   const src = item.src;
   if (!src) refuse('"' + key + '" has no src.');
 
@@ -177,7 +177,7 @@ export async function packAtlas(images, opts) {
   for (const one of list) {
     const key = one && one.key ? String(one.key) : '';
     if (key && seen[key]) {
-      refuse('"' + key + '" was handed to packAtlas() twice. A frame name has to be unique inside '
+      refuse('"' + key + '" was given to packAtlas() twice. A frame name has to be unique inside '
         + 'a sheet, or one of the two pictures is unreachable.');
     }
     seen[key] = true;

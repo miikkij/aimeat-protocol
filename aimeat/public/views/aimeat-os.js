@@ -321,8 +321,8 @@ function generateMarkdown(nodeUrl) {
   // vocabulary live in the guided prompt. What must survive the compression is WHY it exists and
   // that it is a step, not a nicety.
   md += `## Write the data map when you are done\n\n`;
-  md += `If the app stores anything, write down where it puts what and why. Somebody — a person or another AI — will open this app later without having built it, and the only other way to find out where its data lives is to read every line of your source. They will not; they will put the new thing wherever they can reach most easily. That is how a CRM meant for a whole team ended up keeping its shared campaigns in one person's private memory, invisible to their colleagues.\n\n`;
-  md += `The map lives beside the app, so writing or correcting it never means republishing:\n\n`;
+  md += `If the app stores anything, write down where it puts what and why. Somebody — a person or another AI — will open this app later without having built it, and the only other way to find out where its data is stored is to read every line of your source. They will not; they will put the new thing wherever they can reach most easily. That is how a CRM meant for a whole team ended up keeping its shared campaigns in one person's private memory, invisible to their colleagues.\n\n`;
+  md += `The map is stored beside the app, so writing or correcting it never means republishing:\n\n`;
   md += `${SS}\nPUT ${nodeUrl}/v1/datamap/apps/{owner}/{filename}\n${SS}\n\n`;
   md += `${SS}json\n{\n`;
   md += `  "spec": "aimeat.datamap/2",\n`;

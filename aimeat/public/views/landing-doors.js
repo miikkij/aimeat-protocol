@@ -105,7 +105,7 @@ export function ConnectInvite({ onNavigate }) {
         `}
         open=${open} onToggle=${() => setOpen(o => !o)}>
         <div class="ld-loop">
-          <span class="ld-loop-step">① ${tr('landing.connectLoop1', 'Add this node as a connector in your AI tool')}</span>
+          <span class="ld-loop-step">① ${tr('landing.connectLoop1', 'Add this server as a connector in your AI tool')}</span>
           <span class="ld-loop-arrow">→</span>
           <span class="ld-loop-step">② ${tr('landing.connectLoop2', 'Run one prompt that proves the connection works')}</span>
           <span class="ld-loop-arrow">→</span>

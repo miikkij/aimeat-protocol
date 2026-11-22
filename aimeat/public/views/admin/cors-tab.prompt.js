@@ -22,7 +22,7 @@ export function buildCorsPrompt({ url = '' } = {}) {
   return `I run an AIMEAT node${where} and I am its operator. Read its CORS page for me and tell me whether a browser origin is allowed that should not be.
 
 == 1. Read ==
-  aimeat_admin_cors_overview {}   the default list, the three sign-in cookie endpoints and what is named for them, every person and agent with a list of their own, how many records carry one, and the order the lists rank in
+  aimeat_admin_cors_overview {}   the default list, the three sign-in cookie endpoints and what is named for them, every person and agent with a list of their own, how many records have one, and the order the lists rank in
 
 == 2. Judge ==
 A list that is only "*" rewrites the default by hand and gains nothing. A localhost origin on an account that is not a developer's is a leftover. An agent whose list is wider than its owner's answers pages its owner would not. Name each one and say why.

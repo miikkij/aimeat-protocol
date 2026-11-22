@@ -297,7 +297,7 @@ async function balancingTestGaps(deps: Deps, scope: Extract<ComplianceScope, { k
   for (const n of reading.needs) {
     const ev = { ...at, register: n.register.id, title: n.register.title, reach: n.reach, domains: n.domains };
     if (n.need === 'not-allowed') {
-      out.push({ kind: 'legitimate-interests-special-category', detail: `The register "${n.register.title}" names legitimate interests for special category data. That basis alone does not carry such data (GDPR art. 9): choose the ground in the register and write the impact assessment.`, evidence: ev });
+      out.push({ kind: 'legitimate-interests-special-category', detail: `The register "${n.register.title}" names legitimate interests for special category data. That basis alone does not cover such data (GDPR art. 9): choose the ground in the register and write the impact assessment.`, evidence: ev });
       continue;
     }
     if (n.need !== 'required') continue;

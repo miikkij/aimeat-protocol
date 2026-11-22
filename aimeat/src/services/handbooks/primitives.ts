@@ -19,7 +19,7 @@ have to work around: it is the arrangement, and the two tools at the end are how
 ## The pair
 
 **Find something:** \`aimeat_discover\` with \`type: "capability"\` and a plain query — "write a
-memory record", "publish an app", "invite somebody to an organism". Each result carries an \`id\`.
+memory record", "publish an app", "invite somebody to an organism". Each result has an \`id\`.
 
 **Run it:** \`aimeat_invoke\` with that \`id\` and the capability's own \`input\`.
 
@@ -30,7 +30,7 @@ everything you asked.
 **When no tool does the job, a route may.** Every REST route of this node is a capability too, with
 an id like \`route:GET /v1/ledger/usage/runs\` and the tag \`route\`. Run it with \`aimeat_invoke\` and
 \`input: { path, query, body }\`: the route's path values, its query values, and the body as JSON. The
-answer carries the route's own \`status\`, and a refusal is the route's own.
+answer contains the route's own \`status\`, and a refusal is the route's own.
 
 ## What running one means
 

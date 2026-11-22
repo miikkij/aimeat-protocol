@@ -112,7 +112,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
 
     return res.json(success(config.nodeId, {
       split: splitView(out.split),
-      note: 'The pool is taken from YOUR cut, after the platform rake and never from the buyer\'s charge. '
+      note: 'The pool is taken from YOUR cut, after the platform fee and never from the buyer\'s charge. '
         + 'Shares accrue on every settled call; releasing one needs the beneficiary to be verified.',
     }, [
       { description: 'What you now owe', method: 'GET', url: '/v1/commerce/beneficiary/obligations' },

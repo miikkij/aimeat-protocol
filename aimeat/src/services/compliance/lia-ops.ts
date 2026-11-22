@@ -91,7 +91,7 @@ export async function liaDraftOp(deps: Deps, caller: OperatorCaller, input: Scop
     if (n.need === 'not-allowed') {
       notAllowed.push({
         register: n.register, domains: n.domains,
-        what_to_do: 'This register holds special category data. Legitimate interests alone do not carry it (GDPR art. 9): choose the ground in the register (specialBasis and the legal basis that goes with it) and write the impact assessment (part "dpias"). No balancing test is drafted.',
+        what_to_do: 'This register holds special category data. Legitimate interests alone are not enough for it (GDPR art. 9): choose the ground in the register (specialBasis and the legal basis that goes with it) and write the impact assessment (part "dpias"). No balancing test is drafted.',
       });
       continue;
     }
@@ -115,7 +115,7 @@ export async function liaDraftOp(deps: Deps, caller: OperatorCaller, input: Scop
     })),
     how: reading.needs.length === 0
       ? 'No register of this app names legitimate interests as its legal basis, so no balancing test is asked. The basis is set in the register (part "registers").'
-      : 'Each item is a draft: `facts` is what the server reads from the app, and the answers it carries are the ones it can see. Ask the person the open questions, one section at a time, and write their reasoning into `notes` (by section id or question id). '
+      : 'Each item is a draft: `facts` is what the server reads from the app, and the answers it has are the ones it can see. Ask the person the open questions, one section at a time, and write their reasoning into `notes` (by section id or question id). '
         + 'Leave a question out when the person has not answered it. Save with aimeat_compliance_register_write { part: "lias", app, value: { items: [...] } }. The outcome is the person\'s conclusion: ask them for it. '
         + 'aimeat_compliance_register_write { part: "lias", app, item_id, set: { "status": "approved" } } approves the test when the person says so; for a test whose owner approves it themselves (`ownerApproves`) it asks them instead.',
     note: NOT_LEGAL_ADVICE,

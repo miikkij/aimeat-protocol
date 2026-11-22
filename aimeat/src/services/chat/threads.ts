@@ -212,7 +212,7 @@ export function chatToolCopy(thread: Pick<ChatThread, 'turns' | 'gooseSessionId'
 }
 
 /** What the delete answer says when the chat tool keeps its copy. */
-export const CHAT_TOOL_COPY_NOTE = 'The conversation is deleted from this node. The chat tool that answered in it keeps its own copy of the conversation text in its own store on this server, which the node cannot delete; the operator of this node can remove it there.';
+export const CHAT_TOOL_COPY_NOTE = 'The conversation is deleted from your AIMEAT. The chat tool that answered in it keeps its own copy of the conversation text in its own store on this server, which AIMEAT cannot delete; the operator of this server can remove it there.';
 
 /**
  * Roll the oldest conversations into the month they belong to, once there are more open than the

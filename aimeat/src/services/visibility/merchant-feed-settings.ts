@@ -160,7 +160,7 @@ export async function describeFeed(
   const toStore = listing.products.filter((p) => p.linkIsStore).length;
   if (toStore) todo.push(`${toStore} product(s) link to the store's front page. Merchant Center expects a page per product with the same price: set product_links for them.`);
   if (!feed.returnPolicyLabel) todo.push('Set the return policy in Merchant Center (Store settings > UCP settings) and give its label here (return_policy_label); Microsoft requires one for Copilot Checkout.');
-  if (!feed.stripeProfileId) todo.push('For AI platforms that pay through this place\'s own UCP checkout (Stripe shared payment tokens), give your Stripe network profile id (stripe_profile_id, profile_…) from Agentic commerce in the Stripe Dashboard.');
+  if (!feed.stripeProfileId) todo.push('For AI platforms that pay through this server\'s own UCP checkout (Stripe shared payment tokens), give your Stripe network profile id (stripe_profile_id, profile_…) from Agentic commerce in the Stripe Dashboard.');
   todo.push('In your own Merchant Center account, add a feed with "Automatically download file from URL" and the merchant_center address. Merchant Center fetches it once a day, so a price change reaches it by the next day.');
   return {
     enabled: feed.enabled,

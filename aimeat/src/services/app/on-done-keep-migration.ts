@@ -84,7 +84,7 @@ export async function keepOnDoneForAppsOnce(
   }
   result.ran = true;
   if (result.apps.length) {
-    logger.info(`ext:invoke: ${result.apps.length} published app(s) that bind an AI job's on_done kept the word`,
+    logger.info(`ext:invoke: ${result.apps.length} published app(s) that bind an AI job's on_done kept the permission`,
       { apps: result.apps.map(a => a.appId) });
   }
   return result;
@@ -101,9 +101,9 @@ async function tellOperator(storage: Storage, config: Pick<AimeatConfig, 'nodeId
     actorName: 'node',
     source: 'boot',
     detail: `The node gave ext:invoke to ${apps.length} published app(s) of ${owners} owner(s): ${apps.map(a => a.appId).join(', ')}. `
-      + 'Since 2026-10-21 an AI job whose on_done names an extension action is started by an app only with that word, because the '
+      + 'Since 2026-10-21 an AI job whose on_done names an extension action is started by an app only with that permission, because the '
       + 'action then runs unattended in the owner\'s name. These apps, published before it, start such jobs and do not ask for it. '
-      + `${grants} live app grant(s) got the word. An app's owner removes it with aimeat_app_manage scope_allowance_remove, `
+      + `${grants} live app grant(s) got the permission. An app's owner removes it with aimeat_app_manage scope_allowance_remove, `
       + 'and the app\'s change log in the App Catalog says why it was kept.',
   });
 }

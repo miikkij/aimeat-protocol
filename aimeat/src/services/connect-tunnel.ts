@@ -332,7 +332,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
       if (!this.sockets.holds(socketId, target)) {
         this.stats.malformedFramesTotal++;
         this.send(ws, { type: 'error', id: frame.id, agent: target, code: 'UNKNOWN_IDENTITY',
-          message: 'This connection does not carry that identity. Attach it first.' });
+          message: 'This connection does not have that identity. Attach it first.' });
         return;
       }
       if (frame.type === 'detach') { this.detachIdentity(socketId, target, 'detach'); return; }
@@ -415,7 +415,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
       if (!payload?.sub) { refuse('ATTACH_UNAUTHORIZED', 'That credential did not verify.'); return; }
       if (await credentialRevoked(token, payload)) { refuse('ATTACH_UNAUTHORIZED', 'That credential has been revoked.'); return; }
       if (!payload.roles?.includes('agent') && !payload.roles?.includes('ecosystem')) {
-        refuse('ATTACH_FORBIDDEN', 'Only an agent or an ecosystem app may ride this connection.');
+        refuse('ATTACH_FORBIDDEN', 'Only an agent or an ecosystem app may use this connection.');
         return;
       }
       // THE NAME MUST BE THE CREDENTIAL'S OWN. Trusting `frame.agent` over the verified `sub` would

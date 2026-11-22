@@ -28,9 +28,9 @@ export function buildSpecMcpPrompt({ url, owner, filename, name, present, stale 
       : 'It describes the app as it is now.';
   return `Keep the design spec of my AIMEAT app "${name}" (${owner}/${filename}, on ${url}) current. ${state}
 
-1. Read it: aimeat_app_manage { action: "spec", owner: "${owner}", filename: "${filename}" }. The answer carries the document, whether it is stale, and an outline to start from when there is none.
+1. Read it: aimeat_app_manage { action: "spec", owner: "${owner}", filename: "${filename}" }. The answer contains the document, whether it is stale, and an outline to start from when there is none.
 2. Read the app: aimeat_app_get { owner: "${owner}", filename: "${filename}" }, and when the spec is missing or stale, the source too (aimeat_app_draft_read, or the download URL), so the spec says what the app does today.
-3. Write it back: aimeat_app_manage { action: "spec_set", owner: "${owner}", filename: "${filename}", markdown, expected_revision }, the whole document: what the app is for, its screens, where its data lives (memory keys, workspaces, contracts), the decisions made and why, the AI and agents it uses, what is open, and what bit a builder. Keep what is still true, change what is not. A refusal naming the revision means somebody wrote in between: read again and write from that.
+3. Write it back: aimeat_app_manage { action: "spec_set", owner: "${owner}", filename: "${filename}", markdown, expected_revision }, the whole document: what the app is for, its screens, where its data is stored (memory keys, workspaces, contracts), the decisions made and why, the AI and agents it uses, what is open, and what went wrong for a builder. Keep what is still true, change what is not. A refusal naming the revision means somebody wrote in between: read again and write from that.
 4. From now on, read the spec before every change to this app, and after every publish write it back with what changed. The publish answer tells you when it has fallen behind.
 
 Tell me in plain words what the spec now says the app is, and what you changed in it.`;

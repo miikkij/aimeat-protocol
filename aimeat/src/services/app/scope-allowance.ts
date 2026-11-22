@@ -214,7 +214,7 @@ export async function removeScopeAllowanceFor(
   if (found.delegated) return refuse(403, 'FORBIDDEN', 'Only the app owner removes a permission the app kept.');
   const words = (Array.isArray(rawWords) ? rawWords : String(rawWords ?? '').split(/[\s,]+/))
     .map(w => String(w).trim()).filter(Boolean);
-  if (!words.length) return refuse(400, 'INVALID_INPUT', 'words is required: the permission words to remove, for example ext:invoke.');
+  if (!words.length) return refuse(400, 'INVALID_INPUT', 'words is required: the scopes to remove, for example ext:invoke.');
   const a = await readAppScopeAllowance(storage, found.appId);
   const taking = a ? words.filter(w => a.words.includes(w)) : [];
   if (!a || !taking.length) {
@@ -235,7 +235,7 @@ export async function removeScopeAllowanceFor(
     ownerGhii: found.app.ownerGaii, filename: found.app.filename, by: resolveIdentity(caller, config.nodeId),
     action: 'scope_allowance.removed', detail: { words: taking.join(', '), grants },
   });
-  logger.info('app scope allowance: words removed by the owner', { app: found.appId, words: taking, grants });
+  logger.info('app scope allowance: scopes removed by the owner', { app: found.appId, words: taking, grants });
   emitChange('apps');
   return done({ app: found.appId, removed: taking, words: a.words.filter(w => !taking.includes(w)), grants_changed: grants });
 }

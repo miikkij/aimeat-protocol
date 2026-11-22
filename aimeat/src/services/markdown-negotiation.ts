@@ -173,7 +173,7 @@ ${intro}
 - Connect an AI assistant to this node: ${b}/v1/connect
 - Privacy: ${b}/v1/privacy · Terms: ${b}/v1/terms
 
-## For AI agents: how to get in
+## For AI agents: how to connect
 
 ${firstStepsMarkdown(config)}
 

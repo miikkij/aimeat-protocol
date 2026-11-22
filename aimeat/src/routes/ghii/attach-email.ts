@@ -63,7 +63,7 @@ export function registerAttachEmailRoute(
             loginName = loginName.substring(0, atIdx);
             if (nodePart !== config.nodeId) {
                 res.status(400).json(error(config.nodeId, 'FEDERATION_UNSUPPORTED',
-                    'Email is set up on your home node rather than here. Finish it there and come back.'));
+                    'Email is set up on your own AIMEAT rather than here. Finish it there and come back.'));
                 return;
             }
         }

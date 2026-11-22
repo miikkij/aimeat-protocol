@@ -69,7 +69,7 @@ function address(url, base, id, key) {
   if (url.slice(0, 5).toLowerCase() === 'data:') {
     console.warn('[aimeat-phaser] pack "' + id + '" entry "' + key + '" is a data: URI and was '
       + 'dropped. Serve the file (/v1/pub/<owner>/… or storage) and give the pack its address: a '
-      + 'base64 blob is carried in the page on every single load.');
+      + 'base64 blob is sent inside the page on every single load.');
     return null;
   }
   return new URL(url, base).href;
@@ -197,7 +197,7 @@ export function pack(spec) {
 export function fromLibrary(lib) {
   if (!lib || typeof lib.toPack !== 'function') {
     throw new Error('fromLibrary() takes an aimeat-assets library: the object with toPack(), '
-      + 'url() and t() that AIMEAT.assets.library({ app }) hands back. Await it first, or pass the '
+      + 'url() and t() that AIMEAT.assets.library({ app }) returns. Await it first, or pass the '
       + 'promise straight to preloadPack(), which waits for it.');
   }
   return pack(lib.toPack());

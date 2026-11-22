@@ -141,13 +141,13 @@ USAGE
       Point a chat client at this node in ONE command: authorize a dedicated agent
       into its own connector home, write that client's MCP config (merging, never
       replacing what is already there), and leave a launcher that supplies the
-      token at run time so it never lands in a config file.
+      token at run time so it is never written to a config file.
       Options: --url --owner --agent --workdir --home --surface --name --reuse
       (--surface is used by claude-desktop only; the other clients get the full toolset)
       e.g. aimeat connect client goose --url https://aimeat.io --owner alice
 
       Interactive clients reach the node over its HTTP MCP endpoint (/v1/mcp).
-      Claude Desktop is the exception: its config file cannot carry a remote URL,
+      Claude Desktop is the exception: its config file cannot contain a remote URL,
       so it is wired through the local connector over stdio.
 
   aimeat connect --url <node-url> --owner <owner> [--agent <name>] [--mode <mode>] [--scopes <list>]

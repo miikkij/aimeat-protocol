@@ -60,7 +60,7 @@ USD, 0 = free) and, beside it, \`pacingMorsels\`. Completing a session with a mo
 payment \`handler\`; a free session needs none. The pacing is debited from the OWNER's morsel
 balance at completion, and the receipt's \`pacing\` block says how many morsels burned and how many
 reached the seller. A callable app-tool returns its result on session.fulfillment.results; task
-fulfillments land as the seller's agent task. Discover sellables with \`aimeat_discover\` or GET
+fulfillments become the seller's agent task. Discover sellables with \`aimeat_discover\` or GET
 /v1/commerce/feed + /v1/commerce/tools. The feed and the ACP and UCP checkouts are money only: an
 item with no money price is not in the feed and is not sold there.
 

@@ -37,13 +37,13 @@ strong model and once in 3 on a lighter one, which read a third of the guidance.
 
 ## Say it in their words
 
-Everything the specification says is how the node thinks. None of it is how the person you are
-building for thinks, and the proposal is the moment the two get confused. Three or four lines is
+Everything the specification says is in the node's own words. None of it is in the words of the person you are
+building for, and the proposal is the moment the two get confused. Three or four lines is
 the right length. Length was never the problem.
 
 **The test: could the person answer "yes, build that" without knowing a single AIMEAT word?**
 If answering needs them to know what a genre is, what a pack is, or what a scope is, you have
-described the machinery instead of the app.
+described the platform instead of the app.
 
 Not this:
 
@@ -55,9 +55,9 @@ This:
 
 > A page where your club members sign in and keep their own training log. Only they see their
 > own entries; you see the whole list. It remembers everything on your own node, so nothing
-> lives with anyone else. It will live at club.apps.aimeat.io. Shall I build it?
+> is stored with anyone else. Its address will be club.apps.aimeat.io. Shall I build it?
 
-The second one names what they get, who can see what, where it lives, and what they are
+The second one names what they get, who can see what, where it is, and what they are
 agreeing to. The first names five things they cannot judge.
 
 **A term from the node's vocabulary carries its meaning in the same sentence, or it does not
@@ -168,7 +168,7 @@ never counted as passed.
 6. **Driving an AIMEAT app with Playwright.** The kit's form fields carry no \`name\`: a field is
    \`[data-ak-field="<name>"]\` with the input inside. On aimeat.io press the cookie banner's
    necessary-only button (\`#cc-main .cm__btn[data-role="necessary"]\`) first on every app address.
-   An app's session lives in the tab, so a reload or a new navigation signs it out (the data
+   An app's session is kept in the tab, so a reload or a new navigation signs it out (the data
    stays): sign in again. A second app or a visitor page goes in a second tab. On a sandbox the node
    and \`<app>.apps.localhost\` are two sites. In the consent window, wait for the Connect button
    to render. Match the sign-in button by its text without a start anchor.
@@ -204,7 +204,7 @@ LANGUAGE; everything else follows the regional format. A person who chose Finnis
 British date format gets \`3 päivää sitten\` beside \`13/09/2026\`, and that is what they asked for.
 
 **Never write a \`{n} min ago\` translation key for this.** It survives Finnish only because \`min\`
-does not inflect, it cannot produce \`eilen\`, and one \`{n}\` cannot carry a language whose noun
+does not inflect, it cannot produce \`eilen\`, and one \`{n}\` cannot handle a language whose noun
 changes with the number — Polish writes \`1 dzień\` but \`2 dni\`, Russian \`1 день\`, \`2 дня\`,
 \`5 дней\`. CLDR knows every one of those rules; a key does not.
 

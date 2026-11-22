@@ -235,7 +235,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       { name: proposal.name, owner, display_name: proposal.display_name, via: 'proposal' });
     if (!hookResult.allowed) {
       res.status(403).json(error(config.nodeId, 'HOOK_REJECTED',
-        `${hookResult.reason ?? 'An extension on this node refused the new agent.'} Nothing was created, and the proposal is still open, so you can approve it later.`,
+        `${hookResult.reason ?? 'An extension on this server refused the new agent.'} Nothing was created, and the proposal is still open, so you can approve it later.`,
         403, { hook: 'pre_agent_registration' },
         [{ description: 'See the agent proposals waiting for you', method: 'GET', url: '/v1/agents/v2/agent-proposals' }]));
       return;

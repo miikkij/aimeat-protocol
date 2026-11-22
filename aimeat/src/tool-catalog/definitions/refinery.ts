@@ -17,7 +17,7 @@ import { agentEverywhere } from './types.js';
 export const refineryTools = [
     {
         name: 'aimeat_refinery_classes',
-        description: "The class packs a mail refinery sorts messages into: receipt, invoice, order, booking, job, system, support, newsletter and personal. Each says what the decision model is told the class is, whether a message of it is processed or only filed, and the fields an extraction reads from it (an invoice's vendor, amount, due date and reference, for example). A refinery definition names packs by id in its `classes`, or carries classes of its own in the same shape. Read this before writing a definition, so the classes are ones the node already describes well.",
+        description: "The class packs a mail refinery sorts messages into: receipt, invoice, order, booking, job, system, support, newsletter and personal. Each says what the decision model is told the class is, whether a message of it is processed or only filed, and the fields an extraction reads from it (an invoice's vendor, amount, due date and reference, for example). A refinery definition names packs by id in its `classes`, or has classes of its own in the same shape. Read this before writing a definition, so the classes are ones the node already describes well.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Mail Refinery Class Packs', readOnlyHint: true, openWorldHint: false },

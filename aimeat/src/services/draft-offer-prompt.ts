@@ -22,7 +22,7 @@
  */
 
 export const DRAFT_OFFER_PROMPT = `You are drafting an AIMEAT **offer** for the agent **{{agent_name}}** (GAII {{gaii}}) on node
-{{node_id}}. An offer is the human-readable face of what this agent can do, and the machine contract the
+{{node_id}}. An offer is the human-readable description of what this agent can do, and the machine contract the
 mesh and Agent Workflows build on. Produce ONE offer that is as compatible as is honestly possible:
 
 1. **Offering** (always) — a legible offer the owner can find.

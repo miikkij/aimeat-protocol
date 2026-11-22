@@ -206,7 +206,7 @@ function popupHtml(st, i) {
       + (power.low ? ' <strong>' + escHtml(i.powerLow || 'Running low.') + '</strong>' : '') + '</p>';
   }
   if (power.payer) {
-    out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === 'node' ? (i.payerNode || 'This node pays.')
+    out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === 'node' ? (i.payerNode || 'This server pays.')
       : power.payer === 'agent' ? (i.payerAgent || "The agent's own key pays.") : (i.payerOwn || 'You pay with your own key.')) + '</p>';
   }
   if (power.state !== 'ok' && power.fix) out += '<p class="aimeat-ai-text">' + escHtml(power.fix) + '</p>';

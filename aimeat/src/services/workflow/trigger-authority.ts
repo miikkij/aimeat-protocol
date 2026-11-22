@@ -370,7 +370,7 @@ export async function runRefusedAsOwner(
     const started = await start(ownerGhii, ownerName, workflowId);
     if ('error' in started) return { ok: false, code: 'START_FAILED', message: 'Could not start the run', errors: started.error };
     if (started.skipped) {
-      return { ok: false, code: 'SKIPPED', message: 'A run of this workflow is already in flight, so nothing was started. Wait for it and press again.', runId: started.runId };
+      return { ok: false, code: 'SKIPPED', message: 'A run of this workflow is already running, so nothing was started. Wait for it and press again.', runId: started.runId };
     }
     run.refusal = { ...run.refusal, ranAsOwner: { runId: started.runId, at: new Date().toISOString() } };
     await writeRun(deps.storage, ownerGhii, run, rec.version + 1, rec.createdAt);

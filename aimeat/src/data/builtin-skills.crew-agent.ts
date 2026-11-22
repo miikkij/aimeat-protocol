@@ -118,7 +118,7 @@ examples: email, a calendar, meeting notes from a recording.
 2. **Write the crew definition.** One JSON document: \`agent_name\`, \`agents[]\` (each with name,
    role, goal, backstory, tools), \`tasks[]\` (each with id, description, expected_output, agent,
    and \`context\` naming EARLIER task ids only). At least one task description contains
-   \`{{ctx.prompt}}\`, which is where the incoming work lands. \`listen_for\` says what wakes the
+   \`{{ctx.prompt}}\`, which is where the incoming work goes. \`listen_for\` says what starts the
    crew: it defaults to \`["tasks"]\`, and that is wrong for an agent whose work arrives as a
    message or a DM. The full shape is in the \`doc\` parameter of \`aimeat_crew_publish\`.
    **An agent whose work arrives in a workspace.** When the agent is to act on what is published
@@ -158,9 +158,9 @@ examples: email, a calendar, meeting notes from a recording.
    \`aimeat_connector_list\` gives each computer's name and whether it is connected; pass the name
    or the id as \`connector\`. The agent is then offered to that computer only. With one connector
    there is nothing to choose, and \`connector\` is left out.
-4. **Tell the owner where to approve.** The answer carries \`approval_url\`, the page where the
+4. **Tell the owner where to approve.** The answer contains \`approval_url\`, the page where the
    proposal waits, and \`next_step\`, a sentence written for them. Give them both in their own
-   words. Their one press there creates the agent, gives it the definition and hands it to their
+   words. Their one press there creates the agent, gives it the definition and passes it to their
    connector, which runs it on their own computer (\`aimeat connect serve\`). The approval's answer
    says which state it ended in. If no connector was connected (\`waiting_for_connector\` true), the
    agent exists with its instructions and waits: when the owner's connector next connects, the node
@@ -175,13 +175,13 @@ examples: email, a calendar, meeting notes from a recording.
    given the \`purpose\` as the task, which suits only an agent that needs no input.
    **The model is the owner's pick on that page.** The page asks "Which model it uses" and
    lists the models the chosen computer reaches; the pick goes with the approval (\`llm_choice\`) and
-   is stored before the agent is handed to the connector, so the first run already uses it. With no
+   is stored before the agent is passed to the connector, so the first run already uses it. With no
    pick the computer's own setting applies, and that can be a small, cheap model (measured on
    aimeat.io 2026-10-13: a new agent's first run on such a default answered its search step with a
    refusal, and its next step then saved three findings it had invented). So when the work
    searches, reads sources or runs in many steps, tell the owner to pick a strong model on the
    page. \`aimeat_crew_llm_set\` sets it after the approval, which is after the first run began.
-5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
+5. **Scheduled work comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 
 Always send the \`crew_def\`. An agent approved without one exists and cannot start, and
@@ -193,14 +193,14 @@ run by a crew runtime needs \`memory:read\` and \`memory:write\` whatever its jo
 its own definition with the first and stores the result with the second. The node adds both to
 every proposal and every approval, so you need not ask for them (measured 2026-10-02: an agent
 approved with \`memory:write\` alone could not read its definition and never ran). An agent that
-hands work to the owner's other agents asks \`agent:read\` as well: the agent list needs it from
+passes work to the owner's other agents asks \`agent:read\` as well: the agent list needs it from
 node 4.0.0.
-It needs no \`agent:write\` to report its own tags or its own runtime; that word lets an agent approve new agents and
+It needs no \`agent:write\` to report its own tags or its own runtime; that scope lets an agent approve new agents and
 change other agents' settings, so give it only to an agent whose job is that. An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes
 queued work also needs \`work:read\` and \`work:accept\`; one that uses the owner's AI (text, pictures,
 transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. From node
-4.0.0 the calls that asked no word before ask one too, except on the agent's own record (its own
+4.0.0 the calls that asked no scope before ask one too, except on the agent's own record (its own
 tasks, messages, offers and reports): \`task:write\` to queue work for another agent or make a
 schedule, \`task:read\` for the task roster, \`ext:invoke\` to run an extension, \`organism:read\` and
 \`organism:invite\` for organism membership, \`packages:read\` to list installs. Until then such a
@@ -209,17 +209,17 @@ start without asking the owner each time, so say that in the purpose. \`run_mode
 a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits an agent that answers whatever arrives.
 Ask for \`"resident"\` only when the owner's connector can keep an agent up: \`aimeat connect serve\`
 and a hosted place run every agent by spawning, so the node stores such a proposal as \`spawn\` and
-says so in \`run_mode_corrected\`. When the owner's crews think through the node (their default model
-choice is the node, or the node has a key to pay with), the proposal carries \`ai:use\` on its own.
+says so in \`run_mode_corrected\`. When the owner's crews run their model through the node (their default model
+choice is the node, or the node has a key to pay with), the proposal includes \`ai:use\` on its own.
 
-**What it offers.** A definition may carry \`offers\`, a list of offer entries, and the crew runtime
+**What it offers.** A definition may have \`offers\`, a list of offer entries, and the crew runtime
 publishes the FIRST entry to the agent's offers each time the agent starts. That published offer is
 what puts the agent on the owner's "Ask your agents" page, so write one entry when you propose:
 \`id\` (lowercase with hyphens), \`title\`, and \`ask\`, a plain invitation that says what to give the
 agent, what comes back and what it does not do; an \`example\` helps. The node completes the entry
 with the other keys the runtime reads (\`cost\`, \`latency\`, \`repeatability\`, \`verification\`,
 \`consequences\`), and a definition with no entry gets one made from the agent's name and purpose.
-The entry carries no price and no visibility, so the offer is the owner's own: it is not on the
+The entry has no price and no visibility, so the offer is the owner's own: it is not on the
 Exchange until the owner prices and lists it, and it is a workflow step only once it declares its
 signals (https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md).
 
@@ -238,7 +238,7 @@ the workflow run's id, so each run has its own result. Do this only when \`aimea
 \`task_scope\` in \`features\`: a runtime with that feature writes a workflow task's result to the key
 the workflow gave it, and shows the model the values the workflow attached to the task (the
 \`event_*\` variables of a run an event started, and any variable the workflow declares). A runtime
-without it writes the result under a key of its own, and the step ends red. Leave the three fields
+without it writes the result under a key of its own, and the step fails. Leave the three fields
 out when the owner did not ask for a workflow: an offer without them works everywhere else.
 
 **A browser on the agent's computer.** When \`aimeat_crew_menu\` lists the tool \`browser\` (and
@@ -286,7 +286,7 @@ limited what the asking agent may read (its clearance), the new agent gets the s
 stricter one. Ten waiting requests from strangers do not block this call. For a name that
 already EXISTS the node approves at once only when the asking agent is that agent, or is the agent
 that registered it. Any other agent leaves the request waiting for the owner, and the answer says
-so: re-approval rotates the agent's key and hands out a new token, so it is the owner's decision.
+so: re-approval rotates the agent's key and issues a new token, so it is the owner's decision.
 Tell the person to approve in profile → Agents when that happens; nothing is lost.
 
 If that agent is to run a JSON definition and has none yet,
@@ -301,19 +301,19 @@ is online. Edit the document, then \`aimeat_crew_validate\` (the agent's own run
 its messages go to the owner unchanged), \`aimeat_crew_try\` (one run with a prompt, nothing
 stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions stay restorable).
 \`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
-agent or the owner's default; \`{kind: "node"}\` makes the crew think through this node, so the
+agent or the owner's default; \`{kind: "node"}\` makes the crew run its model through this node, so the
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
 only a provider key variable and a public https address. When the owner's model policy leaves a
 pinned model out, the choice is still saved (the crew runs on its own machine) and the answer
-carries \`warning\`; the approval carries it as \`llm_choice.warning\`. Tell the owner, in their words,
+has \`warning\`; the approval has it as \`llm_choice.warning\`. Tell the owner, in their words,
 that the model breaks their own rule. With nothing chosen, an agent holding
-\`ai:use\` thinks through this node when the node has a key to pay with; without \`ai:use\`, or with no
+\`ai:use\` runs its model through this node when the node has a key to pay with; without \`ai:use\`, or with no
 key, it uses the key on the machine that runs it, even when the owner's default says the node. A
-machine that carries its own model routing for its agents applies that routing when nothing is
+machine that has its own model routing for its agents applies that routing when nothing is
 chosen for the agent (seen on aimeat.io 2026-10-13), so a choice made for the agent is the one
 that is certain to apply.
 \`aimeat_crew_menu\` answers which choice applies as \`effective\`. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
-it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
+it is written to YOUR namespace, where neither the runtime nor the Crew tab looks.
 
 ## 4. After it exists
 
@@ -322,7 +322,7 @@ it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
   \`GET /v1/agents/{name}/skills\`.
 - **Organize it:** tags via \`aimeat_agent_tags_set\`; mode and display via
   \`aimeat_operator_agent_configure\` (propose, then confirm: show the owner the diff).
-- **Verify it came online:** \`aimeat_agents_list\`. The new agent's row carries \`last_seen\`,
+- **Verify it came online:** \`aimeat_agents_list\`. The new agent's row has \`last_seen\`,
   \`mode\` and \`tags\`, and \`refusals\`: the calls the node refused it for a scope it lacks. An
   agent that looks connected and does nothing usually has one there. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
   CALLING agent only, so neither one can answer for the agent you just added.

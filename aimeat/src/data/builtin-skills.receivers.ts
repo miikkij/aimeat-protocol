@@ -84,7 +84,7 @@ depth, reserved keys, a key's schema lock, a row space's schema, quotas) still a
 \`aimeat_receiver\` action \`propose\` { name, target, csm?, visibility?, limits?, verbs?, display_name }.
 Give the person the \`approve_url\` and the sentence in \`say\`. The API key is made when they approve and
 is shown to them, never to you. If you hold receivers:manage (the person ticks it on its own; Full
-access does not carry it), \`create\` makes it at once and answers \`key\` ONCE: put it straight into the
+access does not include it), \`create\` makes it at once and answers \`key\` ONCE: put it straight into the
 program's secret store (AWS Secrets Manager, an environment secret) and nowhere else, not in a chat, a
 repository or a memory record. The incoming webhook is the person's, not yours: it keeps working if
 you are removed later, and the person is told then which incoming webhooks you made. The same goes

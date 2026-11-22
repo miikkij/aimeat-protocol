@@ -354,7 +354,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       const html = grownHtml ?? (part ? partPreviewHtml(part, { theme }) : served!.content);
       if (html === null) {
         return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE',
-          `"${id}" points at a template this node no longer carries, so there is nothing to render.`));
+          `"${id}" points at a template this node no longer has, so there is nothing to render.`));
       }
       // A preview is a rendering of the part's current version, not a page of its own: no store,
       // no index — the gallery at /v1/design-book is the address a person keeps. The page's

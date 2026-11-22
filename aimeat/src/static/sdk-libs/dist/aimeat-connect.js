@@ -97,7 +97,7 @@
   }
   var DEFAULT_STRINGS = {
     title: "Connected accounts",
-    intro: "Accounts you have connected so apps can act at those services on your behalf. The account credential stays on this node; an app is only ever told which account it may use.",
+    intro: "Accounts you have connected so apps can act at those services on your behalf. The account credential stays on this server; an app is only ever told which account it may use.",
     empty: "You have not connected any accounts yet.",
     add: "Connect",
     connecting: "Connecting…",
@@ -108,7 +108,7 @@
     confirm: "Disconnect this account? Apps that publish to it will stop being able to.",
     toldProvider: "Disconnected, and the service was told.",
     notToldProvider: "Disconnected here. The service could not be reached to be told, so check it there too.",
-    unavailable: "Connecting accounts is not enabled on this node."
+    unavailable: "Connecting accounts is not enabled on this server."
   };
   async function mountConnectPanel(connect2, opts = {}) {
     const host = typeof opts.target === "string" ? document.querySelector(opts.target) : opts.target;
@@ -253,7 +253,7 @@
       before: "Sign in with the Google account that owns the channel. A Google account with no YouTube channel will connect and then have nowhere to publish."
     },
     x: {
-      before: "Posting to X costs the node operator a small amount per post, charged against prepaid credits at X. When those credits run out, publishing stops until they are topped up."
+      before: "Posting to X costs the operator of this server a small amount per post, charged against prepaid credits at X. When those credits run out, publishing stops until they are topped up."
     },
     linkedin: {
       before: "A LinkedIn connection stops working after about two months and asks to be reconnected. That is LinkedIn: renewing a token in the background is a partner-only feature, so this is the one provider you will have to come back to a few times a year."
@@ -419,7 +419,7 @@
       })
     });
     const url = must(res, "the connection could not be started").authorize_url;
-    if (!url) throw new Error("the node did not return an authorization URL");
+    if (!url) throw new Error("the server did not return an authorization URL");
     const win = window.open(url, "aimeat-connect", "width=620,height=760,noopener=no");
     if (!win) throw new Error("the connect window was blocked; allow pop-ups for this site");
     await waitForRound(before.length, opts.signal);

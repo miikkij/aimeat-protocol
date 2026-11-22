@@ -315,7 +315,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
   // The spec stays REQUIRED: this write replaces the whole map, and a body without it is how a
   // half-written map would wipe a good one.
   if (body.spec !== DATA_MAP_SPEC) {
-    return `A data map must carry spec "${DATA_MAP_SPEC}". Send the WHOLE map in one object: `
+    return `A data map must have spec "${DATA_MAP_SPEC}". Send the WHOLE map in one object: `
       + `{ "spec": "${DATA_MAP_SPEC}", "what": "...", "usedFor": "...", "form": "one-person", "arrangement": "...", `
       + '"machinery": [], "leaves": [], "held": [ ...one row per key family... ], "elsewhere": [] }. '
       + 'This write REPLACES the map, which is why a body without the spec is refused rather than half-stored: read the map first '
@@ -451,13 +451,13 @@ export interface HandsAnswer {
 
 /** Said the same way wherever a tally number is rendered. */
 export const HANDS_NOT_COVERED = [
-  'Counting started when this was switched on. A key written before that and never written since has no hands here, and never will.',
-  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and that is not a hand.',
+  'Counting started when this was switched on. A key written before that and never written since has no writers counted here, and never will.',
+  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and those writes are not counted.',
 ];
 
 /** The note of an answer that covers only the caller's own records: an ecosystem app or a visitor. */
 export const HANDS_OWN_ONLY_NOTE = 'This answer covers the records this app or session keeps itself. '
-  + 'The account owner sees the hands on every record of the account.';
+  + 'The account owner sees the writers on every record of the account.';
 
 /** The caller facts the tally needs: services/caller-context.ts, from callerOf(req) or the MCP session. */
 export type HandsCaller = Pick<CallerContext, 'principal' | 'owner' | 'kind' | 'inPerson' | 'visitor' | 'has' | 'auth' | 'principalView'>;

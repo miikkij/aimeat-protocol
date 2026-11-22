@@ -199,7 +199,7 @@ export function registerMemoryExtendedTools(
             // GET /v1/memory/:gaii/:key.
             const carried = await shareCarriesKey({ storage, config }, record.ownerGaii, record.key, agentGaii);
             if (!carried.carries) {
-                return toolError('CLASSIFIED', `This record belongs to an organism your owner is not a member of, and it is ${carried.reason}, so it is not handed out as a public record (label ${carried.label}).`);
+                return toolError('CLASSIFIED', `This record belongs to an organism your owner is not a member of, and it is ${carried.reason}, so it is not given out as a public record (label ${carried.label}).`);
             }
 
             return {

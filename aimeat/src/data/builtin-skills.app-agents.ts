@@ -93,7 +93,7 @@ The definition is data. The node validates it and stores it, and never runs code
 
 An agent approved from the definition holds exactly this: the permissions in \`scopes\`, plus
 \`memory:read\` and \`memory:write\`, which every crew runtime needs for itself, plus \`ai:use\` when
-the person's agents think through their AIMEAT. Nothing else. A tool that calls the node for
+the person's agents use AI through their AIMEAT. Nothing else. A tool that calls the node for
 anything more is refused, and the task ends as refused after the crew did the work.
 
 - List the smallest set that does the job. The person reads the list as sentences before approving.
@@ -107,7 +107,7 @@ anything more is refused, and the task ends as refused after the crew did the wo
 ## 3. Publish
 
 Publish as usual with \`aimeat_app_publish\` and leave \`cortex_agents\` out. The block is the
-declaration on every route: a plain publish, a draft and a package made from the app.
+declaration for every way to publish: a plain publish, a draft and a package made from the app.
 
 Read the answer:
 
@@ -130,7 +130,7 @@ the previous version.
 - **Through their AI.** \`aimeat_app_manage { action: "agent_deploy", owner, filename, bundled_agent }\`.
   The answer has \`kind: "proposed"\`. Then read \`agent_status\` and give the person its
   \`approval_url\`: nothing exists until they approve there.
-- **With a package.** Installing a package or an install set that carries the app proposes its
+- **With a package.** Installing a package or an install set that contains the app proposes its
   agents in the same way.
 
 \`aimeat_app_manage { action: "agent_status", ... }\` answers the caller's own copy:

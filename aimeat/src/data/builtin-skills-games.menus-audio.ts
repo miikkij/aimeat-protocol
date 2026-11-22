@@ -31,7 +31,7 @@ export const PHASER_MENUS_LEVELS_SKILL: BuiltinSkill = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-phaser-menus-levels
-description: "Menus and levels for a Phaser 4 game on an AIMEAT node: menuItems() draws a keyboard-and-pointer list inside the canvas, titleScene() is a whole first screen you drop into the scenes array, pauseMenu() opens over a running scene, transition() hands one scene to the next four ways, and parseMap()/platformer() turn twelve lines of ASCII into a playable level. Triggers on: menu, main menu, title screen, pause menu, scene transition, fade, wipe, iris, level, tilemap, ASCII map, platformer, level editor, level select, valikko, aloitusnäyttö, taukovalikko, siirtymä, kenttä, kenttäeditori, tasohyppely."
+description: "Menus and levels for a Phaser 4 game on an AIMEAT node: menuItems() draws a keyboard-and-pointer list inside the canvas, titleScene() is a whole first screen you drop into the scenes array, pauseMenu() opens over a running scene, transition() moves from one scene to the next in four ways, and parseMap()/platformer() turn twelve lines of ASCII into a playable level. Triggers on: menu, main menu, title screen, pause menu, scene transition, fade, wipe, iris, level, tilemap, ASCII map, platformer, level editor, level select, valikko, aloitusnäyttö, taukovalikko, siirtymä, kenttä, kenttäeditori, tasohyppely."
 license: MIT
 metadata:
   audience: agent
@@ -125,7 +125,7 @@ Escape closes, and so does the controls state's own \`pause\`. The handle is \`{
 \`{ kind, duration, colour, data }\` where \`kind\` is \`'fade'\` (default), \`'wipe'\`, \`'iris'\`
 or \`'cut'\`, and \`colour\` is \`'bg'\` (default), \`'ink'\` or \`'accent'\`. It covers this scene,
 starts the next, and uncovers it there, resolving once the next scene has been started. \`data\`
-is handed to the target scene.
+is passed to the target scene.
 
 Under less motion every kind becomes a CUT (not a shorter fade, not a faster wipe) and the
 promise still resolves the same way, so your code is unchanged.
@@ -218,7 +218,7 @@ their save. Never one key per level: the budget is 1000 keys per person.
 | Event | Value | Notes |
 |---|---|---|
 | \`coin\` | the running count | after the coin is taken |
-| \`die\` | none | **return \`true\` and you have handled it**; the built-in respawn then stands down |
+| \`die\` | none | **return \`true\` and you have handled it**; the built-in respawn then does not run |
 | \`goal\` | none | fires once |
 | \`land\` | none | the frame the player touched ground |
 
@@ -334,7 +334,7 @@ frequency, so \`rate: 1.5\` is the same voice a fifth higher.
 
 ### Volumes are not persisted here
 
-\`settings()\` hands the four numbers out and \`apply()\` takes them back. Where they are kept
+\`settings()\` returns the four numbers and \`apply()\` takes them back. Where they are kept
 between visits is the app's business (\`saves()\` keeps them in the player's own record), because
 a library that wrote to storage on its own would be writing under someone else's name.
 

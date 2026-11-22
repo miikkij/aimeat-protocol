@@ -51,7 +51,7 @@ export function misdirectedCrewKey(key: string, targetGaii: string, visibility: 
   const targetAgent = hash > 0 ? targetGaii.slice(0, hash) : null;
   if (targetAgent === named) return null;
   const where = targetAgent ? `${targetAgent}'s` : 'your own';
-  return `A crew definition for ${named} lives in ${named}'s own namespace, and this write would land in ${where}, where neither the Crew tab nor ${named}'s runtime looks. Publish it with aimeat_crew_publish or the Crew tab instead; those write it where it belongs.`;
+  return `A crew definition for ${named} is stored in ${named}'s own namespace, and this write would go to ${where}, where neither the Crew tab nor ${named}'s runtime looks. Publish it with aimeat_crew_publish or the Crew tab instead; those write it where it belongs.`;
 }
 
 /**

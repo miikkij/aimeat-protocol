@@ -248,8 +248,8 @@ export async function effectiveLlmChoice(deps: Deps, agent: AgentRecord): Promis
     return { value: null, scope: null, why: `This node has no key to pay for the agent's model calls (${pays.reason}), so it calls its model with the computer's own key.` };
   }
   return stored
-    ? { value: stored.value, scope: 'default', key_source: pays.source, why: 'The owner\'s default: think through this node.' }
-    : { value: { kind: 'node' }, scope: 'node', key_source: pays.source, why: 'Nothing is chosen, the agent holds ai:use and this node has a key, so it thinks through this node.' };
+    ? { value: stored.value, scope: 'default', key_source: pays.source, why: 'The owner\'s default: call the model through this node.' }
+    : { value: { kind: 'node' }, scope: 'node', key_source: pays.source, why: 'Nothing is chosen, the agent holds ai:use and this node has a key, so it calls its model through this node.' };
 }
 
 /**
@@ -263,7 +263,7 @@ export async function checkLlmChoice(choice: unknown): Promise<{ ok: true; choic
   if (!valid) {
     return {
       ok: false, status: 400, code: 'INVALID_CHOICE',
-      message: "A choice is {kind:'node', role?:'<AI role id>'} (think through this node, which picks the model and the key), {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
+      message: "A choice is {kind:'node', role?:'<AI role id>'} (call the model through this node, which picks the model and the key), {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
     };
   }
   if (valid.kind === 'model') {

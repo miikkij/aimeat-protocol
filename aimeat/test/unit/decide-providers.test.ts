@@ -87,7 +87,7 @@ describe('providerViolations', () => {
     expect(v).toHaveLength(1);
     // The page writes the refusal in its own language from these fields, with the name it shows.
     expect(v[0]).toMatchObject({ code: 'PROVIDER_CANNOT_CARRY', question: 'team', what: 'options', limit: 3, count: 4, provider: 'mine', providerTitle: 'mine' });
-    expect(v[0].message).toContain('"mine" carries 3 options');
+    expect(v[0].message).toContain('"mine" takes 3 options');
     expect(v[0].message).toContain('has 4');
   });
 

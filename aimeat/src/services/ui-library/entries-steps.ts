@@ -51,7 +51,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
                 loud: 'the copy is the one thing this place is for: the loud action (the dark slab)', quiet: 'the copy is one way among others, or already done: the action link',
                 className: 'the copy button\'s class, kept for older callers; a page passes loud or quiet instead',
                 copyLabel: 'the copy button words', copiedLabel: 'the words after copying', saveIntent: 'offers "save as an open item" in the corner menu',
-                agents: 'connected agents it can be handed to', showPrompt: 'false folds the text away',
+                agents: 'connected agents it can be given to', showPrompt: 'false folds the text away',
             },
         },
         useFor: ['The prompt-driven workflow: a person runs the prompt in their own chat and brings the result back.'],

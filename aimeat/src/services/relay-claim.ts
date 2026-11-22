@@ -238,7 +238,7 @@ export async function verifyRelayClaim(
   }
   if (exp - iat > MAX_CLAIM_LIFETIME_SECONDS) {
     return refuse(403, 'RELAY_CLAIM_TOO_LONG',
-      `A relay claim may live at most ${MAX_CLAIM_LIFETIME_SECONDS} seconds. A longer one is a bearer token with extra steps.`);
+      `A relay claim is valid for at most ${MAX_CLAIM_LIFETIME_SECONDS} seconds. A longer one is a bearer token with extra steps.`);
   }
   if (iat - now > MAX_CLOCK_SKEW_SECONDS) {
     return refuse(403, 'RELAY_CLAIM_FUTURE', 'That relay claim is dated in the future.');

@@ -109,7 +109,7 @@ export async function unansweredApps(storage: Storage, config: AimeatConfig): Pr
 /** The prompt a maker pastes into their own AI. English, like every prompt here; the AI answers in the person's language. */
 function makerPrompt(nodeUrl: string, refs: string[], withMaps: boolean): string {
   return [
-    `On my AIMEAT node ${nodeUrl}, answer the EU AI Act questions for my app${refs.length > 1 ? 's' : ''} ${refs.join(', ')}.`,
+    `On my AIMEAT ${nodeUrl}, answer the EU AI Act questions for my app${refs.length > 1 ? 's' : ''} ${refs.join(', ')}.`,
     'For each app: call aimeat_datamap_get with the app; its `ai_act` lists the questions and which are unanswered.',
     'Read the app and its data map, then propose an answer to every question with one or two sentences saying why.',
     'Show me the answers and wait for my yes. Then write them into the app\'s data map as',

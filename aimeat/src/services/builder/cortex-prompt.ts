@@ -136,7 +136,7 @@ function versionsSection(url: string): string {
     'Every install and `PUT` keeps a snapshot under `spec.version`. The bare address',
     '`/v1/cortex/{name}/libs/{file}` serves the latest and is never cached;',
     '`/v1/cortex/{name}@{version}/libs/{file}` serves that kept version and is cacheable for good. An app',
-    'built against one version keeps loading it after the cortex moves on. The rule, the same as for',
+    'built against one version keeps loading it after the cortex changes. The rule, the same as for',
     'apps: a fix that changes no API keeps the version; a change that would break an app is a NEW',
     'version, and each app decides when to move. When you write a script tag, pin the version you',
     `tested against. \`GET ${url}/v1/cortex/{name}/versions\` lists the kept ones.`,
@@ -144,7 +144,7 @@ function versionsSection(url: string): string {
     `Before building, read \`GET ${url}/v1/dependencies\`: every cortex and extension on this node and`,
     'which apps use them, read from the published source at publish and install time, never written',
     'by hand. Reuse what exists; extend it with a new version rather than a copy. `GET /v1/cortex`',
-    'carries the same as `used_by` on every row.',
+    'has the same as `used_by` on every row.',
     '',
   ].join('\n');
 }
@@ -154,7 +154,7 @@ function taskSection(): string {
     '## Your task',
     '',
     'Ask the user what the cortex should give an app. Then design the manifest with the components it',
-    'needs, write the library if apps need code, document every function in api_surface, and hand over',
+    'needs, write the library if apps need code, document every function in api_surface, and give',
     'the complete YAML and JS ready to install. Install and activate it when the user says so, and',
     'load it in one app with a pinned version to prove it works.',
     '',

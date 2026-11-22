@@ -30,7 +30,7 @@ export async function installRoleRefusal(storage: Storage, config: AimeatConfig,
   if (isOperatorAccount(await storage.getOwner(accountName))) return null;
   const operators = (await listOperatorGhiis(storage, config)).map(g => localAccountName(g));
   const who = operators.length ? `the operator (${operators.join(', ')})` : 'the operator';
-  return 'On this node only the operator\'s account installs or changes add-on code '
+  return 'On this server only the operator\'s account installs or changes add-on code '
     + `(the setting AIMEAT_EXT_INSTALL_ROLE is "operator"). Ask ${who} to install it for you, `
     + 'or to change the setting. You can write to support@operators.';
 }

@@ -109,7 +109,7 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 
 ## Completing the test task (canonical task lifecycle)
 1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan.
-2. Wait for the owner to approve (task goes to \`active\`). Task-runner mode tasks land in \`active\` immediately.
+2. Wait for the owner to approve (task goes to \`active\`). Task-runner mode tasks go to \`active\` immediately.
 3. Mark each TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
 4. Call \`aimeat_task_complete\` ONCE with the task id.
 

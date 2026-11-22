@@ -163,7 +163,7 @@ export async function appendVersion(
     while (await storage.getMemory(owner, keys.version(org, id, n + 1))) n++;
     const prev = n > 0 ? await readVersion(storage, nodeId, org, id, n) : null;
     const next = CustomerVersionSchema.parse(build(prev, n + 1));
-    if (next.n !== n + 1 || next.id !== id || next.organism !== org) throw new Error('a version must carry its own id, organism and the next number');
+    if (next.n !== n + 1 || next.id !== id || next.organism !== org) throw new Error('a version must have its own id, organism and the next number');
     const now = new Date().toISOString();
     if (!await storage.createMemoryIfAbsent(record(nodeId, keys.version(org, id, next.n), next, now))) continue;
     const openedAt = n === 0 ? next.at : (head?.openedAt ?? next.at);

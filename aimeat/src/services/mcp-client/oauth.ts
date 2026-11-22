@@ -254,7 +254,7 @@ export async function startMcpOAuth(input: {
     return {
       ok: false,
       code: 'NO_ENCRYPTION_KEY',
-      message: 'This node has no encryption key configured, so it cannot hold the token this round '
+      message: 'This server has no encryption key configured, so it cannot hold the token this round '
         + 'would produce. Set AIMEAT_ENCRYPTION_KEY.',
     };
   }

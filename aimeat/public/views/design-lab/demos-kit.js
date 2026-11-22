@@ -125,7 +125,7 @@ export const KIT_DEMOS = {
     { name: 'lead record', render: () => root(html`<${Note} kind="lead" size="record">Reviewed by sandbox on 2026-09-27.<//>`) },
     { name: 'quiet small', render: () => root(html`<${Note} kind="quiet" size="small">Nothing beyond the platform itself.<//>`) },
     { name: 'quiet chapter', render: () => root(html`<${Note} kind="quiet" chapter>No contracts yet.<//>`) },
-    { name: 'aside chapter', render: () => root(html`<${Note} kind="aside" chapter>The legal pages are yours to write; the node only shows them.<//>`) },
+    { name: 'aside chapter', render: () => root(html`<${Note} kind="aside" chapter>The legal pages are yours to write; AIMEAT only shows them.<//>`) },
     { name: 'aside disclosure', render: () => root(html`<${Note} kind="aside" tone="disclosure">This panel is written by an AI. Read it before you keep it.<//>`) },
     { name: 'caption', render: () => root(html`<${Note} kind="caption">Choose who may use Lumo Bakery's data.<//>`) },
     { name: 'caption sizes', render: () => root(html`<${Note} kind="caption" size="medium">3 apps, 2 drafts, 1 skill.<//>
@@ -135,7 +135,7 @@ export const KIT_DEMOS = {
     { name: 'caption faint and mono', render: () => root(html`<${Note} kind="caption" tone="faint">Not yet installed.<//><${Note} kind="caption" mono>sandbox/lumo-bakery.html<//>`) },
     { name: 'report tones', render: () => root(html`<${Note} kind="report" tone="busy">Publishing…<//><${Note} kind="report" tone="ok">Published as v1.4.0.<//>
       <${Note} kind="report" tone="err">The upload failed. Try again.<//><${Note} kind="report" tone="refused">The name is taken.<//>`) },
-    { name: 'report keep', render: () => root(html`<${Note} kind="report" keep><//><p>The line above holds its room while it says nothing.</p>`) },
+    { name: 'report keep', render: () => root(html`<${Note} kind="report" keep><//><p>The line above keeps its height while it says nothing.</p>`) },
     { name: 'report chapter', render: () => root(html`<${Note} kind="report" chapter tone="busy">Your AI is writing a proposal…<//>`) },
     { name: 'state', render: () => root(html`<${Note} kind="state">Search engines have not seen this app yet.<//><${Note} kind="state" tone="fine">Listed in search since 2026-09-20.<//>
       <${Note} kind="state" tone="attention">Announced, not yet seen.<//><${Note} kind="state" tone="danger">Search engines refused the address.<//>`) },
@@ -148,12 +148,12 @@ export const KIT_DEMOS = {
     { name: 'head and actions', render: () => root(html`<${Box} name="Lumo Bakery package" marks=${html`<${Mark}>v1.2.0<//><${Mark} tone="sun">3 apps<//>`}
       end=${html`<${Icon} small label="Hide" onClick=${noop}>✗<//>`} doors=${html`<${Action} small onClick=${noop}>Install<//><${Action} small soft onClick=${noop}>Read the manifest<//>`}>
       Three apps and their records, ready to install.<//>`) },
-    { name: 'raised', render: () => root(html`<${Box} tone="raised">The way to take first: ask your own AI.<//>`) },
+    { name: 'raised', render: () => root(html`<${Box} tone="raised">The first thing to try: ask your own AI.<//>`) },
     { name: 'copy', render: () => root(html`<${Box} tone="copy"><${Code} block>${REQUEST}<//><//>`) },
     { name: 'row', render: () => root(html`<${Box} tone="row">whisper-large-v3 · 2.1 s · "Order forty rolls for Friday."<//>`) },
     { name: 'attention, waiting, current, off', render: () => root(html`<${Box} tone="attention">The nightly run failed at step 2.<//>
       <${Box} tone="waiting">The run waits for your answer.<//><${Box} tone="current">Firefox on this laptop<//><${Box} tone="off">The weekly digest is off.<//>`) },
-    { name: 'edge, field, dim', render: () => root(html`<${Box} tone="edge"><${Label} block>This node must already have<//><${Note} kind="lead">The invoice-drafter agent.<//><//>
+    { name: 'edge, field, dim', render: () => root(html`<${Box} tone="edge"><${Label} block>Your AIMEAT must already have<//><${Note} kind="lead">The invoice-drafter agent.<//><//>
       <${Box} tone="field"><${TextField} label="Request" value='{ "city": "Turku" }' onInput=${noop} /><//>
       <${Box} tone="dim">Manifest hash 9f2c… · signed by Harbour Studio<//>`) },
     { name: 'scroll, document, folded', render: () => root(html`<${Box} tone="copy" scroll document><p>${LONG}.</p><p>${REQUEST}</p><//>
@@ -197,7 +197,7 @@ export const KIT_DEMOS = {
       <${Road} chosen=${true} onPick=${noop} kicker="01 · chat" name="In your AI" text="Your AI writes the contact for you." doors=${html`<${Action} small onClick=${noop}>Copy prompt<//>`} />
       <${Road} chosen=${false} onPick=${noop} kicker="02 · form" name="Here" text="Type the name and the address." />
       <${Road} chosen=${false} kicker="03 · file" name="From a file" sub="a .vcf file" text="Bring the cards your phone exported." doors=${html`<${Action} small onClick=${noop}>Choose<//>`} /><//>`) },
-    { name: 'code line', render: () => root(html`<${Roads} cols="three"><${Road} kicker="MCP" name="Claude Code" text="Adds the node as a server." codeLine="claude mcp add aimeat" /><${Road} kicker="REST" name="Any client" text="Reads the inbox with a token." codeLine="GET /v1/inbox" /><//>`) },
+    { name: 'code line', render: () => root(html`<${Roads} cols="three"><${Road} kicker="MCP" name="Claude Code" text="Adds AIMEAT as a server." codeLine="claude mcp add aimeat" /><${Road} kicker="REST" name="Any client" text="Reads the inbox with a token." codeLine="GET /v1/inbox" /><//>`) },
     { name: 'long', render: () => root(html`<${Roads}><${Road} name=${LONG} text=${LONG} /><${Road} name="Short" text="One line." /><//>`) },
   ] },
   figure: { variants: [
@@ -241,8 +241,8 @@ export const KIT_DEMOS = {
     { name: 'strip: tiles in one sideways line', render: () => root(html`<${CardGrid} cols="strip">
       ${['harbour-sounds', 'ferry-timetables', 'bakery-orders', 'invoice-drafter', 'weather-notes'].map((n) => html`<${Card} key=${n} tone="framed"
         name=${'📦 ' + n} meta="2 libs · 1 schema" onOpen=${noop} openLabel=${n} />`)}<//>`) },
-    { name: 'classic', render: () => html`<${Card} title="Storage" subtitle="What this node keeps"><p>Two files.</p><//>` },
-    { name: 'classic glass', render: () => html`<${Card} variant="glass" title="Storage" subtitle="What this node keeps"><p>Two files.</p><//>` },
+    { name: 'classic', render: () => html`<${Card} title="Storage" subtitle="What your AIMEAT keeps"><p>Two files.</p><//>` },
+    { name: 'classic glass', render: () => html`<${Card} variant="glass" title="Storage" subtitle="What your AIMEAT keeps"><p>Two files.</p><//>` },
     { name: 'empty grid', render: () => root(html`<${CardGrid} />`) },
   ] },
   facts: { variants: [

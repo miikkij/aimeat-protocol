@@ -60,7 +60,7 @@ export function lintAppDecideUse(html: string, scopes: string[]): string[] {
 
   if (DIRECT_TYPESAFE.test(html)) {
     hints.push(
-      'DECIDE: this app appears to call TypeSafe directly or to carry a TypeSafe key. A published app '
+      'DECIDE: this app appears to call TypeSafe directly or to contain a TypeSafe key. A published app '
       + 'is served to everyone who opens it, so a key in it is a key given away, and a direct call skips '
       + 'the personal-data removal, the budget and the decision record. Call the node instead: load '
       + '`/v1/libs/aimeat-decide.js` and use `AIMEAT.decide.ask(state, questions, { subject, gates, thresholds, app_id })`. '

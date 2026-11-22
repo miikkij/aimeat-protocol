@@ -220,7 +220,7 @@ const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
 export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; example: string }> = [
   {
     id: 'app',
-    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status(). SIGN-IN IS ON BY DEFAULT: a signed-out visitor sees only "Log in to continue". An app used without signing in passes `requireLogin: false`, and onReady runs at once with a null session.',
+    summary: 'The shell that handles the whole boilerplate: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status(). SIGN-IN IS ON BY DEFAULT: a signed-out visitor sees only "Log in to continue". An app used without signing in passes `requireLogin: false`, and onReady runs at once with a null session.',
     example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });   // add requireLogin: false for an app anyone uses signed out",
   },
   {
@@ -361,7 +361,7 @@ function renderEffects(): string {
     const how = e.motion.includes('living') && !e.motion.includes('still') && !e.motion.includes('moment')
       ? 'living, on the layer only'
       : e.motion.join(' or ') + (e.post ? ', or living on the layer' : '');
-    return `- \`${e.id}\` — ${e.feel} Evokes: ${e.evokes} Lands ${where}; ${how}${e.backdrop ? '; may run on the backdrop' : ''}. Knobs: ${e.knobs}. Fits: ${e.fits.join(', ')}.`;
+    return `- \`${e.id}\` — ${e.feel} Evokes: ${e.evokes} Goes ${where}; ${how}${e.backdrop ? '; may run on the backdrop' : ''}. Knobs: ${e.knobs}. Fits: ${e.fits.join(', ')}.`;
   }).join('\n');
 }
 
@@ -386,10 +386,10 @@ function composeBody(config: AimeatConfig): string {
   body += 'ON THE LEVEL `fine`, THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. A `fine` app (and a '
     + 'page that states no level, which is held to `fine`) starts from a committed '
     + 'register, never from the bare shell: list the genres with `GET ' + base
-    + '/v1/designbook?kind=genre`, fork the one that carries the page\'s register with `GET ' + base
+    + '/v1/designbook?kind=genre`, fork the one that has the page\'s register with `GET ' + base
     + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
     + 'below has the menu). Every Atelier app declares the register it committed to — '
-    + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already carries, '
+    + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already has, '
     + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
     + 'an Atelier app that names none. A `proto` or `plain` page is the one exception: it starts '
     + 'from the Atelier shell, forks no genre and declares no register, and the publish asks for '
@@ -399,7 +399,7 @@ function composeBody(config: AimeatConfig): string {
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-atelier\n`
     + '```\n\n'
-    + 'It carries a REPLACE-ME register line on purpose, so published as it is served it is '
+    + 'It has a REPLACE-ME register line on purpose, so published as it is served it is '
     + 'refused: the shell is a frame, not a page. '
     + 'A GAME starts from the game shell instead: the same frame with a Phaser canvas, a title '
     + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser, and its '
@@ -407,13 +407,13 @@ function composeBody(config: AimeatConfig): string {
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-phaser-game\n`
     + '```\n\n';
-  body += 'The head is eight lines and stays that way: the ceremony (theme restore, login boot, '
-    + 'mobile guards, designed states, accessibility wiring, motion) lives in the served kit, '
+  body += 'The head is eight lines and stays that way: the boilerplate (theme restore, login boot, '
+    + 'mobile guards, designed states, accessibility wiring, motion) is in the served kit, '
     + 'not in your file. Every byte you add is a byte you re-read on every edit.\n\n';
 
   body += '## The components (`AIMEAT.atelier`)\n\n';
   body += 'Every component takes a spec and returns `{ el, set(patch), destroy() }`. Copying an '
-    + 'example below yields a finished, beautiful, accessible piece — that is the paved path.\n\n';
+    + 'example below yields a finished, beautiful, accessible piece — that is the standard way.\n\n';
   body += renderCatalogue() + '\n\n';
 
   // The recipe half — the four doors and the five patterns — lives in build-atelier-recipe.ts:
@@ -423,7 +423,7 @@ function composeBody(config: AimeatConfig): string {
   body += renderLiving(base);
   body += renderPatterns();
 
-  body += '## The mosaic: the arrangement lives outside your file\n\n';
+  body += '## The mosaic: the arrangement is stored outside your file\n\n';
   body += 'Render the screen through `AIMEAT.atelier.mosaic(...)` instead of appending components '
     + 'by hand. You declare WHAT the app has — one resolver per data source name, an `onPick`, a '
     + '`fallback` layout of blocks — and the ARRANGEMENT (order, look, navigation mode) is a '
@@ -444,7 +444,7 @@ function composeBody(config: AimeatConfig): string {
     + '```\n\n'
     + 'LIVE BY DECLARATION: load `' + base + '/v1/libs/aimeat-live.js` beside the kit and give '
     + 'the mosaic a `live` map — source name → { keyPrefix } naming the memory keys whose change '
-    + 'means that source moved. When anything writes those keys (the owner\'s agent, another '
+    + 'means that source changed. When anything writes those keys (the owner\'s agent, another '
     + 'device, a schedule), the source re-resolves and the screen repaints with the components\' '
     + 'own motion — you never poll, never open a socket, never write a listener. The wiring '
     + 'refuses a memory subscription without a keyPrefix (that would re-fetch on every write '
@@ -458,15 +458,15 @@ function composeBody(config: AimeatConfig): string {
     + 'reveal as the person scrolls; that too is the kit\'s, never yours to code.\n\n'
     + 'Two more one-field decisions, both data and both optional. `choreography: "cinema"` makes '
     + 'scroll the camera: the opening band recedes as the person leaves it and each section rises '
-    + 'to meet them — right for a front, a story or a report, wrong for a tool someone lives in, '
-    + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
-    + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
+    + 'to meet them — right for a front, a story or a report, wrong for a tool someone uses all day, '
+    + 'and free at idle because it is pure CSS scroll timelines. And a chart block may have '
+    + '`presentation: "mural"`: the chart is no longer in a tile and becomes the section\'s '
     + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
     + 'AN ADMIN OR MONITORING SCREEN IS AN ARRANGEMENT, NOT APP CODE. Four blocks make any such '
     + 'screen: `health` (one row per watched thing — lamp, name, latest reading), '
     + '`queue` (work items with states, counted in a strip), `gauge` (ONE value on a dial, '
     + 'bands turning the tone) and `console` (the log view — monospace, capped, follows the '
-    + 'tail only while the reader is at the tail). Their tones ride the theme\'s ok/warn/err '
+    + 'tail only while the reader is at the tail). Their tones use the theme\'s ok/warn/err '
     + 'colours, so a status screen reads at a glance in every look and mode.\n\n'
     + 'CHARTS ARE A FAMILY on one block: `chart` with `kind: "axes"` (bars, lines and filled '
     + 'areas — a series may be kind "area"; `stacked: true` piles the bars into one column per '
@@ -478,36 +478,36 @@ function composeBody(config: AimeatConfig): string {
     + 'losing people — the survival rate written at each step), `"treemap"` (shares as area '
     + 'when the donut\'s slices would not fit), `"flow"` (where the quantity went — ribbons '
     + 'as wide as their sums) or `"radar"` (profiles on spokes — one polygon per series, for '
-    + '"strong where, weak where"). A statRow tile carrying '
+    + '"strong where, weak where"). A statRow tile with '
     + '`trend: [numbers]` draws its short history as a filled sparkline under the figure.\n\n'
     + 'WORK AGAINST PEOPLE AND TIME is its own family: `kanban` (work as columns by state — '
     + 'queue shows the same work as a list, this is the board, and with onMove wired the '
     + 'cards actually move), `plan` (stretches on a shared time axis with today drawn as a '
     + 'line — timeline tells what happened, this tells what is running) and `schedule` (a '
     + 'week as a grid, bookings as blocks — chart kind "calendar" is the year at a distance, '
-    + 'this is next week). And two small truth-tellers: `steps` (where a process stands — '
+    + 'this is next week). And two small display blocks: `steps` (where a process stands — '
     + 'done behind, current lit, the rest ahead) and `rating` (a score as stars, display '
     + 'only — collecting one is a form\'s job).\n\n'
     + 'WHEN THE OWNER SAYS "A MAP", THEY MEAN THE REAL ONE: the `map` block is Leaflet over '
     + 'OpenStreetMap street tiles — pins with popups at real addresses, the view framing the '
     + 'markers on its own, the licence\'s attribution built in, dark mode re-toning the tiles. '
     + 'The `atlas` block is the different, narrower thing: an offline choropleth of countries '
-    + 'for data-by-country, no streets on it. Reaching for atlas when the owner asked for a '
+    + 'for data-by-country, no streets on it. Choosing atlas when the owner asked for a '
     + 'map is a wrong answer with a confident face.\n\n'
     + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
-    + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
+    + '`kind: "orb"` (a signature object turning under the pointer), `"sky"` (a procedural '
     + 'atmosphere band), `"bars"` (the bound rows stand up as a field of columns — the 3D '
     + 'chart), `"model"` (a .glb/.gltf by URL, fitted, grounded and studio-lit like a '
     + 'product shot) or `"globe"` (the earth — places as dots, data travelling between them '
     + 'as lifted arcs). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
     + 'loop stops at rest so an idle scene costs nothing. It is a statement, not a default: '
     + 'most screens want a chart, not a scene.\n\n'
-    + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
+    + 'COMPOSE, do not pile: a block may have `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
     + atelierLayoutRules()
     + 'THE FIRST MOVE IS A PRESET, not a blank page: `GET ' + base + '/v1/apps/ui/catalogue` '
-    + 'carries `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
+    + 'includes `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
     + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
     + 'first stored layout when the owner wants one.\n\n';
@@ -520,25 +520,25 @@ function composeBody(config: AimeatConfig): string {
   body += '## Start from a GENRE — a complete committed register, and the register is required\n\n';
   body += 'On `fine`, every Atelier app names the register it committed to, and the publish refuses one that '
     + 'does not: `<meta name="aimeat-register" content="genre-<id>">` is in every genre\'s head '
-    + 'already, so a fork carries it; a page that commits to a look of its own declares '
+    + 'already, so a fork has it; a page that commits to a look of its own declares '
     + '`<meta name="aimeat-register" content="custom:<name>">`, where the name says what the '
-    + 'register is (custom:game, custom:ledger) and is never "default". The bare shell carries a '
+    + 'register is (custom:game, custom:ledger) and is never "default". The bare shell has a '
     + 'REPLACE-ME line in that place, and the gate refuses it as served: the shell is a frame, '
     + 'not a page.\n\n';
   body += 'Whatever the app is — a poster, a console, a departure board, a ledger — do not '
     + 'assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
     + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
-    + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
-    + 'motion only under the hand or the scroll, zero idle repaints — the look\'s ambient layer is '
+    + 'the words, sources and images for the app at hand, and KEEP THE MOTION RULES (finite entrances, '
+    + 'motion only under the pointer or the scroll, zero idle repaints — the look\'s ambient layer is '
     + 'the one declared exception — reduced-motion honesty). '
     + 'The kit\'s scenic props (`flapify`, `ransom`, `vu`, `typeout`, `dealIn`, the `.ak-stamp` / '
     + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family), the MATERIALS (one class per surface: '
     + '`.ak-mat--glass`, `--aurora`, `--grain`, `--ink`, `--signal`, `--ring`, `--spot`) and the '
     + 'MOTION RECIPES (`.ak-move--magnet`, `--sheen`, `--deal` as classes; `spotlight`, `tilt`, '
-    + '`sheen`, `odometer`, `thumb`, `deal` as calls — every one answers the hand or a change and '
+    + '`sheen`, `odometer`, `thumb`, `deal` as calls — every one answers the pointer or a change and '
     + 'rests, none loops), the kit\'s own MOTION PRIMITIVES (`spring`, `stagger`, `inView`, '
     + '`scrollLink`, `drag` — Web Animations API, no dependency, finite, a no-op under reduced '
-    + 'motion; reach for these before a library) and the pattern shelf below carry the shared '
+    + 'motion; use these before a library) and the pattern list below provide the shared '
     + 'stagecraft. When an app needs a full animation library, the node serves three as packs — '
     + 'Motion (`motion`), anime.js (`anime`) and Lenis (`lenis`) — read the pack\'s doc before '
     + 'writing a line, because every one of them changed its API after the version you know.\n\n';
@@ -554,15 +554,15 @@ function composeBody(config: AimeatConfig): string {
   }
   body += '\n';
   const following = genres.filter(g => g.light === 'follows').map(g => '`' + g.id + '`');
-  body += 'FIXED OR FOLLOWING is the owner\'s choice, and both are right. A FIXED genre is a finished object with its own colours: it looks the same at noon and at night, and the sign-in bar\'s light/dark control stands down on it. A FOLLOWING page is drawn in the theme\'s `--ak-*` tokens and changes with the person\'s light/dark and palette, which is what a tool people work in all day usually wants. '
+  body += 'FIXED OR FOLLOWING is the owner\'s choice, and both are right. A FIXED genre is a finished object with its own colours: it looks the same at noon and at night, and the sign-in bar\'s light/dark control is turned off on it. A FOLLOWING page is drawn in the theme\'s `--ak-*` tokens and changes with the person\'s light/dark and palette, which is what a tool people work in all day usually wants. '
     + (following.length ? 'Following today: ' + following.join(', ') + '; every other genre is fixed. ' : 'Every genre is fixed today. ')
-    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`); give the owner those links, do not describe a look in words when they can look.\n\n';
-  body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack wearing a look is a tool '
+    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the motion rules, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`); give the owner those links, do not describe a look in words when they can look.\n\n';
+  body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack that uses a look is a tool '
     + 'screen, never a statement — assembling components and applying a world reads as "the '
     + 'same dashboard in new paint" no matter which world. When a page must IMPRESS, start '
-    + 'from the SUBJECT (whose page is this, what does it say), fork the genre that carries '
+    + 'from the SUBJECT (whose page is this, what does it say), fork the genre that has '
     + 'that register, and let the components serve the page — they mount in any element, so a '
-    + 'free-composed page can still carry a live gauge or a map. If you cannot name what the '
+    + 'free-composed page can still contain a live gauge or a map. If you cannot name what the '
     + 'page is about beyond "it shows the blocks", you are building a demo, and a demo never '
     + 'looks designed.\n\n';
 
@@ -576,7 +576,7 @@ function composeBody(config: AimeatConfig): string {
 
   // THE PATTERN SHELF — rendered from the registry (atelier-patterns.ts), same data the
   // catalogue serves, so the choosing guidance can never drift from what patterns.css ships.
-  body += '## The pattern shelf\n\n';
+  body += '## The pattern list\n\n';
   body += 'Backgrounds with a personality, built entirely from the `--ak-*` tokens (technique '
     + 'after Temani Afif\'s CSS-Pattern, MIT) — so they follow every look, palette and mode, and '
     + 'the contrast matrix has proven text readable on them. Class is `.ak-pat-<id>` plus ONE '
@@ -599,7 +599,7 @@ function composeBody(config: AimeatConfig): string {
     + 'and flat is a choice, never an accident. Ask the owner how it should feel and map the '
     + 'answer:\n\n';
   body += renderLooks() + '\n\n';
-  body += 'THE MARKER: put `<mark>` round words an AI proposed and nobody has accepted yet, and take it away when a person accepts them. Every look wears it, proven readable; on `korostus` it is the whole idea of the page, so keep that look\'s one colour for this one meaning.\n\n';
+  body += 'THE MARKER: put `<mark>` round words an AI proposed and nobody has accepted yet, and take it away when a person accepts them. Every look shows it, proven readable; on `korostus` it is the whole idea of the page, so keep that look\'s one colour for this one meaning.\n\n';
   body += 'NEVER write a colour, an animation, a theme control or a language switch: colours are '
     + 'the `--ak-*` tokens (every preset × palette × mode combination is verified arithmetically '
     + 'on this node), motion comes from the components, and the login pill owns the theme, '
@@ -614,7 +614,7 @@ function composeBody(config: AimeatConfig): string {
     + 'and the kit mounts it for you. Override only when the owner asked for weather: '
     + '`app({ ambient: \'dust\' })` or `app({ ambient: { preset, alpha, speed } })`; '
     + '`app({ ambient: false })`, or `ambient: { preset: "none" }` on a stored arrangement, '
-    + 'switches the look\'s own off. The layer earns its exception by keeping the physics: it '
+    + 'switches the look\'s own off. The layer earns its exception by keeping the motion rules: it '
     + 'pauses on a hidden tab and off-screen, stands still under the bar\'s Less-motion switch '
     + 'and under the operating system\'s reduced motion, and the viewer\'s weather switch (Off, '
     + 'Calm, Full) always wins. The layer is the kit\'s, chosen by preset — a background '
@@ -622,29 +622,29 @@ function composeBody(config: AimeatConfig): string {
   body += 'The six, described for choosing. A FIELD lays pigment under the words and is proven '
     + 'readable by the contrast matrix at its alpha: on a look that stands on the palette\'s own '
     + 'page it runs only at the whisper it ships at, while a look that owns its ground (lounge, '
-    + 'dawn, stage, broadcast) takes it louder. Points and lines carry no ground and fit any look.'
+    + 'dawn, stage, broadcast) takes it louder. Points and lines have no ground and fit any look.'
     + '\n\n';
   body += renderAmbients() + '\n\n';
-  body += 'One per app, and a tool someone lives in usually wants none. `ambientStage()` gives one '
+  body += 'One per app, and a tool someone uses all day usually wants none. `ambientStage()` gives one '
     + 'section its own weather; `weather()` is the visible control; `attract()` dims the working '
-    + 'surface and lets the layer rise after a while without a hand. The Book has an AMBIENT '
-    + 'shelf: `aimeat_designbook_search` with kind `ambient` finds proven combinations, adopting '
+    + 'surface and lets the layer rise after a while with no input. The Book has an AMBIENT '
+    + 'list: `aimeat_designbook_search` with kind `ambient` finds proven combinations, adopting '
     + 'one merges it into the app\'s arrangement (the look stays), and a combination worth keeping '
     + 'is proposed back the same way.\n\n';
 
-  body += '## Effects: still on the words, a moment on a cue, living only behind them\n\n';
+  body += '## Effects: still on the words, a moment on a cue, animated only behind them\n\n';
   body += 'A post-process EFFECT transforms what is already painted — the raster of a tube '
     + 'television, a lens vignette, a two-ink print, a colour grade, rippled glass, a tear, a worn '
     + 'tape, a drop on water, a kaleidoscope. It is a field on a block of the stored arrangement, '
-    + '`effect: { id, params?, backdrop? }`, and the kit wears it for you; in your own code it is '
+    + '`effect: { id, params?, backdrop? }`, and the kit applies it for you; in your own code it is '
     + '`AIMEAT.atelier.fx(el, { id, params })`. THREE MOTIONS, AND THE RULE IS WHERE THEY MAY '
     + 'RUN: a STILL is drawn once by the compositor and may sit under words; a MOMENT plays once '
     + 'on a cue you give (`AIMEAT.atelier.fxPlay(el, id)` — a glitch when a save fails, a ripple '
     + 'where a touch landed) and is gone on finished; LIVING motion belongs behind the words only, '
     + 'as `ambient.post: [id | { id, params }]` (up to two passes over the layer\'s own field: '
     + POST_IDS.join(', ') + ') or inside an `ambientStage`. A picture effect (duotone, distort) '
-    + 'lands only on a picture or a band, never on a component that bears text — the hosts are '
-    + EFFECT_HOSTS.join(', ') + ', and on a hero it lands on the picture, so a hero needs an '
+    + 'applies only to a picture or a band, never on a component that bears text — the hosts are '
+    + EFFECT_HOSTS.join(', ') + ', and on a hero it applies to the picture, so a hero needs an '
     + 'image for one — because it would bend or recolour the words; the validator refuses it '
     + 'with the hosts named. A colour or overlay effect under words is proven by the contrast '
     + 'matrix on the look at the numbers you set: a quarter of ink passes every look, any hue at '
@@ -657,12 +657,12 @@ function composeBody(config: AimeatConfig): string {
   body += 'The nine, described for choosing:\n\n';
   body += renderEffects() + '\n\n';
   body += 'A filter of your own would be a second implementation nobody proved: the kit\'s nine '
-    + 'are declared once with their bounds, and the Book has an EFFECTS shelf — '
-    + '`aimeat_designbook_search` with kind `effect` finds each one proven where it lands (a '
+    + 'are declared once with their bounds, and the Book has an EFFECTS list — '
+    + '`aimeat_designbook_search` with kind `effect` finds each one proven where it applies (a '
     + 'moment on the hero band, a picture effect on a figure, a living pass over the layer), '
-    + 'and adopting one lands it on the block it names.\n\n';
+    + 'and adopting one applies it to the block it names.\n\n';
 
-  body += '## Motion, and the moment something needs the eye\n\n';
+  body += '## Motion, and the moment something needs attention\n\n';
   body += 'MOTION IS ALREADY ON, and you write none of it. Everything this kit builds arrives, '
     + 'changes and leaves in front of the reader: a block and a row enter with a fade and a short '
     + 'rise, staggered and capped so a long list is finished inside half a second; on a `set()` '
@@ -675,9 +675,9 @@ function composeBody(config: AimeatConfig): string {
     + 'to the content rather than being swapped for it. The pace, the curve, the distance and the '
     + 'beat are the LOOK\'s (`--ak-motion`, `--ak-ease`, `--ak-enter-distance`, '
     + '`--ak-enter-stagger`), so a still register stays still and a springy one bounces from the '
-    + 'same code you wrote — never reach past the look to make a screen move more. Two switches '
-    + 'exist and they are the whole surface: `app({ motion: false })` stands the lot down for an '
-    + 'app, and `motion: false` in one block\'s props stands it down for that block. The viewer '
+    + 'same code you wrote — never go around the look to make a screen move more. Two switches '
+    + 'exist and they are the whole surface: `app({ motion: false })` turns all of it off for an '
+    + 'app, and `motion: false` in one block\'s props turns it off for that block. The viewer '
     + 'beats both: the bar\'s Less-motion switch and the operating system\'s reduced-motion '
     + 'setting collapse every move above to instant, and the screen that is left is the same '
     + 'screen.\n\n';
@@ -692,7 +692,7 @@ function composeBody(config: AimeatConfig): string {
     + 'INSTEAD of words: a gesture is on top of the message, because a person who does not see '
     + 'motion must still be told. The pace and curve come from the look (`--ak-motion`, '
     + '`--ak-ease`), so the same call feels springy in one app and snappy in another. The SPRING '
-    + 'is the look\'s too: each one carries its own stiffness, damping and mass in '
+    + 'is the look\'s too: each one has its own stiffness, damping and mass in '
     + '`--ak-spring-*`, and the kit\'s primitives (`spring`, `drag`, `stagger({ spring: true })`) '
     + 'read them off the element they move, so you tune the look and never the call.\n\n';
   body += atelierMotionParts();
@@ -711,19 +711,19 @@ function composeBody(config: AimeatConfig): string {
     + 'URI is refused by the components and by the publish gate. With zero images the app still '
     + 'looks finished — the fallbacks are designed — so imagery is polish, never a blocker.\n\n';
 
-  body += 'Two agentness handles ride the kit too: `AIMEAT.atelier.delegate({ agent, task: { '
+  body += 'Two agentness handles come with the kit too: `AIMEAT.atelier.delegate({ agent, task: { '
     + 'title, description } })` puts a "let AI handle it" button on any declared piece of work '
-    + '(the agents library\'s spend guard asks the person first, and the outcome lands back in '
+    + '(the agents library\'s spend guard asks the person first, and the outcome comes back to '
     + 'the same view), and `AIMEAT.atelier.agentActivity({ agent })` shows what the owner\'s '
     + 'agents have been doing as the kit\'s own timeline — ownership made visible. Both degrade '
     + 'with words when no agent is connected.\n\n';
 
-  body += '## The signature: this app\'s own hand\n\n';
-  body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of colour, '
+  body += '## The signature: this app\'s own style\n\n';
+  body += 'A stored layout may have a top-level `tokens` object: bounded overrides of colour, '
     + 'shape, typography, density and motion on top of the look (the catalogue\'s '
     + '`signature_tokens` lists every legal name). The one colour you set is `--ak-accent`, as a '
     + 'LIGHT/DARK PAIR "#hex/#hex" — the validator runs the full contrast matrix on each half '
-    + 'against its own mode, so a pair that lands is proven readable everywhere, and a failing '
+    + 'against its own mode, so a pair that is accepted is proven readable everywhere, and a failing '
     + 'one refuses with the measured numbers and which direction to move. Every other colour '
     + '(text tint, gradient, spectrum, focus) derives from the accent on its own. This is how '
     + 'one app stops looking like every other app on the same look. THE DESIGN PASS, when the '
@@ -740,12 +740,12 @@ function composeBody(config: AimeatConfig): string {
   body += KIT_PROMPT_PARAGRAPH;
   body += 'Before composing a screen from nothing, search the Design Book '
     + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN parts — every one '
-    + 'passed its own bench before landing, and adopting one (`aimeat_designbook_adopt`) is one '
+    + 'passed its own bench before it was added, and adopting one (`aimeat_designbook_adopt`) is one '
     + 'call. Eight kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
     + '<placeholder> slots) REPLACES the app\'s arrangement; a `look` (a signature token sheet, '
     + 'colour pair included), `motion` (a motion recipe), `illustration` (art direction for '
     + 'the imagery), `ambient` (the layer behind the app, proven on its look) or `effect` (a '
-    + 'post-process filter, proven where it lands) MERGES into the '
+    + 'post-process filter, proven where it applies) MERGES into the '
     + 'arrangement the app already has; a `genre` (a complete page in a committed register) is '
     + 'forked from its template, never adopted. A starting shape from the '
     + 'Book plus your words beats a fresh composition, and what you had to make is written '
@@ -760,20 +760,20 @@ function composeBody(config: AimeatConfig): string {
 
   body += '## AI inside the app\n\n';
   body += 'The `aide` block puts an AI panel on the screen whose tools are the app\'s OWN '
-    + 'declarations: hand the mosaic spec your `sources` and an `actions` list ({ id, summary, '
+    + 'declarations: give the mosaic spec your `sources` and an `actions` list ({ id, summary, '
     + 'params?, run }) and the aide can read what the screen reads and PROPOSE what the '
     + 'buttons do — a person confirms every run, the platform AI notice and provenance labels '
-    + 'are built in, and it runs on the owner\'s own key (it sleeps politely when no key is '
+    + 'are built in, and it runs on the owner\'s own key (it stays off when no key is '
     + 'set). A model answer may be a small mosaic panel rendered inline over the same sources — '
     + 'arrangement from the closed vocabulary, never markup. Two more affordances every mosaic '
-    + 'carries: `m.explain()` renders "what this screen holds" from the declarations (never '
+    + 'has: `m.explain()` renders "what this screen holds" from the declarations (never '
     + 'hand-write a help text that will drift), and `m.setOverlay({ hidden, order, nav })` '
     + 'applies THIS VIEWER\'S own arrangement over the owner\'s page — store it in the viewer\'s '
     + 'own memory (`atelier.overlay.<filename>`), never in the owner\'s layout.\n\n';
 
   body += '## Data, in short\n\n';
   body += 'Login and data come from `aimeat-auth` and `aimeat-data` exactly as on the rest of the '
-    + 'platform: the shell hands you the session in `onReady`; private data is '
+    + 'platform: the shell gives you the session in `onReady`; private data is '
     + '`AIMEAT.data.set/get` with a `<app-name>.`-prefixed key; one key holds one record a user '
     + 'opens as a unit, never one key per field; read back after writing. Declare the scopes the '
     + 'app uses in `<meta name="aimeat-scopes">`.\n\n';
@@ -825,7 +825,7 @@ function composeBody(config: AimeatConfig): string {
 
   body += '## Never\n\n';
   body += '- daisyUI/Tailwind classes outside a `section` body — the kit is the vocabulary.\n'
-    + '- Hand-written ARIA, focus management or animation code — the components carry them.\n'
+    + '- Hand-written ARIA, focus management or animation code — the components include them.\n'
     + '- A theme, palette or language control — the login pill owns all three.\n'
     + '- An invented script/style URL — everything the app loads is named in the shell.\n'
     + '- The retired Classic build spec or its shells — an app built on Classic is moved with section `from-classic`.\n';

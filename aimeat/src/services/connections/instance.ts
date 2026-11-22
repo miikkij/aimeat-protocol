@@ -60,7 +60,7 @@ export function normalizeInstance(raw: string): InstanceResult {
 
   if (url.protocol !== 'https:') return { ok: false, reason: 'instance must be reachable over https' };
   // Credentials in the URL would be silently carried into every later request to that instance.
-  if (url.username || url.password) return { ok: false, reason: 'instance address must not carry credentials' };
+  if (url.username || url.password) return { ok: false, reason: 'instance address must not contain credentials' };
   // A path would make two spellings of one instance look like two instances.
   if (url.pathname !== '/' || url.search || url.hash) {
     return { ok: false, reason: 'instance address must be a bare host, with no path or query' };

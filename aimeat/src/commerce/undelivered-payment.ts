@@ -73,12 +73,12 @@ export function refundSentence(refund: RefundOutcome, sessionId: string): string
       return 'No payment was taken, so nothing is owed.';
     case 'not_possible':
       return 'The payment was taken and this payment method cannot return it, so the money was NOT refunded. '
-        + `Contact the seller, or the people who run this node, and give them the checkout reference ${sessionId}: `
+        + `Contact the seller, or the people who run this server, and give them the checkout reference ${sessionId}: `
         + 'the seller has a record of this payment. Do not pay for this checkout again until it is settled.';
     case 'failed':
     default:
       return 'The payment was taken and the refund did not go through, so the money was NOT returned. '
-        + `Contact the seller, or the people who run this node, and give them the checkout reference ${sessionId}: `
+        + `Contact the seller, or the people who run this server, and give them the checkout reference ${sessionId}: `
         + 'the seller has a record of this payment. Do not pay for this checkout again until it is settled.';
   }
 }

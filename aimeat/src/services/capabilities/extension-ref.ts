@@ -142,7 +142,7 @@ export async function disableMalformedExtensionRefsOnce(
         actorGhii: securityOwner(config.nodeId),
         actorName: 'node start',
         source: 'capabilities',
-        detail: `${switchedOff.length} extension capability(ies) carried a source ref that names no extension action. `
+        detail: `${switchedOff.length} extension capability(ies) had a source ref that names no extension action. `
           + 'Invoking one sent the caller\'s token to the route the ref spelled out, so each now has the operator\'s '
           + `disable switch set with a note, and nothing was deleted: ${shown.join('; ')}${more}.`,
       });

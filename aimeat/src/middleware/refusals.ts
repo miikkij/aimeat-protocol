@@ -103,7 +103,7 @@ export function refuseNotMember(
 ): AimeatResponse {
     const next: HintAction[] = [];
     if (opts.requestUrl) {
-        next.push({ description: 'Ask to be let in', method: 'POST', url: opts.requestUrl });
+        next.push({ description: 'Ask to join', method: 'POST', url: opts.requestUrl });
     }
     return error(
         config.nodeId,

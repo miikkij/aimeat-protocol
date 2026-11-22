@@ -200,7 +200,7 @@ export const LIST_DEMOS = {
       <${Row}><${Name} meta="47.9 KB · Sep 12, 2026 16:40 · 8 days before">v3<//><${Doors}><${Action} small row onClick=${noop}>View<//><${Action} small row onClick=${noop}>Restore<//><${Action} small row onClick=${noop}>Fork<//><//><//>
     <//>`) },
     { name: 'tone switches: a setting per row', render: () => cat(html`<${List} tone="switches" cols="name-meaning-doors">
-      <${Row}><${Name}>Badge<//><${Desc}>The page shows that Lumo Bakery was made on this node.<//><${Doors}><${Action} small onClick=${noop}>Turn off<//><//><//>
+      <${Row}><${Name}>Badge<//><${Desc}>The page shows that Lumo Bakery was made on this server.<//><${Doors}><${Action} small onClick=${noop}>Turn off<//><//><//>
       <${Row}><${Name}>Install button<//><${Desc}>Nobody can install the app from its page.<//><${Doors}><${Loud} control onClick=${noop}>Turn on<//><//><//>
     <//>`) },
     { name: 'tone counts: a small table of counts', render: () => cat(html`<${List} tone="counts" head=${['AI', { label: 'Asked', num: true }, { label: 'Crawled', num: true }]}>
@@ -255,7 +255,7 @@ export const LIST_DEMOS = {
     // The app catalogue's cuts (appcat, 2026-09-27), each drawn plainly by its cut, in the catalogue's frame.
     { name: 'app index (n-mark-name-desc-state-n-arrow, List index)', render: () => cat(appIndex()) },
     { name: 'switch rows (name-meaning-doors)', render: () => cat(html`<${List} cols="name-meaning-doors">
-      <${Row}><${Name}>Badge<//><${Desc}>The page shows that Lumo Bakery was made on this node.<//><${Doors}><${Action} small onClick=${noop}>Turn off<//><//><//>
+      <${Row}><${Name}>Badge<//><${Desc}>The page shows that Lumo Bakery was made on this server.<//><${Doors}><${Action} small onClick=${noop}>Turn off<//><//><//>
       <${Row}><${Name}>Install button<//><${Desc}>Nobody can install the app from its page.<//><${Doors}><${Action} small onClick=${noop}>Turn on<//><//><//>
     <//>`) },
     { name: 'data map keys (key-desc-who)', render: () => cat(html`<${List} cols="key-desc-who" head=${['Key', 'What it holds', 'Where']}>
@@ -288,11 +288,11 @@ export const LIST_DEMOS = {
       <//>`) },
     { name: 'contract (name-price-rake-budget-state)', render: () => cat(html`<${List} cols="name-price-rake-budget-state">
       <${Row}><${Name} meta="Provider: harbour">image.resize<//>
-        <${Cell}><${Label} block>Pacing<//>3 morsels<//><${Cell}><${Label} block>Rake<//>0.3 (10%)<//>
+        <${Cell}><${Label} block>Pacing<//>3 morsels<//><${Cell}><${Label} block>Platform fee<//>0.3 (10%)<//>
         <${Cell}><${Label} block>Budget<//>42 / 100 <${Label}>(58 left)<//><//>
         <${Cell}><${Note} kind="state" size="small" mono tone="fine">active<//><//><//>
       <${Row}><${Name} meta="Provider: nordic">timetable.lookup<//>
-        <${Cell}><${Label} block>Pacing<//>1 morsel<//><${Cell}><${Label} block>Rake<//>0.1 (10%)<//>
+        <${Cell}><${Label} block>Pacing<//>1 morsel<//><${Cell}><${Label} block>Platform fee<//>0.1 (10%)<//>
         <${Cell}><${Label} block>Budget<//>uncapped<//>
         <${Cell}><${Note} kind="state" size="small" mono tone="attention">paused<//><//><//>
     <//>`) },

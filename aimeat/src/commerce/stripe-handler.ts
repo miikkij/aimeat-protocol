@@ -91,7 +91,7 @@ const STRIPE_SELLER_SIDE = 'The card payment could not be made, because the sell
 /** What the buyer reads when Stripe refuses this request and the reason is not one written for the buyer. */
 const STRIPE_REFUSED = 'The card payment provider refused this payment. Check the card details, or try another card.';
 /** What the buyer reads when Stripe's answer could not be read. */
-const STRIPE_UNREADABLE = 'The card payment provider gave an answer the node could not read. Try again shortly.';
+const STRIPE_UNREADABLE = 'The card payment provider gave an answer this server could not read. Try again shortly.';
 
 /**
  * One raw Stripe REST call through safeFetch (Rule 10: all non-constant outbound HTTP). Params are

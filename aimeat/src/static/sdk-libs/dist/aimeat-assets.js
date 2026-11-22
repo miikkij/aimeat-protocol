@@ -61,7 +61,7 @@
     }
     const address = value.trim();
     if (address.slice(0, 5).toLowerCase() === "data:") {
-      refuse(where + " is a data: URI, and the manifest will not carry one. The record is ONE memory value with 1024 kB to spend, and a base64 blob spends it on every load forever. Upload the file (AIMEAT.assets.upload) and put its /v1/pub/<owner>/<key> address here instead.");
+      refuse(where + " is a data: URI, and the manifest will not contain one. The record is ONE memory value with 1024 kB to spend, and a base64 blob spends it on every load forever. Upload the file (AIMEAT.assets.upload) and put its /v1/pub/<owner>/<key> address here instead.");
     }
     return address;
   }
@@ -810,7 +810,7 @@
   var PADDING = 2;
   async function loadSource(item) {
     const key = item && item.key ? String(item.key) : "";
-    if (!key) refuse("every image handed to packAtlas() needs a key: it becomes the frame name.");
+    if (!key) refuse("every image given to packAtlas() needs a key: it becomes the frame name.");
     const src = item.src;
     if (!src) refuse('"' + key + '" has no src.');
     if (typeof src === "string") {
@@ -892,7 +892,7 @@
     for (const one of list) {
       const key = one && one.key ? String(one.key) : "";
       if (key && seen[key]) {
-        refuse('"' + key + '" was handed to packAtlas() twice. A frame name has to be unique inside a sheet, or one of the two pictures is unreachable.');
+        refuse('"' + key + '" was given to packAtlas() twice. A frame name has to be unique inside a sheet, or one of the two pictures is unreachable.');
       }
       seen[key] = true;
     }

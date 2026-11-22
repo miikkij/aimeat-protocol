@@ -212,7 +212,7 @@ export const SHAPE_DEMOS = {
   ] },
   'box-shape': { variants: [
     { name: 'default', render: () => el('div', 'poster-box', 'A framed object.') },
-    { name: 'raised', render: () => el('div', 'poster-box poster-box--raised', 'The row you opened, or the way to take first.') },
+    { name: 'raised', render: () => el('div', 'poster-box poster-box--raised', 'The row you opened, or the option to take first.') },
     { name: 'copy', render: () => el('div', 'poster-box poster-box--copy', 'A text to copy.') },
     { name: 'row', render: () => el('div', 'poster-box poster-box--row', 'One result in a list.') },
     { name: 'avatar', render: () => el('span', 'poster-box poster-box--avatar', 'AB') },

@@ -166,7 +166,7 @@ APP CONTEXT
 CURRENT CREW-DEFS (edit these, or design new ones):
 ${JSON.stringify(currentAgents ?? [], null, 2)}
 
-SCHEMA RULES (the node rejects anything that violates these):
+SCHEMA RULES (AIMEAT rejects anything that violates these):
 - Array of 1-5 crew-def objects. Each: { "agent_name", "agents", "tasks", optional "readme_md", "llm_profile" ("content"|"coding"|"content-free"), "temperature" (0-2), "tags", "skills", "process" ("sequential"|"hierarchical") }.
 - "agent_name": 3-32 chars, lowercase alphanumeric + hyphens, unique across the array.
 - "agents": 1-10 crew members: { "role", "goal", optional "backstory", "tools" (names from the vetted set: web, memory, schedule, delegate, image, app_build), "skills", "allow_delegation" (boolean) }. Use several members + "process": "hierarchical" when the work needs an orchestrator over specialists.
@@ -186,7 +186,7 @@ MY APPS (pick the one I name, or ask which):
 - ${names || '(none yet)'}
 
 STEPS
-1. Read the app with aimeat_app_get (owner/filename above) and its data map with aimeat_datamap_get, so the skill describes what the app really does and where its data lives.
+1. Read the app with aimeat_app_get (owner/filename above) and its data map with aimeat_datamap_get, so the skill describes what the app really does and where its data is stored.
 2. Write SKILL.md: name, a one-paragraph description of when an agent should use this app, the operating steps in the app's own words, the records it reads and writes, and the mistakes to avoid.
 3. Publish it with aimeat_skill_publish at scope "user", then bind it to the app with aimeat_skill_link using metadata.binding "app:<owner>/<filename>".
 4. Tell me the skill's name and the app it is bound to.`;

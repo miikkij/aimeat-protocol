@@ -195,7 +195,7 @@ export async function setPartyMember(
     if (!inApp && !(await findOwnerParty(deps.storage, ownerGhii, ref.name))) return refuse(404, 'PARTY_NOT_FOUND', `The owner has no party called "${ref.name}".`);
     const before = await getMember(deps.storage, c.appId, party);
     const member = await putMember(deps.storage, { appId: c.appId, account: party, role, approvedBy: c.callerAccount, offerings: [], ...(note ? { note } : {}) });
-    return done({ member, created: !before, party: true, note: 'An outside party has no account here, so the role carries no free access to what the owner sells.' }, before ? 200 : 201);
+    return done({ member, created: !before, party: true, note: 'An outside party has no account here, so the role gives no free access to what the owner sells.' }, before ? 200 : 201);
 }
 
 /** The apps that asked to let people register, for the operator (apps-ask). */

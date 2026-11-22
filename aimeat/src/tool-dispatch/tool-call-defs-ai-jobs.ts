@@ -31,7 +31,7 @@ export const aiJobTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/ai/jobs — 202, and it returns before the model call starts.
         name: 'aimeat_ai_job_start',
-        description: 'Start a background AI job: a model call with a handle. Answers at once with a job id and a queue position; the answer lands at `result_key` when it is done.',
+        description: 'Start a background AI job: a model call with a handle. Answers at once with a job id and a queue position; the answer is written to `result_key` when it is done.',
         input: {
             prompt: { type: 'string', description: 'The prompt. Required unless prompt_key names a record holding it.' },
             prompt_key: { type: 'string', description: 'An owner memory key holding the prompt text.' },
@@ -106,7 +106,7 @@ export const aiJobTools: ConnectCliToolDefinition[] = [
     {
         // → GET /v1/ai/jobs/:id
         name: 'aimeat_ai_job_get',
-        description: 'Read one background AI job: its state, cost, where its answer went, and why it failed if it did. A text job that got an answer carries finish_reason and truncated (true: the answer was cut at a token limit).',
+        description: 'Read one background AI job: its state, cost, where its answer went, and why it failed if it did. A text job that got an answer has finish_reason and truncated (true: the answer was cut at a token limit).',
         input: { job_id: { type: 'string', required: true, description: 'The job id.' } },
         handler: ({ client }, input) =>
             client.get(`/v1/ai/jobs/${encodeURIComponent(requiredString(input, 'job_id'))}`),

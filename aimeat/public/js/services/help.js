@@ -66,9 +66,9 @@ export const helpStatus = () => apiGet('/v1/admin/help/status').then(data);
  */
 export function askPrompt(question = '') {
   const url = getNodeUrl();
-  return `I am a member of the AIMEAT node at ${url}. Help me ask a colleague here who knows${question ? `: ${question}` : '.'}
+  return `I am a member of the AIMEAT server at ${url}. Help me ask a colleague here who knows${question ? `: ${question}` : '.'}
 
-If you can use this node's tools (aimeat_help_*):
+If you can use this server's tools (aimeat_help_*):
 1. Call aimeat_help_find with my question and the topics you read from it. If a kept answer solves it, tell me and stop.
 2. Write the question so a colleague understands it without our conversation: what I am doing, what I want, and what I already tried.
 3. Show me the question and who it would go to. Send it with aimeat_help_ask only when I say yes.
@@ -79,9 +79,9 @@ If you cannot use the tools: write the question for me in the same way, with its
 /** The paste for an AI that handles one question sent to the person. */
 export function answerPrompt(questionId, subject = '') {
   const url = getNodeUrl();
-  return `A colleague on the AIMEAT node at ${url} asked me a question${subject ? ` ("${subject}")` : ''}, id ${questionId}.
+  return `A colleague on the AIMEAT server at ${url} asked me a question${subject ? ` ("${subject}")` : ''}, id ${questionId}.
 
-If you can use this node's tools: read it with aimeat_help_inbox, then draft an answer from what I know (my memory on this node and what I tell you). Show me the draft. On my yes, send it with aimeat_help_respond { question_id: "${questionId}", action: "answer", answer }. If I have no time, use action "pass"; if someone else knows better, action "refer" with their account name.
+If you can use this server's tools: read it with aimeat_help_inbox, then draft an answer from what I know (my memory on this server and what I tell you). Show me the draft. On my yes, send it with aimeat_help_respond { question_id: "${questionId}", action: "answer", answer }. If I have no time, use action "pass"; if someone else knows better, action "refer" with their account name.
 
 If you cannot use the tools: draft the answer for me to paste into the message thread.`;
 }

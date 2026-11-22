@@ -194,7 +194,7 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         const maxBytes = (config.portfolioMaxSizeKb ?? 512) * 1024;
         if (typeof paste === 'string' && Buffer.byteLength(paste, 'utf-8') > maxBytes) {
             res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-                `That paste is larger than ${config.portfolioMaxSizeKb ?? 512}KB. Ask your AI for a shorter page.`));
+                `That pasted text is larger than ${config.portfolioMaxSizeKb ?? 512}KB. Ask your AI for a shorter page.`));
             return;
         }
 

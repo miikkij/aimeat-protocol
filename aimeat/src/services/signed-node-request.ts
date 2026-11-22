@@ -377,7 +377,7 @@ export interface ProofPin {
 function downgradeRefusal(provenSince: string): Refusal {
   return {
     ok: false, status: 401, code: 'AUDIENCE_REQUIRED',
-    message: `The sending node has signed the audience of its messages since ${provenSince}, so this node refuses one from it that carries none.`,
+    message: `The sending node has signed the audience of its messages since ${provenSince}, so this node refuses one from it that has none.`,
   };
 }
 

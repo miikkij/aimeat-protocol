@@ -164,7 +164,7 @@ export async function restoreTeamAndPeople(deps: Deps, caller: { owner: string; 
     if (exported && args.options.team) {
         const ws = { shared: map.get(exported.workspaces.shared), decisions: map.get(exported.workspaces.decisions), waiting: map.get(exported.workspaces.waiting) };
         if (!ws.shared || !ws.decisions || !ws.waiting) {
-            teamOut = { restored: false, skill: null, problem: 'the bundle did not carry all three team workspaces' };
+            teamOut = { restored: false, skill: null, problem: 'the bundle did not contain all three team workspaces' };
         } else {
             const workspaces = ws as TeamRecord['workspaces'];
             const organism = await storage.getOrganism(args.orgId);

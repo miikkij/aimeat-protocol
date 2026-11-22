@@ -124,8 +124,8 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
     const { storage, config } = deps;
     const fail = (status: number, code: string, message: string): ComposeSetResult => ({ ok: false, status, code, message });
     if (typeof input.name !== 'string' || !input.name.trim()) return fail(400, 'INVALID_INPUT', 'name is the set\'s package name.');
-    if (!Array.isArray(input.apps) || input.apps.length === 0) return fail(400, 'INVALID_INPUT', 'apps lists the filenames of your apps the set carries.');
-    if (input.apps.length > MAX_APPS) return fail(400, 'INVALID_INPUT', `A set carries at most ${MAX_APPS} apps.`);
+    if (!Array.isArray(input.apps) || input.apps.length === 0) return fail(400, 'INVALID_INPUT', 'apps lists the filenames of your apps the set contains.');
+    if (input.apps.length > MAX_APPS) return fail(400, 'INVALID_INPUT', `A set contains at most ${MAX_APPS} apps.`);
     if (new Set(input.apps).size !== input.apps.length) return fail(400, 'INVALID_INPUT', 'An app is listed twice.');
     const name = input.name.trim();
     const title = typeof input.title === 'string' && input.title.trim() ? input.title.trim().slice(0, 200) : name;
@@ -161,7 +161,7 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
         addExpect('packs', plan.expects.packs);
         addExpect('extensions', plan.expects.extensions);
         if (plan.expects.extensions.length && input.allowExpectations !== true) {
-            problems.push(`${filename} calls extensions a package cannot carry: ${plan.expects.extensions.join(', ')}. Install them on the target node first, then compose with allow_expectations to record them as requirements.`);
+            problems.push(`${filename} calls extensions a package cannot contain: ${plan.expects.extensions.join(', ')}. Install them on the target node first, then compose with allow_expectations to record them as requirements.`);
         }
         packages.push({ app: filename, group_id: groupId });
         const app = plan.apps[0]!;

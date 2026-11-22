@@ -128,7 +128,7 @@ and how it is used, only facts you can check, no instructions to an AI) and \`ab
 language it is written in). The app's page and its App Catalog page show it under the description,
 and the \`seo\` answer gives \`own_words\`.
 
-**How people and AIs find the owner's apps.** \`aimeat_visibility_report\` covers the whole place, every
+**How people and AIs find the owner's apps.** \`aimeat_visibility_report\` covers everything, every
 app at once, with no setup: people by channel (an AI answer, search, social, another site, direct), which
 AI fetched which app because someone asked it or to build its index, who read the llms.txt, AGENTS.md
 and MCP card, and purchases by channel. One app's own opens and places are \`aimeat_app_manage\` visitors.
@@ -142,7 +142,7 @@ owner's own draft alone. It spends the owner's AI credit, so ask first. \`aimeat
 switches the script off per app, or the weekly fixing agent on.
 
 **What a visitor's AI can use on the app.** When the app has public app tools (\`aimeat_app_tools_publish\`)
-or a public skill bound to it, the served app carries a round "Use with your AI" mark that links to
+or a public skill bound to it, the served app shows a round "Use with your AI" mark that links to
 \`/v1/use-with-ai/{owner}/{filename}\`: the tools, each skill's text, and how a person's own AI, an agent or
 a program uses them. Write the tool descriptions and the skill for that reader. The owner takes the
 mark off with \`aimeat_app_manage\` action \`marks\`, \`aiUse: false\`.
@@ -154,15 +154,15 @@ history are done from the connector at a keyboard, not here). If you want the th
 browser, you want the app tools above. A package that writes entries into the owner's memory needs
 memory:write and memory:write-as-owner; without them the install answers \`status: awaiting_owner\` and
 a \`request_id\`, and it happens once the owner approves. \`aimeat_package_install_requests\` lists
-those requests, and lets you approve one you did not file when you hold the words.
+those requests, and lets you approve one you did not file when you hold the scopes.
 \`aimeat_package_install\` with \`mode: "managed"\` gives the package the code and layout: every
 change to them answers \`MANAGED_BY_PACKAGE\`, an update replaces them, and the owner keeps the settings
-(name, description, access code, parking, search visibility, legal texts). \`aimeat_package_instances\`
+(name, description, access code, listing, search visibility, legal texts). \`aimeat_package_instances\`
 lists the installed copies and their mode; \`aimeat_package_fork\` makes a managed copy the owner's own to
 edit, at the same addresses with the same records, and ends its updates. Fork only when the owner asks.
 An install takes \`config\`, each part's values: run it with \`dry_run\` first, and the answer lists every
 field and which required ones are empty, so you ask your owner for them before installing.
-\`aimeat_package_compose\` also carries your own skills bound to the chosen apps. Installing publishes each
+\`aimeat_package_compose\` also includes your own skills bound to the chosen apps. Installing publishes each
 in the installer's skills, bound to their copy of the app; a skill of that name they already have stays
 theirs, and the answer names it in \`warnings\`. Composing again under the same name publishes the next
 version. \`aimeat_package_compose_set\` makes a set to sell: one package per app and an install bundle
@@ -233,7 +233,7 @@ the record mentions as \`names\`. The publish response lists departures as \`ai_
 **Classified content in an app (\`aimeat-labels.js\`, \`AIMEAT.labels\`).** Read a record's
 classification, set or review one only from the person's own choice on the screen (never lower one
 on an AI's judgement; a person's words go in \`humanSaid\`), show \`renderWarning(item)\` on an item
-that carries a warning, and on \`err.code === "CLASSIFIED"\` from an AI call tell the person instead
+that has a warning, and on \`err.code === "CLASSIFIED"\` from an AI call tell the person instead
 of retrying. Requires aimeat-auth; \`GET /v1/library-packs/aimeat-labels\` has the full usage.
 
 **AI models in an app.** Ask for the work, not a model: \`AIMEAT.ai.complete\` without \`model\` uses
@@ -246,7 +246,7 @@ the app truly needs certain models, declare them in the head,
 answers; an app never names a provider id (it cannot know the owner's), and a refusal
 \`AI_CAPABILITY_UNAVAILABLE\` means the owner has no working provider for that capability: show the
 person \`err.fix\` (their sentence, in their language) and a link to \`err.settingsUrl\`, which opens
-their AI settings where it is fixed. Every answer carries \`route\` (who answered).
+their AI settings where it is fixed. Every answer has \`route\` (who answered).
 
 **AI capabilities.** Before you plan an AI feature, call \`aimeat_ai_capabilities\`: per capability
 (text, vision, files, image, speech, transcription, embed) whether it is on, the model, the price, and
@@ -274,13 +274,13 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 ## Research-first build flow (research → frame → propose → build → finish)
 0. THE GUIDE: every app is built and changed with the **Atelier specification**, on the finest
    level (\`fine\`) forked from a genre and on \`proto\` or \`plain\` started from the shell
-   \`shell-atelier\`, with the served component kit carrying the header, the sign-in and the states.
+   \`shell-atelier\`, with the served component kit providing the header, the sign-in and the states.
    Load \`node:aimeat-app-builder-atelier\` and read the specification, \`aimeat_handbook_get { tier:
    "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). Its part
    \`platform\` lists what only some apps need (a team, files, AI, intake, server-side work). An app
    built on the retired Classic track is moved with its section \`from-classic\`. ${MODEL_QUALITY_ADVICE}
 1. RESEARCH: load the \`node:aimeat-app-builder-atelier\` skill (\`aimeat_skill_get\`), call
-   \`aimeat_appdev_overview\`, and read the specification's parts (it is law).
+   \`aimeat_appdev_overview\`, and read the specification's parts (follow them exactly).
 2. FRAME: the level first; on \`fine\` a genre to fork, on \`proto\` or \`plain\` \`shell-atelier\`. The
    platform sections the app needs, packs, start point (fork a prior app / template proposal / genre),
    own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel), decided NOW. A role belongs to the
@@ -314,7 +314,7 @@ downgrade, re-grant the lower role) · \`aimeat_workspace_members\` (roles + gra
 \`aimeat_workspace_transfer\` (export/import). Grant/revoke are creator-or-org-admin; each is an auditable
 creator-owned consent. A **contributor** who is neither the creator nor an admin adds a space with
 \`aimeat_workspace_space_add\` and changes a document space's sections with \`aimeat_workspace_sections_set\`;
-the workspace's rule (\`member_changes\`, set with \`aimeat_workspace_update\`) decides whether that lands at
+the workspace's rule (\`member_changes\`, set with \`aimeat_workspace_update\`) decides whether that takes effect at
 once or waits as a suggestion, which the creator or an admin decides with \`aimeat_workspace_suggestions\`.
 
 **Building a workspace-PROCESSING agent (one that reads requests + writes results)?** It owns a
@@ -344,13 +344,13 @@ Three layers, and the boundary between them is the whole point. Six apps on this
 their own member model before this existed and disagreed six ways, so the split is now fixed:
 
 - **The NODE owns who is a member.** \`/v1/apps/{owner}/{file}/members\` — approve, remove, ask,
-  read your own standing. It lives here because three of the jobs cannot be done from an app at all:
+  read your own standing. It is kept here because three of the jobs cannot be done from an app at all:
   telling the approved person they were approved (the sandbox \`ctx.notify\` reaches the CALLER, so an
   approval notifies the approver), keeping the list private (an \`ext:\` namespace is world-readable by
   default), and taking free access away together with the role.
 - **The EXTENSION owns what a member may do.** The capability vocabulary is genuinely per-app, and a
   browser can never enforce it. Declare the app in your manifest \`config:\` as \`app: owner/name\`
-  and the node hands your script \`ctx.caller.member\` and \`ctx.caller.isAppOwner\`, resolved before the
+  and the node gives your script \`ctx.caller.member\` and \`ctx.caller.isAppOwner\`, resolved before the
   sandbox starts. Do NOT keep your own roster in \`ctx.memory\`. \`aimeat_iam_define\` generates such a
   gate from your role design: install the extension it returns, then \`init({ app, ext })\`.
 - **The LIBRARY owns the surface.** \`/v1/libs/aimeat-iam.js\`:
@@ -397,20 +397,20 @@ development right, not a membership: \`aimeat_app_manage\` \`builder_set\` with 
 and \`dev_level\` (\`drafter\` writes drafts the owner publishes, \`publisher\` also publishes, \`full\`
 works on it as on their own; use \`drafter\` unless the owner asked for more). It needs app:manage.
 The answer says what Bob's AI does next and gives the settings page (\`page.url\`) where the owner sees
-and takes back every right: hand the owner both. \`builders\` lists who holds a right, \`builder_remove\`
+and takes back every right: give the owner both. \`builders\` lists who holds a right, \`builder_remove\`
 takes one back. Bob needs an account on this server; when the owner knows only his email address,
 ask the owner for his account name. A right over EVERY app of the owner is the account holder's own act on that
 page, signed in, so send them there rather than looking for a tool. On Bob's side, his AI finds the app
 with \`aimeat_app_list\` \`{ building: true }\` and passes \`owner\` to the app tools.
 
 **The app's design spec.** One document beside the app says what it is for, its screens, where its
-data lives, what was decided and what is open, for everybody who builds it. Before you change an app
+data is stored, what was decided and what is open, for everybody who builds it. Before you change an app
 somebody else owns or shares, read it: \`aimeat_app_manage\` \`spec\` with \`filename\` and \`owner\`.
 The answer says whether the app has moved past the version the spec was written against, and gives an
 outline when nobody has written one. After every publish, write it back with what changed:
 \`spec_set\` with \`markdown\` (the whole document; pass the \`expected_revision\` you read, and a
 refusal means somebody else wrote in between). The same text again marks it current for the new
-version. The publish answer carries \`design_spec_hint\` when the spec is missing on a shared app or
+version. The publish answer contains \`design_spec_hint\` when the spec is missing on a shared app or
 has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the app's
 own page in the App Catalog, in its Design spec section, beside the Roadmap and Who else may build
 this sections.
@@ -425,7 +425,7 @@ Write \`data\` after the
 data map questions and \`now\` while you build. Before you build the screens, read \`structure\`: a
 choice with state \`waiting\` is the person's, so build it and write the same value with state
 \`done\`. A choice you make yourself goes in with a \`note\` saying why. \`plans\` lists the apps the
-person has started. The page is help, never a gate: build on whether they open it or not.
+person has started. The page is help, never a requirement: build on whether they open it or not.
 
 ### can() is a HINT, never a gate
 

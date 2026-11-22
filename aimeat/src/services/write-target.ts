@@ -164,7 +164,7 @@ export function resolveMcpWriteTarget(args: {
         return { deny: {
             error: 'NO_OWNER',
             message: 'Cannot resolve your owner from this session.',
-            how_to_fix: 'Reconnect the agent so the session carries its owner.',
+            how_to_fix: 'Reconnect the agent so the session has its owner.',
         } };
     }
     // The same reserved-key guard the app-grant path has: this write lands where the server reads

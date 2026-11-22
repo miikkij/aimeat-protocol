@@ -362,12 +362,12 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     if (candidates.length >= wanted) break;
     const requested = sameModelRef ?? input.requested;
     if (p.problem) { reject(p, 'problem', p.problem); continue; }
-    if (!typeAllowed(config, p.type)) { reject(p, 'type-not-allowed', `This node does not allow ${p.type} providers.`); continue; }
+    if (!typeAllowed(config, p.type)) { reject(p, 'type-not-allowed', `This server does not allow ${p.type} providers.`); continue; }
     if (!serves(p, capability)) { reject(p, 'capability-off', `${p.title} does not serve ${capability}.`); continue; }
     if (input.requires?.local && p.leaves) { reject(p, 'requires-local', `${p.title} is not on this machine.`); continue; }
     // An extension provider has no address: its manifest's hosts meet the allowlist in its runner.
     if (!isFixedType(p.type) && p.type !== 'extension' && config.aiProviderAllowlist.length && !config.aiProviderAllowlist.includes(new URL(p.baseUrl).hostname.toLowerCase())) {
-      reject(p, 'host-not-allowed', `AI provider host "${new URL(p.baseUrl).hostname}" is not in this node's allowlist. Ask the operator to allow it.`);
+      reject(p, 'host-not-allowed', `AI provider host "${new URL(p.baseUrl).hostname}" is not in this server's allowlist. Ask the operator to allow it.`);
       continue;
     }
 
@@ -487,11 +487,11 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
             continue;
           }
           const message = input.op === 'text' && free && !input.requested && !freeAllowed
-            ? `${spent ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
+            ? `${spent ?? 'Your allowance on this server is used up.'} Your model policy does not allow the free model either.`
             : input.op === 'text' && free && !input.requested && !lastResortOn
-              ? `${spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.'} `
+              ? `${spent ?? 'Your allowance on this server is used up. Add more, or set your own key in your AI settings.'} `
                 + 'The free model as the last resort is off for you; you can turn it on in your AI routing rules (freeModelLastResort).'
-              : (spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
+              : (spent ?? 'Your allowance on this server is used up. Add more, or set your own key in your AI settings.');
           reject(p, 'allowance-spent', message, { error: new AiCompletionError('QUOTA_EXHAUSTED', 402, message) });
           continue;
         }
@@ -506,7 +506,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       if (!key) {
         const nodeHost = p.legacy?.provider === 'openrouter' && p.type !== 'openrouter' && !!nodeOpenRouterKey(config);
         if (nodeHost) {
-          const message = 'This node\'s shared AI key is sent only to OpenRouter. To use another address, add your own API key in your AI settings.';
+          const message = 'This server\'s shared AI key is sent only to OpenRouter. To use another address, add your own API key in your AI settings.';
           reject(p, 'node-key-host', message, { error: new AiCompletionError('NODE_KEY_HOST', 403, message) });
         } else {
           const message = p.type === 'openrouter'

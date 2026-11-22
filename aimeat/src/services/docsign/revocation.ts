@@ -285,8 +285,8 @@ export async function checkRevocation(
   });
   if (fallback) notes.push('the OCSP answer the signature carries does not cover a proven signing time, so the responder was asked');
   if (!opts.online) {
-    return fallback ? staleUnknown(fallback, ['online checks are off on this node'])
-      : { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['online checks are off on this node'] };
+    return fallback ? staleUnknown(fallback, ['online checks are off on this server'])
+      : { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['online checks are off on this server'] };
   }
 
   for (const url of cert.ocspUrls.filter((u) => /^https?:\/\//i.test(u)).slice(0, 2)) {

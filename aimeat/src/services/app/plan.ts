@@ -207,7 +207,7 @@ function readProposals(k: ProposalKey, raw: unknown): PlanProposal[] | string {
     if (out.some((p) => p.id === id)) return `${at}.id "${id}" is used twice.`;
     const name = text(r.name, PROPOSAL.name);
     const note = text(r.note, PROPOSAL.note);
-    if (!name || !note) return `${at} carries "name" (at most ${PROPOSAL.name} characters) and "note" (one sentence on what it gives the person, at most ${PROPOSAL.note}).`;
+    if (!name || !note) return `${at} has "name" (at most ${PROPOSAL.name} characters) and "note" (one sentence on what it gives the person, at most ${PROPOSAL.note}).`;
     const rows = r.sketch;
     if (!Array.isArray(rows) || rows.length < 1 || rows.length > PROPOSAL.rows) return `${at}.sketch is 1 to ${PROPOSAL.rows} rows, top to bottom: ${PROPOSAL_SHAPE}.`;
     const sketch: SketchRow[] = [];
@@ -305,7 +305,7 @@ export function readPlanPatch(body: unknown): { ok: true; patch: PlanPatch } | {
       const state = r.state;
       if (state !== undefined && state !== 'waiting' && state !== 'done') return { ok: false, message: `choices.${k}.state is "waiting" or "done".` };
       const note = r.note === undefined ? undefined : text(r.note, LIMITS.note);
-      if (value === CUSTOM_CHOICE && !note) return { ok: false, message: `A "${CUSTOM_CHOICE}" ${k} carries a note: one sentence that describes it, which the structure page shows.` };
+      if (value === CUSTOM_CHOICE && !note) return { ok: false, message: `A "${CUSTOM_CHOICE}" ${k} has a note: one sentence that describes it, which the structure page shows.` };
       patch.choices[k] = { value, ...(state ? { state } : {}), ...(note ? { note } : {}) };
     }
   }

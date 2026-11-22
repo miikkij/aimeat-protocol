@@ -212,13 +212,13 @@ export function registerDesignbookTools(
                 note: out.kind === 'kit'
                     ? 'Taken. Build the app in this kit as `kit.use` says: fork its genre, put `kit.css` in the head, open the app with `kit.app`, and call `kit.ornament` with your elements. Nothing was written; the use is counted.'
                     : out.kind === 'component'
-                    ? 'Taken. Build `snippet.html` and `snippet.css` into your page as they are, and wire the behaviour yourself as `snippet.use` says: a component carries no script. It reads the page\'s tokens, so inside a genre it wears the genre. Name it in your page\'s build notes (`took`, with why you chose it): that is what counts it as used.'
+                    ? 'Taken. Build `snippet.html` and `snippet.css` into your page as they are, and wire the behaviour yourself as `snippet.use` says: a component contains no script. It reads the page\'s tokens, so inside a genre it follows the genre. Name it in your page\'s build notes (`took`, with why you chose it): that is what counts it as used.'
                     : out.kind === 'fill'
                     ? 'Adopted. This part is a starting shape: its <placeholder> texts are yours to replace with aimeat_app_manage (action "ui_set").'
                     : out.kind === 'ambient'
                         ? 'Adopted. The ambient runs behind the app on its next open; its arrangement and look are untouched, and only the part\'s own tokens merged in.'
                         : out.kind === 'effect'
-                            ? 'Adopted. The effect wears on the block it names, or runs as a pass over the app\'s ambient, on the next open; the rest of the arrangement is untouched.'
+                            ? 'Adopted. The effect applies to the block it names, or runs as a pass over the app\'s ambient, on the next open; the rest of the arrangement is untouched.'
                             : 'Adopted. The app renders it on its next open; the replaced layout is archived and one restore brings it back.',
             };
         }),

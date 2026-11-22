@@ -204,7 +204,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       // this document holds this key" and deliberately nothing more — the owner's button press is
       // the authority, this is the binding.
       if (defects.length === 0 && !await verifyCardJws(jws as string, card.publicKey)) {
-        defects.push({ field: 'card', reason: 'The card is not signed by the key it carries.' });
+        defects.push({ field: 'card', reason: 'The card is not signed by the key it contains.' });
       }
 
       if (defects.length > 0) {
@@ -232,7 +232,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
     const missing = grant.agents.filter(n => !seen.has(n));
     if (missing.length > 0) {
       res.status(422).json(error(config.nodeId, 'INCOMPLETE_SUBMISSION',
-        `This grant covers ${grant.agents.length} agents and the submission carries ${seen.size}. Nothing was enrolled.`,
+        `This grant covers ${grant.agents.length} agents and the submission has ${seen.size}. Nothing was enrolled.`,
         undefined, { missing }));
       return;
     }

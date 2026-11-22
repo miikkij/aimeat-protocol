@@ -509,7 +509,7 @@ async function addIdentityContact(
       const kind = identityKind(contactId);
       const what = kind === 'gaii' ? 'agent' : kind === 'geai' ? 'app' : 'owner';
       throw new ContactsError(404, kind === 'ghii' ? 'OWNER_NOT_FOUND' : 'CONTACT_NOT_FOUND',
-        `No ${what} "${contactId}" on this node — check the id, or add them as a person with a name and an email`);
+        `No ${what} "${contactId}" on this server — check the id, or add them as a person with a name and an email`);
     }
   }
   const contact = await storage.setContactState(ownerGhii, contactId, 'accepted', undefined, 'saved');
@@ -762,14 +762,14 @@ export async function resolveOwnerByVerifiedEmail(storage: Storage, email: strin
   }
   const verified = (await storage.getGHIIsByEmailHash(inviteEmailHash(clean))).filter(m => !!m.emailVerifiedAt);
   if (verified.length === 0) {
-    return { ok: false, code: 'NO_ACCOUNT', message: 'No account on this node has that email as a verified address.' };
+    return { ok: false, code: 'NO_ACCOUNT', message: 'No account on this server has that email as a verified address.' };
   }
   if (verified.length > 1) {
     // Should be impossible under the one-verified-email-per-account-per-node invariant (DB-enforced).
     logger.error('Email→owner resolution is ambiguous: >1 account shares a verified email hash', {
       matches: verified.map(m => m.ghii),
     });
-    return { ok: false, code: 'AMBIGUOUS', message: 'That email maps to more than one account — contact the node operator.' };
+    return { ok: false, code: 'AMBIGUOUS', message: 'That email maps to more than one account — contact the operator.' };
   }
   const rec = verified[0];
   return { ok: true, ownerName: rec.ownerName ?? localAccountName(rec.ghii), ghii: rec.ghii };

@@ -40,7 +40,7 @@ export function buildOpenItemsPrompt(
 
     if (fi) {
         return [
-            `Käytän AIMEAT-solmua ${node} ja haluan käydä läpi avoimet asiani kanssasi.`,
+            `Käytän AIMEAT-palvelinta ${node} ja haluan käydä läpi avoimet asiani kanssasi.`,
             '',
             'Tee tässä järjestyksessä:',
             '',
@@ -71,18 +71,18 @@ export function buildOpenItemsPrompt(
     }
 
     return [
-        `I use the AIMEAT node ${node} and I want to go through my open items with you.`,
+        `I use the AIMEAT server ${node} and I want to go through my open items with you.`,
         '',
         'Do this in order:',
         '',
-        `1. Fetch your instructions: aimeat_skill_get for the skill "${OPEN_ITEMS_SKILL}". It carries`,
+        `1. Fetch your instructions: aimeat_skill_get for the skill "${OPEN_ITEMS_SKILL}". It has`,
         '   the current per-kind detail. Follow it over this text wherever they disagree.',
         `2. Read my list: aimeat_memory_read with the key "${OPEN_ITEMS_KEY}" and owner_scope=true.`,
         '   The value is an object whose "items" array is my open items.',
         '3. Tell me what is on it in your own words. No JSON, no table. If something has been open a',
         '   long time, ask whether it still matters.',
         '4. Ask which one to start with. If its kind is empty, ask **what it is** before anything',
-        '   else: many items carry the words of the card I clicked rather than anything about their',
+        '   else: many items have the words of the card I clicked rather than anything about their',
         '   content. Only then ask at what depth.',
         '5. **Two rounds of questions, then you write the draft.** It goes into my organism straight',
         '   away, not after GO: a draft is not doing. What you do not know is not a question for me,',
@@ -95,7 +95,7 @@ export function buildOpenItemsPrompt(
         'somebody else got there first and their change must not be overwritten.',
         '',
         'If an item is a large piece of work in its own right, such as building an application, do',
-        'not try to do it in the middle of this conversation. Say so, and steer me into doing it as',
+        'not try to do it in the middle of this conversation. Say so, and guide me to do it as',
         'its own piece of work in the right order.',
     ].join('\n');
 }

@@ -131,7 +131,7 @@ export async function ensureChatAgent(
         owner: ownerName,
         gaii,
         displayName: 'Chat',
-        description: 'The built-in chat agent. Talks to you in the browser and works through this node.',
+        description: 'The built-in chat agent. Talks to you in the browser and works through this server.',
         capabilities: ['memory', 'apps'],
         publicKey: keyPair.publicKey,
         defaultScopes: scopes,

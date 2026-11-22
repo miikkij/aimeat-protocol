@@ -118,7 +118,7 @@ const PAGE_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-damping': '20',
       '--ak-spring-mass': '1',
     },
-    note: 'The base contract IS vivid; this entry exists for the picker and the prompt table. The spring hand restates the contract\'s own three numbers so a vivid block nested inside a loud look keeps the house feel instead of inheriting its bounce.',
+    note: 'The base contract IS vivid; this entry exists for the picker and the prompt table. The spring settings restate the contract\'s own three numbers so a vivid block nested inside a loud look keeps the house feel instead of inheriting its bounce.',
   },
   {
     id: 'flat',
@@ -401,7 +401,7 @@ const PAGE_LOOKS: readonly AtelierLook[] = [
   },
   {
     id: 'billboard',
-    feel: 'the whole screen is the poster: carnival\'s energy edge to edge, no measure column, a half-screen banner — for fronts, showcases and anything that should fill the room',
+    feel: 'the whole screen is the poster: carnival\'s energy edge to edge, no measure column, a half-screen banner — for fronts, showcases and anything that should fill the screen',
     imagery: 'vibrant pop-art carnival illustration, saturated colours, bold outlines, wide panoramic energy',
     structures: ['full-bleed-hero'],
     tokens: {
@@ -434,7 +434,7 @@ const PAGE_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-damping': '13',
       '--ak-spring-mass': '1.2',
     },
-    note: 'The developer\'s ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival\'s inverse band and printed depth, at room scale. The narrow-screen story is unchanged: the column was never narrower than the phone.',
+    note: 'The developer\'s ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival\'s inverse band and printed depth, at full-screen size. The narrow-screen story is unchanged: the column was never narrower than the phone.',
   },
   {
     id: 'aurora',

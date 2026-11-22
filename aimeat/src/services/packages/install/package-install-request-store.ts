@@ -264,7 +264,7 @@ export async function fileInstallRequest(
     }));
     if (Buffer.byteLength(stableStringify(draft.options), 'utf8') > MAX_OPTIONS_BYTES) {
         return fail(413, 'REQUEST_TOO_LARGE',
-            'This migration carries more content than a request can hold for the owner. The owner can apply it themselves on the Packages page.');
+            'This migration contains more content than a request can hold for the owner. The owner can apply it themselves on the Packages page.');
     }
 
     // In the owner's queue, so the count and the duplicate check see each other and a decision.

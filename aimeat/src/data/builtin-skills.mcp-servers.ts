@@ -95,19 +95,19 @@ Atlassian Cloud's own MCP server (Jira, Confluence, Compass) with its address an
 the name \`atlassian\`. The MCP page has the same as one button. Atlassian Server and Data Center are not
 covered; their own MCP servers, where they exist, are attached by address.
 
-**A server that uses OAuth sign-in** (the person signs in at the far side instead of handing over a
+**A server that uses OAuth sign-in** (the person signs in at the remote server instead of giving a
 token) is attached with \`aimeat_mcp_attach\` \`auth: "oauth"\` (or \`POST /v1/mcp-servers\` with the
 same, or from the MCP page). Then:
 
 1. \`aimeat_mcp_authorize\` with the server's name. It returns an address on this node.
 2. Give the address to the person and say in one sentence what it is for. They open it signed in to
-   their node, confirm, and sign in at the far side. Opening it yourself does nothing: the round is
+   their node, confirm, and sign in at the remote server. Opening it yourself does nothing: the sign-in flow is
    bound to the person's browser.
 3. When they come back, \`aimeat_mcp_tools\` with \`refresh: true\` shows the tools.
 
 The node refreshes the sign-in by itself before calls. When that renewal fails, the server is marked
 as needing a new sign-in at once and the call is refused (\`UPSTREAM_UNAUTHORIZED\`): run
-\`aimeat_mcp_authorize\` again and hand the address over. The same answer cures a server attached this
+\`aimeat_mcp_authorize\` again and give the address to the person. The same answer fixes a server attached this
 way before 2026-11-01 whose every call is refused although the sign-in finished: until then the node
 kept the token and did not send it, and one more sign-in repairs the server.
 
@@ -117,7 +117,7 @@ kept the token and did not send it, and one more sign-in repairs the server.
 - \`aimeat_mcp_tools\` with \`server\`: that server's tools, from the node's cache; \`refresh: true\`
   asks the server again.
 - \`aimeat_mcp_call\` with \`server\`, \`tool\` and \`arguments\`: one call. Treat every call as a write
-  that cannot be undone unless you know the tool reads only: the node cannot tell what the far side
+  that cannot be undone unless you know the tool reads only: the node cannot tell what the remote server
   does with it.
 
 **Two ways the tools appear.** By default a server is a **gateway**: its tools are reached through
@@ -174,10 +174,10 @@ The person in their own session, on their own server, needs no grant.
   (Jira, Confluence, a company wiki), attach the group's server with \`auth: "per-user-oauth"\`; the
   operator does the same for a node server with \`POST /v1/mcp-servers/node\`. \`template: "atlassian"\`
   on a group's or the node's server chooses this by itself. The group then holds
-  no token: each member signs in with their OWN account at the far side, so its own permissions and
+  no token: each member signs in with their OWN account at the remote server, so its own permissions and
   its audit trail apply to each person. \`aimeat_mcp_list\` shows \`personalSignIn\` on such a server,
   with \`signedIn\` for the person you act for. Until they sign in, a call answers 403
-  \`SIGN_IN_REQUIRED\`: run \`aimeat_mcp_authorize\` with the server and hand the address to the
+  \`SIGN_IN_REQUIRED\`: run \`aimeat_mcp_authorize\` with the server and give the address to the
   person (anyone the server admits may; the answer says \`personal: true\`). One person's expired
   sign-in stops only that person. \`aimeat_mcp_sign_out\` removes their sign-in and nobody else's.
 - **Another AIMEAT node.** Attach with \`peer\` (the peer node's id) instead of \`url\`. The address is
@@ -190,9 +190,9 @@ The person in their own session, on their own server, needs no grant.
 | \`NOT_GRANTED\` (403) | the permission, the tool list, read-only, the cap or the expiry stopped it | read \`aimeat_mcp_grant_list\`; ask the person before changing a grant |
 | 403, server switched off | the person or the operator switched it off | ask whether to switch it on (\`aimeat_mcp_update\` \`enabled: true\`) |
 | \`PRICE_UNSUPPORTED\` (402) | an operator's server with a price | tell the person; the operator decides |
-| needs a new sign-in | the OAuth sign-in expired or was withdrawn | \`aimeat_mcp_authorize\`, hand the address over |
-| \`SIGN_IN_REQUIRED\` (403) | a shared server where each person signs in with their own account, and this person has not, or their sign-in stopped working | \`aimeat_mcp_authorize\`, hand the address to that person |
-| 502 | the far server failed or did not answer in time | retry once later; then tell the person which server |
+| needs a new sign-in | the OAuth sign-in expired or was withdrawn | \`aimeat_mcp_authorize\`, give the address to the person |
+| \`SIGN_IN_REQUIRED\` (403) | a shared server where each person signs in with their own account, and this person has not, or their sign-in stopped working | \`aimeat_mcp_authorize\`, give the address to that person |
+| 502 | the remote server failed or did not answer in time | retry once later; then tell the person which server |
 | 503 \`NO_ENCRYPTION_KEY\`, \`PEER_UNKNOWN\`, \`PEER_NOT_ROUTABLE\` | the node's configuration or the peering | send it to the operator (\`support@operators\`) |
 | 508 | the call came back round through other nodes | the servers point at each other; tell the person |
 

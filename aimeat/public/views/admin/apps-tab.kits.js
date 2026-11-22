@@ -50,7 +50,7 @@ A style kit is the whole look a new app starts from. A new app takes the kit of 
 What you can do for me:
 - aimeat_designbook_kit { view: "defaults" } shows the kit for everyone on this server, my own, and the kits of the shared places I run.
 - aimeat_designbook_search { kind: "kit" } lists the kits. A kit for everyone (reach "node") with status "proposed" waits for me; aimeat_designbook_get { id } reads one whole, and its preview_url shows it.
-- aimeat_designbook_status { id, status: "published" } publishes a waiting kit for everyone; status "retired" takes one off the shelf.
+- aimeat_designbook_status { id, status: "published" } publishes a waiting kit for everyone; status "retired" withdraws one.
 - aimeat_designbook_kit_default { node: true, kit } chooses the kit for everyone on this server; { node: true, clear: true } removes it.
 
 Who may do what is how the server works, not a setting: every person chooses their own kit for free, a shared place's owners and admins choose its kit, I choose the one for everyone, and a kit for everyone publishes itself when it comes from an app its owner said turned out well. If I ask to change one of those rules, say that it cannot be changed here.

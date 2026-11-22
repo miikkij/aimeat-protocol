@@ -91,7 +91,7 @@ h.destroy();
   box. The frame keeps the design's aspect ratio through a \`--ak-phaser-ratio\` custom
   property. This is the mode to reach for: the game is laid out once at 960 by 540 and every
   screen gets the same picture.
-- **\`'resize'\`** (\`Scale.RESIZE\`) makes the canvas the parent's box and hands each scene a
+- **\`'resize'\`** (\`Scale.RESIZE\`) makes the canvas the parent's box and sends each scene a
   \`resize\` event. Every position you computed from \`scale.width\` has to be recomputed there.
 - **\`'fixed'\`** (\`Scale.NONE\`) leaves the canvas at the design size, whatever the box does.
 
@@ -234,7 +234,7 @@ export const PHASER_ASSETS_SKILL: BuiltinSkill = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-phaser-assets
-description: "Art and sound for a Phaser 4 game on an AIMEAT node: declaring a resource pack, loading it with a progress bar and 404 reporting, generating tiles and a character so a game runs with no files at all, and where real files live (/v1/pub/<owner>/…, never a data: URI). Also the aimeat-assets manager: one manifest per app as one public memory key, upload, the browser atlas packer, the WAV export, the texts and the gallery. Triggers on: assets, load, preload, spritesheet, atlas, texture, tileset, sprite, image, progress bar, 404, asset manager, aimeat-assets, manifest, packAtlas, upload, kuvat, lataus, tekstuuri, äänitiedostot, resurssit, kuvapaketti."
+description: "Art and sound for a Phaser 4 game on an AIMEAT node: declaring a resource pack, loading it with a progress bar and 404 reporting, generating tiles and a character so a game runs with no files at all, and where real files are stored (/v1/pub/<owner>/…, never a data: URI). Also the aimeat-assets manager: one manifest per app as one public memory key, upload, the browser atlas packer, the WAV export, the texts and the gallery. Triggers on: assets, load, preload, spritesheet, atlas, texture, tileset, sprite, image, progress bar, 404, asset manager, aimeat-assets, manifest, packAtlas, upload, kuvat, lataus, tekstuuri, äänitiedostot, resurssit, kuvapaketti."
 license: MIT
 metadata:
   audience: agent
@@ -362,14 +362,14 @@ AIMEAT.phaser.textures.shapes(this, [{
 }]);
 \`\`\`
 
-## Where real files live
+## Where real files are stored
 
 Published apps are one HTML file, so an asset is a URL, not bytes in the page.
 
 - Upload once through \`AIMEAT.storage\` and serve from \`/v1/pub/<owner>/<path>\`.
 - Give the pack that address as its \`base\`.
 - A \`data:\` URI is REFUSED by \`pack()\` with a warning that names the entry, because a base64
-  blob is carried in the page on every single load, forever.
+  blob is sent in the page on every single load, forever.
 
 ## The aimeat-assets manager
 
@@ -405,13 +405,13 @@ hud.message(lib.t('level.start', { n: 1 }));      // the texts live in the same 
 | \`add(kind, key, entry)\` | one entry, after an upload |
 | \`url(key)\` / \`has(key)\` / \`list(kind)\` | resolve, ask, and one row per key for a table |
 | \`toPack()\` | the manifest as the resource pack \`preloadPack()\` reads |
-| \`t(key, vars)\` / \`lang(code)\` | the texts, with \`{n}\` substitution and English as the floor |
+| \`t(key, vars)\` / \`lang(code)\` | the texts, with \`{n}\` substitution and English as the fallback |
 | \`check()\` | asks every address whether it is there → \`{ ok, missing: [{ key, url, status }] }\` |
 | \`onChange(fn)\` / \`destroy()\` | watch, and stop |
 
 \`toPack()\` maps the manifest onto the pack shape: an image with a \`frames\` block becomes a
 spritesheet, one without stays an image, atlases stay atlases, an audio pair keeps both
-addresses, tilemaps are Tiled JSON, and a font carrying \`data\` becomes a bitmap font.
+addresses, tilemaps are Tiled JSON, and a font with \`data\` becomes a bitmap font.
 
 ### The manifest
 
@@ -440,7 +440,7 @@ const gallery = AIMEAT.assets.preview('#library', lib, { check: true });
 - **\`upload(file, { app, key, kind, visibility, mime_type })\`** returns the \`/v1/pub/<owner>/<key>\`
   address, which is the anonymous read. Without \`visibility\` the node stores the file at its
   level for an app's upload, which is public unless the operator chose otherwise; pass
-  \`visibility: 'public'\` to be sure. A file that does not land public is warned about at upload
+  \`visibility: 'public'\` to be sure. A file that is not stored public is warned about at upload
   time rather than found later as a blank sprite.
 - **\`packAtlas(images, { maxSize, padding, pot, name })\`** packs loose pictures into one sheet
   plus TexturePacker JSON, in the browser, and returns \`{ png, json, sheet }\`. \`src\` may be an
@@ -474,7 +474,7 @@ const gallery = AIMEAT.assets.preview('#library', lib, { check: true });
    the art list, and nobody but the player may read their save.
 9. **\`/v1/storage/<key>\` is not an asset address.** It needs an Authorization header, so it
    works for the file's owner and for nobody else. Every manifest entry uses
-   \`/v1/pub/<owner-ghii>/<key>\`, which is what \`upload()\` hands back.
+   \`/v1/pub/<owner-ghii>/<key>\`, which is what \`upload()\` returns.
 10. **\`lib.save()\` needs \`aimeat-data.js\` on the page**, and says so in words when it is not
     there. Everything else in the asset library works without it.
 11. **A manifest over 1024 kB is refused rather than written.** Split the app into two

@@ -168,7 +168,7 @@ export function odpsWriteRefusal(key: string, value: unknown, previous: unknown)
         const src = e.where(f);
         fields.push({ entry: e.label, source_field: src, odps_field: path, length, max_length: limit.maxLength, room });
         const shares = [
-          ...(nodePart > 0 ? [`the node's usage-terms sentences take ${nodePart} characters with the space after them`] : []),
+          ...(nodePart > 0 ? [`AIMEAT's usage-terms sentences take ${nodePart} characters with the space after them`] : []),
           ...present.filter(p => p.f !== f).map(p => `${e.where(p.f)} takes ${charLength(p.t) + 1} with its joining space`),
         ];
         sentences.push(`${src} makes ${path} ${length} characters, and ODPS v${ODPS_VERSION} allows ${limit.maxLength}`
@@ -181,7 +181,7 @@ export function odpsWriteRefusal(key: string, value: unknown, previous: unknown)
   return {
     ok: false, status: 422, code: ODPS_FIELD_TOO_LONG,
     message: `Not saved: the EXCHANGE listing${labels.length > 1 ? 's' : ''} ${labels.join(', ')} would publish an ODPS document`
-      + ` the ODPS v${ODPS_VERSION} schema refuses. ${sentences.join(' ')} Shorten the text and write again. The node does not`
+      + ` the ODPS v${ODPS_VERSION} schema refuses. ${sentences.join(' ')} Shorten the text and write again. AIMEAT does not`
       + ' cut it for you, because a shortened licence term would say something you did not write.',
     details: { key, fields },
   };

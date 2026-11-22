@@ -407,7 +407,7 @@ Write the manifest with the visibility \`private\` unless the user asked for the
 
 ## Rules
 
-1. Only real, verified sources. An unverified source is marked unverified, never dressed up.
+1. Only real, verified sources. An unverified source is marked unverified, never presented as verified.
 2. Every entry shows its visibility before the user says yes, and nothing is written before the yes.
 3. Be honest about the synthesis level.
 4. The manifest first, then the entries; an entry whose write fails is reported, not silently skipped.
@@ -446,7 +446,7 @@ Content-Type: application/json
 }
 \`\`\`
 
-The response carries a verification address and a short code.
+The response contains a verification address and a short code.
 
 ### Step 2: The user approves you
 Give the user the verification address and the code. They sign in to their own portal, approve you and choose what you may do. The user's password and keys stay with them, so ask for neither.
@@ -460,7 +460,7 @@ Content-Type: application/json
 { "device_code": "<device_code_from_step_1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
 \`\`\`
 
-The answer carries your access token and your identity (GAII). The full flow, with every field: GET {{node_url}}/auth.md
+The answer contains your access token and your identity (GAII). The full flow, with every field: GET {{node_url}}/auth.md
 
 ### Step 4: Use AIMEAT services
 Send the token on every call as \`Authorization: Bearer <access_token>\`. You can now:

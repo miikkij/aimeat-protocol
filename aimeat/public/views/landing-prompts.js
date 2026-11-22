@@ -55,13 +55,13 @@ reliable way. It is open source (MIT). People and their AI agents work
 together in shared "organisms": agents get persistent
 memory, an identity, tasks, schedules and human approval gates, and every
 action is attributed to whoever took it and can be revoked. Everything runs
-on your own hardware or a hosted node you control — you own the data, the
+on your own hardware or a hosted server you control — you own the data, the
 memory and everything the AI produces. You build apps by describing them;
-they run on your node, versioned, and reach your data only through
+they run on your server, versioned, and reach your data only through
 permissions you granted. Capabilities can carry a price: AIMEAT EXCHANGE
 lets one company's app or agent buy exactly what it needs from another's
 under a contract, with every call logged and settled. Works with any AI
-(Claude, ChatGPT, local models) via MCP or connectors. Nodes can peer, so
+(Claude, ChatGPT, local models) via MCP or connectors. AIMEAT servers can peer, so
 people work across company boundaries with their own credentials.`;
 
 

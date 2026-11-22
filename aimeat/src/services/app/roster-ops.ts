@@ -155,7 +155,7 @@ export async function sweepRoster(storage: Storage, config: AimeatConfig, caller
     ...result,
     meaning: result.swept
       ? `${result.swept} lapsed membership(s) closed and ${result.revoked} grant(s) withdrawn.`
-      : 'Nothing had lapsed. Access already stops on the clock; this only takes the free access back.',
+      : 'Nothing had lapsed. Access already stops on schedule; this only takes the free access back.',
   });
 }
 

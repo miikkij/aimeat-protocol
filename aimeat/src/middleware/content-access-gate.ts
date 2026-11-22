@@ -349,6 +349,6 @@ export function contentAccessGate(
       return;
     }
     res.status(401).json(error(config.nodeId, 'SIGN_IN_REQUIRED',
-      'This node shows its content to its own signed-in accounts only. Sign in, or connect your AI to this node, and ask again.'));
+      'This server shows its content to its own signed-in accounts only. Sign in, or connect your AI to this server, and ask again.'));
   };
 }

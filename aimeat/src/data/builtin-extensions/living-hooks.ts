@@ -68,7 +68,7 @@ export const LIVING_HOOKS_MANIFEST = `extension: "1.0"
 metadata:
   name: "living-hooks"
   version: "${LIVING_HOOKS_VERSION}"
-  description: "Lets a living document talk to the world: send the whole state of the document to an address you allowed when something changes, and read a value back in from an address, raw or picked out of JSON. You say which addresses are allowed; nothing else is called. A password or key you would rather not write into the document is stored once in your own vault and named in a header as {{secret:NAME}}, and it is filled in on the way out."
+  description: "Lets a living document call other services: send the whole state of the document to an address you allowed when something changes, and read a value back in from an address, raw or picked out of JSON. You say which addresses are allowed; nothing else is called. A password or key you would rather not write into the document is stored once with your own secrets and named in a header as {{secret:NAME}}, and it is filled in when the request is sent."
   author: "AIMEAT"
   license: "MIT"
 
@@ -109,7 +109,7 @@ actions:
         description: "POST or PUT. POST when omitted."
       headers:
         type: object
-        description: "Header names and values. Authorization, Content-Type, Accept, X-Api-Key, X-Requested-With, and any name starting with X-Living-. A value may name a secret from your vault as {{secret:NAME}}; the node fills it in on the way out and it never reaches this document."
+        description: "Header names and values. Authorization, Content-Type, Accept, X-Api-Key, X-Requested-With, and any name starting with X-Living-. A value may name one of your own secrets as {{secret:NAME}}; the node fills it in when the request is sent and it never reaches this document."
       body:
         type: object
         description: "What the receiver reads: the whole state of the document, the transition that fired, and the time."
@@ -155,7 +155,7 @@ actions:
         description: "When this value was actually fetched. An answer that came from the ten-second cache carries the original time."
       contentType:
         type: string
-        description: "What the far end said it was sending."
+        description: "What the remote server said it was sending."
       cached:
         type: boolean
         description: "True when this came from the ten-second cache rather than a new call."
@@ -273,7 +273,7 @@ export default async function (ctx, input) {
   var bytes = livingBytes(res.text);
   if (bytes > 1048576) {
     return livingRefuse('TOO_LARGE',
-      'The answer is ' + bytes + ' bytes and the ceiling is 1048576, which is 1 MB. Ask the far end '
+      'The answer is ' + bytes + ' bytes and the ceiling is 1048576, which is 1 MB. Ask the remote server '
       + 'for a smaller answer, or for the one value instead of the whole document.',
       { bytes: bytes, limit: 1048576 });
   }

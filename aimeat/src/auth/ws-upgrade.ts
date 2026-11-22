@@ -106,7 +106,7 @@ function noteQueryTokenUse(socket: SocketKind): void {
   if (day === lastQueryTokenNoticeDay) return;
   lastQueryTokenNoticeDay = day;
   logger.warn(
-    `A WebSocket upgrade carried a session token in its URL (?token=). This is deprecated and removed in ${WS_QUERY_TOKEN_REMOVED_IN}, `
+    `A WebSocket upgrade sent a session token in its URL (?token=). This is deprecated and removed in ${WS_QUERY_TOKEN_REMOVED_IN}, `
     + 'because reverse proxies log URLs. Clients should POST /v1/ws/ticket and connect with ?ticket=. '
     + 'GET /v1/stats counts the uses (ws_query_token); AIMEAT_WS_QUERY_TOKEN=false refuses them. Logged once a day.',
     { socket },

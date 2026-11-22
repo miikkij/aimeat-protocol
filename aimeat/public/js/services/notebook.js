@@ -103,7 +103,7 @@ export async function parkMessageToNotebook(msg, opts = {}) {
     trackedResponseIntent: { owes: true, mode: opts.mode || 'approve' },
   };
   const resp = await createMemory(key, value, 'private');
-  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not park to notebook');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not save to notebook');
   return { key };
 }
 
@@ -173,7 +173,7 @@ export async function parkConversationToNotebook({ conv, thread, peerName, summa
     trackedResponseIntent: { owes: false, mode: 'approve' },
   };
   const resp = await createMemory(key, value, 'private');
-  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not park conversation to notebook');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not save conversation to notebook');
   return { key };
 }
 

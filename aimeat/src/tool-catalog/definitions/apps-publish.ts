@@ -46,7 +46,7 @@ import { AI_ROLE_PARAM } from './ai-models.js';
 /** One input picture of an image call: a stored file by key, or a data: URL (services/ai/call-files.ts). */
 const imageInputShape = z.object({
     storage_key: z.string().min(1).max(512).optional().describe('A picture in your storage, or one you made with aimeat_image_generate.'),
-    data_url: z.string().max(60_000_000).optional().describe('data:<mime>;base64,<bytes>. Prefer storage_key: a data URL travels through your context.'),
+    data_url: z.string().max(60_000_000).optional().describe('data:<mime>;base64,<bytes>. Prefer storage_key: a data URL goes through your context.'),
 });
 
 /**
@@ -82,7 +82,7 @@ const DRAFT_NOTICE_INPUT = {
 export const appPublishTools = [
     {
         name: 'aimeat_app_publish',
-        description: 'Publish or update an HTML app STRAIGHT TO LIVE (versioned by group) — every call becomes the new live version users get immediately. START FROM A TEMPLATE, never from scratch: on the Atelier track a `fine` app forks a genre (`genre-<id>`) and a `proto` or `plain` app starts from the shell `shell-atelier` (`GET /v1/app-templates` lists them; the build specification says which). The template carries the login pill, the language and theme controls, and the design system the node already serves; an app written from nothing typically ships without them, and the person only finds out by opening it. Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback. DECIDING LIVE vs STAGING: use this when you are confident the app works. When you want to TEST the next version first (e.g. anything using the microphone/camera, which only work on a real origin — never in an embedded preview), stage it with aimeat_app_draft_save, open its preview_url to verify, then aimeat_app_draft_publish — the live app stays untouched until you do. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer carries publish_request.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update an HTML app STRAIGHT TO LIVE (versioned by group) — every call becomes the new live version users get immediately. START FROM A TEMPLATE, never from scratch: on the Atelier track a `fine` app forks a genre (`genre-<id>`) and a `proto` or `plain` app starts from the shell `shell-atelier` (`GET /v1/app-templates` lists them; the build specification says which). The template has the login pill, the language and theme controls, and the design system the node already serves; an app written from nothing typically ships without them, and the person only finds out by opening it. Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback. DECIDING LIVE vs STAGING: use this when you are confident the app works. When you want to TEST the next version first (e.g. anything using the microphone/camera, which only work on a real origin — never in an embedded preview), stage it with aimeat_app_draft_save, open its preview_url to verify, then aimeat_app_draft_publish — the live app stays untouched until you do. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer contains publish_request.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -109,12 +109,12 @@ export const appPublishTools = [
             // development grant does not carry them.
             toll_morsels: { type: 'number', description: "The app's pacing amount: the morsels of pacing taking this app moves (0 to 100; a morsel paces use and is not money). Your owner's own apps only: on an app you build for somebody else it is refused (FORBIDDEN). Inline publish only; a publish in upload mode keeps the amount the app has.", zod: z.number().int().min(0) },
             license_type: { type: 'string', enum: ['single', 'lifetime'], description: "How taking the app is licensed: 'single' or 'lifetime'. Your owner's own apps only, as toll_morsels; inline publish only." },
-            cortex_agents: { type: 'array', description: 'The agents this app brings (manifest.cortex.agents), validated at publish in both modes. Usually omit it and declare them in the page instead, in a <script type="application/json" id="aimeat-crews"> block, which a package made from the app reads too. With neither, the previous version\'s agents carry forward; [] clears. The shape is in skill node:aimeat-app-agents.', zod: z.array(z.record(z.string(), z.unknown())) },
+            cortex_agents: { type: 'array', description: 'The agents this app brings (manifest.cortex.agents), validated at publish in both modes. Usually omit it and declare them in the page instead, in a <script type="application/json" id="aimeat-crews"> block, which a package made from the app reads too. With neither, the previous version\'s agents are kept; [] clears. The shape is in skill node:aimeat-app-agents.', zod: z.array(z.record(z.string(), z.unknown())) },
         },
     },
     {
         name: 'aimeat_app_list',
-        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Paged: the answer carries `total`, `limit`, `offset` and `has_more`, so read the whole catalogue by calling again with offset += limit while has_more is true. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_manage { action: "versions" }. Publish with aimeat_app_publish.',
+        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Paged: the answer contains `total`, `limit`, `offset` and `has_more`, so read the whole catalogue by calling again with offset += limit while has_more is true. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_manage { action: "versions" }. Publish with aimeat_app_publish.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Apps', readOnlyHint: true },
@@ -159,7 +159,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_fork',
-        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license; for an app behind an access code, you pass that code as access_code). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact. When the node asks the owner before making something public, a fork the node would list for anyone lands unlisted and the answer carries publish_request.',
+        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license; for an app behind an access code, you pass that code as access_code). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact. When the node asks the owner before making something public, a fork the node would list for anyone is published unlisted and the answer contains publish_request.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -201,7 +201,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_draft_publish',
-        description: 'Promote an app\'s saved draft to a NEW live version, then clear the draft slot — THIS is the moment the live app changes. Carries the live app\'s parked/forkable/protection state forward, exactly like a normal re-publish. Call this after you have tested the draft via the preview_url from aimeat_app_draft_save and it works. Fails if there is no saved draft. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer carries publish_request.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Promote an app\'s saved draft to a NEW live version, then clear the draft slot — THIS is the moment the live app changes. Keeps the live app\'s parked/forkable/protection state, exactly like a normal re-publish. Call this after you have tested the draft via the preview_url from aimeat_app_draft_save and it works. Fails if there is no saved draft. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer contains publish_request.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -213,7 +213,7 @@ export const appPublishTools = [
             ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
-            version: { type: 'string', description: 'Display version to publish with, e.g. "1.4.0". Overrides the one the draft carries (set by aimeat_app_draft_save, else the live app\'s).' },
+            version: { type: 'string', description: 'Display version to publish with, e.g. "1.4.0". Overrides the one the draft has (set by aimeat_app_draft_save, else the live app\'s).' },
         },
     },
     {
@@ -232,7 +232,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_draft_write',
-        description: 'Write into an app\'s draft slot a PIECE AT A TIME, so you can build an app larger than one model response. This is the way to author a real app: no model emits 400 kB in one go, and there is no filesystem here to assemble it on. Call repeatedly with mode "append" until the file is complete, then aimeat_app_draft_publish. Use mode "replace" for the first call, or to start over. Content is plain UTF-8 text, NOT base64. To continue an app that is already live, copy it into the slot first with aimeat_app_draft_seed. To change something you already wrote, prefer aimeat_app_draft_replace over rewriting the whole file. Pass expected_size_bytes when you are appending across many calls and want to be told if the draft moved underneath you.',
+        description: 'Write into an app\'s draft slot a PIECE AT A TIME, so you can build an app larger than one model response. This is the way to author a real app: no model emits 400 kB in one go, and there is no filesystem here to assemble it on. Call repeatedly with mode "append" until the file is complete, then aimeat_app_draft_publish. Use mode "replace" for the first call, or to start over. Content is plain UTF-8 text, NOT base64. To continue an app that is already live, copy it into the slot first with aimeat_app_draft_seed. To change something you already wrote, prefer aimeat_app_draft_replace over rewriting the whole file. Pass expected_size_bytes when you are appending across many calls and want to be told if the draft changed meanwhile.',
         caller: 'agent',
         visibility: agentEverywhere,
         // append is not idempotent: calling it twice writes the chunk twice, which is the whole point of
@@ -314,7 +314,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_seo_announce',
-        description: 'Tell the search engines about the whole site now, through IndexNow: the node\'s pages and, by default, every findable application and the public page of every public data package, sent as one batch per host under that host\'s own key file. It reaches Bing (and through Bing, Copilot and ChatGPT search), Yandex, Naver, Seznam and Yep; Google does not take part, so the sitemap stays the way Google hears. It is a knock, not an order: each engine decides whether to come and what to keep, and a site never verified in Bing Webmaster Tools gets little of Bing\'s time, so read aimeat_seo_status first and get the verification done. With plan: true it lists what would be sent, host by host, and sends nothing. Refuses when no IndexNow key is configured or when the node turns search engines away. Operator-only.',
+        description: 'Tell the search engines about the whole site now, through IndexNow: the node\'s pages and, by default, every findable application and the public page of every public data package, sent as one batch per host under that host\'s own key file. It reaches Bing (and through Bing, Copilot and ChatGPT search), Yandex, Naver, Seznam and Yep; Google does not take part, so Google still finds the pages through the sitemap. It is a request, not an order: each engine decides whether to come and what to keep, and a site never verified in Bing Webmaster Tools gets little of Bing\'s time, so read aimeat_seo_status first and get the verification done. With plan: true it lists what would be sent, host by host, and sends nothing. Refuses when no IndexNow key is configured or when the node refuses search engines. Operator-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.
@@ -328,7 +328,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_image_generate',
-        description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never travel through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. To keep a character, a place or a style the same from picture to picture, pass the earlier pictures as reference_images (stored files by key: your own, or a picture you made with this tool before); the model sees them as pictures. To redraw only part of a picture, give it as the first reference and pass a mask. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default), and for references one that takes pictures as input — it refuses by name rather than handing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
+        description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never pass through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. To keep a character, a place or a style the same from picture to picture, pass the earlier pictures as reference_images (stored files by key: your own, or a picture you made with this tool before); the model sees them as pictures. To redraw only part of a picture, give it as the first reference and pass a mask. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default), and for references one that takes pictures as input — it refuses by name rather than passing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

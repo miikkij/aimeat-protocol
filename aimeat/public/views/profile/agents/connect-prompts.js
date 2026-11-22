@@ -168,7 +168,7 @@ You do NOT need to:
 - Write any AIMEAT REST or MCP code by hand
 
 == Step 4b -- Run as a daemon (this is what you really want) ==
-The one-shot above proves the wiring works, but to make the crew a
+The one-shot above proves the setup works, but to make the crew a
 REACHABLE TARGET in the AIMEAT network -- so other agents (Claude
 Desktop, Hermes, another crew) can queue tasks for it via the
 aimeat_task_create MCP tool and the crew picks them up automatically --

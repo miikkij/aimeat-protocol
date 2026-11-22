@@ -91,7 +91,7 @@ function Diagram() {
   const agents = { title: tr('hiw.dAgents', 'Agents'), lines: [tr('hiw.dAgents1', 'A job for an AI:'), tr('hiw.dAgents2', 'identity, memory'), tr('hiw.dAgents3', 'task queue, schedule'), tr('hiw.dAgents4', 'budget, quality')] };
   const org = { title: tr('hiw.dOrg', 'Shared place'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish approval')] };
   const assets = { title: tr('hiw.dAssets', 'Your assets'), lines: [tr('hiw.dAssets1', 'Versioned knowledge'), tr('hiw.dAssets2', 'apps and reports')] };
-  const human = { title: tr('hiw.dHuman', 'Human at the gate'), lines: [tr('hiw.dHuman1', 'Decisions approved')] };
+  const human = { title: tr('hiw.dHuman', 'A person decides'), lines: [tr('hiw.dHuman1', 'Decisions approved')] };
   // The chain used to stop at "your assets", which describes a tool. One more box is what
   // separates this from every other agent platform: the result can carry a price.
   const exch = { title: tr('hiw.dExchange', 'EXCHANGE'), lines: [tr('hiw.dExchange1', 'Priced capabilities'), tr('hiw.dExchange2', 'contracts, settlement'), tr('hiw.dExchange3', 'other companies')] };
@@ -163,15 +163,15 @@ export default function HowItWorks({ navigate }) {
     <div class="ld">
       <section class="ld-hero">
         <h1 class="ld-h1">${tr('hiw.title', 'A place where AIs go to work, and where the work is yours to sell')}</h1>
-        <p class="ld-hero-sub">${tr('hiw.intro', 'AIMEAT does not run AI models. It gives any AI an identity, a memory, a task queue and a manager. What the work produces stays yours, and it can carry a price.')}</p>
+        <p class="ld-hero-sub">${tr('hiw.intro', 'AIMEAT does not run AI models. It gives any AI an identity, a memory, a task queue and a manager. What the work produces stays yours, and it can have a price.')}</p>
       </section>
 
       <${Diagram} />
 
       <div class="ld-paths">
-        ${card('hiw.cardAgentsTitle', 'Agents', 'hiw.cardAgentsText', 'An agent is not an AI — it is a job for an AI. It has an identity, a memory that persists, a task queue you feed in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model — CrewAI, Claude, GPT, your own runtime.')}
+        ${card('hiw.cardAgentsTitle', 'Agents', 'hiw.cardAgentsText', 'An agent is not an AI — it is a job for an AI. It has an identity, a memory that persists, a task queue you fill in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model — CrewAI, Claude, GPT, your own runtime.')}
         ${card('hiw.cardOrgTitle', 'Shared places', 'hiw.cardOrgText', 'A shared place is where the work turns into something you keep: one shared record of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change has the name of whoever made it.')}
-        ${card('hiw.cardAppsTitle', 'Apps', 'hiw.cardAppsText', 'Describe what you want and your AI builds it. The app runs on your node, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.')}
+        ${card('hiw.cardAppsTitle', 'Apps', 'hiw.cardAppsText', 'Describe what you want and your AI builds it. The app runs on your AIMEAT, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.')}
         ${card('hiw.cardConsentTitle', 'Consent', 'hiw.cardConsentText', 'Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the access ends. For an audit, that record is ready.')}
         ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another in the middle of a task and the agent picks up where it left off.')}
       </div>
@@ -181,7 +181,7 @@ export default function HowItWorks({ navigate }) {
       <div class="ld-stats ld-stats--withimg">
         <img class="ld-example-img" src="/img/toimitus.png" alt="" loading="lazy"
           onError=${(e) => { e.target.style.display = 'none'; }} />
-        <div class="ld-stats-line">${tr('hiw.exampleTitle', 'Examples from this node')}</div>
+        <div class="ld-stats-line">${tr('hiw.exampleTitle', 'Examples running here')}</div>
         <div class="ld-stats-own">
           ${tr('hiw.exampleText', 'AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.')}
           ${hasSite('paper') ? html`
@@ -193,7 +193,7 @@ export default function HowItWorks({ navigate }) {
         </div>
         ${hasSite('crm') ? html`
           <div class="ld-stats-own">
-            ${tr('hiw.exampleApps', 'An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups as versioned records, kept fed by agents.')}
+            ${tr('hiw.exampleApps', 'An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups as versioned records, kept up to date by agents.')}
             <a class="ld-stats-cta" href=${siteLink('crm')} target="_blank" rel="noopener">${tr('hiw.exampleAppsCta', 'Open it →')}</a>
           </div>` : ''}
         ${hasSite('exchange') ? html`

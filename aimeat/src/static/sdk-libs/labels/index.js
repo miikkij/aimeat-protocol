@@ -53,7 +53,7 @@ const HUMAN = {
   CLASSIFIED: 'This content is classified so that an AI may not read it. Nothing was sent to the AI.',
   AUDIENCE_LOCKOUT: 'This label limits who may read the content, and you are not among them. Pick another label, or add yourself to its audience first.',
   JUSTIFICATION_REQUIRED: 'Lowering this label needs a written reason: why the content is less sensitive than its label says.',
-  POLICY_DILUTES: 'A lower level may only make the node policy stricter.',
+  POLICY_DILUTES: 'A lower level may only make this server\'s policy stricter.',
   INVALID_POLICY: 'The policy is not valid.',
   PERSON_REQUIRED: 'A person decides this, signed in themselves.',
   AI_LABELLING_OFF: 'The classification policy does not let an AI set labels. A person sets the label.',
@@ -61,11 +61,11 @@ const HUMAN = {
   CLASSIFICATION_OFF: 'Classification is off on this server.',
   NO_SUGGESTION: 'Nothing is waiting for a review on this content.',
   NO_PROPOSAL: 'Nothing is waiting for a review on this policy.',
-  OPERATOR_REQUIRED: 'Only an operator of this server changes the node policy.',
+  OPERATOR_REQUIRED: 'Only an operator of this server changes this server\'s policy.',
   NOT_FOUND: 'No such content, or it is not yours to label.',
-  FOREIGN_VISITOR: 'A visitor from another node labels nothing here.',
+  FOREIGN_VISITOR: 'A visitor from another server labels nothing here.',
   AUTH_REQUIRED: 'Sign in to see or change a classification.',
-  INVALID_INPUT: 'The request does not name the content the way the node expects.',
+  INVALID_INPUT: 'The request does not name the content the way this server expects.',
   EXCEPTION_LIMIT: 'This month already holds as many exceptions as it may. Withdraw ones that are no longer needed.',
 };
 

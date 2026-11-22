@@ -115,11 +115,11 @@ describe('the component bench', () => {
   });
 
   it('carries no script, in any of the ways script gets in', () => {
-    expect(bad({ html: '<div class="wkgrid"><script>alert(1)</script></div>' })).toThrow(/may not carry <script>/);
+    expect(bad({ html: '<div class="wkgrid"><script>alert(1)</script></div>' })).toThrow(/may not contain <script>/);
     expect(bad({ html: '<div class="wkgrid" onclick="x()"></div>' })).toThrow(/attribute "onclick"/);
-    expect(bad({ html: '<div class="wkgrid"><a href="javascript:x()">x</a></div>' })).toThrow(/may not carry <a>/);
-    expect(bad({ html: '<div class="wkgrid"><iframe></iframe></div>' })).toThrow(/may not carry <iframe>/);
-    expect(bad({ html: '<div class="wkgrid"><img src="x"></div>' })).toThrow(/may not carry <img>/);
+    expect(bad({ html: '<div class="wkgrid"><a href="javascript:x()">x</a></div>' })).toThrow(/may not contain <a>/);
+    expect(bad({ html: '<div class="wkgrid"><iframe></iframe></div>' })).toThrow(/may not contain <iframe>/);
+    expect(bad({ html: '<div class="wkgrid"><img src="x"></div>' })).toThrow(/may not contain <img>/);
     expect(bad({ html: '<div class="wkgrid" style="color:red"></div>' })).toThrow(/attribute "style"/);
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { background: url(https://evil.example/x.png); color: var(--ak-ink); }' })).toThrow(/no url\(\)/);
     expect(bad({ css: '@import "https://evil.example/a.css";\n' + WEEK_GRID.css })).toThrow(/loads nothing/);
@@ -134,8 +134,8 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid"' })).toThrow(/never meets its ">"/);
     expect(bad({ html: '<div class="wkgrid" title="never closed></div>' })).toThrow(/never meets its ">"/);
     // A browser drops tabs and newlines inside a scheme, so the bench does before it looks.
-    expect(bad({ html: '<div class="wkgrid" title="java\tscript:x()"></div>' })).toThrow(/may not carry an address/);
-    expect(bad({ html: '<svg class="wkgrid"><path class="wkgrid-p" d="java\nscript:alert(1)"></path></svg>' })).toThrow(/may not carry an address/);
+    expect(bad({ html: '<div class="wkgrid" title="java\tscript:x()"></div>' })).toThrow(/may not contain an address/);
+    expect(bad({ html: '<svg class="wkgrid"><path class="wkgrid-p" d="java\nscript:alert(1)"></path></svg>' })).toThrow(/may not contain an address/);
   });
 
   // 1a0a15eb7b20: each of these passed the bench, and a browser ran the script in it. A browser
@@ -146,8 +146,8 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid" ="><script>alert(1)</script>"></div>' })).toThrow(/"=" stands where a browser expects/);
     expect(bad({ html: '<div class="wkgrid" = "><script>alert(1)</script>"></div>' })).toThrow(/"=" stands where a browser expects/);
     expect(bad({ html: '<div class="wkgrid" hidden/="><script>alert(1)</script>"></div>' })).toThrow();
-    expect(bad({ html: '<div class="wkgrid"></div ="><script>alert(1)</script>">' })).toThrow(/closing tag carries nothing/);
-    expect(bad({ html: '<div class="wkgrid"></div title="><script>alert(1)</script>">' })).toThrow(/closing tag carries nothing/);
+    expect(bad({ html: '<div class="wkgrid"></div ="><script>alert(1)</script>">' })).toThrow(/closing tag contains nothing/);
+    expect(bad({ html: '<div class="wkgrid"></div title="><script>alert(1)</script>">' })).toThrow(/closing tag contains nothing/);
     expect(bad({ html: '<div class="wkgrid"></ div title="><script>alert(1)</script>">' })).toThrow(/right after "<" or "<\/"/);
     expect(bad({ html: '<div class="wkgrid">< div title="x"></div>' })).toThrow(/right after "<" or "<\/"/);
     // The reader says so itself, from the parser's own error: nothing it could not read is dropped on the floor.
@@ -184,7 +184,7 @@ describe('the component bench', () => {
   it('checks every tag the parser builds, and refuses a "<" that starts none', () => {
     expect(bad({ html: '<div class="wkgrid"><td class="wkgrid-c" onclick="x()">1</td></div>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<textarea class="wkgrid-t"><script>alert(1)</script></textarea>' })).toThrow(/starts no tag a browser reads in that place/);
-    expect(bad({ html: '<select class="wkgrid-s"><option>a</option><title><script>alert(1)</script></title></select>' })).toThrow(/may not carry <script>|starts no tag/);
+    expect(bad({ html: '<select class="wkgrid-s"><option>a</option><title><script>alert(1)</script></title></select>' })).toThrow(/may not contain <script>|starts no tag/);
     expect(bad({ html: '<div class="wkgrid"><body onload="x()"></body></div>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<svg class="wkgrid-i"><![CDATA[><script>alert(1)</script>]]></svg>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<div class="wkgrid">x</p></div>' })).toThrow(/starts no tag a browser reads in that place/);
@@ -211,10 +211,10 @@ describe('the component bench', () => {
     expect(() => validateComponentBody(labelled('&#169; 2026, Tom &#x26; Jerry'))).not.toThrow();
     expect(() => validateComponentBody(labelled('Read &AMP; write'))).not.toThrow();
     const svg = (attr: string) => ({ html: `<svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" ${attr}></rect></svg>` });
-    expect(bad(svg('fill="u&#114;l(https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
-    expect(bad(svg('fill="&#x75;rl(https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
-    expect(bad(svg('fill="url&lpar;https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
-    expect(bad(svg('fill=u&#114;l(https://e.example/p.svg#g)'))).toThrow(/may not carry an address/);
+    expect(bad(svg('fill="u&#114;l(https://e.example/p.svg#g)"'))).toThrow(/may not contain an address/);
+    expect(bad(svg('fill="&#x75;rl(https://e.example/p.svg#g)"'))).toThrow(/may not contain an address/);
+    expect(bad(svg('fill="url&lpar;https://e.example/p.svg#g)"'))).toThrow(/may not contain an address/);
+    expect(bad(svg('fill=u&#114;l(https://e.example/p.svg#g)'))).toThrow(/may not contain an address/);
     // Without its semicolon a reference still decodes, and the parser says the markup is not clean.
     expect(bad(svg('fill="u&#114l(https://e.example/p.svg#g)"'))).toThrow(/does not read cleanly/);
     expect(bad({ html: WEEK_GRID.html.replace('aria-label="This week"', 'aria-label="&copy 2026"') })).toThrow(/does not read cleanly/);
@@ -289,10 +289,10 @@ describe('the component bench', () => {
   // same wherever it lands.
   it('carries no "</", so every page reads the stylesheet as the bench does', () => {
     const commented = WEEK_GRID.css + '\n@media (width </* ) { } .wkgrid-x { background: url(https://evil.example/x.png) } @media ( */ 600px) { .wkgrid-y { color: var(--ak-ink); } }';
-    expect(bad({ css: commented })).toThrow(/carries no "<\/"/);
+    expect(bad({ css: commented })).toThrow(/contains no "<\/"/);
     expect(componentPreviewHtml({ ...WEEK_GRID, css: commented } as unknown as ComponentBody)).not.toContain('evil.example');
     const closing = WEEK_GRID.css + '\n.wkgrid-x::before { content: "</style><p>"; color: var(--ak-ink); }';
-    expect(bad({ css: closing })).toThrow(/carries no "<\/"/);
+    expect(bad({ css: closing })).toThrow(/contains no "<\/"/);
     expect(() => componentSnippet({ ...WEEK_GRID, css: closing } as unknown as ComponentBody)).toThrow(/no longer passes/);
     // Inside a string, "<\/" reads the same and passes.
     expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-x::before { content: "<\\/p>"; color: var(--ak-ink); }' })).not.toThrow();
@@ -475,7 +475,7 @@ describe('the component bench', () => {
   it('refuses @scope wherever it stands, and says how to write the rule on the component\'s own classes', () => {
     // Nested in a rule of the component, the prelude makes "&" the page's <body>.
     expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid { @scope (body) { & p { color: var(--ak-accent); } } }` }))
-      .toThrow(/carries no @scope, and a component does not need it.*"@scope \(\.wkgrid\) \{ \.wkgrid-cell \{ … \} \}" is "\.wkgrid \.wkgrid-cell \{ … \}", or "& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/);
+      .toThrow(/contains no @scope, and a component does not need it.*"@scope \(\.wkgrid\) \{ \.wkgrid-cell \{ … \} \}" is "\.wkgrid \.wkgrid-cell \{ … \}", or "& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/);
     for (const css of [
       `@scope (.wkgrid) { .wkgrid-cell { color: var(--ak-accent); } }\n${WEEK_GRID.css}`,
       `${WEEK_GRID.css}\n.wkgrid-row { @scope (.wkgrid-row) to (.wkgrid-cell) { & { color: var(--ak-accent); } } }`,
@@ -483,7 +483,7 @@ describe('the component bench', () => {
       `${WEEK_GRID.css}\n.wkgrid { @SCOPE (body) { & p { color: var(--ak-accent); } } }`,
       `${WEEK_GRID.css}\n.wkgrid { @\\73 cope (body) { & p { color: var(--ak-accent); } } }`,
     ]) {
-      expect(bad({ css }), css).toThrow(/carries no @scope/);
+      expect(bad({ css }), css).toThrow(/contains no @scope/);
     }
     // What a string or a comment holds is text.
     for (const css of [`${WEEK_GRID.css}\n.wkgrid-cell::after { content: "@scope (body)"; }`, `${WEEK_GRID.css}\n/* no @scope here */`]) {
@@ -493,12 +493,12 @@ describe('the component bench', () => {
 
   // A component's stylesheet reaches only the component. These three act on the whole page by nature.
   it.each([
-    ['layer', '@layer wkgrid-base { .wkgrid-cell { color: var(--ak-accent); } }', /carries no @layer: the order of cascade layers belongs to the whole page.*":where\(\.wkgrid-cell\) \{ … \}"/],
-    ['layer', '@layer wkgrid-base, wkgrid-top;', /carries no @layer: /],
-    ['layer', '.wkgrid { @LAYER wkgrid-base { & .wkgrid-cell { color: var(--ak-accent); } } }', /carries no @layer: /],
-    ['page', '@page { margin: 0; }', /carries no @page: it sets how the whole page prints.*How a page prints is the page's to say/],
-    ['page', '@\\70 age :first { margin: 0; }', /carries no @page: /],
-    ['view-transition', '@view-transition { navigation: auto; }', /carries no @view-transition: it sets how the whole page changes to the next one/],
+    ['layer', '@layer wkgrid-base { .wkgrid-cell { color: var(--ak-accent); } }', /contains no @layer: the order of cascade layers belongs to the whole page.*":where\(\.wkgrid-cell\) \{ … \}"/],
+    ['layer', '@layer wkgrid-base, wkgrid-top;', /contains no @layer: /],
+    ['layer', '.wkgrid { @LAYER wkgrid-base { & .wkgrid-cell { color: var(--ak-accent); } } }', /contains no @layer: /],
+    ['page', '@page { margin: 0; }', /contains no @page: it sets how the whole page prints.*How a page prints is the page's to say/],
+    ['page', '@\\70 age :first { margin: 0; }', /contains no @page: /],
+    ['view-transition', '@view-transition { navigation: auto; }', /contains no @view-transition: it sets how the whole page changes to the next one/],
   ])('refuses @%s, which acts on the whole page: %s', (_name, rule, message) => {
     expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
   });
@@ -630,9 +630,9 @@ describe('the component bench', () => {
     expect(bad({ css: `${WEEK_GRID.css}\n@keyframes wkgrid-a { to { display: list-item; } }` })).toThrow(/makes an element a list item/);
     const disclosure = '<details class="wkgrid"><summary class="wkgrid-s">More</summary><p class="wkgrid-p">x</p></details>';
     for (const decl of ['counter-increment: wkgrid-step', 'counter-increment: none']) {
-      expect(bad({ html: disclosure, css: `${WEEK_GRID.css}\n.wkgrid-s { ${decl}; }` }), decl).toThrow(new RegExp(`The markup carries a <summary>, which a browser makes a list item that counts 0, and the declaration "${decl}" can reach it: `
+      expect(bad({ html: disclosure, css: `${WEEK_GRID.css}\n.wkgrid-s { ${decl}; }` }), decl).toThrow(new RegExp(`The markup contains a <summary>, which a browser makes a list item that counts 0, and the declaration "${decl}" can reach it: `
         + 'a counter-increment replaces that 0, so the <summary> is numbered as an item of the page\'s own list around the component, and the page\'s items after it count on from it\\. '
-        + 'Where the markup carries a <summary>, every counter-increment also writes "list-item 0": "counter-increment: wkgrid-step list-item 0"\\.'));
+        + 'Where the markup contains a <summary>, every counter-increment also writes "list-item 0": "counter-increment: wkgrid-step list-item 0"\\.'));
     }
     // A list of the component holds its own items, and "list-item 0" keeps a <summary> counting 0.
     for (const [html, css] of [
@@ -657,14 +657,14 @@ describe('the component bench', () => {
       ['counter-reset: wkgrid-x', 'counter-reset: wkgrid-x list-item'], ['counter-reset: none', 'counter-reset: list-item'],
       ['counter-reset: initial', 'counter-reset: list-item'], ['counter-reset: unset', 'counter-reset: list-item'],
     ]) {
-      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid { ${decl}; }` }), decl).toThrow(new RegExp('The markup carries an <ol>, whose items a browser numbers from the counter-reset: list-item '
+      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid { ${decl}; }` }), decl).toThrow(new RegExp('The markup contains an <ol>, whose items a browser numbers from the counter-reset: list-item '
         + `that its default style gives every <ul>, <ol> and <menu>\\. The declaration "${decl}" can reach that list and replace its reset, and a browser that numbers lists by the list-item counter `
         + 'then numbers the list\'s items as items of the page\'s own list around the component, whose items after them count on from them\\. '
-        + `Where the markup carries a <ul>, <ol> or <menu>, every counter-reset also names list-item: "${fix}"\\.`));
+        + `Where the markup contains a <ul>, <ol> or <menu>, every counter-reset also names list-item: "${fix}"\\.`));
     }
     for (const decl of ['all: initial', 'all: unset']) {
-      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid-i { ${decl}; }` }), decl).toThrow(new RegExp(`The markup carries an <ol>, and the declaration "${decl}" sets counter-reset to none wherever it reaches.*`
-        + 'Where the markup carries a <ul>, <ol> or <menu>, "all" takes only revert or revert-layer, which keep that reset\\.'));
+      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid-i { ${decl}; }` }), decl).toThrow(new RegExp(`The markup contains an <ol>, and the declaration "${decl}" sets counter-reset to none wherever it reaches.*`
+        + 'Where the markup contains a <ul>, <ol> or <menu>, "all" takes only revert or revert-layer, which keep that reset\\.'));
     }
     for (const decl of [
       'counter-reset: list-item', 'counter-reset: list-item 3', 'counter-reset: wkgrid-x list-item', 'counter-reset: reversed(list-item)', 'counter-reset: revert',
@@ -702,12 +702,12 @@ describe('the component bench', () => {
   // browser a Kelvin sign (U+212A) is not a "k", so `@\212a eyframes` is an at-rule it does not know.
   it('reads every name in ASCII lower case, as a browser matches it', () => {
     expect(readStylesheet('@\\212a eyframes wkgrid-a { from { opacity: 0 } }').atRules).toEqual([{ name: 'Keyframes', within: null }]);
-    expect(bad({ css: `${WEEK_GRID.css}\n@\\212a eyframes wkgrid-a { from { opacity: 0; } }` })).toThrow(/carries no @Keyframes: it uses only @media/);
+    expect(bad({ css: `${WEEK_GRID.css}\n@\\212a eyframes wkgrid-a { from { opacity: 0; } }` })).toThrow(/contains no @Keyframes: it uses only @media/);
     expect(bad({ css: `${WEEK_GRID.css}\n@keyframes w\\212a grid-a { from { opacity: 0; } }` })).toThrow(/defines the animation "wKgrid-a" with @keyframes/);
     expect(bad({ css: `${WEEK_GRID.css}\n@keyframes "WKGRID-X" { from { opacity: 0; } }` })).toThrow(/defines the animation "wKgrid-x" with @keyframes/);
     expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid-row { counter-increment: w\\212a grid-step; }` })).toThrow(/names the counter "wKgrid-step"/);
-    expect(bad({ html: '<div class="wkgrid"><marK class="wkgrid-m">x</marK></div>' })).toThrow(/may not carry <marK>/);
-    expect(bad({ html: '<div class="wkgrid" stroKe="x"></div>' })).toThrow(/may not carry the attribute "stroKe"/);
+    expect(bad({ html: '<div class="wkgrid"><marK class="wkgrid-m">x</marK></div>' })).toThrow(/may not contain <marK>/);
+    expect(bad({ html: '<div class="wkgrid" stroKe="x"></div>' })).toThrow(/may not contain the attribute "stroKe"/);
     // A name in ASCII capitals reads as its lower case.
     expect(readStylesheet('@MEDIA print { .A { COLOR: RED } }')).toMatchObject({ atRules: [{ name: 'media', within: null }], declarations: [{ property: 'color', keyword: 'red' }] });
     expect(readMarkup('<DIV CLASS="x"><SVG VIEWBOX="0 0 1 1"></SVG></DIV>').elements).toEqual([

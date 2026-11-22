@@ -132,7 +132,7 @@ export async function setParticipation(deps: HelpDeps, caller: CallerContext, bo
     const rank = (m: HelpAiMode) => AI_MODES.indexOf(m);
     if (rank(next.aiMode) > rank(cur.aiMode) || (next.agentsMayAsk && !cur.agentsMayAsk) || (next.aiMaySend && !cur.aiMaySend)
       || next.autoTopics.some(a => !cur.autoTopics.some(c => c.toLowerCase() === a.toLowerCase()))) {
-      return refuse(403, 'PERSON_REQUIRED', 'Only the person may give their AI more room (a higher AI level, more topics it answers on its own, or asking in their name). Ask them to change it on the page Ask someone who knows.');
+      return refuse(403, 'PERSON_REQUIRED', 'Only the person may give their AI more freedom (a higher AI level, more topics it answers on its own, or asking in their name). Ask them to change it on the page Ask someone who knows.');
     }
   }
   await deps.storage.putHelpParticipant(next);

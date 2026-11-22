@@ -135,7 +135,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -567,7 +567,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -1035,7 +1035,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -1481,7 +1481,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -1905,7 +1905,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -2373,7 +2373,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -2825,7 +2825,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -3293,7 +3293,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -4175,7 +4175,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -4642,7 +4642,7 @@
       "request_id": "<masked>",
       "error": {
         "code": "FEDERATION_AUTH_NOT_ALLOWED",
-        "message": "This link does not carry sign-ins"
+        "message": "This link does not allow sign-ins"
       },
       "hints": {
         "next_actions": [
@@ -4954,12 +4954,12 @@
       "request_id": "<masked>",
       "error": {
         "code": "FEDERATION_AUTH_FAILED",
-        "message": "Sign-in failed. Check the password, and that your home node lets this node sign you in."
+        "message": "Sign-in failed. Check the password, and that your home server lets this server sign you in."
       },
       "hints": {
         "next_actions": [
           {
-            "description": "The two nodes could not agree on who you are. Whoever runs them can fix it.",
+            "description": "The two servers could not agree on who you are. Whoever runs them can fix it.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -5115,7 +5115,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },
@@ -5551,7 +5551,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "description": "You can change this in your settings, or ask whoever runs this server.",
             "method": "GET",
             "url": "/v1/docs"
           },

@@ -591,7 +591,7 @@ function resizeCheck(pass: MainPassMeasurements): AppPlaytestCheck {
   const shape = mobile.canvas
     ? `The canvas is ${mobile.canvas.w}x${mobile.canvas.h} on a phone and ${desktop.canvas?.w}x${desktop.canvas?.h} on a desktop`
       + (fixed ? ', a fixed size that fits both, ' : ', following the space it is given, ')
-    : 'The page carries no canvas, ';
+    : 'The page has no canvas, ';
   return check('resizes', true, 'must', `${shape}and neither screen scrolls sideways.`);
 }
 

@@ -93,7 +93,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   {
     term: 'GEAI', area: 'identity', aka: ['ecosystem app identity'],
     form: 'eco:app#owner@node-id', example: 'eco:drum-news#alice@aimeat-fi-001-genesis',
-    definition: 'An external application connected to a node as a principal in its own right, consented like an agent. It writes into its own eco: namespace and is fenced to an approved scope and data-area list. Onboarded by a hello-approve-token handshake with key pinning on first use.',
+    definition: 'An external application connected to a node as a principal in its own right, consented like an agent. It writes into its own eco: namespace and is limited to an approved scope and data-area list. Onboarded by a hello-approve-token handshake with key pinning on first use.',
     seeAlso: ['GAII', 'Scope', 'Namespace'],
   },
   {
@@ -116,7 +116,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'App grant', area: 'identity',
-    definition: 'The consent a person gives a hosted app to act inside their own space. The app resolves to the owner but is fenced to the scopes and data areas the grant names, so it can do its job without becoming the owner.',
+    definition: 'The consent a person gives a hosted app to act inside their own space. The app resolves to the owner but is limited to the scopes and data areas the grant names, so it can do its job without becoming the owner.',
     seeAlso: ['Scope', 'App'],
   },
   {
@@ -128,13 +128,13 @@ export const GLOSSARY: GlossaryTerm[] = [
   // ── Data ─────────────────────────────────────────────────────────────────────────────────
   {
     term: 'Memory', area: 'data',
-    definition: 'The node\'s key-value store: a JSON value under a dotted key, owned by an identity, carrying a visibility, tags and version history. It is where anything an agent needs to remember between sessions goes.',
+    definition: 'The node\'s key-value store: a JSON value under a dotted key, owned by an identity, with a visibility, tags and version history. It is where anything an agent needs to remember between sessions goes.',
     seeAlso: ['Namespace', 'Visibility', 'Record'],
   },
   {
     term: 'Namespace', area: 'data',
     form: 'ext:prh', example: 'alice@node-id, ext:prh, eco:drum-news#alice@node-id',
-    definition: 'The identity a memory key is stored under. Owner data, extension data and ecosystem-app data live in separate namespaces and are never interchangeable: an extension owns ext:{name} and can read an owner\'s public keys, but the owner\'s settings and translations remain owner data.',
+    definition: 'The identity a memory key is stored under. Owner data, extension data and ecosystem-app data are stored in separate namespaces and are never interchangeable: an extension owns ext:{name} and can read an owner\'s public keys, but the owner\'s settings and translations remain owner data.',
     seeAlso: ['Memory', 'Extension', 'GEAI'],
   },
   {
@@ -145,7 +145,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'Organism', area: 'data',
-    definition: 'Where work lives between conversations: one place where a person, the people they invite and all their AIs, whichever company makes them, read and write the same notes, documents and decisions, and nothing goes out without a person. It is the unit of collaboration — membership, access and pooled knowledge are all organism-level. On the home page it is called a shared place, and it can start from a shape: own work, team, company, family, club or project.',
+    definition: 'Where work is kept between conversations: one place where a person, the people they invite and all their AIs, whichever company makes them, read and write the same notes, documents and decisions, and nothing goes out without a person. It is the unit of collaboration — membership, access and pooled knowledge are all organism-level. On the home page it is called a shared place, and it can start from a shape: own work, team, company, family, club or project.',
     seeAlso: ['Workspace', 'Record', 'Member'],
   },
   {
@@ -161,7 +161,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'Document', area: 'data',
-    definition: 'A markdown document in a workspace, versioned with the same draft-and-publish cycle as a record. Records carry structure; documents carry the reasoning.',
+    definition: 'A markdown document in a workspace, versioned with the same draft-and-publish cycle as a record. Records hold structure; documents hold the reasoning.',
     seeAlso: ['Record', 'Workspace'],
   },
   {

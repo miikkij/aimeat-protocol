@@ -76,7 +76,7 @@ export async function askPersonToDecide(
   const input = JSON.stringify(args.input ?? {});
   if (input.length > INPUT_MAX_CHARS) {
     return { ok: false, status: 413, code: PERSON_DECIDES,
-      message: personDecidesText(ext.name, action.id, where, `its input is ${input.length} characters, more than the ${INPUT_MAX_CHARS} a request for the person's approval carries`) };
+      message: personDecidesText(ext.name, action.id, where, `its input is ${input.length} characters, more than the ${INPUT_MAX_CHARS} a request for the person's approval can hold`) };
   }
   const preview = input.length > INPUT_PREVIEW_CHARS ? `${input.slice(0, INPUT_PREVIEW_CHARS)}…` : input;
   const requester = caller.kind === 'ecosystem'

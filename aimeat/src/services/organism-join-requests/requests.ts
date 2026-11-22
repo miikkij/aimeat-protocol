@@ -429,7 +429,7 @@ async function alreadyOpens(deps: JoinRequestDeps, auth: AudienceAuth, target: A
 export async function requestAccess(
   deps: JoinRequestDeps, auth: AudienceAuth | null | undefined, target: AccessRequestTarget, message?: unknown,
 ): Promise<JoinRequestRefusal | { ok: true; joinRequest: JoinRequestRecord }> {
-  if (!isNodeAccount(auth)) return refuse(403, 'ACCESS_DENIED', 'Only an account of this node can ask for access.');
+  if (!isNodeAccount(auth)) return refuse(403, 'ACCESS_DENIED', 'Only an account of this server can ask for access.');
   if (await alreadyOpens(deps, auth!, target)) return refuse(409, 'ALREADY_OPEN', 'This already opens for you.');
   const organismId = organismOfAccess(target.access);
   const organism = organismId ? await deps.storage.getOrganism(organismId) : null;

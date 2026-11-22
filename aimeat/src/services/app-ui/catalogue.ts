@@ -88,7 +88,7 @@ export function buildUiCatalogue(): {
     nav_modes: NAV_MODES,
     choreographies: {
       values: CHOREOGRAPHIES,
-      summary: 'How the page moves under the reader\'s hand. still: nothing scroll-driven. cinema: the opening band recedes and each section rises as it enters the view — right for fronts, stories and reports; wrong for a tool someone lives in.',
+      summary: 'How the page moves as the reader scrolls. still: nothing scroll-driven. cinema: the opening band recedes and each section rises as it enters the view — right for fronts, stories and reports; wrong for a tool someone uses all day.',
     },
     looks: LOOKS,
     spans: {
@@ -125,7 +125,7 @@ export function buildUiCatalogue(): {
         + 'is before a word is read (plain, danger, celebrate, ai), the size how much room it '
         + 'takes, and from whether it arrives centred or up from the bottom edge for a phone. '
         + 'Open it with AIMEAT.atelier.dialog({ layout, sources, ...the shape }); the buttons and '
-        + 'when it opens stay your app\'s. A dialog SHAPE travels through the Design Book like '
+        + 'when it opens stay your app\'s. A dialog SHAPE is shared through the Design Book like '
         + 'any other arrangement.',
     },
     imagery: {
@@ -134,7 +134,7 @@ export function buildUiCatalogue(): {
         + 'Builders and the Design Book\'s illustration parts write it; image generation reads it.',
     },
     patterns: {
-      summary: 'The pattern shelf (patterns.css): gradient-built background recipes on the '
+      summary: 'The pattern set (patterns.css): gradient-built background recipes on the '
         + '--ak-* tokens, technique after Temani Afif\'s CSS-Pattern (MIT). Class is '
         + '.ak-pat-<id> plus ONE volume: .ak-pat--ground (a whole page stands on it, body text '
         + 'proven readable), .ak-pat--prop (one object\'s texture — a chip, an edge, an empty '
@@ -151,16 +151,16 @@ export function buildUiCatalogue(): {
       })),
     },
     ambients: {
-      summary: 'The ambient shelf: the one layer allowed to move at idle, behind the app. '
+      summary: 'The ambient set: the one layer allowed to move at idle, behind the app. '
         + 'THE LOOK DECIDES — each look sheet says which preset it runs (`ambient`, or none), '
         + 'and an arrangement overrides with an optional top-level `ambient`: { preset, alpha?, '
         + 'speed? }, or { preset: "none" } to switch the look\'s own off. A field preset (it lays '
         + 'pigment under the words) is proven by the contrast matrix at peak × alpha: on a look '
-        + 'that stands on the palette\'s own page it may run only at the whisper (alpha at or '
+        + 'that stands on the palette\'s own page it may run only at low strength (alpha at or '
         + 'below the preset\'s default), while a world that owns its ground (lounge, dawn, stage, '
         + 'broadcast) runs it as loud as the ink allows. The layer pauses on a hidden tab, stills '
         + 'under Less motion and reduced motion, and the viewer\'s weather switch (Off, Calm, '
-        + 'Full) always wins. One per app; a tool someone lives in usually wants none. '
+        + 'Full) always wins. One per app; a tool someone uses all day usually wants none. '
         + `Optional \`post\`: up to ${POST_MAX} passes run over the layer's own field each frame `
         + `(${POST_IDS.join(', ')}), as ids or { id, params } — the one place an effect may live.`,
       presets: AMBIENTS.map((a) => ({
@@ -176,13 +176,13 @@ export function buildUiCatalogue(): {
       })),
     },
     effects: {
-      summary: 'The effects shelf (effects.css, effects.js): post-process filters a block wears, '
+      summary: 'The effects set (effects.css, effects.js): post-process filters a block uses, '
         + 'declared once with every knob\'s bounds and default. Per block: `effect: { id, params?, '
         + 'backdrop? }`. STILL on the words (scanlines, vignette, recolour) or on a picture '
         + '(duotone, distort); a MOMENT the app plays on a cue with AIMEAT.atelier.fxPlay (glitch, '
         + 'vhs, distort, ripple), finite and gone on finished; LIVING only behind the words — '
         + '`ambient.post` runs it over the layer\'s own field (glitch, vhs, ripple, kaleidoscope). '
-        + 'A prop or zone effect lands only on a picture or a band (`hosts`; on a hero, on its '
+        + 'A prop or zone effect applies only to a picture or a band (`hosts`; on a hero, on its '
         + 'image); on any other component it would bend or recolour the words and is refused. A '
         + 'colour or overlay effect under words is proven by the contrast matrix on the look '
         + '(AK-FX): a quarter of ink passes every look, any hue at saturate 1.5 or under passes '

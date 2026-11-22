@@ -18,7 +18,7 @@
 export function publishWalkthrough(nodeUrl: string): string {
   let body = '';
   body += '## When the app is ready — tell me how to publish it\n';
-  body += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
+  body += 'After you give me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
   body += '1. Open ' + nodeUrl + '/v1/appcat\n';
   body += '2. Click "+" → "Add app" → the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
   body += '3. Click Save. A second dialog opens: fill in the description and click Publish. (Two dialogs, not one — Save takes the file, Publish puts it on the node.)\n';

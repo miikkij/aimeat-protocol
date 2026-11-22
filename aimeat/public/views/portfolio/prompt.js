@@ -61,7 +61,7 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     for (const board of selectedBoards) {
       prompt += `- ${board.name} (${board.visibility}) → GET ${url}/v1/boards/${board.id}/posts?limit=10 · open on the node: ${url}/v1/profile?tab=boards\n`;
     }
-    prompt += `The response is { ok, data: { posts: [...], cursor, authors: { [author_gaii]: { posts, thanks, since } } } }. Each post carries title, body (plain text, render it as text), category (a short word such as "for sale" or "wanted"; show it as a label), tags, author_gaii ("name@environment" for a person, "agent#name@environment" for that person's agent: show the name, and "name · agent" when an agent wrote it), created_at, ttl_expires_at (show "N days left"; a notice that has expired is not returned), replies (a count) and reactions (reactions.thanks is a list; show its length as "N thanks"). Show the poster's standing from authors[author_gaii] next to the name ("14 notices · 11 thanks"). A visitor can READ; publishing, replying and thanking need a signed-in session on the node, so put one link on the section that opens the board on the node (the profile link above) rather than a form of your own. Use the cursor field for a "show more" link (pass it back as ?cursor=). Show an honest empty state ("No notices right now") when posts is empty, and never invent notices.\n`;
+    prompt += `The response is { ok, data: { posts: [...], cursor, authors: { [author_gaii]: { posts, thanks, since } } } }. Each post has title, body (plain text, render it as text), category (a short word such as "for sale" or "wanted"; show it as a label), tags, author_gaii ("name@environment" for a person, "agent#name@environment" for that person's agent: show the name, and "name · agent" when an agent wrote it), created_at, ttl_expires_at (show "N days left"; a notice that has expired is not returned), replies (a count) and reactions (reactions.thanks is a list; show its length as "N thanks"). Show the poster's standing from authors[author_gaii] next to the name ("14 notices · 11 thanks"). A visitor can READ; publishing, replying and thanking need a signed-in session on the node, so put one link on the section that opens the board on the node (the profile link above) rather than a form of your own. Use the cursor field for a "show more" link (pass it back as ?cursor=). Show an honest empty state ("No notices right now") when posts is empty, and never invent notices.\n`;
   }
 
   // Selected cortex extensions
@@ -96,7 +96,7 @@ The user wants to create a personal portfolio website. Generate a single, self-c
       }
     }
     if (gatedMems.length > 0) {
-      prompt += `These entries are NOT readable by visitors at all (any fetch attempt returns 401/404). Represent each with its preview text baked into the HTML, or a placeholder the user can edit:\n`;
+      prompt += `These entries are NOT readable by visitors at all (any fetch attempt returns 401/404). Represent each with its preview text written into the HTML, or a placeholder the user can edit:\n`;
       for (const mem of gatedMems) {
         prompt += `- ${mem.key} (visibility: ${mem.visibility})${mem.preview ? ` — preview: ${mem.preview}` : ''}\n`;
       }
@@ -122,7 +122,7 @@ An editorial poster: big type, ink rules, one diagonal colour band, and a lot of
 - Faces: headlines in "Archivo Black" (uppercase, tight letter-spacing around -0.03em, line-height 0.9), body and labels in "Archivo" (weights 400/600/800), small facts (addresses, dates, counts) in "JetBrains Mono". Load them from Google Fonts with a <link> in <head>; give every face a system fallback (Arial Black / Arial / monospace).
 - Colours, and only these: paper #FAFAF8 (background), ink #1A1A2E (text, rules, the one solid button), coral #E8564A (the band, one accent word in a headline, links), sun #FFB52E (highlights, the stripe under the band, the selected thing). No gradients, no drop shadows with blur, no rounded corners anywhere.
 - The masthead: the person's name as the headline, very large (5rem and up on desktop, 2.6rem on a phone), one word of it in coral. Under it a one-line kicker in mono.
-- The band: one full-width coral band rotated about -3deg with a 20px sun stripe along its lower edge, carrying two to four big numbers in paper (Archivo Black, 4rem+) with an uppercase label under each, and one call-to-action as an ink rectangle with a solid 8px offset sun shadow. Use overflow: hidden on the band's wrapper so the rotation never causes a horizontal scrollbar, and make the wrapper tall enough that the numbers sit fully on the coral at both ends.
+- The band: one full-width coral band rotated about -3deg with a 20px sun stripe along its lower edge, holding two to four big numbers in paper (Archivo Black, 4rem+) with an uppercase label under each, and one call-to-action as an ink rectangle with a solid 8px offset sun shadow. Use overflow: hidden on the band's wrapper so the rotation never causes a horizontal scrollbar, and make the wrapper tall enough that the numbers sit fully on the coral at both ends.
 - Sections: no cards. A section is a headline (Archivo Black, uppercase, 2.4rem) over a 3px ink rule; lists are rows separated by 2px ink rules with a two-digit mono index in coral on the left (01, 02, 03) and an arrow on the right; a fact table is a two-column grid with uppercase coral labels.
 - Highlights: a sun background behind a phrase or a selected row, with ink text. Quiet actions are uppercase 800-weight words with a 2px ink underline; there is exactly one solid ink button per screen.
 - Phone (under 640px): the band goes straight (no rotation), the numbers go two per row, everything else stacks.
@@ -238,9 +238,9 @@ Wrap gated content in \`<div data-auth-required>\` and add a placeholder:
 Rules:
 - Show the placeholder until data actually arrives — no spinners waiting on the bridge
   (an older viewer never answers, and the placeholder is the correct fallback).
-- Members-only values arrive ONLY via the bridge — never bake them into the HTML and never
+- Members-only values arrive ONLY via the bridge — never write them into the HTML and never
   fetch them directly.
-- Content that is merely wrapped in [data-auth-required] but baked into the HTML is a
+- Content that is merely wrapped in [data-auth-required] but written into the HTML is a
   convenience, not a security boundary — it is visible in the HTML source. Keep truly
   private data out of the portfolio entirely.
 `;

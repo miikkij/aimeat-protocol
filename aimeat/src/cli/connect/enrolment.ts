@@ -169,7 +169,7 @@ export async function fetchNodeCard(nodeUrl: string): Promise<NodeCard> {
   }
   const nodeId = body?.data?.node_id;
   const publicKey = body?.data?.public_key;
-  if (typeof nodeId !== 'string' || !nodeId) return { ok: false, detail: 'the answer carries no node id' };
+  if (typeof nodeId !== 'string' || !nodeId) return { ok: false, detail: 'the answer has no node id' };
   return { ok: true, nodeId, publicKey: typeof publicKey === 'string' && publicKey ? publicKey : null };
 }
 

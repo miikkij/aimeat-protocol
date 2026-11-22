@@ -233,7 +233,7 @@ export async function buildUsagePage(
         cost_usd: pricedTotal,
         calls: ledger.totals.calls,
         total_tokens: ledger.totals.total_tokens,
-        counted_from: 'the LLM usage rollup, which carries calls the per-owner daily table does not',
+        counted_from: 'the LLM usage rollup, which includes calls the per-owner daily table does not',
       },
       grant_usd: grant,
       accounts: owners.length,

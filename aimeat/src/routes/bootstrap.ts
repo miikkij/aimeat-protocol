@@ -438,9 +438,9 @@ export function bootstrapRouter(
               },
             } : {}),
             app_building: {
-              note: 'A new app is built on the Atelier track, forked from a genre. FIRST fetch its build spec: GET /v1/prompts/build-app-atelier (?format=txt for raw text, ?idea=<what to build>), or over MCP aimeat_handbook_get { tier: "build-app-atelier" }, in parts. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder-atelier via aimeat_skill_get. Its part "platform" lists what only some apps need; an AI that cannot connect reads ?delivery=paste. Every app is built and changed with this one specification; an app built on the retired Classic track is moved with its section "from-classic". Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
+              note: 'A new app is built on the Atelier track, forked from a genre. FIRST fetch its build spec: GET /v1/prompts/build-app-atelier (?format=txt for raw text, ?idea=<what to build>), or over MCP aimeat_handbook_get { tier: "build-app-atelier" }, in parts. MCP-equipped agents: load the skill for the standard way, node:aimeat-app-builder-atelier, via aimeat_skill_get. Its part "platform" lists what only some apps need; an AI that cannot connect reads ?delivery=paste. Every app is built and changed with this one specification; an app built on the retired Classic track is moved with its section "from-classic". Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app-atelier`,
-              builder_skill: 'node:aimeat-app-builder-atelier (aimeat_skill_get) — the paved-path workflow skill',
+              builder_skill: 'node:aimeat-app-builder-atelier (aimeat_skill_get) — the workflow skill for the standard way',
               starter_templates_endpoint: `${base}/v1/app-templates`,
               pitfalls_endpoint: `${base}/v1/appdev/pitfalls`,
               research_overview: `${base}/v1/appdev/overview (MCP: aimeat_appdev_overview) — ONE call: your apps, packs with per-model proofs, templates, pitfalls`,

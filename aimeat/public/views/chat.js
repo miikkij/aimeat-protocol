@@ -749,7 +749,7 @@ export default function ChatView() {
                 ${disabled && status?.state ? html`<${ChatUnavailable} status=${status} />` : capped ? html`
                     <${ConversationCap}
                         title=${tr('chat.capTitle', 'This conversation has used up its free share.')}
-                        body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}
+                        body=${tr('chat.capBody', "Chat here runs on this server's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}
                         ways=${[
                             { loud: true, href: '/v1/profile?tab=ai', label: tr('chat.capOwnKey', 'Bring your own key →') },
                             // The store is the one price door; a node without one offers only the key.

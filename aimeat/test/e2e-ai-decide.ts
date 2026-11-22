@@ -1046,7 +1046,7 @@ const QUESTIONS = {
     const r = await ask(A.token, { provider: 'mine-local', questions: { team: FOUR } });
     const msg = String(r.body.error?.message ?? '');
     assert(r.status === 400 && r.body.error?.code === 'PROVIDER_CANNOT_CARRY', `got ${r.status} ${r.body.error?.code}`);
-    assert(msg.includes('"My local model" carries 3 options') && msg.includes('has 4'), `named as the page names it, in its own numbers, got: ${msg}`);
+    assert(msg.includes('"My local model" takes 3 options') && msg.includes('has 4'), `named as the page names it, in its own numbers, got: ${msg}`);
     const v = r.body.error?.details?.violations?.[0];
     assert(v?.what === 'options' && v.limit === 3 && v.count === 4 && v.provider === 'mine-local' && v.providerTitle === 'My local model',
       `the fields a page writes it from in its own language, got: ${JSON.stringify(v)}`);

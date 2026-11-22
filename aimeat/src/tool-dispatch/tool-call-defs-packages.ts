@@ -150,7 +150,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
-            allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry.' },
+            allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot contain.' },
             outcome: { type: 'string', description: 'What the package gives a person, in one sentence (the head of its sheet).' },
             prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.' },
         },

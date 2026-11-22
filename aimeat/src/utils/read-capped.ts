@@ -211,7 +211,7 @@ export function capResponseBody(resp: Response, maxBytes: number): Response {
     // fails the way a dropped connection does.
     if (resp.status < 200 || resp.status > 599) {
         resp.body.cancel().catch(err => logger.warn('capResponseBody: cancelling an unusable answer failed', { error: String(err) }));
-        throw new TypeError(`The far side answered with status ${resp.status}, which is outside HTTP's 200 to 599.`);
+        throw new TypeError(`The other server answered with status ${resp.status}, which is outside HTTP's 200 to 599.`);
     }
     const perEvent = (resp.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream');
     let run = 0;

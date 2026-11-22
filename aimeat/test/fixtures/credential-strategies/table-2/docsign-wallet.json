@@ -103,7 +103,7 @@
       "hints": {
         "next_actions": [
           {
-            "description": "Ask whoever runs this node whether it can be turned on.",
+            "description": "Ask whoever runs this server whether it can be turned on.",
             "method": "GET",
             "url": "/v1/docs"
           },

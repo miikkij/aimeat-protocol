@@ -110,12 +110,12 @@ export interface DocumentsBesideApp {
 export function documentSteps(ownerName: string, filename: string, d: DocumentsBesideApp): Record<string, unknown> {
   const app = `${ownerName}/${filename}`;
   const dataMap = d.dataMapMissing
-    ? `No data map yet. Write one with aimeat_datamap_set { app: "${app}", data_map }: what the app is for and, for each family of keys or files, where it lives, who owns and reads it, and ONE sentence on why there. You are the only one who knows where you put things; the next builder has no other way to find out.`
+    ? `No data map yet. Write one with aimeat_datamap_set { app: "${app}", data_map }: what the app is for and, for each family of keys or files, where it is stored, who owns and reads it, and ONE sentence on why there. You are the only one who knows where you put things; the next builder has no other way to find out.`
     : d.dataMapRowsWithoutWhy > 0
       ? `This app has a data map, and ${d.dataMapRowsWithoutWhy} row(s) in it say no \`why\` yet. Read it with aimeat_datamap_get { app: "${app}" }, fill what you know, and update it if this change moved or added data.`
-      : `This app has a data map. If this change moved or added where data lives, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
+      : `This app has a data map. If this change moved or added where data is stored, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
   const designSpec = d.designSpecVersion === undefined
-    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
+    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data is stored, what was decided and why, what is open, and what went wrong; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
     : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
   return {
     data_map_present: !d.dataMapMissing,
@@ -209,7 +209,7 @@ export async function buildPublishNextSteps(
       // Stated every time, present or not. An app without a face is a page agents have to scrape,
       // and an app without a bound skill teaches nobody how to operate it.
       agent_face: faceRec
-        ? `This app has an agent face (${agentFaceKey(filename)}). Update it on the SAME writes that update the visible view, or agents and humans drift apart.`
+        ? `This app has an agent face (${agentFaceKey(filename)}). Update it on the SAME writes that update the visible view, or agents and humans see different states.`
         : `No agent face yet. Publish one with /v1/libs/aimeat-agentface.js — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One PUBLIC memory record: ${agentFaceKey(filename)}, so an app whose data is private describes what it does and never its records.`,
       bound_skill: boundSkills.length > 0
         ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
@@ -243,7 +243,7 @@ export async function buildPublishNextSteps(
       // Only for an app whose data map says it keeps personal data and that has no register for it
       // (compliance/register-step.ts, the same reading as the gap app-personal-data-without-register).
       ...(recordsOfProcessing ? { register: recordsOfProcessing } : {}),
-      template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
+      template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would cause problems for the next builder go to aimeat_appdev_pitfall_report.',
     };
   } catch (err) {
     logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) });

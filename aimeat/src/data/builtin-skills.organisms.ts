@@ -42,7 +42,7 @@ metadata:
   audience: agent
 ---
 
-# Organisms: where work lives between conversations
+# Organisms: where work is kept between conversations
 
 ## Say it this way
 
@@ -97,7 +97,7 @@ create without a shape and add a workspace with \`aimeat_workspace_create\`.
 Every shaped workspace starts with a readme that says what it is for and has a section for what is
 current. Fill that section with them, from what they told you. Do not invent content for them.
 
-Then hand over the address and say in one sentence how another of their AIs reads the same place:
+Then give the person the address and say in one sentence how another of their AIs reads the same place:
 it connects to this node and finds it with \`aimeat_discover { scope: "shared" }\`.
 
 ## Who can see and change what
@@ -118,12 +118,12 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
   refuses asks from that page, or their AI asks with \`aimeat_access_request\`. The organism's owners
   and admins read the requests with \`aimeat_organism_join_requests\` (each says which app or page it
   came from) and decide with \`aimeat_organism_join_request_review\`. Approving makes the person a
-  member of the organism, so ask your owner before you approve unless they told you whom to let in.
+  member of the organism, so ask your owner before you approve unless they told you whom to approve.
   The owner turns requests off with \`aimeat_organism_update { access_requests: "off" }\`.
 - **Public** means anyone can find and read the organism without joining. An organism made with no
   visibility and no shape gets the level this node gives a new organism: public unless its operator
   chose private, so name the level when it matters. When the node asks the person before making something public, it is
-  made private instead and the answer carries \`publish_request\`: give them its \`approve_url\`. An
+  made private instead and the answer has \`publish_request\`: give them its \`approve_url\`. An
   organism whose classification limits who may see it cannot be made public past that limit
   (\`LABEL_CAPS_AUDIENCE\`, 409): keep it private, or tell the person; only they can allow it, with a
   written reason.
@@ -134,7 +134,7 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
 
 ## Apps and agents in a workspace
 
-A workspace can carry apps bound to it, which read and write the same records. An installed package
+A workspace can have apps bound to it, which read and write the same records. An installed package
 can say which workspace it uses. An agent that works on its own reads and writes a workspace with its
 owner's rights; give it only the workspaces it needs.
 
@@ -142,7 +142,7 @@ owner's rights; give it only the workspaces it needs.
 
 Knowledge here has a lifecycle. Keep the readme's "what is current" section true: when something
 stops mattering, say so there and archive the material (\`aimeat_organism_archive\` for a whole
-workspace or organism). A place nobody prunes becomes a pile no AI can use. Offer this once when a
+workspace or organism). A place nobody cleans up becomes too large for any AI to use. Offer this once when a
 workspace has grown and nothing in it has changed for a long time.
 `,
 };

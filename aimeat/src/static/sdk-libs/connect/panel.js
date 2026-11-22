@@ -62,7 +62,7 @@ function injectStyle() {
 
 const DEFAULT_STRINGS = {
   title: 'Connected accounts',
-  intro: 'Accounts you have connected so apps can act at those services on your behalf. The account credential stays on this node; an app is only ever told which account it may use.',
+  intro: 'Accounts you have connected so apps can act at those services on your behalf. The account credential stays on this server; an app is only ever told which account it may use.',
   empty: 'You have not connected any accounts yet.',
   add: 'Connect',
   connecting: 'Connecting…',
@@ -73,7 +73,7 @@ const DEFAULT_STRINGS = {
   confirm: 'Disconnect this account? Apps that publish to it will stop being able to.',
   toldProvider: 'Disconnected, and the service was told.',
   notToldProvider: 'Disconnected here. The service could not be reached to be told, so check it there too.',
-  unavailable: 'Connecting accounts is not enabled on this node.',
+  unavailable: 'Connecting accounts is not enabled on this server.',
 };
 
 /**

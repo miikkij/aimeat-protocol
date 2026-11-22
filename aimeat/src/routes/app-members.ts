@@ -254,7 +254,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'These are your own apps already.'));
     }
     if (!(await storage.getGHIIByOwner(account))) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No owner named "${account}" on this node.`));
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No owner named "${account}" on this server.`));
     }
     const body = (req.body ?? {}) as Record<string, unknown>;
     const rec = await putBlanketGrant(storage, {

@@ -32,6 +32,6 @@ export interface RetiredBuiltinSkill {
 export const RETIRED_BUILTIN_SKILLS: RetiredBuiltinSkill[] = [
   {
     name: 'hatchery-agent-requests',
-    reason: 'There is no agent hatchery. What the skill taught lives on as aimeat-recurring-work; agents are made with aimeat_agent_propose and a crew definition (2026-09-19).',
+    reason: 'There is no agent hatchery. What the skill taught continues as aimeat-recurring-work; agents are made with aimeat_agent_propose and a crew definition (2026-09-19).',
   },
 ];

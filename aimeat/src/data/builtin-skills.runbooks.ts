@@ -133,7 +133,7 @@ show the owner what you found before acting.
    morsels in circulation. For owners and memory, \`aimeat_admin_statistics\`.
 2. \`aimeat_admin_agents\` (or \`aimeat_agents_list\` for your own owner) — who is registered,
    their owner, trust, morsel balance, last-seen.
-3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
+3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what is stored in them.
    \`aimeat_admin_teams\` — every team as counts only: leads, members, connected AIs, AI onboarding,
    last change and the week's numbers. A team's content is for its members, not for you.
 4. \`aimeat_discover\` with \`mode: "map"\` — a faceted map of every content type (skills,
@@ -148,19 +148,19 @@ show the owner what you found before acting.
    an AI, because the operator does that on the admin Config page.
 
 ## Before the node goes online
-When the operator asks whether the node is ready for its users, or what is still missing, walk these
+When the operator asks whether the node is ready for its users, or what is still missing, go through these
 in order. Read each one first, show the operator what you found, and change a setting only on their word.
 1. **The address.** \`aimeat_admin_config\` with \`q: "passkey"\`: a passkey is bound to the node's
    domain for good (\`passkey.rp_id\`, which cannot be changed while the node runs). If the address is
    still going to change, say so before anyone registers a passkey: after a change every passkey
    stops working.
-2. **The security picture.** \`aimeat_admin_security_overview\`: open incidents, whether apps run on
+2. **The security overview.** \`aimeat_admin_security_overview\`: open incidents, whether apps run on
    their own origin and what to set when they do not, test-only settings still in force, who holds
    the operator role, how many accounts have two-step sign-in, the registration mode and the
    sign-in limits.
 3. **Email.** \`aimeat_admin_config\` with \`q: "smtp"\`. Without an SMTP server the node sends no
    sign-in links, invitations or address confirmations. Tell the operator that the sender's domain
-   needs SPF, DKIM and DMARC records at their mail provider or the messages land in spam, and that
+   needs SPF, DKIM and DMARC records at their mail provider or the messages go to spam, and that
    the test send is on the admin Email page (\`/v1/admin?tab=email\`).
 4. **Sign-in.** \`aimeat_admin_sso_list\` for SAML and SCIM connections, and \`aimeat_admin_config\`
    with \`q: "entra"\` and \`q: "google"\` for the Microsoft and Google sign-in. Each needs an app
@@ -190,7 +190,7 @@ the operator's decisions still open.
 
 ## A dispute that waits for a ruling
 When one agent's work is disputed and the two parties do not settle it, one escalates it to the
-operator, or the 30-day timeout hands it over because the provider's balance does not cover the
+operator, or the 30-day timeout sends it there because the provider's balance does not cover the
 refund. \`aimeat_admin_disputes\` lists what waits (with \`id\`, one dispute and its audit trail): who
 asked, who delivered, why it was opened, and \`paid_morsels\`, what delivery paid the provider. A ruling
 shares out only those morsels: \`to_requester\` goes back to the requester, \`burned\` leaves circulation,
@@ -200,13 +200,13 @@ requester_wins ruling lowers the provider's trust score. The admin Work page sho
 dispute with its ruling dialog.
 
 ## Replacing the data key
-The data key seals every stored secret. The keys are set in the server's environment by whoever runs
+The data key encrypts every stored secret. The keys are set in the server's environment by whoever runs
 it, never through a tool: a second key (AIMEAT_ENCRYPTION_KEY_1) on every process first, then
-AIMEAT_ENCRYPTION_KEY_CURRENT=1 to seal new secrets with it. \`aimeat_admin_key_reencrypt\` reads which
+AIMEAT_ENCRYPTION_KEY_CURRENT=1 to encrypt new secrets with it. \`aimeat_admin_key_reencrypt\` reads which
 keys the node holds and how the last re-encrypt run went; with \`action: "start"\`, on the operator's
-word, it moves the stored secrets to the current key in the background, and every secret keeps opening
+word, it moves the stored secrets to the current key in the background, and every secret can still be decrypted
 while it runs. Tell the operator the old key may be removed only when \`old_key_removable\` is true, and
-that a copy of it stays with the backups taken before. A value that opens with neither key is left as
+that a copy of it stays with the backups taken before. A value that neither key decrypts is left as
 it is and named by its place: ask the operator what to do with it.
 
 ## After an update
@@ -265,9 +265,9 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     \`npx aimeat connect serve\`), and the computer stays on while it works. Read the organisms and
     workspaces it will work on first (\`aimeat_workspace_list\`), then propose the agent with
     \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition, and
-    \`schedule\` when it works on a clock); the owner approves it at the \`approval_url\` the answer
+    \`schedule\` when it works on a schedule); the owner approves it at the \`approval_url\` the answer
     gives (the proposal's own page, also in their open items), and approving creates it, on its
-    clock when the proposal named one. This node makes and runs it, so an outside agent builder is
+    schedule when the proposal named one. This node makes and runs it, so an outside agent builder is
     never the answer. Ask only the permissions the work needs: one that can spend money, or send or
     delete in their name, makes every task of the agent wait for their OK, on each scheduled run too,
     and the proposal's \`warnings\` say so. To call app tools or capabilities they already accepted,
@@ -376,14 +376,14 @@ flowchart LR
   2026-10-15; without it an agent reads what they mark owner, members or public. An agent that
   needs the owner's private records for its job asks the owner for that permission by name. The
   organism rule holds there too: a record under \`organism.<id>.\` comes back with \`owner_scope\` only
-  when that organism lets the agent in. An organism that admits only the agents on its list leaves
+  when that organism gives the agent access. An organism that admits only the agents on its list leaves
   its records out for every other agent, in a read and in a list, as a read of the key itself does;
   the fix is that the owner adds the agent in the Agents section of the organism's page, not another
   permission. Content whose classification refuses an outside model (every TL and NATO class, and
   what a register with health, biometric, defence or export-controlled data raises) is absent for
   every agent whose model runs somewhere else, whatever its permissions. Only an agent whose runtime
   report says \`llm: "local"\` (its model runs on its own machine, \`aimeat_agent_runtime_report\`)
-  reads it, and no exception opens it. Tell the owner it is the classification, not a permission.
+  reads it, and no exception makes it readable. Tell the owner it is the classification, not a permission.
   Making something public to anyone takes publish:public when this node asks the owner first: that
   permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
   change that makes something public (a record, a file, an app, a page, an organism, a board, a

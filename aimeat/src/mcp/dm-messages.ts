@@ -145,7 +145,7 @@ function attachmentView(a: DirectMessageAttachment, mailboxOwnerGhii: string): R
         size: a.size,
         mode: a.mode,
         expired: a.expired ?? false,
-        note: 'Open it with aimeat_storage_download using this ref (key="<owner@node>/<key>" or owner + key). MCP never carries the bytes.',
+        note: 'Open it with aimeat_storage_download using this ref (key="<owner@node>/<key>" or owner + key). MCP never sends the bytes.',
     };
 }
 

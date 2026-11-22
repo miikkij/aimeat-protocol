@@ -42,7 +42,7 @@ The whole save file is ONE private memory record and the board row is ONE public
 not a convention, it is the budget: 1024 kB per value and 1000 keys per person, so a key per
 score would fill a player's whole allowance inside a year of playing.
 
-\`saves()\` works signed OUT. The file lives in the browser under \`ak.phaser.<key>\`, every
+\`saves()\` works signed OUT. The file is stored in the browser under \`ak.phaser.<key>\`, every
 method behaves the same, nothing throws and nothing asks the player to sign in.
 
 ## Quick Start
@@ -204,7 +204,7 @@ and every caller inside the same 300 ms window gets the same promise.
    \`keys_per_day × 365\` over 1000 has the wrong shape.
 2. **\`load()\` before anything else.** \`get()\` before a load returns the empty default and
    your first \`set()\` will then be merged over it, not over the player's real file.
-3. **\`get()\` hands back the LIVE object.** Read it; change it through \`set()\`, \`settings()\`
+3. **\`get()\` returns the LIVE object.** Read it; change it through \`set()\`, \`settings()\`
    or \`levels.*\` so the change is reported and written.
 4. **\`score(n)\` is not \`hud.score(n)\`.** One adds to a total, the other displays a number.
    \`hud.score(store.score())\` is the pairing.
@@ -304,7 +304,7 @@ than relying on it.
 ### The touch overlay
 
 A stick pad on the left and two round buttons (Jump, Act) on the right, mounted over the
-canvas as ordinary DOM and dressed by the library's stylesheet on the page's own colours. Only
+canvas as ordinary DOM and styled by the library's stylesheet on the page's own colours. Only
 the parts themselves take pointer events, so a tap between them still reaches the game, and
 each part sets \`touch-action: none\` so dragging the stick never scrolls the page behind it.
 
@@ -318,7 +318,7 @@ one frame, never for two.
 ### hud(scene, opts)
 
 Score top left in the display face, lives under it as drawn hearts, level and clock top right.
-Everything rides the camera at \`setScrollFactor(0)\` and a high depth, so it stays put while
+Everything follows the camera at \`setScrollFactor(0)\` and a high depth, so it stays put while
 the level scrolls under it.
 
 | Option | Meaning |
@@ -326,7 +326,7 @@ the level scrolls under it.
 | \`score\` \`lives\` \`level\` \`time\` | starting values |
 | \`depth\` | default 900 |
 | \`pad\` | the inset, default 14 |
-| \`themeFrom\` | the element whose colours dress it |
+| \`themeFrom\` | the element whose colours style it |
 
 Methods: \`score(v)\` · \`lives(n)\` · \`level(text)\` · \`time(seconds)\` (shown as \`m:ss\`) ·
 \`message(text, ms)\` · \`set({ score, lives, level })\` · \`destroy()\`.
@@ -356,7 +356,7 @@ panel.destroy();
 \`\`\`
 
 Sound (three sliders and a mute), Display (fullscreen), Controls (the on-screen pad switch and
-a rebind row per action), Motion (less motion), plus Reset to defaults. Every change lands
+a rebind row per action), Motion (less motion), plus Reset to defaults. Every change takes effect
 immediately and is written through \`saves.settings()\`; there is no Save button, because a
 volume slider you have to confirm is a slider that lies to you.
 
@@ -367,7 +367,7 @@ action, because the person pressed one key and expects that key to be the answer
 ## The second player: net(spec)
 
 \`AIMEAT.phaser.net()\` puts the state above on the wire, over the node's own realtime rooms. It
-belongs in this skill because its payload IS the controls state: what travels is "this player is
+belongs in this skill because its payload IS the controls state: what is sent is "this player is
 holding left and jump", and each peer runs its own copy of the game on those inputs.
 
 \`\`\`html
@@ -388,7 +388,7 @@ if (link.isHost()) link.sendState(world, { every: 100 });
 
 | Field | Meaning |
 |---|---|
-| \`room\` | the room's NAME; peers asking for the same name in the same app meet |
+| \`room\` | the room's NAME; peers asking for the same name in the same app join the same room |
 | \`app\` | the app type the room is filed under, so two different games never share a room |
 | \`name\` | what this player is called. Default \`'player'\` |
 | \`rate\` | milliseconds between input packets. Default 30 |
@@ -403,7 +403,7 @@ went out now.
 
 **It sends input and state, never frames.** \`sendInput()\` goes out at most once per \`rate\`
 and only when the input CHANGED, so a player holding right for ten seconds costs one packet; a
-change that lands inside the window is held and sent as the window closes, so the last input of
+change that arrives inside the window is held and sent as the window closes, so the last input of
 a press never goes missing. \`sendState()\` has its own slower window, 100 ms by default, and is
 the HOST's snapshot of the shared world.
 
@@ -434,7 +434,7 @@ is not playable as a guest), or when \`room\` or \`app\` is missing.
 2. **A Phaser 4 gamepad axis is an OBJECT, not a number.** \`pad.axes[0].getValue()\` is the
    reading; \`pad.axes[0]\` used as a number is \`NaN\`. \`pad.leftStick\` is the shortcut where
    it exists, and the library tries it first.
-3. **Read after \`update()\`, once per frame.** Calling \`update()\` twice in a frame eats the
+3. **Read after \`update()\`, once per frame.** Calling \`update()\` twice in a frame loses the
    press edges: the second call sees the same button already held and reports no press.
 4. **\`justPressed\` needs \`update()\`.** A handler that checks it from a timer or a pointer
    callback reads last frame's answer.

@@ -106,7 +106,7 @@ function summaryOf(authority: ReadAuthority, kind: ReadAuthorityView['installedB
   if (kind === 'self') {
     return 'You wrote this extension\'s code yourself, so it reads your files with your own reach whichever setting you choose.';
   }
-  return 'This extension was installed before the node recorded who wrote its code, so it reads your files with your own reach. The next time its code is published, the principal is recorded and the setting takes effect.';
+  return 'This extension was installed before this server recorded who wrote its code, so it reads your files with your own reach. The next time its code is published, the principal is recorded and the setting takes effect.';
 }
 
 /**

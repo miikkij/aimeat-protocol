@@ -565,7 +565,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const toggleGate = useCallback(async () => {
     setBusy(true);
     try { await orgService.setPublishGate(orgId, !gateOn); setGateOn(!gateOn); showToast(t('organisms.gateToggled') || 'Publish review updated'); }
-    catch (e) { showToast((e && e.message) || 'Failed to update gate'); }
+    catch (e) { showToast((e && e.message) || 'Failed to update publish review'); }
     finally { setBusy(false); }
   }, [orgId, gateOn, showToast]);
 

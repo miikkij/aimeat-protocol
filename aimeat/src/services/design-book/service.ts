@@ -579,16 +579,16 @@ export class DesignBookService {
       // A genre that grew out of an app is handed over under its own part id.
       const tid = (part.body as { template?: string }).template || part.id;
       throw new DesignBookError('GENRE_IS_FORKED',
-        `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry hands it over.`, 409);
+        `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry returns it.`, 409);
     }
     let nextLayout: unknown = part.body;
     if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration' || part.kind === 'ambient' || part.kind === 'effect') {
       const current = await apps.read(app.ownerGaii, filename);
       if (!current.layout) {
         throw new DesignBookError('NO_LAYOUT',
-          `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then season it.`
-          + (part.kind === 'ambient' ? ' An app with no stored arrangement can still carry an ambient in its own code: app({ ambient: "<preset>" }).' : '')
-          + (part.kind === 'effect' ? ' An app with no stored arrangement can still wear an effect in its own code: AIMEAT.atelier.fx(el, { id }).' : ''), 409);
+          `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then adopt it.`
+          + (part.kind === 'ambient' ? ' An app with no stored arrangement can still have an ambient in its own code: app({ ambient: "<preset>" }).' : '')
+          + (part.kind === 'effect' ? ' An app with no stored arrangement can still use an effect in its own code: AIMEAT.atelier.fx(el, { id }).' : ''), 409);
       }
       if (part.kind === 'illustration') {
         nextLayout = { ...current.layout, imagery: part.body };
@@ -602,7 +602,7 @@ export class DesignBookService {
           const layer = current.layout.ambient;
           if (!layer || layer.preset === 'none') {
             throw new DesignBookError('NO_TARGET',
-              `"${filename}" runs no ambient, and a pass runs over the layer's own field: adopt an ambient first (the Book's ambient shelf), then this pass.`, 409);
+              `"${filename}" runs no ambient, and a pass runs over the layer's own field: adopt an ambient first (the Book's ambients), then this pass.`, 409);
           }
           const rest = (layer.post ?? []).filter((p) => (typeof p === 'string' ? p : p.id) !== body.effect);
           nextLayout = { ...current.layout, ambient: { ...layer, post: [...rest, spec].slice(-POST_MAX) } };
@@ -611,7 +611,7 @@ export class DesignBookService {
           const idx = blocks.findIndex((b) => b.component === body.on);
           if (idx < 0) {
             throw new DesignBookError('NO_TARGET',
-              `"${filename}" has no ${body.on} block for this effect to land on. Add one (or adopt a layout that has it), then adopt the effect.`, 409);
+              `"${filename}" has no ${body.on} block for this effect to apply to. Add one (or adopt a layout that has it), then adopt the effect.`, 409);
           }
           nextLayout = { ...current.layout, blocks: blocks.map((b, i) => (i === idx ? { ...b, effect: spec } : b)) };
         }
@@ -694,7 +694,7 @@ export class DesignBookService {
     const out = await new DesignBookReasons(this.storage, this.config).keep({ ownerGhii: app.ownerGaii, ownerName, filename, kept });
     if (!out || out.version === null) {
       throw new DesignBookError('NO_NOTES',
-        `"${filename}" has written down no build notes, so there is nothing to keep yet. A page carries them in <script type="application/json" id="aimeat-build-notes"> `
+        `"${filename}" has written down no build notes, so there is nothing to keep yet. A page keeps them in <script type="application/json" id="aimeat-build-notes"> `
         + '(what it took from the Design Book, what it passed over, what it made by hand, each with why) and the next publish stores them.', 409);
     }
     const next = !kept
@@ -703,16 +703,16 @@ export class DesignBookService {
         ? `This version made ${out.made.length} thing${out.made.length === 1 ? '' : 's'} by hand because the Book had nothing for it: ${out.made.map(m => m.name).join(', ')}. `
           + 'NOW is when they are offered to the next builder, and you do it, in this conversation: for each one, take its markup and its styles out of the app (aimeat_app_get, then read the page) and propose it, '
           + `aimeat_designbook_propose with kind "component" and body { prefix, html, css, use, judgement: { reach, why }, from_app: "${filename}" }. `
-          + 'The component carries no script (the app that takes it wires the behaviour), every class starts with its prefix, its markup closes every element it opens, a rule nested inside another starts with "&", and every colour is a var(--ak-…) token so it wears whatever page it lands in. '
+          + 'The component has no script (the app that takes it wires the behaviour), every class starts with its prefix, its markup closes every element it opens, a rule nested inside another starts with "&", and every colour is a var(--ak-…) token so it takes the colours of whatever page it goes into. '
           + 'JUDGE EACH ONE HONESTLY: reach "general" when another kind of app would use it (a grid a person ticks), "special" when it belongs to this app alone (a flute fingering chart), with the reason. '
           + 'A general one from this app is published by itself; a special one stays listed and yours. An ARRANGEMENT you composed goes in as kind "fill", its own words turned back into <placeholders>. '
-          + 'Tell the owner in a line what went onto the shelf and what you judged special.'
+          + 'Tell the owner in a line what was published and what you judged special.'
         : 'Recorded. This version made nothing by hand, so there is nothing new to offer the Book; the parts it took now count as kept.';
     // A PAGE WITH A LOOK OF ITS OWN can become a genre the next builder starts from (grown-genre.ts).
     const genre = kept && out.register?.toLowerCase().startsWith('custom:')
       ? ` THE PAGE ITSELF has a look of its own (${out.register}), so it can be a GENRE the next builder forks. Judge it as honestly as a component: would a different kind of app start from this page ("general"), or is the look this app's own ("special")? `
         + `Propose it, aimeat_designbook_propose with kind "genre", id "genre-<name>" and body { app: { owner: "${ownerName}", filename: "${filename}" }, judgement: { reach, why } }. `
-        + 'A general one goes onto the shelf by itself ONLY IF THE OWNER HAS OPENED THE APP FOR FORKING, because a genre hands the page\'s whole source to every builder on this node. That is theirs to allow and never yours: '
+        + 'A general one is published by itself ONLY IF THE OWNER HAS OPENED THE APP FOR FORKING, because a genre gives the page\'s whole source to every builder on this node. That is theirs to allow and never yours: '
         + 'ask them in one plain sentence whether other people\'s AIs may start from this page, and if they say yes they turn forking on for the app. The answer to the propose says what is still missing.'
       : '';
     return { app: out.app, kept: out.kept, version: out.version, took: out.took, made: out.made, next: next + genre };

@@ -81,7 +81,7 @@ describe('the shipped networks settle both money currencies', () => {
   });
 });
 
-describe('buildExactRequirements carries the session currency’s own asset', () => {
+describe('buildExactRequirements uses the session currency’s own asset', () => {
   const common = { payTo: `0x${'b'.repeat(40)}`, amountMicros: 1_500_000, resource: 'https://node.invalid/s/1', description: 'checkout' };
 
   it('prices a EUR sale in EURC and a USD sale in USDC on the same network', () => {
@@ -117,7 +117,7 @@ describe('micros → token atomic units honours the token’s own decimals', () 
     expect(Number(microsToTokenRaw(1_500_000, 18))).toBeGreaterThan(Number.MAX_SAFE_INTEGER);
   });
 
-  it('rounds UP when scaling down, so the seller is never handed less than the price', () => {
+  it('rounds UP when scaling down, so the seller never gets less than the price', () => {
     expect(microsToTokenRaw(1_500_000, 2)).toBe('150');  // exact
     expect(microsToTokenRaw(2000, 2)).toBe('1');         // 0.002 → 0.01, never 0
   });

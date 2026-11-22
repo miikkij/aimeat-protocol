@@ -23,7 +23,7 @@ export const SCREEN_ONLY_MD = `## On the screen, and why
 Almost everything here is done from the chat. A few things the person does themselves, signed in on
 the web, because they decide who can get into the account, move money or give rights. When the
 person asks for one of them, give the exact link and say why in one sentence. Do not look for
-another way round: the node refuses an agent on each of these.
+a workaround: the node refuses an agent on each of these.
 
 - **Signing in:** two-step sign-in, passkeys, open sessions, the password and the email address.
   /v1/profile?tab=security . Why: they decide who can get into the account.

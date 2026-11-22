@@ -127,7 +127,7 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
       return;
     }
     if (exceedsCeiling(config.maxAgentScopes, words).length > 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', 'This node does not let agents do that. Ask whoever runs it.'));
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', 'This server does not let agents do that. Ask whoever runs it.'));
       return;
     }
     const held = agent.defaultScopes ?? [];

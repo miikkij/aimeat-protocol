@@ -325,7 +325,7 @@ export function packagesRouter(
     const upstream = await upstreamFromZip(parsed, peers);
     if (upstream === 'INVALID') {
       res.status(400).json(error(config.nodeId, 'INVALID_SIGNATURE',
-        'That package carries a signature from a node this one knows, and it does not check out against that node\'s key.'));
+        'That package has a signature from a node this one knows, and it does not check out against that node\'s key.'));
       return;
     }
 

@@ -154,14 +154,14 @@ export default function Business({ navigate }) {
           quote=${tr('biz.c4Quote', 'This could replace Jira.')} quoteBy=${tr('biz.c4QuoteBy', 'game developer, large studio')}
           proofHref=${siteLink('roadmap')}
           proofLabel=${tr('biz.c4Proof', 'Open our own roadmap, live →')}
-          proofNote=${tr('biz.proofUnavailable', 'Live proof runs on the operator’s node.')}
+          proofNote=${tr('biz.proofUnavailable', 'Live proof runs on the operator’s server.')}
           ctaLabel=${tr('biz.c4Cta', 'Turn your project into an organism →')} ctaHref=${CONTACT} />
         <${Case} id="case-feedback"
           title=${tr('biz.c5Title', "A user's idea shipped the same day")}
           text=${tr('biz.c5Text', 'A user left an idea in the morning. An agent triaged it into a task, implemented it, ran the tests, updated the status page and marked the feedback resolved. A human confirmed it works. The whole chain is traceable: feedback → task → release.')}
           proofHref=${siteLink('roadmap')}
           proofLabel=${tr('biz.c5Proof', 'Follow one from idea to release →')}
-          proofNote=${tr('biz.proofUnavailable', 'Live proof runs on the operator’s node.')}
+          proofNote=${tr('biz.proofUnavailable', 'Live proof runs on the operator’s server.')}
           ctaLabel=${tr('biz.c5Cta', 'Open a feedback loop for your customers →')} ctaHref=${CONTACT} />
       <//>
 
@@ -189,12 +189,12 @@ export default function Business({ navigate }) {
             ctaLabel=${tr('biz.c10Cta', 'Package what you know →')} ctaHref=${CONTACT} />` : ''}
         ${hasSite('showcase') ? html`
           <${Case} id="case-node"
-            title=${tr('biz.c6Title', 'A whole company running on its own node')}
-            text=${tr('biz.c6Text', "The homepage lives in agent memory on its own AIMEAT node, federated into the network. One crew audits the node every morning at 04:00; another runs research overnight.")}
+            title=${tr('biz.c6Title', 'A whole company running on a server of its own')}
+            text=${tr('biz.c6Text', "The homepage is stored in agent memory on its own AIMEAT, federated into the network. One crew audits the server every morning at 04:00; another runs research overnight.")}
             quote=${'Every discovery is a mistake that survived long enough to prove itself.'}
             quoteBy=${'Kalle Määttä, founder, The Original Miskate Oy'}
             proofHref=${siteLink('showcase')}
-            proofLabel=${tr('biz.c6Proof', 'Open a living node →')}
+            proofLabel=${tr('biz.c6Proof', 'Open a company that runs this way →')}
             ctaLabel=${tr('biz.c6Cta', 'See hosting packages →')} ctaStore=${true} />` : ''}
       <//>
 
@@ -236,7 +236,7 @@ export default function Business({ navigate }) {
         <p class="ld-case-text">${tr('biz.trans1', 'Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app runs on: content a model produced has a record of how it was made, a person reading it on the server’s own pages sees a label, and the operator’s legal identity and supervisory authority are at a fixed machine-readable address your compliance officer can fetch without asking us. Content the server sent can be checked by anyone, byte for byte, with no account.')}</p>
         <p class="ld-case-text">${tr('biz.trans2', 'What stays yours: the obligations that come with what you publish. Running on AIMEAT does not discharge them, and we would rather say so here than have you discover it later. What the platform does is make marking, labelling and the record the default path instead of a project.')}</p>
         <a class="ld-path-cta" href="/v1/transparency"
-          onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('biz.transCta', 'How this node marks AI content →')}</a>
+          onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('biz.transCta', 'How this server marks AI content →')}</a>
       </section>
 
       <div class="ld-stats">

@@ -298,7 +298,7 @@ ${RESOLVE_FN}
   if (op === 'setCommands') {
     if (!Array.isArray(input.commands)) return refuse('needs commands as a list of { id, capability, tier, description }');
     const badCmd = input.commands.findIndex(function (c) { return !isMap(c) || !isText(c.id) || !isText(c.capability); });
-    if (badCmd !== -1) return refuse('needs every command to carry an id and a capability; entry ' + badCmd + ' does not');
+    if (badCmd !== -1) return refuse('needs every command to have an id and a capability; entry ' + badCmd + ' does not');
     commands = input.commands; await ctx.memory.set('iam.commands', commands);
     return { ok: true, commands: commands };
   }
@@ -333,7 +333,7 @@ const EXTENSION_IAM = JSON.stringify({
     '  - id: check',
     '    method: POST',
     '    path: /check',
-    '    description: "Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user. The answer carries `via` (owner | agent | none) so the reason a role resolved is visible, not just the verdict."',
+    '    description: "Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user. The answer contains `via` (owner | agent | none) so the reason a role resolved is visible, not just the verdict."',
     '    input: { type: object, properties: { permission: { type: string }, command: { type: string } } }',
     '    output: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean }, subject: { type: string }, via: { type: string } } }',
     '    script: check.js',
@@ -564,7 +564,7 @@ entry: index.html
 export function aimeatIamPackage(): ExamplePackageDef {
   return {
     name: 'aimeat-iam',
-    description: 'In-app role & permission management (RBAC). Define roles and a permission matrix, assign roles to users by GHII, and set a configurable default role — all enforced server-side by a sandboxed extension. The owner manages everything from the dashboard, which also hands the AI a ready snippet for wiring enforcement into the app.',
+    description: 'In-app role & permission management (RBAC). Define roles and a permission matrix, assign roles to users by GHII, and set a configurable default role — all enforced server-side by a sandboxed extension. The owner manages everything from the dashboard, which also gives the AI a ready snippet for wiring enforcement into the app.',
     category: 'security',
     tags: ['iam', 'rbac', 'roles', 'permissions', 'access-control', 'security'],
     visibility: 'public',

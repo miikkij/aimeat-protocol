@@ -162,11 +162,11 @@ export function validateRule(
   if (raw.sample !== undefined && raw.sample !== null) {
     // estimateTokens is a quarter of the JSON length, and Infinity for a value JSON cannot carry
     // (it logs that case itself), so one comparison refuses both.
-    if (estimateTokens(raw.sample) * 4 > MAX_SAMPLE_BYTES) bad('sample', 'SAMPLE_TOO_LARGE', 'sample: a state of at most 64 kB that JSON can carry.');
+    if (estimateTokens(raw.sample) * 4 > MAX_SAMPLE_BYTES) bad('sample', 'SAMPLE_TOO_LARGE', 'sample: a state of at most 64 kB that JSON can hold.');
     else {
       sample = raw.sample;
       const extra = fieldsOutside(sends, sample);
-      if (extra.length) bad('sample', 'SAMPLE_OUTSIDE_SENDS', `sample carries ${extra.map(f => `'${f}'`).join(', ')}, which sends does not list.`);
+      if (extra.length) bad('sample', 'SAMPLE_OUTSIDE_SENDS', `sample has ${extra.map(f => `'${f}'`).join(', ')}, which sends does not list.`);
     }
   }
 

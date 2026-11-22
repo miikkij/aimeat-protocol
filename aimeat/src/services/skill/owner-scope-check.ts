@@ -57,7 +57,7 @@ export function ownerScopeIssuesIn(fileTexts: Record<string, string>, prefixes: 
       issues.push({
         path, prefix: hit.prefix,
         message: `${path} tells the AI to write "${hit.prefix}" keys with ${WRITE_TOOL} without owner_scope. `
-          + `The app ${app} keeps them in the owner's memory, and an agent's write without owner_scope lands in `
+          + `The app ${app} keeps them in the owner's memory, and an agent's write without owner_scope goes to `
           + 'the agent\'s own namespace, where the app does not read it. Add `owner_scope: true` to the call '
           + '(the agent needs memory:write-as-owner, which the owner grants per agent).',
       });

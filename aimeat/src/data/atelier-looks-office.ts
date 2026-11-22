@@ -134,7 +134,7 @@ export const OFFICE_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-damping': '40',
       '--ak-spring-mass': '1',
     },
-    note: 'The second office world Jouni chose on 2026-11-04. Colour carries one meaning here, so the marker is reserved for <mark> around what an AI proposed. The same yellow and the same black words stand in both modes, because a highlighter does not change with the room.',
+    note: 'The second office world Jouni chose on 2026-11-04. Colour has one meaning here, so the marker is reserved for <mark> around what an AI proposed. The same yellow and the same black words stand in both modes, because a highlighter does not change with the room.',
   },
   {
     id: 'komento',

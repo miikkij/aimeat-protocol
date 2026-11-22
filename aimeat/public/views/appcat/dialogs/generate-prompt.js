@@ -54,7 +54,7 @@ export function connectedPrompt(o) {
   const app = o.app || null;
   const spec = 'the Atelier build spec (aimeat_handbook_get { tier: "build-app-atelier" }, then the parts it names and the platform sections this app needs) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get';
   const read = 'call aimeat_appdev_overview, read ' + spec + ', read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use.';
-  const finish = 'run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages when the app keeps anything about people (action "legal"), ask me whether search engines may list it (action "seo"), and hand me the address.';
+  const finish = 'run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages when the app keeps anything about people (action "legal"), ask me whether search engines may list it (action "seo"), and give me the address.';
   let p = 'You are connected to ' + host + ' over MCP as my AI. ';
   if (!app) {
     p += 'Build a new app with me and publish it on my account.\n\n';

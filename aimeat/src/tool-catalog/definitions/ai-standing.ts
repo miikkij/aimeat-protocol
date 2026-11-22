@@ -17,7 +17,7 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const aiStandingTools = [
     {
         name: 'aimeat_ai_standing_get',
-        description: 'What your owner lets every one of their AIs do without asking each time ("Allow always"): each permission the setting can name, in plain words in `lang`, whether it is on, who set it and when, and whether this node lets it stand. A permission that is on is already on your own list, so do the work and do not ask your owner again for it; each such act is written to your owner\'s feed. A permission that is off and that you need: tell your owner in one sentence what you would do, and give them `page`, where they can turn it on for all of their AIs. Only your owner, signed in themselves, changes this setting.',
+        description: 'What your owner lets every one of their AIs do without asking each time ("Allow always"): each permission the setting can name, in plain words in `lang`, whether it is on, who set it and when, and whether this node allows it. A permission that is on is already on your own list, so do the work and do not ask your owner again for it; each such act is written to your owner\'s feed. A permission that is off and that you need: tell your owner in one sentence what you would do, and give them `page`, where they can turn it on for all of their AIs. Only your owner, signed in themselves, changes this setting.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Allow Always Setting', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

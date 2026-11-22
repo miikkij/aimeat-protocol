@@ -129,7 +129,7 @@ function detailOf(names: HeldAccountName[], bindings: number, untied: number): s
   }
   if (bindings > 0) {
     parts.push(`${bindings} hook binding${bindings === 1 ? '' : 's'} name${bindings === 1 ? 's' : ''} no published action now. `
-      + 'A gate among them lets everything pass until you bind it again on the Hooks page.');
+      + 'A blocking hook among them lets everything pass until you bind it again on the Hooks page.');
   }
   if (untied > 0) {
     parts.push(`${untied} value${untied === 1 ? '' : 's'} in other people's ledgers name${untied === 1 ? 's' : ''} no account, and nothing ties ${untied === 1 ? 'it' : 'them'} to a person, so ${untied === 1 ? 'it stays' : 'they stay'} as ${untied === 1 ? 'it is' : 'they are'}.`);
@@ -180,7 +180,7 @@ function logHeld(names: HeldAccountName[], bindingsLeft: IncidentBinding[]): voi
     logger.warn(`held-account-names: the rows under the name "${n.name}" are older than the account that holds it now, and stay as they are until an operator decides on the Security page (${n.actions} actions, ${n.work} work, ${n.own_lines} own lines, ${n.naming_lines} lines naming it, ${n.cortexes ?? 0} cortexes, ${apps} ecosystem apps${apps ? ', which act for that account until then' : ''}, ${n.app_grants ?? 0} app grants and ${n.access_tokens ?? 0} access tokens, which are refused).`);
   }
   for (const b of bindingsLeft) {
-    logger.warn(`held-account-names: "${b.ref}" on ${b.hook} names no published action${b.gate ? ', so this gate lets everything pass until it is bound again' : ''}.`);
+    logger.warn(`held-account-names: "${b.ref}" on ${b.hook} names no published action${b.gate ? ', so this blocking hook lets everything pass until it is bound again' : ''}.`);
   }
 }
 

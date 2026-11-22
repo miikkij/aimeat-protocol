@@ -254,11 +254,11 @@ export const DECISIONS = [
     proposal: {
       variant: 'aside', name: 'The dashed coral note',
       summary: 'The design language\'s note with a thick dashed coral frame, for every note that asks for attention.',
-      text: '.poster-aside: 3px dashed coral frame, card ground. The waiting note keeps its pulsing dot; the nudge keeps its way out on the same line.',
+      text: '.poster-aside: 3px dashed coral frame, card ground. The waiting note keeps its pulsing dot; the nudge keeps its "Not now" on the same line.',
     },
     variants: [
       { id: 'waiting-note', name: 'The waiting note ("Waiting for your agent")', code: '.poster-waiting (waiting-note.css)', becomes: 'the dashed coral note, with its pulsing dot', look: 'thin dashed frame, pulsing coral dot, bold line', where: 'the home: the agent step while it waits', crop: null },
-      { id: 'nudge', name: 'The nudge ("Put this on your phone")', code: '.poster-nudge (nudge.css)', becomes: 'the dashed coral note', look: 'thin dashed frame, one line, the way out on the same line', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-nudge', user: 'second' } },
+      { id: 'nudge', name: 'The nudge ("Put this on your phone")', code: '.poster-nudge (nudge.css)', becomes: 'the dashed coral note', look: 'thin dashed frame, one line, "Not now" on the same line', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-nudge', user: 'second' } },
       { id: 'aside', name: 'The dashed coral note', code: '.poster-aside (poster.css)', becomes: 'this is the proposal', look: '3px dashed coral frame, card ground', where: 'organism settings and admin pages', crop: null },
     ],
     changes: [
@@ -269,11 +269,11 @@ export const DECISIONS = [
   },
   {
     id: 'action-link',
-    title: 'Action link: a way on that is not the one big button',
-    question: 'The home and the chat draw a quiet way on in six ways. Should they share one?',
+    title: 'Action link: a link that is not the one big button',
+    question: 'The home and the chat draw a quiet link in six ways. Should they share one?',
     proposal: {
       variant: 'poster-action', name: 'Underlined capitals',
-      summary: 'Dark capitals with a thick line under them for every quiet way on; the old rounded and plain buttons go.',
+      summary: 'Dark capitals with a thick line under them for every quiet link; the old rounded and plain buttons go.',
       text: '.poster-action: Archivo .9rem 800 caps, 3px ink underline, coral on hover. The classic .btn-outline and .btn-ghost leave the poster pages.',
     },
     variants: [
@@ -360,7 +360,7 @@ export const DECISIONS = [
     proposal: {
       variant: 'without', name: 'Without the borrowed style',
       summary: 'Remove the borrowed style, so the label and hint read in the body letters (in phase 3).',
-      text: 'The wrapper wears .poster-masthead-name, given to it on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line.',
+      text: 'The wrapper has .poster-masthead-name, given to it on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line.',
     },
     variants: [
       { id: 'as-is', name: 'As it is', code: '.poster-masthead-name on the wrapper', becomes: 'goes', look: 'label and hint in Fjalla caps from the masthead name rule', where: 'the home: the agent step', crop: null },
@@ -516,8 +516,8 @@ export const DECISIONS = [
   },
   {
     id: 'small-link',
-    title: 'Small link: a quiet way on inside a part',
-    question: 'Six small ways on are each drawn their own way: "What does that mean?", "Use your own key →", "Powered by goose", "Official instructions →", "Show older" and the jump to the latest message. Should they share one?',
+    title: 'Small link: a quiet link inside a part',
+    question: 'Six small links are each drawn their own way: "What does that mean?", "Use your own key →", "Powered by goose", "Official instructions →", "Show older" and the jump to the latest message. Should they share one?',
     proposal: {
       variant: 'proposal', name: 'Small coral underlined words',
       summary: 'Each becomes small coral words in typewriter letters with an underline, as "Show all" under a list is.',

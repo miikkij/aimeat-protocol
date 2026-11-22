@@ -103,7 +103,7 @@ const RECURRING_WORK_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-recurring-work
-description: What to do when someone asks for something to happen regularly ("every morning", "each week", "keep an eye on"). Find out whether they already have an agent that could do it and give the work to that agent, rather than building a fourth parallel implementation they will never find again. Covers how to look, how to hand work over, and the two token-free options when there is nobody to hand it to, and how to propose a new agent when the work needs one. Then how to put the work on a clock, with the schedule kinds and their fields, the REST routes for an agent with no model in the loop, steps joined by memory keys, who starts a task the clock gives, and what a fire does when an agent is offline or the last run is still going. Use before creating any schedule or installing any extension that runs on a clock.
+description: What to do when someone asks for something to happen regularly ("every morning", "each week", "keep an eye on"). Find out whether they already have an agent that could do it and give the work to that agent, rather than building a fourth parallel implementation they will never find again. Covers how to look, how to give the work to an agent, and the two token-free options when there is no agent to give it to, and how to propose a new agent when the work needs one. Then how to put the work on a schedule, with the schedule kinds and their fields, the REST routes for an agent with no model in the loop, steps joined by memory keys, who starts a scheduled task, and what a fire does when an agent is offline or the last run is still going. Use before creating any schedule or installing any extension that runs on a schedule.
 license: MIT
 metadata:
   audience: agent
@@ -129,27 +129,27 @@ Read it for two things:
 - **Is one of them already doing this?** Capabilities and tags usually say. If yes, the work is
   an addition to that agent, not a new mechanism.
 - **Is one of them ALIVE?** \`last_seen\` is the test. An agent that has not been seen for weeks
-  is a record, not a runtime, and handing it work means the work never happens.
+  is a record, not a runtime, and giving it work means the work never happens.
 
-An agent whose profile carries a console address is hosted somewhere that actually runs it: a
-fleet runtime, a cockpit, the person's own daemon. That is the strongest signal you can get from
+An agent whose profile has a console address is hosted somewhere that actually runs it: a
+fleet runtime, an agent console, the person's own daemon. That is the strongest signal you can get from
 here, because it means something outside this node is keeping it alive.
 
-## 2. Hand the work over
+## 2. Give the work to the agent
 
 \`aimeat_task_create\` assigns a task to another agent of the SAME owner. That is the whole
 mechanism, and it is enough:
 
 - Say what the outcome is, not how to get it. The agent receiving this has its own tools and
   its own model, and they are probably not yours.
-- Say where the result should land — the memory key, the workspace space, the record shape.
+- Say where the result should be written — the memory key, the workspace space, the record shape.
 - Say what "done" looks like, so the agent can close it rather than leaving it open forever.
 
-To make it recur, a schedule of \`kind: "agent_task"\` queues that task on a clock. Note what
+To make it recur, a schedule of \`kind: "agent_task"\` queues that task on a schedule. Note what
 that costs: the receiving agent spends its own tokens on its own account, and this node
 measures none of it. Say so before you set it up, rather than after the first bill.
 
-## 3. When there is nobody to hand it to
+## 3. When there is no agent to give it to
 
 Say that plainly first — "you have no agent running that could do this" is information, not a
 failure, and the person may want to connect one before anything else. Connecting an AI they
@@ -157,7 +157,7 @@ already pay for is in the profile under Agents.
 
 Then offer what the node itself can do, cheapest first:
 
-- **\`kind: "extension"\`** — a sandboxed action on the node's own clock. **Zero tokens**, no key
+- **\`kind: "extension"\`** — a sandboxed action on the node's own schedule. **Zero tokens**, no key
   of theirs, no account anywhere else. This is the right answer for fetch-and-store, for
   checking whether something changed, and for any tidying that needs no judgement.
 - **\`kind: "ai"\`** — a server-side completion over memory keys, on **their own AI providers** (their
@@ -176,7 +176,7 @@ Then offer what the node itself can do, cheapest first:
   \`schedule\` (\`aimeat_dataproduct\` action \`define\`), which also removes it when the product goes;
   it runs as you and reads each source as you. Skill: aimeat-data-ownership, section 1.
 
-Prefer the extension whenever the work does not need reasoning. A model called on a clock to do
+Prefer the extension whenever the work does not need reasoning. A model called on a schedule to do
 something a script could do is a bill that arrives every week for no reason.
 
 ## 4. When the work needs an agent of its own
@@ -193,20 +193,20 @@ workspace's record shape and design the agent for it.
 \`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from (name their data in
 it), the scopes the agent needs (never more than you hold yourself; the node adds \`memory:read\`
 and \`memory:write\`, which a crew runtime needs for itself, and \`ai:use\` when the person's crews
-think through this node) and a \`crew_def\`, the JSON document that says what the agent is: its
+use this node's AI) and a \`crew_def\`, the JSON document that says what the agent is: its
 roles, its tasks and its tools. Leave \`run_mode\` out: a worker per piece of work is what the
 person's connector runs, and a \`resident\` ask is stored as \`spawn\` with \`run_mode_corrected\`
 saying so wherever the connector cannot keep an agent up. The call creates nothing.
 It puts one line on the person's open items, and their press on it creates the agent, gives it the
-definition and hands it to their connector to run. The answer carries \`approval_url\` and
+definition and passes it to their connector to run. The answer contains \`approval_url\` and
 \`next_step\`: give the person both, so they know where to press. Send the \`crew_def\` with the
 proposal: an agent approved without one exists and cannot start. One \`offers\` entry in the
 definition (\`id\`, \`title\`, \`ask\`) is what puts the agent on the person's "Ask your agents" page once
 it has started; the node adds one from the name and the purpose when the definition has none.
 
 The approval gives the new agent its work once, as a task with its name and the offer's \`example\`
-(its purpose when the offer has none), so the person sees a first result without waiting for the clock. Once it runs, section 2 applies: a
-schedule of \`kind: "agent_task"\` gives it the work on a clock. How to write the definition and how
+(its purpose when the offer has none), so the person sees a first result without waiting for the schedule. Once it runs, section 2 applies: a
+schedule of \`kind: "agent_task"\` gives it the work on a schedule. How to write the definition and how
 to check it is in the skill \`node:add-a-crew-agent\`.
 
 Say what this needs before you propose it: a connector of theirs running on a computer of theirs,
@@ -214,7 +214,7 @@ and a model that computer can reach. Without the connector the agent is created 
 answer to the approval says so; when their connector next connects, the node gives the agent its
 key and the connector starts it, with nothing for them to press. A person with more than one
 connector says which computer: \`aimeat_connector_list\` names them, and the proposal's
-\`connector\` carries the choice, so the agent waits for that computer and no other.
+\`connector\` holds the choice, so the agent waits for that computer and no other.
 
 Say which model the work needs, too. The approval page asks "Which model it uses" and lists
 the models the chosen computer reaches; the person's pick is stored before the first run. With no
@@ -223,9 +223,9 @@ whose agent searches, reads sources or works in many steps to pick a strong mode
 person's own model policy leaves the picked model out, the agent is still made with it and the
 approval says so in \`llm_choice.warning\`: tell the person.
 
-## 5. Putting the work on a clock
+## 5. Putting the work on a schedule
 
-The node holds the clock. A schedule fires while the agent that made it is offline, and the owner
+The node runs the schedule. A schedule fires while the agent that made it is offline, and the owner
 sees every schedule and can pause or delete any of them.
 
 \`aimeat_schedule_create\` takes \`kind\`, \`cron\` (five fields: \`"0 7 * * *"\` is 07:00 every day),
@@ -241,7 +241,7 @@ sees every schedule and can pause or delete any of them.
 | \`dataproduct\` | \`input: { name }\` (a data product you defined; better made with the definition's \`schedule\`) | \`storage:write\`, \`memory:write\` |
 
 **When the person was promised the result** ("it comes to your email every morning"), give the
-\`agent_task\` schedule \`deliver: "owner"\`. The node then hands each finished task's result to the
+\`agent_task\` schedule \`deliver: "owner"\`. The node then sends each finished task's result to the
 owner itself, into their bell and by email when they have a notification address, under a heading
 with the date the node writes. Do not leave that promise to the agent's notify tool: a model can
 forget the call, and it can get the date wrong. \`aimeat_schedule_update\` with \`deliver: "owner"\`
@@ -257,11 +257,11 @@ cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one
 sibling's included, and no further: a schedule an app or a connected outside app made is that
 maker's own, and so is one the owner made. An app and a connected outside app each reach only the
 ones they made themselves. Changing what a schedule does (its prompt, input, cron or timezone, or resuming it) and
-running it now need the same word as creating it, the last column above; pausing, renaming and
+running it now need the same permission as creating it, the last column above; pausing, renaming and
 deleting need none. When you change the prompt or input of a sibling's \`ai\` schedule that reads
-your owner's records you may not read yourself, the change is stored and the answer carries
+your owner's records you may not read yourself, the change is stored and the answer contains
 \`approval_request\`: its next run waits for your owner's one press, and you hear the answer. Tell
-your owner in one sentence what you changed and why. A clock you run yourself, outside the node, can still be shown
+your owner in one sentence what you changed and why. A schedule you run yourself, outside the node, can still be shown
 to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
 
 **Over REST, for an agent with no model in the loop.** \`POST /v1/agents/{name}/schedules\` puts a
@@ -282,7 +282,7 @@ steps at different times (fetch at 06:00, write at 07:00), and name the exact me
 reads and writes, in \`task_description\` and in \`input_keys\`, so each step finds what the one before
 it left.
 
-**Who starts a task the clock gives.** An \`agent_task\` fire queues a task. It starts on its own only
+**Who starts a scheduled task.** An \`agent_task\` fire queues a task. It starts on its own only
 when the agent's owner lets that agent start tasks by itself (\`aimeat_agent_task_start_set\`, or an
 agent in \`task-runner\` mode when the owner has said nothing); otherwise it waits for the owner's OK
 on each one. An agent that can spend money, send mail or delete as the owner always waits. The
@@ -307,7 +307,7 @@ nobody should have to approve every morning.
   schedule and the owner is told, so the fix is the maker's permission, not the cron. Two kinds of
   older schedule keep running as before: one an app made before 2026-10-05, which counts as the
   owner's, and an \`extension\` one an app made without \`ext:invoke\` before the node's 2026-10 security update, which still
-  fires and can be run now; changing it needs the word.
+  fires and can be run now; changing it needs the permission.
 
 ## The rule underneath all of this
 

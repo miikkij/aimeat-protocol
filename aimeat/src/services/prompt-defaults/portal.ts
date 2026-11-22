@@ -155,7 +155,7 @@ A custom template REPLACES the entire landing page, including the default AIMEAT
 header/navigation bar (logo, nav links, language switcher, theme toggle, and the
 golden login/logout pill that the SPA normally renders). If your template has no
 header, visitors land on a page with no visible way to log in or reach their
-profile/admin — they get stranded.
+profile/admin — they are stuck there.
 
 Before generating the template, ASK the user this exact choice (do not guess):
 "Do you want the standard AIMEAT header at the top — the real logo, nav, language +
@@ -252,7 +252,7 @@ Ask your user: "Do you already have an account on this node?"
 If you cannot make POST requests at all, say so plainly and immediately, and send them to {{node_url}}/v1/portal to register themselves. Do not describe what you would have done — they are waiting.
 
 Step 3 — Authenticate (only when you hold an agent KEYPAIR):
-Device authorization already handed you a token, so most agents skip this. It applies when you were registered via POST /v1/agents and hold a private key:
+Device authorization already gave you a token, so most agents skip this. It applies when you were registered via POST /v1/agents and hold a private key:
 1. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp). No nonce is fetched.
 2. POST {{node_url}}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }
 3. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>
@@ -318,7 +318,7 @@ Help your user with what they want to accomplish. Use hints.next_actions in resp
 
 Hello {{display_name}},
 
-I am the person who runs this node. You now have a home here, and this is its mailbox — messages from people and from your own agents arrive in this one place.
+I am the person who runs this server. You now have a home here, and this is its mailbox — messages from people and from your own agents arrive in this one place.
 
 Two things worth knowing on day one:
 
@@ -338,11 +338,11 @@ If something here does not work, or does not make sense, reply to this message. 
 
 Hei {{display_name}},
 
-Minä pyöritän tätä solmua. Sinulla on nyt täällä koti, ja tämä on sen postilaatikko — viestit ihmisiltä ja omilta agenteiltasi tulevat tähän samaan paikkaan.
+Minä pyöritän tätä palvelinta. Sinulla on nyt täällä koti, ja tämä on sen postilaatikko — viestit ihmisiltä ja omilta agenteiltasi tulevat tähän samaan paikkaan.
 
 Kaksi asiaa jotka kannattaa tietää ensimmäisenä päivänä:
 
-Tervetulomattosi on oikea sivu omalla osoitteellaan. Kuka tahansa jolle annat linkin näkee sen, eikä mikään muu sinun tiedoistasi näy ennen kuin itse sanot niin.
+Esittelysivusi on oikea sivu omalla osoitteellaan. Kuka tahansa jolle annat linkin näkee sen, eikä mikään muu sinun tiedoistasi näy ennen kuin itse sanot niin.
 
 Agenttisi tekee työtä sinulle, ei meille. Sinä päätät hyväksyessäsi mitä se saa tehdä, ja voit ottaa sen pois milloin tahansa kysymättä keneltäkään.
 

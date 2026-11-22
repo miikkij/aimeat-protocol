@@ -1,6 +1,6 @@
 # 06 AI and models
 
-> Checked against AIMEAT node 4.3.1 (commit 89dc5e6bb) on 2026-11-19. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 6ad8b6759) on 2026-11-22. Maintained with the code: see the README for how.
 
 This page is for the architect and the security officer who decide which AI model sources the node may use, and for the administrator who connects them. It answers: which provider types exist and what each can do, who holds the keys, how the node limits where a key and a prompt may go, what data reaches a model and when, how data is kept to a local model, how spend is limited and measured, what the node does for EU AI Act transparency, and what IT prepares for each model source.
 

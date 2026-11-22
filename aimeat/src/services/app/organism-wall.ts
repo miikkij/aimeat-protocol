@@ -86,7 +86,7 @@ export async function organismWall(
   if (!gate.ok) {
     return gate.code === 'NOT_FOUND'
       ? { ok: false, status: 404, code: 'NOT_FOUND', message: 'There is no such organism.' }
-      : { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'The app wall of an organism is for its members.' };
+      : { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'The app list of an organism is for its members.' };
   }
   const viewerGhii = who.owner ? (who.owner.includes('@') ? who.owner : `${who.owner}@${config.nodeId}`) : undefined;
   const { apps } = await storage.listApps({
@@ -146,7 +146,7 @@ async function opensToday(storage: Storage, day: string, apps: Set<string>): Pro
       out.set(r.appId, (out.get(r.appId) ?? 0) + (r.calls ?? 0));
     }
   } catch (err) {
-    logger.warn('[organism-wall] the opens of today could not be read; the wall shows none', { error: String(err) });
+    logger.warn('[organism-wall] the opens of today could not be read; the list shows none', { error: String(err) });
   }
   return out;
 }

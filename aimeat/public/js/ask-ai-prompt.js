@@ -44,7 +44,7 @@ const LANGUAGE = { en: 'English', fi: 'Finnish', es: 'Spanish' };
 export function buildAskPrompt({ subject, explanation, terms, mine, locale, base }) {
   const origin = String(base || '').replace(/\/+$/, '');
   const lines = [
-    `I use AIMEAT (${origin}): a place where my own AI agents, apps and shared knowledge live, and which I own. I want to understand one part of it: ${subject}.`,
+    `I use AIMEAT (${origin}): a place that holds my own AI agents, apps and shared knowledge, and which I own. I want to understand one part of it: ${subject}.`,
     '',
     'Below is what AIMEAT itself says. Treat it as the source of truth. When it does not cover my question, say so and point me to the links below instead of filling the gap yourself.',
     '',
@@ -108,7 +108,7 @@ export function buildPagePrompt({ title, explanation, about, concept, locale, ba
     ? `call aimeat_handbook_get with tier "places" to see where this page is and what is on it, and with tier "settings/${concept}" for its full explanation`
     : 'call aimeat_handbook_get with tier "places" (or "places/admin" for an admin page) to see where this page is and what is on it';
   return [
-    `I use AIMEAT (${origin}): a place where my own AI agents, apps and shared knowledge live, and which I own. I have its page "${title}" open, and I want to understand it.`,
+    `I use AIMEAT (${origin}): a place that holds my own AI agents, apps and shared knowledge, and which I own. I have its page "${title}" open, and I want to understand it.`,
     '',
     aboutLine(about),
     '',

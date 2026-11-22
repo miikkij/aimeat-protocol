@@ -98,8 +98,8 @@ export function silentAppToken() {
 export function reportUngrantableScopes(r) {
   try {
     console.error('[aimeat-auth] Nobody can sign in to ' + (r.app || 'this app') + ': its <meta name="aimeat-scopes"> asks for '
-      + (r.unknown ? r.unknown : 'a word') + ', which this node cannot grant, and one such word refuses the whole sign-in. '
-      + 'Take the words from GET /v1/app-grants/scopes and publish the app again.');
+      + (r.unknown ? r.unknown : 'a scope') + ', which this node cannot grant, and one such scope refuses the whole sign-in. '
+      + 'Take the scopes from GET /v1/app-grants/scopes and publish the app again.');
   } catch { /* no console */ }
 }
 

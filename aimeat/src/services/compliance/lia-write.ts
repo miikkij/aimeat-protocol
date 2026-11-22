@@ -109,7 +109,7 @@ export function liaOff(config: Pick<AimeatConfig, 'balancingTest'>): LiaRefusal 
 }
 
 export const SPECIAL_REFUSAL = (title: string) => refuse(409, 'LIA_SPECIAL_CATEGORY',
-  `The register "${title}" holds special category data (health, biometric or genetic data, or another special category). Legitimate interests alone do not carry that data: GDPR art. 9(2) names the grounds. `
+  `The register "${title}" holds special category data (health, biometric or genetic data, or another special category). Legitimate interests alone do not cover that data: GDPR art. 9(2) names the grounds. `
   + 'No balancing test is written for it. Choose the ground in the register (specialBasis, and the legal basis that goes with it), and write the impact assessment (part "dpias").');
 
 /** The tests a write stores: each a draft with fresh facts and marked sources, an unchanged approved one as it was. */
@@ -333,7 +333,7 @@ export function balancingTestStepOf(config: AimeatConfig, scope: AppScope, readi
   if (special.length) {
     return {
       state: 'choose-another-basis', registers: special.map(n => n.register.title), url,
-      text: `The register ${special.map(n => `"${n.register.title}"`).join(', ')} names legitimate interests for special category data. That basis alone does not carry such data (GDPR art. 9). Choose the ground in the register and write the impact assessment; no balancing test is drafted.`,
+      text: `The register ${special.map(n => `"${n.register.title}"`).join(', ')} names legitimate interests for special category data. That basis alone does not cover such data (GDPR art. 9). Choose the ground in the register and write the impact assessment; no balancing test is drafted.`,
     };
   }
   const required = reading.needs.filter(n => n.need === 'required');

@@ -65,7 +65,7 @@ export function isAnonymousPrincipal(auth: AnonymousPrincipalView | null | undef
   return account === ANONYMOUS_ACCOUNT;
 }
 
-const SIGNED_IN_ONLY = 'This is for signed-in members. The shared anonymous access of this node does not reach it. '
+const SIGNED_IN_ONLY = 'This is for signed-in members. The shared anonymous access of this server does not reach it. '
   + 'Sign in with your own account and try again.';
 
 /**

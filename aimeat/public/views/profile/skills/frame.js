@@ -65,7 +65,7 @@ export const daysAgo = (iso) => (Date.now() - new Date(iso || 0).getTime()) / 86
 export function agentRule(nodeUrl) {
   return [
     'Skills on this AIMEAT node are SKILL.md packs loaded by reference, never copied into prompts. Before driving an app, list the skills bound to it (aimeat_skill_list { binding: "app:<owner>/<file>" }) and read them. When you do not know how something is done here, search the registry by name before guessing (aimeat_skill_list, then aimeat_skill_get { ref }). A skill the owner attached to you loads fresh every time.',
-    'A ref says where a skill lives: node:<name>, user:<owner>/<name>, ws:<org>/<ws>/<name>; append @<version> to pin the retained snapshot.',
+    'A ref says where a skill is stored: node:<name>, user:<owner>/<name>, ws:<org>/<ws>/<name>; append @<version> to pin the retained snapshot.',
     `Without MCP: GET ${nodeUrl}/v1/skills and GET ${nodeUrl}/v1/skills/<name>?scope=user&owner=<owner>. Public skills are also listed at ${nodeUrl}/.well-known/agent-skills/index.json.`,
   ].join('\n');
 }

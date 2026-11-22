@@ -55,7 +55,7 @@ export const accountRightsTools = [
     },
     {
         name: 'aimeat_provenance_embed',
-        description: 'Write the AI provenance INTO an exported file, so it travels with the file: a PNG, a JPEG, a PDF or a CBZ (a ZIP of pages) in storage, marked with the records its content was made from (the provenance_id each picture of aimeat_image_generate came with). The marked copy is stored beside the original as <key>.marked.<ext>, or at output_key; the original stays as it was. It carries the IPTC digital source type that image tools and platforms read, and each record\'s address. Several records, or composite: true, mark it as combined from AI and human work.',
+        description: 'Write the AI provenance INTO an exported file, so it stays with the file: a PNG, a JPEG, a PDF or a CBZ (a ZIP of pages) in storage, marked with the records its content was made from (the provenance_id each picture of aimeat_image_generate came with). The marked copy is stored beside the original as <key>.marked.<ext>, or at output_key; the original stays as it was. It contains the IPTC digital source type that image tools and platforms read, and each record\'s address. Several records, or composite: true, mark it as combined from AI and human work.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Mark an Export', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

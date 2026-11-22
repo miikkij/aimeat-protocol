@@ -59,7 +59,7 @@ export function questionWords(q, builtIn) {
 /** The prompt for the owner's own AI: the same job the node's reminder message hands over. */
 function promptFor(ref) {
   return [
-    `On my AIMEAT node ${window.location.origin}, answer the EU AI Act questions for my app ${ref}.`,
+    `On my AIMEAT ${window.location.origin}, answer the EU AI Act questions for my app ${ref}.`,
     'Call aimeat_datamap_get with the app; its `ai_act` lists the questions and which are unanswered.',
     'Read the app and its data map, then propose an answer to every question with one or two sentences saying why.',
     'Show me the answers and wait for my yes. Then write them into the app\'s data map as',

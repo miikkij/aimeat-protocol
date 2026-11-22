@@ -102,7 +102,7 @@ export async function resolveOwnerModel(
     // Presence only — the key is never decrypted here. A node with no encryption key configured
     // cannot read it either, and that is a different, operator-facing failure.
     if (!getEncryptionKey(config)) {
-      throw new NotebookAiError('ENCRYPTION_NOT_CONFIGURED', 'Encryption key not configured on this node.', 503);
+      throw new NotebookAiError('ENCRYPTION_NOT_CONFIGURED', 'Encryption key not configured on this server.', 503);
     }
   } else if (provider === 'openrouter' && !(await hasOwnAiKey(storage, gaii))) {
     // No key of the person's own (a key on one of their providers counts: from node 4.0.0 that is the
@@ -128,7 +128,7 @@ export async function resolveOwnerModel(
 /** The refusal for a person no key can pay for. The code is the one clients branch on. */
 function noKeyError(message?: string): NotebookAiError {
   return new NotebookAiError('NO_OPENROUTER_KEY',
-    message || 'No AI key can pay for this. Add your own key on the AI settings page, or ask the operator to give this node a shared key.', 400);
+    message || 'No AI key can pay for this. Add your own key on the AI settings page, or ask the operator to give this server a shared key.', 400);
 }
 
 /** A chokepoint refusal as this surface's stable codes: NO_API_KEY keeps its long-standing name. */

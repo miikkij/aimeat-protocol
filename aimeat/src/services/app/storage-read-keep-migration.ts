@@ -105,7 +105,7 @@ async function tellOperator(storage: Storage, config: Pick<AimeatConfig, 'nodeId
     detail: `The node gave storage:read to ${apps.length} published app(s) of ${owners} owner(s): ${apps.map(a => a.appId).join(', ')}. `
       + 'Since 2026-10-16 a signed-in app reads a file that is not public from /v1/pub only with that word, and these apps, '
       + 'published before it, read such files and do not ask for it, so their workspace images were refused. '
-      + `${grants} live app grant(s) got the word. An app's owner removes it with aimeat_app_manage scope_allowance_remove, `
+      + `${grants} live app grant(s) got the scope. An app's owner removes it with aimeat_app_manage scope_allowance_remove, `
       + 'and the app\'s change log in the App Catalog says why it was kept.',
   });
 }

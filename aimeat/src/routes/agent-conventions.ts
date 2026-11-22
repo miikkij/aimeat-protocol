@@ -67,7 +67,7 @@ license: see ${b}/v1/terms
 
 ## When to use this
 
-Reach for this node when an agent needs to remember something after the session ends, when a person
+Use this node when an agent needs to remember something after the session ends, when a person
 must stay in control of what an agent can touch, or when several agents and people work on the same
 material. It is the wrong tool for a one-shot script that needs no state.
 
@@ -88,7 +88,7 @@ curl ${b}/v1/memory/notes.today -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
 Every response is enveloped as \`${envelopeShape().success}\`, and
-\`hints.next_actions\` names what to do next, so the API can be followed without a map.
+\`hints.next_actions\` names what to do next, so the API can be followed without other documentation.
 
 ## Configuration
 
@@ -212,7 +212,7 @@ function buildX402Json(config: AimeatConfig): object {
     // Non-custodial: no node wallet, so no node payTo. Per-item terms come with the 402.
     settlement: {
       custodial: false,
-      note: 'Payment goes directly from the buyer to the seller\'s own address. This node never holds funds, so there is no node-level payTo. Each 402 response carries the accepts[] for that specific item.',
+      note: 'Payment goes directly from the buyer to the seller\'s own address. This node never holds funds, so there is no node-level payTo. Each 402 response contains the accepts[] for that specific item.',
     },
     discovery: {
       priced_tools: `${b}/v1/commerce/tools`,

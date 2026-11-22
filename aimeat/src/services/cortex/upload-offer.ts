@@ -49,6 +49,6 @@ export async function cortexUploadOffer(config: AimeatConfig, principal: string)
         expires_in_seconds: 3600,
         zip_structure: 'manifest.yaml at root, lib files in libs/ directory',
         note: 'Create a ZIP with manifest.yaml and libs/*.js, then PUT it to upload_url. '
-            + 'A ZIP that carries the name of a cortex you installed replaces it in place; an active one is activated again from the new manifest.',
+            + 'A ZIP that has the name of a cortex you installed replaces it in place; an active one is activated again from the new manifest.',
     };
 }

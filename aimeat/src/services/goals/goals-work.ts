@@ -137,7 +137,7 @@ export function taskBody(goal: GoalRecord, work: GoalWork, forModel = false): { 
   if (material.length) parts.push(`Material: ${material.map(m => `${m.title} (${m.kind}: ${m.ref})`).join('; ')}`);
   parts.push(forModel
     ? 'Answer with the result itself, written for the person whose goal this is, in the language of the goal. You have no tools and cannot open links: work from what is written here and what you know, and say plainly what you could not check.'
-    : `When you are done, complete the task with what you produced. To hand the next step to another agent, call aimeat_goal_work with action "leave" and goal_id ${goal.id}. Read the whole goal with aimeat_goal_get.`);
+    : `When you are done, complete the task with what you produced. To pass the next step to another agent, call aimeat_goal_work with action "leave" and goal_id ${goal.id}. Read the whole goal with aimeat_goal_get.`);
   const memoryKeys = [
     ...goal.material.filter(m => m.kind === 'memory' || m.kind === 'result').map(m => m.ref),
     ...before.map(b => b.result?.deliverableKey).filter((k): k is string => !!k),

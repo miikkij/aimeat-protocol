@@ -58,7 +58,7 @@ export async function readNodeCard(url: string, timeoutMs: number): Promise<Node
     const nodeId = body?.data?.node_id;
     const publicKey = body?.data?.public_key;
     if (typeof nodeId !== 'string' || !nodeId || typeof publicKey !== 'string' || !publicKey) {
-        return { ok: false, reason: 'unreachable', detail: 'The answer carries no node id and key.' };
+        return { ok: false, reason: 'unreachable', detail: 'The answer has no node id and key.' };
     }
     return { ok: true, nodeId, publicKey };
 }

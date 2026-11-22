@@ -236,7 +236,7 @@ export function registerMcpProxyTools(
         next: auth === 'per-user-oauth'
           ? `Each member signs in with their own account: aimeat_mcp_authorize with server "${result.server.id}" gives the address for the person you act for.`
           : auth === 'oauth'
-            ? `Sign in to it next: aimeat_mcp_authorize with server "${result.server.slug}" gives the address to hand over.`
+            ? `Sign in to it next: aimeat_mcp_authorize with server "${result.server.slug}" gives the address to send to the person.`
             : `Call them with aimeat_mcp_call, naming server "${result.server.slug}".`,
       });
     });
@@ -294,7 +294,7 @@ export function registerMcpProxyTools(
       }
       return ok({
         signed_out: row.slug,
-        note: 'The sign-in stored here is gone. Access granted at the far side is still the person\'s to revoke there.',
+        note: 'The sign-in stored here is gone. Access granted on that server is still the person\'s to revoke there.',
       });
     });
 

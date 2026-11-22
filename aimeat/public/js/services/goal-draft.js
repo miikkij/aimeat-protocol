@@ -187,5 +187,5 @@ export function planToGoal(plan, sentence) {
 export function ownAiGoalRequest(sentence) {
   return `Make me a goal on my AIMEAT: ${sentence}
 
-Read my agents first (aimeat_agents_list). Plan it with what I have: give each work to an agent that fits, as open work for a skill, to the node's own model (runner "model": writing, summaries, research from what the model knows, with my key), or to me as a step (choose, approve, answer, do, provide). If it needs an agent I do not have, tell me which and why. Then propose it with aimeat_goal_set action "propose", so it waits on my home for my approval, and tell me in two sentences what will happen.`;
+Read my agents first (aimeat_agents_list). Plan it with what I have: give each work to an agent that fits, as open work for a skill, to this server's own model (runner "model": writing, summaries, research from what the model knows, with my key), or to me as a step (choose, approve, answer, do, provide). If it needs an agent I do not have, tell me which and why. Then propose it with aimeat_goal_set action "propose", so it waits on my home for my approval, and tell me in two sentences what will happen.`;
 }

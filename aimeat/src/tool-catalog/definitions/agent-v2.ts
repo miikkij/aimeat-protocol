@@ -27,7 +27,7 @@ export const agentV2Tools = [
     // turn. The three above keep working exactly as they did.
     {
         name: 'aimeat_v2_message_send',
-        description: 'Send one turn to another principal on this same account: an agent, an ecosystem app, or the owner. A turn carries an ordered list of parts, so one send can say something, point at a file and hand over a structured payload together. Group turns with context_id: pass the same one to continue an exchange, omit it to start a new one and the answer tells you the id it got. The recipient hears about it on its tunnel if it is connected and on its registered delivery target if it is not, and can always read it back with aimeat_v2_message_list whatever happened. To reach a PERSON, use aimeat_dm_send; to reach your own owner in the dashboard thread, aimeat_message_send.',
+        description: 'Send one turn to another principal on this same account: an agent, an ecosystem app, or the owner. A turn contains an ordered list of parts, so one send can say something, point at a file and pass a structured payload together. Group turns with context_id: pass the same one to continue an exchange, omit it to start a new one and the answer tells you the id it got. The recipient hears about it on its tunnel if it is connected and on its registered delivery target if it is not, and can always read it back with aimeat_v2_message_list whatever happened. To reach a PERSON, use aimeat_dm_send; to reach your own owner in the dashboard thread, aimeat_message_send.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Not openWorld: every one of these stays inside the account. The delivery target is the one
@@ -46,11 +46,11 @@ export const agentV2Tools = [
         surfaces: ['agent'],
         input: {
             to: { type: 'string', required: true, description: 'The recipient principal on this account: an agent GAII (claude#alice@node), an ecosystem app (eco:drum#alice@node) or the owner GHII (alice@node).' },
-            parts: { type: 'array', required: true, description: 'Ordered parts. Each is {kind:"text",text} or {kind:"file",file:{uri,name?,mimeType?}} or {kind:"data",data:{...}}. A file part carries a URI, never bytes.', zod: partsSchema },
+            parts: { type: 'array', required: true, description: 'Ordered parts. Each is {kind:"text",text} or {kind:"file",file:{uri,name?,mimeType?}} or {kind:"data",data:{...}}. A file part contains a URI, never bytes.', zod: partsSchema },
             role: { type: 'string', enum: ['user', 'agent'], description: 'Send "user" if you are asking and "agent" if you are answering. Default "user". It is not a principal type.' },
             context_id: { type: 'string', description: 'The exchange this turn belongs to. Omit on the first turn.' },
             task_id: { type: 'string', description: 'The task this turn belongs to, if there is one.' },
-            metadata: { type: 'object', description: 'Anything you want carried along. Never read by the node.' },
+            metadata: { type: 'object', description: 'Anything you want sent along. Never read by the node.' },
         },
     },
     {
@@ -136,12 +136,12 @@ export const agentV2Tools = [
         surfaces: ['agent'],
         input: {
             assigned_to: { type: 'string', required: true, description: 'The principal that is to do this: an agent GAII, an ecosystem app, or the owner GHII.' },
-            input: { type: 'array', required: true, description: 'What is being asked, as parts: {kind:"text",text} or {kind:"file",file:{uri}} or {kind:"data",data:{...}}. The same shape a turn carries.', zod: partsSchema },
+            input: { type: 'array', required: true, description: 'What is being asked, as parts: {kind:"text",text} or {kind:"file",file:{uri}} or {kind:"data",data:{...}}. The same shape a turn has.', zod: partsSchema },
             context_id: { type: 'string', description: 'The exchange this work belongs to. Omit and the task names itself.' },
             status_message: { type: 'string', description: 'One line for a person about what this is.' },
             ttl_ms: { type: 'number', description: 'How long the result stays worth reading, in milliseconds. Advice, not a deletion.' },
             poll_interval_ms: { type: 'number', description: 'How often you intend to poll, in milliseconds.' },
-            metadata: { type: 'object', description: 'Carried along, never read by the node.' },
+            metadata: { type: 'object', description: 'Sent along, never read by the node.' },
         },
     },
     {

@@ -60,7 +60,7 @@ export function buildHelloMcpPrompt(config: AimeatConfig, opts: { lang?: string 
     if (l === 'fi') {
         L.push('Puhu minulle suomea.');
         L.push('');
-        L.push(`Olet kytketty AIMEAT-nodeeni (${node}) MCP:n yli. Tarkistetaan toimiiko kytkös, ennen kuin teemme mitään muuta.`);
+        L.push(`Olet kytketty AIMEATiini (${node}) MCP:n yli. Tarkistetaan toimiiko kytkös, ennen kuin teemme mitään muuta.`);
         L.push('');
         L.push('Tee tasan tämä:');
         L.push('');
@@ -75,7 +75,7 @@ export function buildHelloMcpPrompt(config: AimeatConfig, opts: { lang?: string 
     } else {
         L.push('Talk to me in the language I use with you.');
         L.push('');
-        L.push(`You are connected to my AIMEAT node (${node}) over MCP. Before we do anything else, let us check that the connection actually works.`);
+        L.push(`You are connected to my AIMEAT (${node}) over MCP. Before we do anything else, let us check that the connection actually works.`);
         L.push('');
         L.push('Do exactly this:');
         L.push('');
@@ -107,7 +107,7 @@ export function buildOrganismSetupPrompt(config: AimeatConfig, opts: { lang?: st
     if (l === 'fi') {
         L.push('Puhu minulle suomea.');
         L.push('');
-        L.push(`Olet kytketty AIMEAT-nodeeni (${node}) MCP:n yli. Perusta minulle oma organismi.`);
+        L.push(`Olet kytketty AIMEATiini (${node}) MCP:n yli. Perusta minulle oma organismi.`);
         L.push('');
         L.push('Organismi on jaettu tila jossa minä, sinä ja muut agenttini työskentelemme saman');
         L.push('aineiston päällä: muistiinpanot, dokumentit, tehtävät ja päätökset pysyvät siellä');
@@ -133,7 +133,7 @@ export function buildOrganismSetupPrompt(config: AimeatConfig, opts: { lang?: st
     } else {
         L.push('Talk to me in the language I use with you.');
         L.push('');
-        L.push(`You are connected to my AIMEAT node (${node}) over MCP. Set up my own organism.`);
+        L.push(`You are connected to my AIMEAT (${node}) over MCP. Set up my own organism.`);
         L.push('');
         L.push('An organism is a shared space where I, you and my other agents work on the same');
         L.push('material: notes, documents, tasks and decisions stay there between conversations,');
@@ -213,8 +213,8 @@ export function buildInstructionBlocks(
     if (l === 'fi') {
         B.push(`## AIMEAT: ${input.orgName}`);
         B.push('');
-        B.push(`Työskentelen AIMEAT-nodella ${node}. Organismi \`${input.orgId}\` ("${input.orgName}") on`);
-        B.push('se paikka jossa työni asuu: muistiinpanot, dokumentit, tehtävät ja päätökset.');
+        B.push(`Työskentelen omassa AIMEATissani osoitteessa ${node}. Organismi \`${input.orgId}\` ("${input.orgName}") on`);
+        B.push('se paikka johon työni on tallennettu: muistiinpanot, dokumentit, tehtävät ja päätökset.');
         B.push('');
         if (wsLines.length) {
             B.push('Workspacet:');
@@ -236,8 +236,8 @@ export function buildInstructionBlocks(
     } else {
         B.push(`## AIMEAT: ${input.orgName}`);
         B.push('');
-        B.push(`I work on the AIMEAT node ${node}. The organism \`${input.orgId}\` ("${input.orgName}") is`);
-        B.push('where my work lives: notes, documents, tasks and decisions.');
+        B.push(`I work in my AIMEAT at ${node}. The organism \`${input.orgId}\` ("${input.orgName}") is`);
+        B.push('where my work is stored: notes, documents, tasks and decisions.');
         B.push('');
         if (wsLines.length) {
             B.push('Workspaces:');

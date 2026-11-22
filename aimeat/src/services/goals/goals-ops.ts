@@ -352,7 +352,7 @@ function leaveInto(cur: GoalRecord, spec: WorkSpec, access: GoalAccess, from: Go
   const extra: Partial<GoalWork> = { hop, loop, round, ...(from && access.agent ? { origin: { agent: access.agent, work: from.id } } : {}) };
   // An agent's own result never gives it the next work: that is the self-wake guard.
   if (access.agent && !spec.agent) extra.exclude = [access.agent];
-  if (spec.agent && spec.agent === access.agent && from) throw new GoalError(400, 'INVALID_INPUT', 'An agent does not hand work to itself; it continues its own task.');
+  if (spec.agent && spec.agent === access.agent && from) throw new GoalError(400, 'INVALID_INPUT', 'An agent does not give work to itself; it continues its own task.');
   const overHops = from && hop > cur.limits.hops;
   const overLoops = loop > cur.limits.fixRounds;
   if ((overHops || overLoops) && (spec.kind ?? 'agent') === 'agent') {

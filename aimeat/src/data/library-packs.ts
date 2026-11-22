@@ -153,7 +153,7 @@ export function buildCapabilityPackLines(nodeUrl: string, except: string[] = [])
   const capability = VENDORED_PACKS.filter(p => p.status !== 'deprecated' && !except.includes(p.id));
   if (capability.length > 0) {
     s += 'Optional capability packs (vendored third-party libraries, self-hosted on this node — NEVER load these from an external CDN):\n';
-    s += 'Each pack carries a reliability tag from AEB testing: [any] a mid-tier model codes it correctly from memory · [frontier] the pinned API BREAKS vs the version you likely know — you MUST fetch its ai_doc, and heed the ⚠ line · [needs-doc] AIMEAT-authored, no priors — fetch its ai_doc or you cannot use it.\n';
+    s += 'Each pack has a reliability tag from AEB testing: [any] a mid-tier model codes it correctly from memory · [frontier] the pinned API BREAKS vs the version you likely know — you MUST fetch its ai_doc, and heed the ⚠ line · [needs-doc] AIMEAT-authored, no priors — fetch its ai_doc or you cannot use it.\n';
     for (const p of capability) {
       const inc = renderPackText(p.include.join(' + '), nodeUrl);
       const tier = p.modelTier ? ' [' + p.modelTier + ']' : '';
@@ -163,7 +163,7 @@ export function buildCapabilityPackLines(nodeUrl: string, except: string[] = [])
       if (p.apiCaveat) s += '  ⚠ ' + p.apiCaveat + '\n';
     }
     s += 'Before writing code that uses a capability pack, fetch its full usage doc (API idioms, version notes, gotchas): GET ' + nodeUrl + '/v1/library-packs/<id> — the ai_doc field (it also returns modelTier + the per-model proof ledger). Index of every pack: GET ' + nodeUrl + '/v1/library-packs. Include ONLY packs the user\'s needs match.\n';
-    s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API. A community pack may carry SELF-REPORTED per-model proofs (proofs[] with self_reported: true, proven_models) — treat them as the owner\'s own acceleration claims, not a node-verified badge.\n\n';
+    s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API. A community pack may have SELF-REPORTED per-model proofs (proofs[] with self_reported: true, proven_models) — treat them as the owner\'s own acceleration claims, not a node-verified badge.\n\n';
   }
   return s;
 }

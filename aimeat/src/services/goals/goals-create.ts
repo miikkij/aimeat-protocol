@@ -145,7 +145,7 @@ function roundsFrom(r: RoundsInput, cur: GoalRecord['rounds'] = null): NonNullab
   const cron = r.cron !== undefined ? filled(r.cron) : (r.trigger === 'manual' ? undefined : cur?.cron);
   const condition = r.condition !== undefined ? filled(r.condition) : (r.trigger === 'condition' ? cur?.condition : undefined);
   const timezone = r.timezone !== undefined ? filled(r.timezone) : cur?.timezone;
-  if (r.trigger === 'clock' && !cron) throw new GoalError(400, 'INVALID_INPUT', 'A goal whose rounds run by the clock names rounds.cron.');
+  if (r.trigger === 'clock' && !cron) throw new GoalError(400, 'INVALID_INPUT', 'A goal whose rounds run on a schedule names rounds.cron.');
   return {
     trigger: r.trigger, cron, timezone, condition,
     count: cur?.count ?? 0, ...(cur?.lastAt ? { lastAt: cur.lastAt } : {}),

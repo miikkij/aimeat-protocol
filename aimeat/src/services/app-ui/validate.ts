@@ -209,7 +209,7 @@ export function validateSignatureTokens(raw: unknown, look?: string): Record<str
       fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
     }
     if (TOKEN_VALUE_FORBIDDEN.test(value)) {
-      fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
+      fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value and nothing more.`);
     }
     if (name === '--ak-accent') {
       out[name] = validateAccentPair(value, look);
@@ -254,7 +254,7 @@ export function validateImageryStyle(raw: unknown): { style: string; palette_wor
     fail('imagery.style is the illustration prompt fragment: 1-400 characters of art direction, like "soft watercolour wash, grainy paper, no text".');
   }
   if (TOKEN_VALUE_FORBIDDEN.test(style)) {
-    fail('imagery.style may not carry urls, comments or declaration characters — it is words for the image prompt, never a vehicle.');
+    fail('imagery.style may not carry urls, comments or declaration characters — it is words for the image prompt and nothing more.');
   }
   const out: { style: string; palette_words?: string } = { style };
   if (o.palette_words !== undefined) {
@@ -315,7 +315,7 @@ export function validateAmbientSpec(raw: unknown, look?: string): { preset: stri
     const where = first.min > 0
       ? `${first.label} in ${first.combo} measures ${first.actual.toFixed(2)} against the ${first.min} floor (${first.why})`
       : `${first.label} in ${first.combo}: ${first.why}`;
-    fail(`ambient ${preset} at alpha ${alpha} fails the contrast matrix on the ${presets[0]} look: ${where}; ${bad.length} check(s) fail in all. Lower ambient.alpha (${preset} ships at ${entry.defaultAlpha}, the whisper every look allows), or move the arrangement to a look that owns its ground.`);
+    fail(`ambient ${preset} at alpha ${alpha} fails the contrast matrix on the ${presets[0]} look: ${where}; ${bad.length} check(s) fail in all. Lower ambient.alpha (${preset} ships at ${entry.defaultAlpha}, the faint level every look allows), or move the arrangement to a look that has its own background.`);
   }
   return out;
 }
@@ -329,14 +329,14 @@ function validateEffectParams(effect: AtelierEffect, raw: unknown, at: string): 
   if (raw === undefined) return undefined;
   const names = effect.params.map((p) => p.name);
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    fail(`${at}: params is an object of the effect's own knobs — ${effect.id} takes ${names.join(', ')}.`);
+    fail(`${at}: params is an object of the effect's own parameters — ${effect.id} takes ${names.join(', ')}.`);
   }
   const out: Record<string, number | string> = {};
   for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
     const decl = effect.params.find((p) => p.name === name);
     if (!decl) {
       const guess = nearest(name, names);
-      fail(`${at}: ${effect.id} has no knob called "${name}".${guess ? ` Did you mean "${guess}"?` : ''} Its knobs: ${names.join(', ')}.`);
+      fail(`${at}: ${effect.id} has no parameter called "${name}".${guess ? ` Did you mean "${guess}"?` : ''} Its parameters: ${names.join(', ')}.`);
     }
     if (decl.kind === 'number') {
       const n = typeof value === 'number' ? value : Number.NaN;
@@ -371,7 +371,7 @@ export function validatePostChain(raw: unknown): AppUiPostSpec[] {
     const obj = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : null;
     const id = typeof item === 'string' ? item.trim() : obj ? String(obj.id ?? '').trim() : '';
     if (!ids.includes(id)) {
-      if (effectById(id)) fail(`${at}: ${id} is not a pass the layer runs — the passes are ${ids.join(', ')}; ${id} lands on a block as its effect.`);
+      if (effectById(id)) fail(`${at}: ${id} is not a pass the layer runs — the passes are ${ids.join(', ')}; ${id} is applied to a block as its effect.`);
       unknownName('post effect', id, ids);
     }
     const params = obj ? validateEffectParams(effectById(id)!, obj.params, at) : undefined;
@@ -413,11 +413,11 @@ export function validateEffectSpec(
   }
   const component = opts.component;
   if (component && isTextBearing(component) && !effect.volume.includes('ground')) {
-    fail(`${at}: ${effect.id} is a ${effect.volume.join(' or ')} effect and ${component} bears text — it would bend or recolour the words. A prop or zone effect lands only on a picture or a band: ${EFFECT_HOSTS.join(', ')}.`
+    fail(`${at}: ${effect.id} is a ${effect.volume.join(' or ')} effect and ${component} bears text — it would bend or recolour the words. A prop or zone effect applies only to a picture or a band: ${EFFECT_HOSTS.join(', ')}.`
       + (effect.id === 'duotone' ? ' (Measured 2026-09-05: under body text a duotone puts the secondary line in the middle of its ramp on 18 of 19 looks.)' : ''));
   }
   if (component === 'hero' && opts.hasImage === false && !effect.volume.includes('zone')) {
-    fail(`${at}: on a hero an effect lands on the hero's image, and this hero has none — give it an image, or play a moment on the band instead (${ZONE_EFFECT_IDS.join(', ')}).`);
+    fail(`${at}: on a hero an effect applies to the hero's image, and this hero has none — give it an image, or play a moment on the band instead (${ZONE_EFFECT_IDS.join(', ')}).`);
   }
   let backdrop = false;
   if (o.backdrop !== undefined) {
@@ -462,7 +462,7 @@ export const DIALOG_FROM = ['center', 'bottom'] as const;
  */
 export function validateDialogShape(raw: unknown): { title?: string; tone?: string; size?: string; from?: string } {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    fail('dialog is one object: { title?, tone?, size?, from? } — the shape of the modal this arrangement stands inside.');
+    fail('dialog is one object: { title?, tone?, size?, from? } — the shape of the modal this arrangement is shown inside.');
   }
   const o = raw as Record<string, unknown>;
   const out: { title?: string; tone?: string; size?: string; from?: string } = {};
@@ -593,7 +593,7 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
     const count = (perComponent.get(def.id) ?? 0) + 1;
     perComponent.set(def.id, count);
     if (def.maxPerLayout !== undefined && count > def.maxPerLayout) {
-      fail(`${at} ("${b.id}"): at most ${def.maxPerLayout} ${def.id} per layout — ${def.id === 'hero' ? 'two focal points is shouting' : 'the layout stops reading as one'}.`);
+      fail(`${at} ("${b.id}"): at most ${def.maxPerLayout} ${def.id} per layout — ${def.id === 'hero' ? 'two focal points compete for attention' : 'the layout stops reading as one'}.`);
     }
 
     const props: Record<string, BlockPropValue> = {};

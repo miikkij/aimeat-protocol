@@ -34,7 +34,7 @@ export function oneLanguageFindings(input: { isUpdate: boolean; html: string }):
     message: `This new app declares one language ("${langs[0]}"). The default on this node is two, \`<meta name="aimeat-locales" content="en fi">\`, `
       + 'with every string the page shows read from a dictionary so the sign-in bar\'s switch can change it. One language is the owner\'s '
       + 'decision, not the builder\'s, and the language of the conversation does not make it. If the owner asked for one language, tell '
-      + 'them that is what they got; if they did not, add the second one before you hand this over.',
+      + 'them that is what they got; if they did not, add the second one before you give it to them.',
     url: `/v1/appdev/pitfalls/${PITFALL}`,
   }];
 }

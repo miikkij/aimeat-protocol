@@ -69,7 +69,7 @@
   function applyWish() {
     a.set({ ambient: wish.preset === null && !wish.post.length ? null : { preset: wish.preset, post: wish.post } });
   }
-  const presets = K.section({ target: a.main, title: 'Override', hint: 'An app may name a preset over the look; "look" hands the decision back.' });
+  const presets = K.section({ target: a.main, title: 'Override', hint: 'An app may name a preset over the look; "look" gives the decision back.' });
   row(presets.body, PRESETS.concat(['look']), 'preset', function (id) {
     wish.preset = id === 'look' ? null : id;
     applyWish();
@@ -87,7 +87,7 @@
   words.body.appendChild(p);
 
   // The effects on a block of words: the ground volume, proven under body text.
-  const wordFx = K.section({ target: a.main, title: 'An effect on the words', hint: 'Still effects a block may wear under its text; the matrix proved the ink at each one\'s default.' });
+  const wordFx = K.section({ target: a.main, title: 'An effect on the words', hint: 'Still effects a block may have under its text; the matrix proved the ink at each one\'s default.' });
   const wordBox = document.createElement('div');
   wordBox.className = 'demo-fx-box';
   const wordLine = document.createElement('p');
@@ -125,7 +125,7 @@
   moments.setAttribute('aria-label', 'Play a moment on the picture');
   pictureFx.body.appendChild(picture);
 
-  const stages = K.section({ target: a.main, title: 'One stage per preset', hint: 'A section can carry its own weather.' });
+  const stages = K.section({ target: a.main, title: 'One stage per preset', hint: 'A section can have its own weather.' });
   const grid = document.createElement('div');
   grid.className = 'demo-stages';
   stages.body.appendChild(grid);

@@ -470,7 +470,7 @@ export function extractPdfSignatures(pdf: Buffer, opts: { maxFields?: number } =
       distinct.add(`${m[1]},${m[2]},${m[3]},${m[4]}`);
       if (distinct.size > max) {
         throw new PdfExtractError('TOO_MANY_SIGNATURES',
-          `The file has more than ${max} signatures, and this node checks at most ${max} in one file. The operator sets the number with the setting docsign.max_signatures.`);
+          `The file has more than ${max} signatures, and this server checks at most ${max} in one file. The operator sets the number with the setting docsign.max_signatures.`);
       }
     }
   }

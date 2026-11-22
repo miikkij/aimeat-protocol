@@ -125,7 +125,7 @@ export function validateSections(raw: unknown): { sections: Section[] } | { erro
         if (s.parentId !== null && !ids.has(s.parentId)) return { error: `Section "${s.id}" names a parent "${s.parentId}" that is not in the list.` };
     }
     const cyc = hasCycle(out);
-    if (cyc) return { error: `The parents of section "${cyc}" lead back to it, so it would sit inside itself.` };
+    if (cyc) return { error: `The parents of section "${cyc}" lead back to it, so it would be inside itself.` };
     return { sections: out };
 }
 

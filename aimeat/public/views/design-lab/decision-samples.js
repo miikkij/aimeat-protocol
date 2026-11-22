@@ -109,7 +109,7 @@ const more = (text) => html`<a class="poster-action poster-action--more" href="#
 const tabs = (...names) => row(names.map((n, i) => html`<button type="button" class=${'poster-tab' + (i === 0 ? ' is-on' : '')}>${n}</button> `));
 const prompt = () => html`<${PromptCard} label="Remember something" prompt="Tell me in the language I use with you…" className="poster-action" copyLabel="Copy prompt" copiedLabel="Copied" />`;
 const result = () => inTurn(html`<${ResultCards} cards=${[{ kind: 'page', title: 'Team page', url: '#' }]} />`);
-const waiting = () => html`<${WaitingNote} title="Waiting for your agent to knock.">The next move is in your AI chat.<//>`;
+const waiting = () => html`<${WaitingNote} title="Waiting for your agent to connect.">The next move is in your AI chat.<//>`;
 /** The prompt card's opened menu, its rows as PromptCard draws them (the menu opens only on a press). */
 const promptMenu = (...labels) => html`<div class="poster-prompt-menu">${labels.map((l) => html`<button type="button" key=${l} class="poster-menu-row">${l}</button>`)}</div>`;
 
@@ -243,10 +243,10 @@ export const SAMPLES = {
   'step-state': [
     { id: 'name-empty', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline" disabled>That is its name</button></div>`,
       after: after('.poster-action', () => row(html`<button type="button" class="poster-action" disabled>That is its name</button>`)) },
-    { id: 'mat-waiting', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline" disabled>Here is my welcome mat</button></div>`,
-      after: after('.poster-action', () => row(html`<button type="button" class="poster-action" disabled>Here is my welcome mat</button>`)) },
-    { id: 'copy-done', measure: '.poster-prompt-actions .btn-outline', render: () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML welcome mat…" className="btn-outline" copyLabel="Copy the prompt" copiedLabel="Copied" />`,
-      after: after('.poster-prompt-actions .poster-action', () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML welcome mat…" className="poster-action" copyLabel="Copy the prompt" copiedLabel="Copied" />`) },
+    { id: 'mat-waiting', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline" disabled>Here is my introduction page</button></div>`,
+      after: after('.poster-action', () => row(html`<button type="button" class="poster-action" disabled>Here is my introduction page</button>`)) },
+    { id: 'copy-done', measure: '.poster-prompt-actions .btn-outline', render: () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML introduction page…" className="btn-outline" copyLabel="Copy the prompt" copiedLabel="Copied" />`,
+      after: after('.poster-prompt-actions .poster-action', () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML introduction page…" className="poster-action" copyLabel="Copy the prompt" copiedLabel="Copied" />`) },
     { id: 'started-done', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline">I have started it</button></div>`,
       after: after('.poster-action', () => row(html`<button type="button" class="poster-action">I have started it</button>`)) },
   ],

@@ -569,7 +569,7 @@ const GOOD_BODY = {
         // A character reference is decoded as a browser decodes it before the value is used, so
         // `u&#114;l(` in fill is an address and is refused as one (1a0a15eb7b20).
         const referenced = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid"><svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" fill="u&#114;l(https://evil.example/p.svg#g)"></rect></svg></div>' }));
-        assert(referenced.status === 422 && /may not carry an address/.test(referenced.body.error?.message ?? ''), `an address spelled with a character reference is refused: ${referenced.status} ${JSON.stringify(referenced.body?.error)}`);
+        assert(referenced.status === 422 && /may not contain an address/.test(referenced.body.error?.message ?? ''), `an address spelled with a character reference is refused: ${referenced.status} ${JSON.stringify(referenced.body?.error)}`);
         const escaped = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); background: u\\rl(https://evil.example/x.png); }' }));
         assert(escaped.status === 422 && /no url\(\)/.test(escaped.body.error?.message ?? ''), `an escaped url( is refused: ${escaped.status} ${JSON.stringify(escaped.body?.error)}`);
         // A selector is read to its end: `.wkgrid ~ p` starts at the component and styles the page after it.
@@ -586,7 +586,7 @@ const GOOD_BODY = {
         }
         // A page reads the stylesheet inside a <style> element, which "</style" ends, so no "</" passes.
         const closing = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell::after { content: "</style><p>"; }' }));
-        assert(closing.status === 422 && /carries no "<\/"/.test(closing.body.error?.message ?? ''), `a "</" in the stylesheet is refused: ${closing.status} ${JSON.stringify(closing.body?.error)}`);
+        assert(closing.status === 422 && /contains no "<\/"/.test(closing.body.error?.message ?? ''), `a "</" in the stylesheet is refused: ${closing.status} ${JSON.stringify(closing.body?.error)}`);
 
         // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
         const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
@@ -676,7 +676,7 @@ const GOOD_BODY = {
 
     await test('a stylesheet carrying @scope is refused, with how to write the rule on the component\'s own classes', async () => {
         const scoped = await proposeComponent(`comp-bad-${Date.now() % 100000}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); @scope (body) { & p { color: var(--ak-accent); } } }' }));
-        assert(refusedWith(scoped, /carries no @scope, and a component does not need it.*"& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/),
+        assert(refusedWith(scoped, /contains no @scope, and a component does not need it.*"& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/),
             `@scope is refused, with the form that passes: ${said(scoped)}`);
     });
 
@@ -685,7 +685,7 @@ const GOOD_BODY = {
         const wrong: string[] = [];
         for (const [name, rule] of [['layer', '@layer wkgrid-base { .wkgrid-cell { min-height: 40px; } }'], ['page', '@page { margin: 0; }'], ['view-transition', '@view-transition { navigation: auto; }']]) {
             const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `.wkgrid { color: var(--ak-ink); }\n${rule}` }));
-            if (!refusedWith(r, new RegExp(`carries no @${name}: `))) wrong.push(`@${name}: ${said(r)}`);
+            if (!refusedWith(r, new RegExp(`contains no @${name}: `))) wrong.push(`@${name}: ${said(r)}`);
         }
         assert(wrong.length === 0, `each is refused by name: ${wrong.join('; ')}`);
     });
@@ -723,7 +723,7 @@ const GOOD_BODY = {
             ['@position-try --ak-top { top: 0; }', '"@position-try --wkgrid-ak-top"'],
             ['@function --ak-gap() { result: 4px; }', '"@function --wkgrid-ak-gap()"'],
             ['@font-feature-values Inter { @styleset { nice: 1; } }', '"@font-feature-values wkgrid-inter"'],
-            ['@document url-prefix() { .wkgrid-cell { min-height: 40px; } }', 'carries no @document: it uses only @media, @supports, @container and @starting-style'],
+            ['@document url-prefix() { .wkgrid-cell { min-height: 40px; } }', 'contains no @document: it uses only @media, @supports, @container and @starting-style'],
         ]) {
             const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `.wkgrid { color: var(--ak-ink); }\n${rule}` }));
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${rule.split(' {')[0]}: ${said(r)}`);
@@ -784,7 +784,7 @@ const GOOD_BODY = {
     await test('a name is read in ASCII lower case, as a browser matches it: spelled with a Kelvin sign, it is neither @keyframes nor the component\'s own', async () => {
         const stamp = Date.now() % 100000;
         const kelvin = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n@\\212a eyframes wkgrid-in { from { opacity: 0; } }` }));
-        assert(refusedWith(kelvin, /carries no @Keyframes: it uses only @media/), `an at-rule spelled with a Kelvin sign is off the list: ${said(kelvin)}`);
+        assert(refusedWith(kelvin, /contains no @Keyframes: it uses only @media/), `an at-rule spelled with a Kelvin sign is off the list: ${said(kelvin)}`);
         const counter = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n.wkgrid-cell { counter-increment: w\\212a grid-step; }` }));
         assert(refusedWith(counter, /names the counter "wKgrid-step"/), `a counter spelled with a Kelvin sign is not the component's own: ${said(counter)}`);
     });
@@ -813,7 +813,7 @@ const GOOD_BODY = {
             [{ html: '<div class="wkgrid"><li class="wkgrid-item">a</li></div>' }, 'An <li> stands inside <div>, outside a list of the component: a browser numbers it as an item of the page\'s own list'],
             [{ css: `${componentBody().css}\n.wkgrid-cell { display: list-item; }` }, 'makes an element a list item'],
             [{ css: `${componentBody().css}\n.wkgrid-cell { display: var(--wkgrid-d); }` }, 'writes display through var()'],
-            [{ html: disclosure, css: `${componentBody().css}\n.wkgrid-s { counter-increment: wkgrid-step; }` }, 'The markup carries a <summary>, which a browser makes a list item that counts 0'],
+            [{ html: disclosure, css: `${componentBody().css}\n.wkgrid-s { counter-increment: wkgrid-step; }` }, 'The markup contains a <summary>, which a browser makes a list item that counts 0'],
         ] as Array<[Record<string, unknown>, string]>) {
             const r = await proposeComponent(`comp-bad-${stamp}`, componentBody(patch));
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(patch).slice(0, 90)}: ${said(r)}`);
@@ -1365,7 +1365,7 @@ const GOOD_BODY = {
         const living = await proposeEffect({ effect: 'kaleidoscope', on: 'figure' });
         assert(living.status === 422 && /ambient\.post/.test(living.body.error.message), `living motion on a figure is pointed at the layer: ${JSON.stringify(living.body)}`);
         const block = await proposeEffect({ effect: 'vignette', on: 'layer' });
-        assert(block.status === 422 && /lands on a block/.test(block.body.error.message), `a block effect as a layer pass is pointed back: ${JSON.stringify(block.body)}`);
+        assert(block.status === 422 && /is applied to a block/.test(block.body.error.message), `a block effect as a layer pass is pointed back: ${JSON.stringify(block.body)}`);
         const knob = await proposeEffect({ effect: 'glitch', params: { strength: 4 } });
         assert(knob.status === 422 && /from 0 to 1/.test(knob.body.error.message), `a knob outside its bounds refuses with the bounds: ${JSON.stringify(knob.body)}`);
     });

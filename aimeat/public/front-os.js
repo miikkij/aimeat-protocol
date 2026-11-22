@@ -34,13 +34,13 @@
       'liitetään työtilat........ ok',
       'herätetään agentit........ ok',
       'avataan appikatalogi...... ok',
-      'sinun nodesi, sinun datasi: käynnistetään työpöytä',
+      'sinun AIMEATisi, sinun datasi: käynnistetään työpöytä',
     ] : [
       'AIMEAT BIOS v4.0 — memory check ok',
       'mounting workspaces....... ok',
       'waking agents............. ok',
       'opening the app catalog... ok',
-      'your node, your data: starting desktop',
+      'your AIMEAT, your data: starting desktop',
     ];
     var out = document.getElementById('fos-boot-lines');
     var i = 0;
@@ -96,7 +96,7 @@
         };
         line('$ aimeat status', '', 'd');
         line(FI ? 'appeja:' : 'apps:', fmt(d.apps) + (FI ? ' käynnissä' : ' running'));
-        line(FI ? 'agentteja:' : 'agents:', fmt(d.agents) + (FI ? ', hereillä ' + fmt(d.agents_online) : ', ' + fmt(d.agents_online) + ' awake'));
+        line(FI ? 'agentteja:' : 'agents:', fmt(d.agents) + (FI ? ', verkossa ' + fmt(d.agents_online) : ', ' + fmt(d.agents_online) + ' online'));
         line(FI ? 'avauksia:' : 'opens:', fmt(d.downloads));
         line('uptime:', FI ? 'koko ajan, se on koko pointti' : 'always, that is the point', 'a');
       }

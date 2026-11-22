@@ -122,7 +122,7 @@ export async function credentialHealthForOwner(
         live_sessions: live?.count ?? 0,
         key_pinned: keyPinned, card_valid: cardValid, connected,
         summary:
-          state === 'never' ? 'Created, and its connector has not taken it on yet.'
+          state === 'never' ? 'Created, and its connector has not accepted it yet.'
             : state === 'dead' ? 'Its key is missing, so it cannot sign in. Create it again.'
               : state === 'unreadable' ? 'Its card cannot be read. Ask whoever runs this for help.'
                 : connected ? 'Signs itself in with its own key, and is connected now.'
@@ -154,8 +154,8 @@ export async function credentialHealthForOwner(
       live_sessions: live?.count ?? 0,
       key_pinned: false, card_valid: false, connected,
       summary:
-        state === 'never' ? 'Never connected. Run the connect step to bring it in.'
-          : state === 'dead' ? 'Its sign-in has run out, so it cannot get in any more. Connect it again.'
+        state === 'never' ? 'Never connected. Run the connect step to connect it.'
+          : state === 'dead' ? 'Its sign-in has run out, so it cannot sign in any more. Connect it again.'
             : state === 'expiring'
               ? (days === 0
                 ? 'Its sign-in runs out today. Connect it again now.'

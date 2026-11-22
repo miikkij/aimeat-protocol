@@ -130,7 +130,7 @@ export function gatePeer(
   // every person here. Every admission path refuses that id; this refuses it at every door too, for
   // a row any other path wrote (secaudit2026oct26 round 8c).
   if (sourceNode === ownNodeIdOf(peers)) {
-    return { ok: false, status: 403, code: 'FORBIDDEN', message: `${sourceNode} is this node's own id, so no peer speaks under it here.` };
+    return { ok: false, status: 403, code: 'FORBIDDEN', message: `${sourceNode} is this node's own id, so no peer uses it here.` };
   }
   const peer = [...peers.values()].find(p => p.nodeId === sourceNode);
   if (!peer || !accept.includes(peer.status)) return forbidden;

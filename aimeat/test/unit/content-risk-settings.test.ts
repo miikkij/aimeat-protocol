@@ -108,7 +108,7 @@ describe('content risk settings', () => {
   it('checks a patch strictly and reads a stored layer leniently', () => {
     expect(() => checkRiskLayer({}, { on_read: 'hold' }, { allowLock: true })).toThrow(/A read has no hold/);
     expect(() => checkRiskLayer({}, { nope: 1 }, { allowLock: true })).toThrow(/risk.nope is not a setting/);
-    expect(() => checkRiskLayer({}, { locked: true }, { allowLock: false })).toThrow(/floor for nobody/);
+    expect(() => checkRiskLayer({}, { locked: true }, { allowLock: false })).toThrow(/lower limit for nobody/);
     expect(() => checkRiskLayer({}, { kinds: { 'bad-kind': true } }, { allowLock: true })).toThrow(/not a kind/);
     expect(checkRiskLayer({ on_read: 'mark', detect: 'rules' }, { on_read: null }, { allowLock: false })).toEqual({ detect: 'rules' });
     expect(lenientRiskLayer({ on_read: 'hold', on_intake: 'mark', enabled: 'yes' })).toEqual({ on_intake: 'mark' });

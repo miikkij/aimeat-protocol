@@ -29,13 +29,13 @@ Your owner keeps a list of what they mean to do here. Each item is one memory re
 namespace, keyed \`intent.<id>\`. This explains the two ways you meet that list, and the one way you
 must not.
 
-## 1. Work that was handed to you arrives as a TASK
+## 1. Work that was given to you arrives as a TASK
 
 When your owner gives you an item, the node creates an ordinary task. You need no new tool:
 
 - \`aimeat_task_list\` — your queue, as always.
-- A task from the pool carries \`resources.memoryKeys\` containing \`intent.<id>\`, and its scope
-  carries \`kind=intent\` plus \`intent_id\`. That is how you know where it came from.
+- A task from the pool has \`resources.memoryKeys\` containing \`intent.<id>\`, and its scope
+  has \`kind=intent\` plus \`intent_id\`. That is how you know where it came from.
 - \`aimeat_task_complete\` when it is done.
 
 **Completing the task closes the intent.** The node does that, not you. Do not try to write the
@@ -43,7 +43,7 @@ record yourself — you do not have permission to, and the refusal you would get
 
 ## 2. If the task names a prompt, fetch it — do not invent one
 
-A pooled item often names a node-served prompt rather than carrying its text:
+A pooled item often names a node-served prompt rather than containing its text:
 
     prompt_ref: "build-app-atelier"   →   GET ${url}/v1/prompts/build-app-atelier
 
@@ -63,15 +63,15 @@ Use this to ANSWER: "what is on my list?", "what did I say I wanted to do about 
 genuinely useful thing to be able to say.
 
 **Do not start work you find there.** An item that was not promoted to a task was not given to you.
-It is a person's own list, and working through it uninvited is taking something that was not handed
-over — even when you could do it well. If something on the list looks worth doing, say so and let
+It is a person's own list, and working through it uninvited is taking something that was not given
+to you — even when you could do it well. If something on the list looks worth doing, say so and let
 them decide.
 
 ## 4. Items that close themselves
 
-Some entries carry \`closes_when\`, e.g. \`{ "check": "first_agent" }\`. Those are the node's own
+Some entries have \`closes_when\`, e.g. \`{ "check": "first_agent" }\`. Those are the node's own
 suggestions and they stop being offered the moment the condition is true. Never mark one done and
-never act on one: it is not a task, and if the situation unwinds it is supposed to come back.
+never act on one: it is not a task, and if the condition stops being true it is supposed to come back.
 
 ## In one line
 

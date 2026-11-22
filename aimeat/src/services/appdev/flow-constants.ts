@@ -42,17 +42,17 @@ export const FLOW_TOOLS = {
 /** The Step 0 research instruction (MCP agents; humans in a chat skip it naturally). */
 export function buildResearchStep(): string {
     let s = '## Step 0 — Research first (agents with AIMEAT MCP tools)\n';
-    s += `If you have \`aimeat_*\` MCP tools, follow the ${FLOW_PHASES} flow — it is the promise an MCP connection makes: a better result than building cold.\n`;
+    s += `If you have \`aimeat_*\` MCP tools, follow the ${FLOW_PHASES} flow — it is the promise an MCP connection makes: a better result than building without research.\n`;
     s += `1. RESEARCH: load \`${FLOW_TOOLS.atelierSkill}\` (\`${FLOW_TOOLS.skillGet}\`), then call \`${FLOW_TOOLS.overview}\` (pass your OWN model id — self-identify from your own configuration, never ask the user) — the owner's existing apps and template proposals are usually the fastest correct starting point; read the pitfalls for the areas you will touch.\n`;
     s += '2. FRAME: the level first (the finest, unless the owner chose a quick prototype or an ordinary page), then the genre or the shell, the platform sections the app needs, the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
     s += '3. PROPOSE the frame to the user in 3-5 lines, in their words (level, design, start point: fork/template/scratch, who signs in) and adjust to their answer.\n';
-    s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip the research and the framing and build directly — the flow is a default, never a gate. Without MCP tools, go straight to the interview.\n\n`;
+    s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip the research and the framing and build directly — the flow is a default, never a required step. Without MCP tools, go straight to the interview.\n\n`;
     return s;
 }
 
 /** The finish checklist appended to the MCP section of the build prompt. */
 export function buildFinishChecklist(): string {
-    return `FINISH (after a successful publish — the publish response's next_steps shows what is missing): (1) publish the app's agent face + bind a skill (metadata.binding \`app:{owner}/{filename}\`) so the app is agent-facing by default; (2) if anything generalizes, record a template with \`${FLOW_TOOLS.templatePropose}\` (your own model id required — self-identify, never ask the user); (3) for what bit you, ask four questions in this order: ${PITFALL_FOUR_QUESTIONS} — the next build starts smarter than this one.\n`;
+    return `FINISH (after a successful publish — the publish response's next_steps shows what is missing): (1) publish the app's agent face + bind a skill (metadata.binding \`app:{owner}/{filename}\`) so the app is agent-facing by default; (2) if anything generalizes, record a template with \`${FLOW_TOOLS.templatePropose}\` (your own model id required — self-identify, never ask the user); (3) for each problem you hit, ask four questions in this order: ${PITFALL_FOUR_QUESTIONS} — the next build starts smarter than this one.\n`;
 }
 
 /**

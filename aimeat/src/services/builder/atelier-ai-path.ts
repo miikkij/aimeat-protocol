@@ -32,21 +32,21 @@ export const ATELIER_AI_PATH_SECTION = '## How the person\'s own AI uses the app
   + 'On AI-accelerated, read platform section `ai-path` (`build-app-atelier/ai-path`) before you design the records.\n\n';
 
 /** The platform section `ai-path`: read on every AI-accelerated build, as the core section says. */
-export const AI_PATH_SECTION = '## How the person\'s own AI uses the app: the build style and the path in\n'
+export const AI_PATH_SECTION = '## How the person\'s own AI uses the app: the build style and how the AI reaches the app\n'
   + 'This node is AI-first. The person does their work through their own AI, and typing into the app by hand is an option they choose, '
-  + 'never the only way: an app is finished when their AI can do in it what they can do in it. The person decides which acts they keep for their own hands.\n\n'
+  + 'never the only way: an app is finished when their AI can do in it what they can do in it. The person decides which acts they keep for themselves.\n\n'
   + '**Recommend a build style in the proposal, and let the owner pick.** Ask no extra questions for it; recommend from what the app is for:\n'
   + '- **AI-accelerated**, the default for anything used for real work or by other people: the bound skill tells an AI how to read and write the app\'s data, '
-  + 'the data map says where the data lives, and the app gets app tools where the list below asks for them.\n'
+  + 'the data map says where the data is stored, and the app gets app tools where the list below asks for them.\n'
   + '- **Quick trial**: the level `proto`, an idea the owner tries and shares with nobody. Nothing for AI.\n'
   + '- **Presentation**: a page that is shown and not changed afterwards, with no interaction (a story, a CV, a landing page). The agent face only; '
   + 'declare `' + AI_PATH_NONE_META + '` so the publish does not ask for more.\n\n'
-  + '**The path into the app: take the cheapest one that holds.**\n'
+  + '**How the AI reaches the app: take the cheapest way that works.**\n'
   + '1. **The person\'s own data grows** (records are added and changed): a bound skill that names the keys or the workspace spaces and the record shape. '
   + 'The AI writes with the tools it already has (`aimeat_memory_write`, `aimeat_workspace_write`, `aimeat_workspace_rows_append`); no extension is needed. '
   + 'Keep each record one thing a person opens as a unit, let the app derive totals and states itself, and re-read on the live event, so a write the AI made shows without a reload.\n'
   + '2. **The app enforces a rule** (a calculation, a limit, money or points, a validation, a permission, a law): an app tool backed by an extension action, '
-  + 'and the space closed so nobody\'s AI writes past the tool. Platform section `app-tools`.\n'
+  + 'and the space closed so nobody\'s AI bypasses the tool. Platform section `app-tools`.\n'
   + '3. **Several people or agents share the data:** tools that check the version and the rights.\n'
   + '4. **The app produces content** (levels, songs, scenes, worlds): tools to read the schema, validate, simulate and put.\n'
   + '5. **The app shows data someone else produces:** a read tool only when another person\'s AI needs that data.\n'
@@ -54,10 +54,10 @@ export const AI_PATH_SECTION = '## How the person\'s own AI uses the app: the bu
   + 'People keep these for themselves unless they say otherwise: sending anything outward, paying, publishing, accepting a decision, and judging another person. '
   + 'The AI writes a proposal for these, and the person approves it in the app. The number of tools follows the verbs on the data, never the number of fields or screens.\n\n'
   + '**What the bound skill holds.** It is written for the person who OPERATES the app through their AI, not for the next builder: '
-  + 'where each kind of data lives (the keys with the app\'s prefix, or the workspace and its spaces, as the data map says); the record shape with a short example, '
+  + 'where each kind of data is stored (the keys with the app\'s prefix, or the workspace and its spaces, as the data map says); the record shape with a short example, '
   + 'and what the app derives itself and must not be written; the rules the app checks, so a direct write keeps them; which acts the person confirms and how the AI proposes them; '
   + 'the app tools, if any, and that they come before a direct write; and whether the open app shows a change without a reload. '
-  + 'Write each app tool call in it with its fields, `tool_name { field, field: value }`: the publish holds those calls to the tool manifest and names in `skill.toolFieldIssues` every field a tool does not accept, so fix those before anyone follows the skill. '
+  + 'Write each app tool call in it with its fields, `tool_name { field, field: value }`: the publish checks those calls against the tool manifest and names in `skill.toolFieldIssues` every field a tool does not accept, so fix those before anyone follows the skill. '
   + 'Bind it with `metadata.binding: "app:<owner>/<filename>"` (`aimeat_skill_publish`). Test it once as its reader: with only the skill, add one record and change it, see the app show it, then remove the record.\n';
 
 /** The platform section `app-tools`: read when rule 2, 3 or 4 of the core section applies. */

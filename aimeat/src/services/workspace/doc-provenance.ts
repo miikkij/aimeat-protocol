@@ -67,7 +67,7 @@ export async function provenanceForDocEdit(
 
   const before = previous
     ? `whose previous version was recorded as ${previous.record.level} (record ${previous.id})`
-    : 'that carried no provenance record, which is how a person\'s own writing is stored';
+    : 'that had no provenance record, which is how a person\'s own writing is stored';
   const row = await mintProvenance(storage, {
     stampedBy: 'node',
     observed: false,

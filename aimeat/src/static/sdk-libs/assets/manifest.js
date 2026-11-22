@@ -174,7 +174,7 @@ function checkAddress(value, where) {
   }
   const address = value.trim();
   if (address.slice(0, 5).toLowerCase() === 'data:') {
-    refuse(where + ' is a data: URI, and the manifest will not carry one. The record is ONE memory '
+    refuse(where + ' is a data: URI, and the manifest will not contain one. The record is ONE memory '
       + 'value with 1024 kB to spend, and a base64 blob spends it on every load forever. Upload the '
       + 'file (AIMEAT.assets.upload) and put its /v1/pub/<owner>/<key> address here instead.');
   }

@@ -355,7 +355,7 @@ export async function carryDeclaration(
         reason:
           `${route} reads no ai_provenance_id, so record ${declaredId} was NOT attached to this write. `
           + 'The node stamped the write from your principal instead. To attach a record, write through '
-          + 'aimeat_memory_write, which carries ai_provenance_id.',
+          + 'aimeat_memory_write, which takes ai_provenance_id.',
       };
     }
     return { recorded: true, id: declaredId, via: 'attached' };
@@ -393,7 +393,7 @@ export async function carryDeclaration(
     throw new ProvenanceCarryError(
       `The write succeeded but your ai_provenance declaration was REFUSED by the node (${code}): `
       + `${resp.error?.message ?? 'no message'} `
-      + 'The entry now carries the node\'s own stamp instead — for an agent that is `ai-generated` '
+      + 'The entry now has the node\'s own stamp instead — for an agent that is `ai-generated` '
       + 'with no human review. Re-declare it with POST /v1/provenance (attachToMemoryKey) once the '
       + 'cause is fixed.');
   }

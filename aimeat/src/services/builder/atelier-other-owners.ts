@@ -31,18 +31,18 @@
 
 /** The section text. English, as every build text is; `##` because the Atelier text is cut at `## `. */
 export const OTHER_OWNERS_SECTION = '## Other people\'s accounts and their AI agents use the app\n'
-  + 'Read this when people of OTHER accounts use the app\'s shared data, and above all when their own AI agents read and write it: a situation room, a shared project floor, a log several people\'s agents keep. '
+  + 'Read this when people of OTHER accounts use the app\'s shared data, and above all when their own AI agents read and write it: a situation room, a shared project tracker, a log several people\'s agents keep. '
   + 'An app for one person and their own organism works on the first try. This shape did not: one such app needed five published versions before both people and both people\'s agents saw the same thing, '
   + 'and every round was one of the rules below. Decide each one before the first publish, and run the check at the end before you call the app done.\n\n'
-  + '**1. Who is in, and how they get in.** The shared data lives in an organism workspace (sections `group` and `row-spaces`), and the app is opened to that organism\'s members (`open_to`). '
+  + '**1. Who is in, and how they get in.** The shared data is stored in an organism workspace (sections `group` and `row-spaces`), and the app is opened to that organism\'s members (`open_to`). '
   + 'An invitation (`aimeat_organism_invite`, or by e-mail) is accepted by the invited PERSON, signed in themselves: no agent accepts it for them, and until they do, the app refuses them. '
   + 'The refusal page tells them an invitation waits; tell the person who invites the same, in one sentence. When they have agreed already, the organism\'s creator or an admin adds them at once instead (`aimeat_organism_member_add`). '
   + 'Then their agents: an organism admits all of its members\' agents (`agent_access: "all"`) or only the listed ones (`"listed"`, attached with `aimeat_organism_agent_attach`). '
   + 'Agents of a member write in that member\'s name, so decide which ones, and say on the app\'s help page how a member brings an agent in.\n\n'
   + '**2. Agents write through the app\'s own tools, from the first version.** A workspace write tool checks the schema and nothing else: another account\'s agent writes whatever its model typed. '
   + 'Put every write an agent makes behind an extension action that checks it (skill `node:aimeat-extension-builder`), publish those actions as the app\'s tools (`aimeat_app_tools_publish`), '
-  + 'and FENCE the spaces they write: the space\'s object type names the extension (`"extensions": ["<installer>/<extension>"]`), and the node then refuses an agent\'s write that does not come through it. '
-  + 'The person in the app, signed in, still writes directly. An agent whose session holds `organism:direct` (or `*`, or `organism:*`) also writes past the fence: that is a permission its owner gave on purpose, so the fence is a rule for the agents that do not hold it, not a lock. '
+  + 'and RESTRICT the spaces they write: the space\'s object type names the extension (`"extensions": ["<installer>/<extension>"]`), and the node then refuses an agent\'s write that does not come through it. '
+  + 'The person in the app, signed in, still writes directly. An agent whose session holds `organism:direct` (or `*`, or `organism:*`) also writes past the restriction: that is a permission its owner gave on purpose, so the restriction is a rule for the agents that do not hold it, not a lock. '
   + 'The organism\'s member list says which admitted agent holds it (`writes_past_app_rules`): show it on the app\'s members view. '
   + 'An agent calls an app tool with `aimeat_app_tool_invoke`, which needs `ext:invoke` and `exchange:write`; the app\'s help page names both.\n\n'
   + '**3. The app reads what other accounts wrote, and shows a refusal.** A record space of the workspace is read by the app as any member reads it. A ROW space opens to the app only when the space names it (`"apps": ["<owner>/<filename>"]`) and the person approved `organism:rows`; '
@@ -60,4 +60,4 @@ export const OTHER_OWNERS_SECTION = '## Other people\'s accounts and their AI ag
 
 /** The line the sections `group` and `row-spaces` end with, so a builder who reads one finds this one. */
 export const OTHER_OWNERS_POINTER = '\nIf people of other accounts, or their own AI agents, read and write this data, read the section `other-owners` before you publish: '
-  + 'who gets in and how, writes through the app\'s own tools behind a fence, reads that show a refusal, live updates that reach the other account, and the two-account check.\n';
+  + 'who gets in and how, writes through the app\'s own tools behind a write restriction, reads that show a refusal, live updates that reach the other account, and the two-account check.\n';

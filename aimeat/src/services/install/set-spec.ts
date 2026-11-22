@@ -174,7 +174,7 @@ function run<T>(fn: () => T): Parsed<T> {
 /** Parse a bundle document. Keys are unique, and every agent names a package the bundle lists. */
 export function parseInstallBundle(raw: unknown): Parsed<InstallBundle> {
     return run(() => {
-        if (!isObj(raw) || raw.spec !== BUNDLE_SPEC) fail(`An install bundle carries spec "${BUNDLE_SPEC}".`);
+        if (!isObj(raw) || raw.spec !== BUNDLE_SPEC) fail(`An install bundle has spec "${BUNDLE_SPEC}".`);
         const doc = raw as Obj;
         const name = str(doc.name) ?? fail('The bundle has a name.');
         const packages = list(doc.packages, 'packages').map((p, i): BundlePackage => {
@@ -261,7 +261,7 @@ function membershipsOf(v: unknown, where: string, bundle: InstallBundle | null):
  */
 export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = null): Parsed<InstallSet> {
     return run(() => {
-        if (!isObj(raw) || raw.spec !== INSTALL_SET_SPEC) fail(`An install set carries spec "${INSTALL_SET_SPEC}".`);
+        if (!isObj(raw) || raw.spec !== INSTALL_SET_SPEC) fail(`An install set has spec "${INSTALL_SET_SPEC}".`);
         const doc = raw as Obj;
         if (!isObj(doc.bundle)) fail('bundle is { group_id, node_id?, version? }.');
         const b = doc.bundle as Obj;

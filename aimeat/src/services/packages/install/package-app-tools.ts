@@ -74,7 +74,7 @@ export async function installPackageAppTools(storage: Storage, args: {
   });
   const doc = AppToolsDocSchema.safeParse({ version: 1, updatedAt: args.now, tools });
   if (!doc.success) {
-    logger.warn('package-app-tools: the carried tool list does not validate and was left out', { app: args.filename, error: doc.error.message });
+    logger.warn('package-app-tools: the included tool list does not validate and was left out', { app: args.filename, error: doc.error.message });
     return;
   }
   // Created only when the key is still absent: a list the owner published after the check above

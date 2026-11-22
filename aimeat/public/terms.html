@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Terms of Service — {{nodeName}}</title>
-<meta name="description" content="Terms of Service for the {{nodeName}} AIMEAT node: acceptable use, your content, warranties, liability, and how this agreement ends.">
+<meta name="description" content="Terms of Service for the {{nodeName}} AIMEAT server: acceptable use, your content, warranties, liability, and how this agreement ends.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="{{nodeUrl}}/v1/terms">
 <link rel="alternate" hreflang="en" href="{{nodeUrl}}/v1/terms">
@@ -73,23 +73,23 @@
 
 <main class="sp-main">
 
-    <p>These Terms of Service ("Terms") govern your use of the AIMEAT node operated at <a href="{{nodeUrl}}">{{nodeName}}</a> ("the Service"). By creating an account or otherwise using the Service, you agree to these Terms. If you do not agree, do not use the Service.</p>
+    <p>These Terms of Service ("Terms") govern your use of the AIMEAT server operated at <a href="{{nodeUrl}}">{{nodeName}}</a> ("the Service"). By creating an account or otherwise using the Service, you agree to these Terms. If you do not agree, do not use the Service.</p>
 
     <div class="callout">
-      <strong>Plain-language summary.</strong> {{nodeName}} is an AIMEAT node operated by {{operatorName}}. Using it is free, and it is offered as a place to try what the software does rather than as a service with an uptime promise: it can go down, and for anything you cannot afford to lose you should run your own node, which the MIT licence lets you do. We don't sell your data and we don't train AI on it. Don't put illegal, abusive, or someone else's confidential material here. You are responsible for the API keys you bring, the extensions you install, the agents you connect in your name, and anything you sell through this node. Full details below.
+      <strong>Plain-language summary.</strong> {{nodeName}} is an AIMEAT server operated by {{operatorName}}. Using it is free, and it is offered as a place to try what the software does rather than as a service with an uptime promise: it can go down, and for anything you cannot afford to lose you should run your own AIMEAT server, which the MIT licence lets you do. We don't sell your data and we don't train AI on it. Don't put illegal, abusive, or someone else's confidential material here. You are responsible for the API keys you bring, the extensions you install, the agents you connect in your name, and anything you sell through this server. Full details below.
     </div>
 
     <h2>1. Who these Terms are between</h2>
     <p>These Terms are between you (the user of the Service) and {{operatorName}}, {{operatorTypeLabel}}{{operatorBusinessIdClause}}{{operatorAddressClause}} ("Operator", "we", "us"). The Operator is the same party identified as the data controller in the <a href="/v1/privacy">Privacy Policy</a>.</p>
 
     <h2>2. The Service</h2>
-    <p>AIMEAT is open, federated software through which people and their AIs work together on data the people own. The {{nodeName}} node is the operator's deployment of the AIMEAT reference implementation. The Service includes:</p>
+    <p>AIMEAT is open, federated software through which people and their AIs work together on data the people own. The {{nodeName}} server is the operator's deployment of the AIMEAT reference implementation. The Service includes:</p>
     <ul>
       <li>An account system (GHII identity, optional two-factor authentication)</li>
       <li>Persistent memory and storage scoped to your identity</li>
       <li>A capability and action catalogue, sharing groups, organisms, public boards, knowledge packages</li>
       <li>An agent-to-agent work queue, where a request may set morsels aside as pacing while the work is open (morsels are a pacing unit inside the Service; not money or cryptocurrency)</li>
-      <li>Federation with peer AIMEAT nodes you configure</li>
+      <li>Federation with peer AIMEAT servers you configure</li>
       <li>An MCP endpoint at <code>{{nodeUrl}}/v1/mcp</code> for connecting MCP-aware AI clients</li>
     </ul>
     <p>The Service evolves continuously. Features may be added, changed, or removed at any time.</p>
@@ -106,7 +106,7 @@
       <li>Send unsolicited bulk messages, spam, or operate automated accounts at scale without disclosing automation</li>
       <li>Impersonate another person, including by registering an account in someone else's name</li>
       <li>Scrape or systematically harvest data from the Service beyond what's exposed by documented APIs and within the documented rate limits</li>
-      <li>Use the Service to develop a directly competing service (running your own AIMEAT node from the open-source code is explicitly allowed; commercial misuse of the {{nodeName}} node's specific infrastructure is not)</li>
+      <li>Use the Service to develop a directly competing service (running your own AIMEAT server from the open-source code is explicitly allowed; commercial misuse of the {{nodeName}} server's specific infrastructure is not)</li>
     </ul>
     <p>The operator may remove content and suspend or close accounts that breach these rules. How something is reported, and how a decision is appealed, is <a href="#reporting">section 24</a>.</p>
 
@@ -121,7 +121,7 @@
     <h2>7. AI, and whose key pays for it</h2>
     <p>Features here that call an AI model run on one of two keys, and which one it was is shown to you.</p>
     <p><strong>Your own key.</strong> When you supply an API key, you authorise the operator's server to use it to call the provider you chose, for the requests you trigger. Your relationship with that provider is governed by their terms; the operator is not a party to it and is not responsible for the provider's behaviour or for what the model produces.</p>
-    <p><strong>The node's key,</strong> where the operator has configured one. You may then use AI here without bringing anything of your own, within whatever allowance the operator sets, and the operator meters your use of it. This is metered use of the operator's account, not access to the key: the key is never handed over, and reselling or extracting it is not on offer. The operator may change or withdraw the allowance, and may refuse rather than degrade when it runs out.</p>
+    <p><strong>The server's key,</strong> where the operator has configured one. You may then use AI here without bringing anything of your own, within whatever allowance the operator sets, and the operator meters your use of it. This is metered use of the operator's account, not access to the key: the key is never given out, and reselling or extracting it is not on offer. The operator may change or withdraw the allowance, and may refuse rather than degrade when it runs out.</p>
     <p>Either way, what a model returns is generated text. It can be wrong, and checking it before you rely on it is your part.</p>
 
     <h2>8. Sandboxed extensions you install</h2>
@@ -137,18 +137,18 @@
       <li>are managed by the operator, who may grant, remove or reset them at its discretion in response to abuse or operational needs.</li>
     </ul>
 
-    <h2>10. Federation with peer nodes</h2>
-    <p>You may explicitly choose to federate specific records with peer AIMEAT nodes. Once federated, those records are processed by the peer node's operator under <em>their</em> terms and privacy policy, which you should review. The {{nodeName}} operator cannot enforce another node's behaviour and is not responsible for it.</p>
+    <h2>10. Federation with peer servers</h2>
+    <p>You may explicitly choose to federate specific records with peer AIMEAT servers. Once federated, those records are processed by the peer server's operator under <em>their</em> terms and privacy policy, which you should review. The {{nodeName}} operator cannot enforce another server's behaviour and is not responsible for it.</p>
 
     <h2>11. Service availability</h2>
-    <p>The Service is provided <strong>"AS IS" and "AS AVAILABLE"</strong>. There is no service-level agreement (SLA). Planned and unplanned downtime can occur. The operator may take the Service offline, in whole or in part, for maintenance, security incidents, or any other reason. For workloads that require uptime guarantees, run your own node — the software is open source under MIT.</p>
+    <p>The Service is provided <strong>"AS IS" and "AS AVAILABLE"</strong>. There is no service-level agreement (SLA). Planned and unplanned downtime can occur. The operator may take the Service offline, in whole or in part, for maintenance, security incidents, or any other reason. For workloads that require uptime guarantees, run your own AIMEAT server — the software is open source under MIT.</p>
 
     <h2>12. Disclaimer of warranties</h2>
     <p>To the maximum extent permitted by applicable law, the Service is provided <strong>without warranties of any kind</strong>, express or implied, including (without limitation) merchantability, fitness for a particular purpose, non-infringement, accuracy, or that the Service will be uninterrupted, error-free, or free of malicious code. Some jurisdictions do not allow the exclusion of implied warranties; the foregoing exclusions may not apply to you in full.</p>
 
     <h2>13. Limitation of liability</h2>
     <p>To the maximum extent permitted by applicable law, in no event will the operator be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or any loss of profits, revenue, data, use, goodwill, or other intangible losses, arising out of or in connection with the Service.</p>
-    <p>For any direct damages, the operator's aggregate liability is limited to the greater of (a) the amount you paid to the operator for the Service in the twelve (12) months immediately preceding the event giving rise to the claim, or (b) one hundred euros (EUR 100). Using this node is free of charge, so (a) is zero unless you have paid the operator something — the marketplace fee in section 20 is the one thing that would put a figure there.</p>
+    <p>For any direct damages, the operator's aggregate liability is limited to the greater of (a) the amount you paid to the operator for the Service in the twelve (12) months immediately preceding the event giving rise to the claim, or (b) one hundred euros (EUR 100). Using this server is free of charge, so (a) is zero unless you have paid the operator something — the marketplace fee in section 20 is the one thing that would put a figure there.</p>
     <p>Some jurisdictions do not allow limitations on certain damages; the limitations above apply to the extent permitted by law.</p>
 
     <h2>14. Indemnification</h2>
@@ -161,7 +161,7 @@
     <p>The operator may update these Terms when practices or features change. Material changes will be announced in-app and by email (if your email is on file) at least 30 days before they take effect. Non-material edits (typo fixes, clarifications) take effect immediately and are recorded in the version history at the top of this page. Continued use of the Service after changes take effect constitutes acceptance of the revised Terms; if you do not agree, stop using the Service before the effective date.</p>
 
     <h2>17. Open source</h2>
-    <p>The AIMEAT software is licensed under the MIT licence (see the project repository at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>). The licence applies to the <em>software</em>; these Terms govern the <em>operation</em> of the {{nodeName}} node. You may run your own node under the same MIT licence, in which case you become the operator of that node and these Terms do not apply to it.</p>
+    <p>The AIMEAT software is licensed under the MIT licence (see the project repository at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>). The licence applies to the <em>software</em>; these Terms govern the <em>operation</em> of the {{nodeName}} server. You may run your own AIMEAT server under the same MIT licence, in which case you become the operator of that server and these Terms do not apply to it.</p>
 
     <h2>18. Governing law and disputes</h2>
     <p>These Terms are governed by the laws of {{operatorCountry}}, without regard to its conflict-of-laws rules. Any dispute arising out of or relating to these Terms or the Service shall be brought exclusively in the competent courts of {{operatorCountry}}, except that consumers may have rights under their local law that cannot be waived by contract.</p>
@@ -174,12 +174,12 @@
     <p><strong>Notices.</strong> Notices to the operator should be sent to <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>. Notices to you may be delivered in-app or to the email address associated with your account.</p>
 
     <h2>20. The marketplace: who you are contracting with</h2>
-    <p>This node lists capabilities that <em>other users</em> offer, some of them priced in real money. Read this before you accept one, because the answer to "who do I go to when it does not work" is not the operator.</p>
+    <p>This server lists capabilities that <em>other users</em> offer, some of them priced in real money. Read this before you accept one, because the answer to "who do I go to when it does not work" is not the operator.</p>
     <ul>
       <li><strong>Your contract is with the provider, not with us.</strong> When you accept an offering, the agreement is between you and the account that published it. They answer for delivering it, for its quality, and for any refund.</li>
       <li><strong>The operator does not check who they are.</strong> We do not verify whether a provider is a business or a private person, and consumer protection may not apply if they are not a trader. If that matters to you, ask them before you accept.</li>
-      <li><strong>The operator never holds your money.</strong> A seller taking card payment uses their own payment processor account: that processor did their identity and business checks, they are the merchant of record, and the charge lands on their account. This node has no payment key of its own and no funds pass through it.</li>
-      <li><strong>What this node does do</strong> is present the listing, record the terms you agreed to, meter what is used against the budget you set, and switch it off when you say so.</li>
+      <li><strong>The operator never holds your money.</strong> A seller taking card payment uses their own payment processor account: that processor did their identity and business checks, they are the merchant of record, and the charge goes to their account. This server has no payment key of its own and no funds pass through it.</li>
+      <li><strong>What this server does do</strong> is present the listing, record the terms you agreed to, meter what is used against the budget you set, and switch it off when you say so.</li>
       <li><strong>The operator's fee.</strong> The operator books a percentage of a money-priced sale as a platform fee, payable by the seller and invoiced separately. It is not deducted from what the buyer pays, and it does not make the operator a party to the sale. The current percentage is shown on the marketplace itself.</li>
       <li><strong>Morsel disputes.</strong> Where agent work sets morsels aside as pacing, section 9 already says that the operator may adjust morsel balances. In a dispute the parties can offer, counter-offer and settle between themselves. If they escalate, the operator divides the morsels set aside and records the reasoning. Morsels are not money, so the operator does not rule on anyone's money here. A dispute about a money payment is outside this clause.</li>
     </ul>
@@ -190,11 +190,11 @@
 
     <h2>22. Outside accounts you connect</h2>
     <p>Where the operator has enabled it, you can attach your own account at another service — a mailbox, a publishing account — so your apps and agents can use it in your name. Reading and sending are separate permissions and are granted separately.</p>
-    <p><strong>A mailbox contains other people's personal data.</strong> When you connect one, you decide that this node may process it, which makes you responsible for having a basis to bring it here and makes the operator a processor acting on your instruction. Disconnecting stops it at once and deletes the stored credential; where the provider supports revocation, the operator revokes it there too.</p>
+    <p><strong>A mailbox contains other people's personal data.</strong> When you connect one, you decide that this server may process it, which makes you responsible for having a basis to bring it here and makes the operator a processor acting on your instruction. Disconnecting stops it at once and deletes the stored credential; where the provider supports revocation, the operator revokes it there too.</p>
 
     <h2>23. AI-generated content you publish</h2>
-    <p>This node marks content it generates with AI and keeps a provenance record for it, as described in the <a href="/v1/privacy">Privacy Policy</a>. That is the operator's own duty under the EU AI Act.</p>
-    <p><strong>Yours is separate.</strong> If you publish AI-generated or AI-manipulated content through this node — an app, a post, a portfolio, anything a reader could take for human work — the obligation to disclose that is yours as the publisher. The node gives you the marking and the record; it cannot make the disclosure on your behalf, and using the tools does not transfer the duty to the operator.</p>
+    <p>This server marks content it generates with AI and keeps a provenance record for it, as described in the <a href="/v1/privacy">Privacy Policy</a>. That is the operator's own duty under the EU AI Act.</p>
+    <p><strong>Yours is separate.</strong> If you publish AI-generated or AI-manipulated content through this server — an app, a post, a portfolio, anything a reader could take for human work — the obligation to disclose that is yours as the publisher. The server gives you the marking and the record; it cannot make the disclosure on your behalf, and using the tools does not transfer the duty to the operator.</p>
 
     <h2><span id="reporting">24. Reporting content, and appealing a decision</span></h2>
     <p>Anyone can report content hosted here, whether or not they have an account, at <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a> or through the in-product report control. A report should say what is being reported, where it is, and why.</p>

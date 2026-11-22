@@ -182,7 +182,7 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
     id: 'realtime', layer: 'on-demand',
     when: 'People see each other live: presence, a shared board, a two-player game.',
   },
-  'Live updates without a firehose (aimeat-live.js)': {
+  'Live updates without too many events (aimeat-live.js)': {
     id: 'live-updates', layer: 'on-demand',
     when: 'The screen shows data that changes on the node (a record, a file, work an agent does). Read it before you write a timer around a read.',
   },
@@ -248,10 +248,10 @@ function sectionIndex(pointers: SectionPointer[], nodeUrl: string, paged: boolea
     out += '### This specification comes in parts\n';
     out += 'You are reading part `start`. Every app needs the three parts after it as well, so read them before you write code, in this order. ' + how;
     for (const p of SPEC_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
-    out += '\nThen the sections below, each of which covers one situation. They belong to the same specification and carry the same authority: read the ones this app is in BEFORE you write that part of it, and leave the others.\n';
+    out += '\nThen the sections below, each of which covers one situation. They belong to the same specification and have the same authority: read the ones this app is in BEFORE you write that part of it, and leave the others.\n';
   } else {
     out += '### More of this specification, read when the app needs it\n';
-    out += 'What you are reading is the part every app needs. The sections below belong to the same specification and carry the same authority; each covers one situation, so read the ones this app is in BEFORE you write that part of it, and leave the others. ' + how;
+    out += 'What you are reading is the part every app needs. The sections below belong to the same specification and have the same authority; each covers one situation, so read the ones this app is in BEFORE you write that part of it, and leave the others. ' + how;
   }
   for (const p of pointers) out += '- `' + p.id + '` — ' + p.when + '\n';
   return out;
@@ -302,7 +302,7 @@ export function layeredBuildAppPrompt(full: string, baseUrl: string): { prompt: 
  * 2026-09-19 nothing in this specification said another track existed.
  */
 export const CLASSIC_TRACK_NOTICE = '### Which track this is\n'
-  + 'This is the CLASSIC build specification. A NEW app is built on the Atelier track instead: forked from a genre, with the served component kit carrying the header, the sign-in and the loading, empty and error states. Its specification is `aimeat_handbook_get { tier: "build-app-atelier" }`, and its skill is `node:aimeat-app-builder-atelier`. '
+  + 'This is the CLASSIC build specification. A NEW app is built on the Atelier track instead: forked from a genre, with the served component kit providing the header, the sign-in and the loading, empty and error states. Its specification is `aimeat_handbook_get { tier: "build-app-atelier" }`, and its skill is `node:aimeat-app-builder-atelier`. '
   + 'Read on here only if you are improving an app that is already Classic, or the owner asked for the Classic track by name. If you began on Atelier, stay on it: the two guides do not describe each other, and changing over in the middle means starting again. '
   + 'Declare `<meta name="aimeat-track" content="classic">` in the head. A Classic page may load the Atelier kit for a library block it calls, such as `AIMEAT.atelier.members` or `aiTask`, but it never draws the Atelier shell with `atelier.app()`.\n\n';
 

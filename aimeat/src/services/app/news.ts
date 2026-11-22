@@ -200,7 +200,7 @@ export async function readAppNews(
 ): Promise<AppNews> {
   const appId = `${app.ownerName}/${app.filename}`;
   const road = await readAppRoadmap(storage, appId).catch((err) => {
-    logger.warn('readAppNews: the roadmap was not read; the news carries no changes', { appId, error: String(err) });
+    logger.warn('readAppNews: the roadmap was not read; the news has no changes', { appId, error: String(err) });
     return null;
   });
   const changes = (road?.entries ?? [])

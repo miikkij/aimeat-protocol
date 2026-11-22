@@ -100,7 +100,7 @@ export function templateLanguageRefusals(id, node, out) {
     for (const s of every) {
       if (list.indexOf(s) >= 0) continue;
       out.push('The sentence "' + id + '" reads "' + s + '" in one language and not in ' + lang
-        + '. A sentence carries the same holes in every language it is written in.');
+        + '. A sentence has the same placeholders in every language it is written in.');
     }
   }
 }

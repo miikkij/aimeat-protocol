@@ -159,7 +159,7 @@ export function StepAgent({ onChanged, showToast }) {
     <${StepCard} num="2" title=${tr('home.agent.title', 'Connect your first agent')}>
 
       <${StepLede}>
-        ${tr('home.agent.lede', 'An agent here is simply the AI you already talk to, given a way into your home. Once it is connected it can read and write things for you directly, instead of you copying text back and forth. You decide what it may do, and you can take it back at any time.')}
+        ${tr('home.agent.lede', 'An agent here is simply the AI you already talk to, given access to your home. Once it is connected it can read and write things for you directly, instead of you copying text back and forth. You decide what it may do, and you can take it back at any time.')}
       <//>
 
       ${!named ? html`
@@ -227,7 +227,7 @@ export function StepAgent({ onChanged, showToast }) {
           <//>`}
 
         ${waiting && pending.length === 0 && html`
-          <${WaitingNote} title=${tr('home.agent.waitTitle', 'Waiting for your agent to knock.')}>
+          <${WaitingNote} title=${tr('home.agent.waitTitle', 'Waiting for your agent to connect.')}>
             ${tr('home.agent.waitBody', 'The next step is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.')}
           <//>`}
 

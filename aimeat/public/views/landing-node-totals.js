@@ -62,8 +62,8 @@ export default function NodeTotals() {
   const figures = [
     { key: 'apps', value: d.apps, label: tr('landing.showApps', 'wishes running as apps') },
     { key: 'opens', value: d.downloads, label: tr('landing.showOpens', 'times opened') },
-    { key: 'agents', value: d.agents, label: tr('landing.showAgents', 'AI helpers on the payroll') },
-    { key: 'awake', value: d.agents_online, label: tr('landing.showAwake', 'awake right now'), live: true },
+    { key: 'agents', value: d.agents, label: tr('landing.showAgents', 'AI helpers at work') },
+    { key: 'awake', value: d.agents_online, label: tr('landing.showAwake', 'online right now'), live: true },
   ];
 
   return html`

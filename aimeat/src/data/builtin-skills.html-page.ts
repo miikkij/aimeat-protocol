@@ -36,7 +36,7 @@ export const HTML_PAGE_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-html-page
-description: How to make an HTML page in an AIMEAT workspace (a presentation, a report with charts, a page with pictures and some interaction), share it with people outside the organism and hand out its link, in three tool calls, and the rules a page follows to work in its isolated frame. Use when the person wants a presentation, slides, a visual report or an interactive page they can show or send, and an app would be more than the job needs.
+description: How to make an HTML page in an AIMEAT workspace (a presentation, a report with charts, a page with pictures and some interaction), share it with people outside the organism and give out its link, in three tool calls, and the rules a page follows to work in its isolated frame. Use when the person wants a presentation, slides, a visual report or an interactive page they can show or send, and an app would be more than the job needs.
 license: MIT
 metadata:
   audience: agent
@@ -79,10 +79,10 @@ chart, a page with pictures. Choose something else when:
    (\`LABEL_CAPS_AUDIENCE\`, 409): share it with \`account\` or \`organism\` instead, or tell the person.
    Give the person the \`viewer_url\` from the
    answer. A link to an HTML page ends after 90 days unless you pass \`until\` (an ISO date, or "none");
-   say so, and when it ends (\`ends_at\`). The answer also carries \`window_url\`: the same page alone
+   say so, and when it ends (\`ends_at\`). The answer also contains \`window_url\`: the same page alone
    in the whole browser window, with only its AI label at the bottom-left. Give that one when the
    person wants the page to fill the screen, for a presentation or a page to post. When the answer
-   also carries \`publish_request\`, the node asks the person before anything opens to anyone with the
+   also contains \`publish_request\`, the node asks the person before anything opens to anyone with the
    link: the link works once they approve, so give them its \`approve_url\` as well.
 
 Find a document space first with \`aimeat_workspace_read\` (the index lists the spaces and their
@@ -135,7 +135,7 @@ to end. The person decides.
 
 ## A person whose AI cannot connect
 
-The "+ HTML page" dialog in the workspace carries a ready-made prompt with these same rules. They run
+The "+ HTML page" dialog in the workspace has a ready-made prompt with these same rules. They run
 it in any AI chat, paste the answer, and save. Point them there.
 `,
 };

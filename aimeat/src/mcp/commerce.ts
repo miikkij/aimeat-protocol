@@ -552,7 +552,7 @@ export function registerCommerceTools(
             const split = out.split;
             return ok({
                 split,
-                note: 'The pool is taken from YOUR cut, after the platform rake and never from the buyer\'s charge. '
+                note: 'The pool is taken from YOUR cut, after the platform fee and never from the buyer\'s charge. '
                     + 'Shares accrue on every settled call; releasing one needs the beneficiary to be verified.',
             });
         },
@@ -657,7 +657,7 @@ export function registerCommerceTools(
             if (!isOperator) return fail('FORBIDDEN: recording an approval is an operator action');
             if (!scopeIsCovered(sessionScopes, 'commerce:beneficiary-verify')) {
                 return fail('Recording a beneficiary approval needs the "commerce:beneficiary-verify" '
-                    + 'permission, which this session does not carry.');
+                    + 'permission, which this session does not have.');
             }
             if (!ghii) return fail('INVALID_INPUT: name the beneficiary GHII to record an approval for');
             if (state === 'verified' && !method) {

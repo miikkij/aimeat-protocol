@@ -84,6 +84,6 @@ export async function migrateToolScopeWordsOnce(storage: Storage, nodeId: string
         await claim.release();
         throw err;
     }
-    if (agents > 0) logger.info(`Tool scope words: ${agents} agent(s) approved before ${TOOL_SCOPE_WORDS_SHIPPED_AT} keep their workspace read and send tools`);
+    if (agents > 0) logger.info(`Tool scopes: ${agents} agent(s) approved before ${TOOL_SCOPE_WORDS_SHIPPED_AT} keep their workspace read and send tools`);
     return { ran: true, agents };
 }

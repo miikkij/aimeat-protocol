@@ -188,7 +188,7 @@ export function buildAimeatAcpAgent(deps: AcpAgentDeps): AgentApp {
       if (skipped.length > 0) {
         // Named, not dropped: an editor whose attachment vanished behind a successful answer has
         // been lied to.
-        await say(ctx, session, `Sent without ${skipped.join(' and ')}: this node carries a file as a link rather than as bytes.`);
+        await say(ctx, session, `Sent without ${skipped.join(' and ')}: this node sends a file as a link rather than as bytes.`);
       }
 
       const created = await deps.client.post('/v1/agents/v2/tasks', {
@@ -209,7 +209,7 @@ export function buildAimeatAcpAgent(deps: AcpAgentDeps): AgentApp {
         return { stopReason: 'refusal' };
       }
       session.activeTaskId = taskId;
-      await say(ctx, session, `Handed to ${deps.agentLabel} on ${deps.nodeLabel}. Task ${taskId}.`);
+      await say(ctx, session, `Sent to ${deps.agentLabel} on ${deps.nodeLabel}. Task ${taskId}.`);
 
       const stop = await watchTask(ctx, session, taskId, task?.pollIntervalMs ?? null);
       session.activeTaskId = null;
@@ -273,7 +273,7 @@ export function buildAimeatAcpAgent(deps: AcpAgentDeps): AgentApp {
       if (Date.now() - started > MAX_WAIT_MS) {
         // The turn ends; the TASK does not. Saying where it is beats leaving the editor to believe
         // the work evaporated.
-        await say(ctx, session, `Still running after thirty minutes, so I am handing your turn back. It is task ${taskId} and it keeps going.`);
+        await say(ctx, session, `Still running after thirty minutes, so I am returning your turn. It is task ${taskId} and it keeps going.`);
         return 'max_turn_requests';
       }
 

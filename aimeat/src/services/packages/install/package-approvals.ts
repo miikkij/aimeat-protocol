@@ -73,12 +73,12 @@ export function codeInstallRefusal(
   if (widened ? widened.length === 0 : !summary.carriesCode) return null;
   if (isOwnerInPerson(caller)) return null;
   if (caller.roles.includes('ecosystem')) {
-    return { status: 403, code: 'FORBIDDEN', missing: [], message: 'This package carries code, and an ecosystem app does not install code into the owner\'s account.' };
+    return { status: 403, code: 'FORBIDDEN', missing: [], message: 'This package contains code, and an ecosystem app does not install code into the owner\'s account.' };
   }
   if (scopeIsCovered(caller.scopes ?? [], INSTALL_CODE_SCOPE)) return null;
   const what = widened
     ? `This version adds what the owner has not approved (${widened.slice(0, 6).join(', ')}${widened.length > 6 ? ', …' : ''}).`
-    : 'This package carries code: an app, an extension, a browser library or instructions for the owner\'s AI.';
+    : 'This package contains code: an app, an extension, a browser library or instructions for the owner\'s AI.';
   return {
     status: 403, code: 'SCOPE_DENIED', missing: [INSTALL_CODE_SCOPE],
     message: `${what} Doing that without the owner takes "${INSTALL_CODE_SCOPE}", which this session does not hold, so it waits for the owner to approve what the package can do.`,

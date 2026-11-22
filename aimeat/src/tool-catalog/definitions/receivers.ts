@@ -35,12 +35,12 @@ export const RECEIVER_ACTIONS: Record<string, ReceiverAction> = {
     propose: {
         fields: { name: true, target: true, csm: false, csm_version: false, verbs: false, limits: false, visibility: false, display_name: false, description: false, expires_days: false },
         scope: READ,
-        summary: 'store an incoming webhook WITHOUT an API key, waiting for the owner; the answer carries approve_url for the person, and the API key is shown to the owner when they approve, never to you',
+        summary: 'store an incoming webhook WITHOUT an API key, waiting for the owner; the answer has approve_url for the person, and the API key is shown to the owner when they approve, never to you',
     },
     create: {
         fields: { name: true, target: true, csm: false, csm_version: false, verbs: false, limits: false, visibility: false, display_name: false, description: false, expires_days: false },
         scope: MANAGE,
-        summary: 'make it now; the answer carries the API key as `key` ONCE: put it straight into the program\'s secret store and nowhere else',
+        summary: 'make it now; the answer contains the API key as `key` ONCE: put it straight into the program\'s secret store and nowhere else',
     },
     update: {
         fields: { name: true, verbs: false, limits: false, visibility: false, display_name: false, description: false, expires_days: false, csm_version: false, target_max_keys: false },
@@ -78,7 +78,7 @@ export const receiverTools = [
     {
         name: 'aimeat_receiver',
         description: 'Incoming webhooks. Give an outside program (an AWS Lambda, a home sensor, a CRM export, a scheduled script) an incoming webhook: its own address and API key that write into EXACTLY ONE place of the owner\'s data over plain REST, with no agent and no MCP on the program\'s side. When you speak to the person, call it an incoming webhook and its credential an API key. '
-            + 'Use it when the person says something like "make an address the Lambda writes the sensor views to" or "let our CRM push new leads into the team\'s workspace". Do not hand such a program an access token or an agent: a token writes into its own test identity, and an agent with write-as-owner reaches all of the owner\'s memory. '
+            + 'Use it when the person says something like "make an address the Lambda writes the sensor views to" or "let our CRM push new leads into the team\'s workspace". Do not give such a program an access token or an agent: a token writes into its own test identity, and an agent with write-as-owner reaches all of the owner\'s memory. '
             + 'First read what will READ the data (the app and the keys it reads, or the row space), so the target matches. Then call "propose" { name, target: { prefix: "ruuvit" } (or { key } or { organism_id, ws, space }), csm? } and give the person the approve_url from the answer, saying the sentence in `say`. With receivers:manage, "create" makes it at once and answers the API key as `key` ONCE: put it straight into the program\'s secret store (AWS Secrets Manager, an environment secret), never into a chat, a file in a repository or a memory record. '
             + 'A CSM shape is optional and recommended: with csm, every message is checked against it and a message that does not match is refused with each field named (make one with aimeat_csm, from_sample builds it from one example message). Without it any JSON is taken, and the node\'s own checks (size, depth, reserved keys, a key\'s schema lock, quotas) still apply. '
             + 'The program calls POST/PUT/PATCH/GET/DELETE /v1/receive/{owner}/{name} or /v1/receive/{owner}/{name}/{sub} on this server with "Authorization: Bearer aimeat_rcv_…" and Content-Type application/json; GET .../_self says what the incoming webhook takes; ?dry_run=true checks without storing; Idempotency-Key makes a retry replace the same row instead of adding another. A prefix target names the key\'s last part as {sub} (with prefix "ruuvit", sub "olohuone" writes ruuvit.olohuone). Only POST/PUT is on by default: `verbs` adds "merge" (PATCH), "read" (GET of its own target) and "delete". '

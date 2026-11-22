@@ -170,12 +170,12 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
                 prompt: 'the text the person copies into their own AI (the locale\'s words when omitted)',
                 next: 'what follows the first action, one sentence (the locale\'s words when omitted)',
                 action: '{ onClick | href | copy, label }: the page\'s own button for the same first action',
-                link: '{ onClick | href, label }: a way on after the purpose sentence',
+                link: '{ onClick | href, label }: a link after the purpose sentence',
                 done: 'true when the first action is done (it starts folded), null while the page does not know yet, false or absent: open; the person\'s own choice wins',
             },
         },
         useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.'],
-        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'done or the person\'s choice', when: 'the person has done the first action, or folded it: one line with the way to open it' }],
+        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'done or the person\'s choice', when: 'the person has done the first action, or folded it: one line with the control to open it' }],
         example: {
             id: 'memory',
             purpose: 'Memory keeps what every AI you connect should know about you and your work.',
@@ -255,7 +255,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         module: '/components/NamedRow.js', sheet: '/css/components/named-row.css',
         data: { shape: 'NamedRow({ label, title, stack, children })', fields: { label: 'the category word', title: 'the full category on hover', stack: 'the content one part under another at the row\'s full width', children: 'the row content' } },
         useFor: ['A band that lists several kinds of thing, one kind per row.'],
-        variants: [{ name: 'stack', class: 'poster-named-row-body--stack', prop: 'stack', when: 'the row holds a form field, or a list with a way on under it' }],
+        variants: [{ name: 'stack', class: 'poster-named-row-body--stack', prop: 'stack', when: 'the row holds a form field, or a list with a link under it' }],
         example: { label: 'Apps', children: 'ThingLink × n' },
     },
     {

@@ -324,7 +324,7 @@ async function restoredExtension(
   const libs = Object.fromEntries(ext.libs);
   for (const [lib, content] of ext.libs) {
     if (Buffer.byteLength(content, 'utf8') / 1024 > config.cortexMaxLibSizeKb) {
-      throw new Error(`QUOTA_EXCEEDED: The library "${lib}" is larger than this node allows (${config.cortexMaxLibSizeKb} KB).`);
+      throw new Error(`QUOTA_EXCEEDED: The library "${lib}" is larger than this server allows (${config.cortexMaxLibSizeKb} KB).`);
     }
   }
   const ceiling = await cortexInstallRefusal({ storage, config }, true);
@@ -333,7 +333,7 @@ async function restoredExtension(
   const manifest = typeof ext.record.manifest === 'string' ? ext.record.manifest : '';
   const parsedManifest = parseCortexManifest(manifest, owner, ext.libs.size > 0 ? libs : undefined);
   if (!parsedManifest.ok || !parsedManifest.extension) {
-    throw new Error(`INVALID_MANIFEST: The extension's manifest in the backup does not pass this node's checks: ${(parsedManifest.errors ?? []).join('; ')}`);
+    throw new Error(`INVALID_MANIFEST: The extension's manifest in the backup does not pass this server's checks: ${(parsedManifest.errors ?? []).join('; ')}`);
   }
   const fromManifest = parsedManifest.extension;
   const namespace = fromManifest.namespace === sourceOwner ? owner : fromManifest.namespace;

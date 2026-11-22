@@ -55,7 +55,7 @@ which price a visitor sees first, whether an agent-callable price is worth havin
 research later. Ask it first and follow where it goes. Then, briefly: which currency, which languages,
 and whether the products already exist somewhere you could import.
 
-Ask one question at a time, in their language, and write each answer down as it lands. Never fill a
+Ask one question at a time, in their language, and write each answer down as they give it. Never fill a
 blank with something that merely sounds right — an unstated delivery time is an absent line, not a
 promise of next-day.
 
@@ -68,19 +68,19 @@ Then install it, once. That is the only yes this step needs. If any part of it f
 install is rolled back and nothing is left behind; tell them that plainly rather than retrying blind.
 
 ## Step 3 — Give the shop somewhere to keep things
-Products, prices and pages live in an organism of their own, so nobody else can read or edit them.
+Products, prices and pages are stored in an organism of their own, so nobody else can read or edit them.
 Create it (\`aimeat_organism_create\`, private) and a workspace in it (\`aimeat_workspace_create\`). The
 back office finds that workspace by itself afterwards — it looks for the contract \`shop\` in the
 manifest — so there is nothing to paste back.
 
-If the back office is already open it will hand you the exact manifest to pass through unchanged.
+If the back office is already open it will give you the exact manifest to pass through unchanged.
 Use that rather than writing your own.
 
 ## Step 4 — Fill it in
 Write the catalogue as ONE record holding the whole list, never one record per product. Same for a
-price list. Then set what is on the shelf, and fill in the blanks in the privacy, terms and delivery
-skeletons from what they told you and from their company details. Those pages carry who wrote them,
-because a skeleton the operator filled in is a starting point they own and not advice.
+price list. Then set what is in stock, and fill in the blanks in the privacy, terms and delivery
+templates from what they told you and from their company details. Those pages show who wrote them,
+because a template the operator filled in is a starting point they own and not advice.
 
 Publishing sends a copy to the shop front. Until they press that, everything is theirs alone.
 
@@ -94,9 +94,9 @@ Ask before configuring any payment method, and only the ones they asked for:
 ## Throughout
 - One thing at a time, and stop when they have had enough. The back office opens on what is still
   missing, in order, so they can come back to exactly where they left off.
-- Anything that spends tokens on a clock stays switched off unless they turn it on.
+- Anything that spends tokens on a schedule stays switched off unless they turn it on.
 - If something is not available on this node, say so instead of working around it.
-- When the shop is up, hand them the address on its own line.`,
+- When the shop is up, give them the address on its own line.`,
     variables: ['node_url'],
     usedIn: ['/v1/prompts/playbook/businesslauncher'],
   },
@@ -112,14 +112,13 @@ account at {{node_url}}.
 ## What they get
 One page that answers three questions: what does this company know, where did each piece come from,
 and what is waiting for me. Their own registered details are its first facts. Every source says what
-it does NOT cover. A weekly check that spends nothing tells them when something that fed it goes
-quiet. It is theirs: their space, their records, exportable whenever they want it elsewhere.
+it does NOT cover. A weekly check that spends nothing tells them when a source stops sending data. It is theirs: their space, their records, exportable whenever they want it elsewhere.
 
 Do NOT build this by hand. It is an installable package, and one owner can install it once per
 company — each copy knows which company it belongs to from the address it is served at.
 
 ## Step 1 — The company comes first, as its own step
-A brain hangs off a company, so register the company before anything else and let that be a finished
+A brain belongs to a company, so register the company before anything else and let that be a finished
 thing on its own. A name is enough (\`aimeat_company_create\`); the address is reserved immediately.
 
 Ask for the name and confirm it before you call anything. Reserving a public address is a public act
@@ -160,7 +159,7 @@ Set the installed app as the company's front page (\`aimeat_company_front_page\`
 the installed app's \`owner/filename\`). Confirm before this one: it is the step after which something
 is reachable at a public address.
 
-Hand them the address on its own line when it is done.
+Give them the address on its own line when it is done.
 
 ## Step 6 — Say what feeds it, and what each source does not cover
 A brain with one import is a snapshot. Ask what else they would want it to know, and add each as a
@@ -174,10 +173,10 @@ quietly becomes "everything we know", and the weekly check names any source that
   plain words, when the turn ends.
 - Never invent a fact or a source. If nobody can say where something came from, it is a gap, not a
   fact, and writing it down as a gap is the useful move.
-- Anything a person merely observed wears out: give it a date to look at again. Anything written in
+- Anything a person merely observed goes out of date: give it a date to look at again. Anything written in
   a document they hold does not.
 - Findings your research produces stay drafts. Turning one into a fact is theirs to decide.
-- Anything that spends tokens on a clock stays switched off unless they turn it on. The weekly
+- Anything that spends tokens on a schedule stays switched off unless they turn it on. The weekly
   caretaker is not one of those: it costs nothing.
 - If something is not available on this node, say so instead of working around it.`,
     variables: ['node_url'],
@@ -210,7 +209,7 @@ Set the payout side up before the buying side:
 - Check the result with \`aimeat_commerce_psp_status\` and tell them plainly which methods are live and which are still off.
 
 ## Step 3 — The shop itself
-Build the storefront as an app on their account (the app-building rules apply — load \`aimeat-app-building\` first). It lists what they sell and opens a checkout session per purchase. Publish it, hand them the address on its own line, and tell them it opens in a new tab.
+Build the storefront as an app on their account (the app-building rules apply — load \`aimeat-app-building\` first). It lists what they sell and opens a checkout session per purchase. Publish it, give them the address on its own line, and tell them it opens in a new tab.
 
 ## Step 4 — What happens when somebody buys
 Explain the flow in their words, once: a purchase becomes a hold, the hold is captured when they deliver, and the money is paid out to them. If other people helped make the thing, set a beneficiary split so their share is paid automatically rather than remembered.
@@ -240,7 +239,7 @@ Walk them through the connect flow for that provider. When they come back, confi
 Say which of their agents may publish to it, and make sure that is what they want. An account that any agent may post to is a decision, not a default — ask.
 
 ## Step 4 — The first post
-Write something with them, show it to them in full BEFORE it goes out, and publish only when they say yes. Then show them where the record of it lives, so they can see everything their agents have posted.
+Write something with them, show it to them in full BEFORE it goes out, and publish only when they say yes. Then show them where the record of it is kept, so they can see everything their agents have posted.
 
 ## Throughout
 - Never publish anything they have not read.
@@ -263,15 +262,15 @@ Ask what the page should say and who it is for. Keep it to what they can answer 
 ## Step 2 — Put it up
 Build and publish the page (load \`aimeat-welcome-pages\` for how). Keep the first version short and obviously theirs, with placeholders they can see and correct.
 
-## Step 3 — Hand over the address
+## Step 3 — Give them the address
 Give them the address on its own line and say it opens in a new tab. That link is the moment this becomes real, so do not bury it in a paragraph.
 
 ## Step 4 — Changing it
-Show them that changing it is a sentence: "put my new title on the page" is the whole interface. If they want parts only some people can see, explain that those live behind sharing they control, and set it up only if they ask.
+Show them that changing it is a sentence: "put my new title on the page" is the whole interface. If they want parts only some people can see, explain that those are behind sharing settings they control, and set it up only if they ask.
 
 ## Throughout
 - Publish nothing about them that they did not tell you.
-- Their page is theirs: it lives on their account and stays when they take their data elsewhere.`,
+- Their page is theirs: it is stored in their account and stays when they take their data elsewhere.`,
     variables: ['node_url'],
     usedIn: ['/v1/prompts/playbook-page'],
   },
@@ -284,7 +283,7 @@ Show them that changing it is a sentence: "put my new title on the page" is the 
     content: `The person is asking about running AIMEAT themselves, rather than on {{node_url}}. Help them decide first and install second — an instance nobody needed is a machine they now maintain.
 
 ## Step 1 — Whether they should
-Ask what they want that this node does not give them. The honest answers are: their own rules about who joins and what agents may do, data that sits on hardware they control, their own AI keys and costs, or a shop under their own name. If none of those is the reason, say so — staying here is a fine answer.
+Ask what they want that this node does not give them. The honest answers are: their own rules about who joins and what agents may do, data that is stored on hardware they control, their own AI keys and costs, or a shop under their own name. If none of those is the reason, say so — staying here is a fine answer.
 
 ## Step 2 — Install it
 Walk them through the install for their platform (the guide is at /v1/start, and \`aimeat init\` sets the node up). Get them to a node that answers on its own address before configuring anything else.
@@ -293,7 +292,7 @@ Walk them through the install for their platform (the guide is at /v1/start, and
 Their data comes with them: memory, files, workspaces and agents can be exported here and imported there. Nothing they made is trapped on this node, and say that plainly — it is the reason the export exists.
 
 ## Step 4 — Decide their own rules
-Once it runs, walk the decisions that are now theirs: who may register, which AI provider pays for what, whether their node federates with others, and what their agents are allowed to do without asking.
+Once it runs, go through the decisions that are now theirs: who may register, which AI provider pays for what, whether their node federates with others, and what their agents are allowed to do without asking.
 
 ## Throughout
 - Be honest about what they take on: updates, backups, and being the person who answers when it breaks.

@@ -27,7 +27,7 @@ export const FINAL_DECISIONS = [
     id: 'poster-shapes-baseline',
     textOnly: true,
     title: 'Copied shapes: the check that counts shapes written outside the library',
-    question: 'A check counts the places where a sheet writes one of the design language\'s shapes itself (the yellow ground, the headline letters, the dark frame, the yellow shadow) instead of taking it from the library. The moves of this round cut those places from 558 to 343. But they carried old copies into 15 library sheets that are new, so the check now fails on 19 counts that went up. Should the check take the new, smaller numbers as its starting point, or should the 19 places be rewritten first?',
+    question: 'A check counts the places where a sheet writes one of the design language\'s shapes itself (the yellow ground, the headline letters, the dark frame, the yellow shadow) instead of taking it from the library. The moves of this round cut those places from 558 to 343. But they put old copies into 15 library sheets that are new, so the check now fails on 19 counts that went up. Should the check take the new, smaller numbers as its starting point, or should the 19 places be rewritten first?',
     proposal: {
       variant: 'record', name: 'Take the new numbers as the starting point',
       summary: 'The check records today\'s numbers: 343 copies in 79 files instead of 558 in 99. From then on a number can only go down, as before. The 19 places stay as they are and are cleaned up with the others.',
@@ -237,7 +237,7 @@ export const FINAL_DECISIONS = [
     proposal: {
       variant: 'proposal', name: 'Fix it in Pebble\'s data',
       summary: 'The line in Pebble\'s data that colours the band\'s figures goes, so the figures take the page colour, as in AIMEAT. Only Pebble on this sandbox changes; AIMEAT does not.',
-      text: 'Pebble\'s componentCss "stat": ".poster-stat-number { font-weight: 600; } .poster-stat-number--band { color: var(--accent); }". poster.css: .poster-stat-number--band { color: var(--bg) }; the band is .pf .pf-lp-stats::before on --accent (profile.css). Morsels carries .pf-lp-stat-green (color var(--bg)), which Pebble does not touch. The fix is one theme save (the Themes & Styles editor or aimeat_theme_save) that removes the second rule; Pebble lives in the sandbox\'s data, not in the repository (lab .dl-pebble-fix draws it).',
+      text: 'Pebble\'s componentCss "stat": ".poster-stat-number { font-weight: 600; } .poster-stat-number--band { color: var(--accent); }". poster.css: .poster-stat-number--band { color: var(--bg) }; the band is .pf .pf-lp-stats::before on --accent (profile.css). Morsels has .pf-lp-stat-green (color var(--bg)), which Pebble does not touch. The fix is one theme save (the Themes & Styles editor or aimeat_theme_save) that removes the second rule; Pebble is stored in the sandbox\'s data, not in the repository (lab .dl-pebble-fix draws it).',
     },
     variants: [
       { id: 'band-figures', name: 'The band\'s figures in Pebble', code: 'Pebble componentCss "stat": .poster-stat-number--band { color: var(--accent) }', becomes: 'in Pebble the page colour, as in AIMEAT', look: 'in Pebble: blue figures on the blue band; in AIMEAT the page colour on coral', where: 'Settings & Controls: the overview', crop: { url: '/v1/profile', eval: 'return new Promise((r) => setTimeout(r, 3000));', selector: '.poster-stat-number--band', around: '.pf-lp-stats' } },

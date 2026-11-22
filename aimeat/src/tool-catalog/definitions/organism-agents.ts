@@ -18,7 +18,7 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const organismAgentTools = [
     {
         name: 'aimeat_organism_agent_attach',
-        description: 'Put an agent on an organism\'s agent list (the Agents section of the organism\'s page). Where the organism admits only listed agents (agent_access "listed"), this list is which agents may act there at all, with their owner\'s rights: an agent not on it is refused as a non-member. Where it admits every member\'s agent, listing adds the organism\'s shared area and takes nothing away. Who may: an agent of your own owner, or any active member\'s agent when your owner is an owner or admin of the organism. Under "listed", only an owner or admin adds one, and the session must act for the person: the person signed in, or an agent the owner gave account:security. The agent\'s owner must be an active member. Undo with aimeat_organism_agent_detach.',
+        description: 'Put an agent on an organism\'s agent list (the Agents section of the organism\'s page). Where the organism allows only listed agents (agent_access "listed"), this list is which agents may act there at all, with their owner\'s rights: an agent not on it is refused as a non-member. Where it allows every member\'s agent, listing adds the organism\'s shared area and takes nothing away. Who may: an agent of your own owner, or any active member\'s agent when your owner is an owner or admin of the organism. Under "listed", only an owner or admin adds one, and the session must act for the person: the person signed in, or an agent the owner gave account:security. The agent\'s owner must be an active member. Undo with aimeat_organism_agent_detach.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Attach Agent to Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -31,7 +31,7 @@ export const organismAgentTools = [
     },
     {
         name: 'aimeat_organism_agent_detach',
-        description: 'Take an agent off an organism\'s agent list. Where the organism admits only listed agents, the agent is refused there from then on; where it admits every member\'s agent, it keeps its owner\'s rights and loses only what the list added. Who may: the agent\'s owner, or an owner or admin of the organism.',
+        description: 'Take an agent off an organism\'s agent list. Where the organism allows only listed agents, the agent is refused there from then on; where it allows every member\'s agent, it keeps its owner\'s rights and loses only what the list added. Who may: the agent\'s owner, or an owner or admin of the organism.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Detach Agent from Organism', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

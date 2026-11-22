@@ -18,7 +18,7 @@ export const disputeTools = [
         name: 'aimeat_admin_disputes',
         description: 'Operator-only. The work disputes on this node that wait for the operator, or one dispute in full. '
             + 'Without `id`: the disputes the parties escalated, and the ones that timed out after 30 days while the provider\'s balance did not cover the refund (`status` "escalated", the default); "open" adds the disputes the parties are still settling between themselves, and "all" adds the resolved ones. '
-            + 'Each row carries the dispute id, the work\'s tracking code, the requester and the provider, why it was opened, `paid_morsels` (what delivery paid the provider, which is all a ruling can share out), `waits_since`, and `timed_out` when the 30-day timeout handed it to the operator. '
+            + 'Each row has the dispute id, the work\'s tracking code, the requester and the provider, why it was opened, `paid_morsels` (what delivery paid the provider, which is all a ruling can share out), `waits_since`, and `timed_out` when the 30-day timeout passed it to the operator. '
             + 'With `id`: that dispute, the same fields, and its audit trail, every event in order with the hash chain that makes a change visible. '
             + 'Rule one with aimeat_admin_dispute_rule. Same as GET /v1/admin/disputes and GET /v1/admin/disputes/:id. Returns NOT_FOUND for an unknown id, and an operator-role error for non-operators.',
         caller: 'operator',

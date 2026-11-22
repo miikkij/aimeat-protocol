@@ -105,12 +105,12 @@ export function StoreSection({ fromPrice, tiers }) {
         </h2>
         <${StoreSoonNote} class="ld-sh-text" />
         <p class="ld-sh-text">
-          ${tr('landing.storeText', 'Everything you just tried is the display model. Your own AIMEAT is the same whole place on an address with your name on it, kept running and updated for a monthly fee, and every bit of it yours the way your house is yours.')}
+          ${tr('landing.storeText', 'Everything you just tried is a demo. Your own AIMEAT is the same whole place on an address with your name on it, kept running and updated for a monthly fee, and every bit of it yours the way your house is yours.')}
         </p>
         <ul class="ld-sh-list">
-          <li>${Star}<span>${tr('landing.storeLi1', 'Every AI you use, Claude, ChatGPT, local models, under one roof, working on the same memory.')}</span></li>
+          <li>${Star}<span>${tr('landing.storeLi1', 'Every AI you use, Claude, ChatGPT, local models, in one place, working on the same memory.')}</span></li>
           <li>${Star}<span>${tr('landing.storeLi2', 'Your data and what you build remain yours. You decide whom to grant access.')}</span></li>
-          <li>${Star}<span>${tr('landing.storeLi3', 'Sell what you build: payment rails and agent-to-agent commerce come with the house.')}</span></li>
+          <li>${Star}<span>${tr('landing.storeLi3', 'Sell what you build: payment rails and agent-to-agent commerce are included.')}</span></li>
         </ul>
         ${ladder.length > 0 ? html`
           <div class="ld-sh-tiers">
@@ -121,7 +121,7 @@ export function StoreSection({ fromPrice, tiers }) {
                 <span class="ld-sh-tier-unit">${tr('landing.storePerMonth', 'per month')}</span>
               </div>`)}
           </div>` : ''}
-        <${StoreDoor} class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label=${tr('landing.storeCta', 'Step into the store →')} />
+        <${StoreDoor} class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label=${tr('landing.storeCta', 'Open the store →')} />
       </div>
     </section>`;
 }
@@ -131,7 +131,7 @@ export function TrustList({ navigate }) {
   const items = [
     [tr('landing.trust1Title', 'Every action signed'), tr('landing.trust1Text', 'Whatever a person, an app or an AI does here carries the name of who did it, and you can read the trail.')],
     [tr('landing.trust2Title', 'AI content labeled'), tr('landing.trust2Text', 'What a model wrote says so where a person reads it, with a record of how it was made. The EU AI Act disclosure is served, live.')],
-    [tr('landing.trust3Title', 'Consent you can revoke'), tr('landing.trust3Text', 'A helper reaches exactly what you handed it. Taking a permission back is one click, and it holds.')],
+    [tr('landing.trust3Title', 'Consent you can revoke'), tr('landing.trust3Text', 'A helper reaches exactly what you gave it. Taking a permission back is one click, and it holds.')],
     [tr('landing.trust4Title', 'GDPR as buttons'), tr('landing.trust4Text', 'Export and deletion controls are available in your account. Where data is stored and AI processes it depends on the hosting and model you choose.')],
   ];
   return html`
@@ -148,7 +148,7 @@ export function TrustList({ navigate }) {
         ${tr('landing.trustEu', 'Built in Finland, in the EU: the rules this list names are the ones we live under ourselves.')}
         ${' '}
         <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>
-          ${tr('landing.transCta', 'How this node marks AI content →')}
+          ${tr('landing.transCta', 'How this server marks AI content →')}
         </a>
       </p>
     </section>`;

@@ -302,7 +302,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
     // work" failure TARGET-057 names, and the picker offers the same set for the same reason.
     if (!chosen.email) {
       res.status(422).json(error(config.nodeId, 'NOT_REACHABLE',
-        'That contact has no saved address — an app can be handed a person saved with an email'));
+        'That contact has no saved address — an app can be given a person saved with an email'));
       return;
     }
     const handle = mintContactHandle({ ownerGhii, app: target.target, contactId });

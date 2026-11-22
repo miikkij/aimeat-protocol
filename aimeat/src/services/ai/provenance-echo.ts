@@ -43,7 +43,7 @@ export async function provenanceWriteEcho(
         recorded: false,
         declared: { ai_provenance_id: input.declaredId },
         reason: `Record ${input.declaredId} was NOT attached: only a record of your own account can be attached. `
-          + (input.storedId ? `The write carries the node's own record ${input.storedId} instead.` : 'The write carries no record.'),
+          + (input.storedId ? `The write has the node's own record ${input.storedId} instead.` : 'The write has no record.'),
       },
     };
   }

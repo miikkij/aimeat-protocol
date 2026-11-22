@@ -85,5 +85,5 @@ export function onScopesChanged(ctx: ScopeRefreshCtx, frame: TunnelFrame): void 
 
   // A name this socket does not hold: dropped, and said out loud. Every neighbouring case logs what
   // it discards; this one used to fall through in silence.
-  console.error(`[${ctx.label}] scopes_changed for ${named}, which this socket does not carry — ignored`);
+  console.error(`[${ctx.label}] scopes_changed for ${named}, which this socket does not hold — ignored`);
 }

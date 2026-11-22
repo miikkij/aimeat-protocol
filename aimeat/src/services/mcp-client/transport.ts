@@ -161,7 +161,7 @@ export async function resolveWireAddress(
     return {
       ok: false,
       code: 'PEER_NOT_ROUTABLE',
-      message: `The peering with "${t.peerNodeId}" does not carry routing, so this node does not `
+      message: `The peering with "${t.peerNodeId}" does not include routing, so this node does not `
         + 'make calls into it. An operator can promote the peer to member.',
     };
   }

@@ -75,7 +75,7 @@ node. Use it when they say "the one someone showed me".
 ## Where it shows on a screen
 
 My Apps (\`/v1/appcat\`) shows the same thing: the apps opened most recently at the
-top, and the person's own apps not opened nor changed in six months in a folded
+top, and the person's own apps not opened nor changed in six months in a collapsed
 section under the list. A search there looks through all of them.
 `,
   };

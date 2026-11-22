@@ -47,7 +47,7 @@ describe('an owner\'s provider record', () => {
     for (const type of ['local', 'openai-compatible']) {
       const r = owner({ type, baseUrl: 'http://127.0.0.1:1234/v1' }, pub);
       expect(r.provider, type).toBeNull();
-      expect(r.problems.join(' ')).toMatch(/public node/);
+      expect(r.problems.join(' ')).toMatch(/public server/);
     }
   });
 

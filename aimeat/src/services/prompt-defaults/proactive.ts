@@ -60,7 +60,7 @@ apps actually does, so find out for yourself: aimeat_discover with mode "map" co
 across everything they own, and aimeat_app_list gives you their apps by name and description.
 Reading six names costs you one call, and it saves them being offered something they built in March.
 
-### When it lands, and when it does not
+### When to offer, and when not
 
 A missed opening costs one conversation. A badly timed one costs every conversation after it,
 because they learn to skim past you. So when you are not sure this is the moment, it is not.

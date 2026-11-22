@@ -72,7 +72,7 @@ export async function complianceRefusal(
   if (answer.ok) return null;
   if (answer.why === 'needs-word') {
     return `This needs the "${scope}" permission. Whoever runs this installation grants it per agent, `
-      + 'and "Full access" does not carry it.';
+      + 'and "Full access" does not include it.';
   }
   return 'This is the compliance report for the whole installation. The account behind this session does not run it.';
 }

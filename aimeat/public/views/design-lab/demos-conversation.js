@@ -99,7 +99,7 @@ function Conversation({ list = false, empty = false, capped = false }) {
         <${ConversationScroll} onScroll=${noop}>
           ${empty
             ? html`<${ConversationWelcome} title="Your first agent" body="It works here the way your own AI tool would. Ask it for something."
-                trust="Everything you make here lands in your own account.">
+                trust="Everything you make here is saved in your own account.">
                 <${Suggestions}><${Suggestion} onClick=${noop}>Make me a page<//><${Suggestion} onClick=${noop}>What can you do?<//><//>
               <//>`
             : html`<${Turn} id="d1" turn=${USER} /><${Turn} id="d2" turn=${AGENT} />`}
@@ -147,10 +147,10 @@ export const CONVERSATION_DEMOS = {
       region: { current: 'eu', choices: ['eu'], can_choose: false, eu_only: true, applies_to: 'all' } } }} />` },
   ] },
   'agent-status': { variants: [
-    { name: 'the house pays', render: (ex) => html`<${StatusBar} status=${ex.status} onReset=${noop} />` },
+    { name: 'this server pays', render: (ex) => html`<${StatusBar} status=${ex.status} onReset=${noop} />` },
     { name: 'own key', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'own', has_own_key: true }} onReset=${noop} />` },
     { name: 'allowance', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'allowance' }} onReset=${null} />` },
-    { name: 'own key saved, the house pays the chat', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'node', has_own_key: true, own_key: { set: true, covers: ['node_ai', 'agent_calls_via_node'], not_covered: [{ part: 'chat', reason: 'shared_chat_key' }, { part: 'agent_runtimes', reason: 'runtime_uses_machine_key' }] } }} onReset=${noop} />` },
+    { name: 'own key saved, this server pays the chat', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'node', has_own_key: true, own_key: { set: true, covers: ['node_ai', 'agent_calls_via_node'], not_covered: [{ part: 'chat', reason: 'shared_chat_key' }, { part: 'agent_runtimes', reason: 'runtime_uses_machine_key' }] } }} onReset=${noop} />` },
   ] },
   'rail-action': { variants: [
     { name: 'default', render: (ex) => html`<button type="button" class="btn-ghost poster-rail-action">${ex.children}</button>` },
@@ -191,7 +191,7 @@ export const CONVERSATION_DEMOS = {
     { name: 'busy', render: (ex) => html`<${Composer} value=${ex.value} busy=${true} onInput=${noop} onSend=${noop} onStop=${noop} />` },
     { name: 'attachments, one failed', render: () => html`<${Composer} value="" onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop}
         attachments=${[{ id: 'a', name: 'photo.png', preview: '/og-image.png' }, { id: 'b', name: 'report.pdf', state: 'error', error: 'too large' }]} />` },
-    { name: 'no agent here', render: () => html`<${Composer} value="" disabled=${true} note="There is no chat agent on this node." onInput=${noop} onSend=${noop} onStop=${noop} />` },
+    { name: 'no agent here', render: () => html`<${Composer} value="" disabled=${true} note="There is no chat agent on this server." onInput=${noop} onSend=${noop} onStop=${noop} />` },
     { name: 'own words, sending, slash commands (an agent\'s Messages tab)', render: () => html`<div style="padding-top: 7rem"><${Composer} value="/st" onInput=${noop} onSend=${noop} onStop=${noop}
         placeholder="Write to bot…" sendLabel="Send to bot" sending=${true} suggestLabel="Commands"
         suggest=${[{ key: 'status', name: '/status', desc: 'What the agent is doing now', onPick: noop }, { key: 'stop', name: '/stop', desc: 'Stop the running task', onPick: noop }]} /></div>` },

@@ -74,7 +74,7 @@ export async function agreementAccess(deps: Deps, caller: OperatorCaller, a: Agr
   if (a.counterparty.account && ownerGhii === a.counterparty.account && await counterpartyHolds(deps.storage, a)) {
     const word = mode === 'read' ? COMPLIANCE_READ_SCOPE : COMPLIANCE_WRITE_SCOPE;
     if (actsForSomeone(caller) && !scopeIsCovered(caller.scopes ?? [], word)) {
-      throw new AgreementError(403, 'SCOPE_DENIED', `This needs the "${word}" permission. The person grants it per agent, and "Full access" does not carry it.`);
+      throw new AgreementError(403, 'SCOPE_DENIED', `This needs the "${word}" permission. The person grants it per agent, and "Full access" does not include it.`);
     }
     return { role: 'counterparty', by: caller.sub, ownerGhii };
   }

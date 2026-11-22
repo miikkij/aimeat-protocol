@@ -85,7 +85,7 @@ export function appGrantsManageRouter(config: AimeatConfig, storage: Storage): R
     }
     const wanted = (req.body ?? {}).scopes;
     if (!Array.isArray(wanted) || wanted.some((s: unknown) => typeof s !== 'string')) {
-      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'scopes must be a list of the scope words to keep'));
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'scopes must be a list of the scopes to keep'));
     }
     const keep = [...new Set(wanted as string[])];
     if (keep.length === 0) {

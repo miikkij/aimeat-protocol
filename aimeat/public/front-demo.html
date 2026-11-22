@@ -7,7 +7,7 @@
     private instance) as the destination. Served at / when AIMEAT_FRONT_PAGE=demo
     (src/routes/bootstrap.ts); always previewable directly at /front-demo.html. Finnish
     sibling: front-demo.fi.html. The only JS is /front-demo.js (same-origin, CSP-clean):
-    live numbers, the app wall, and the signed-in "Your home" chip.
+    live numbers, the public app list, and the signed-in "Your home" chip.
   @version-history
     v1.2.3 - 2026-11-15 - The own-AIMEAT and privacy sections say what you get in plain words: a
       public demo and a private AIMEAT of your own, in place of a public square, a clubhouse, a
@@ -32,7 +32,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AIMEAT · Try everything, then own it</title>
-  <meta name="description" content="aimeat.io is the world's most honest demo: a fully working AIMEAT anyone can drive today, free. When you want your own, with nobody in it but you and the people you invite, the store is one door over." />
+  <meta name="description" content="aimeat.io is the world's most honest demo: a fully working AIMEAT anyone can drive today, free. When you want your own, with nobody in it but you and the people you invite, the store is one click away." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <script src="/front-demo.js" defer></script>
   <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
@@ -262,8 +262,8 @@
   <div class="fd-strip">
     <span><b id="fd-n-apps">130</b> apps built in this demo</span>
     <span><b id="fd-n-opens">10,223</b> times opened</span>
-    <span><b id="fd-n-agents">148</b> AI helpers on the payroll</span>
-    <span><b id="fd-n-online">53</b> awake right now</span>
+    <span><b id="fd-n-agents">148</b> AI agents at work</span>
+    <span><b id="fd-n-online">53</b> online right now</span>
     <span class="fd-strip-note" id="fd-strip-note">Counted right here on 2026-08-19. They only go up.</span>
   </div>
 
@@ -356,7 +356,7 @@
     </div>
     <p class="fd-small">
       Numbers on this page are read <a class="fd-plain" href="/v1/public/node-totals">live from the platform itself</a>.
-      Posters cooked in our own imagery kitchen. No stock photos were harmed.
+      Posters made with our own image tools. No stock photos were harmed.
     </p>
     <div class="fd-foot-links">
       <a href="/v1/pricing">Pricing</a>

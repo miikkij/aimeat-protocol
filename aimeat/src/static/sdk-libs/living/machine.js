@@ -116,7 +116,7 @@ function compile(def, errors) {
 
   walk(def.states, '');
   for (const w of (def.when || [])) {
-    const tree = expr(String(w.expr), 'the crossing that sends ' + w.send);
+    const tree = expr(String(w.expr), 'the transition that sends ' + w.send);
     if (tree) whens.push({ tree: tree, send: String(w.send), was: false });
   }
   return { guards: guards, assigns: assigns, whens: whens };

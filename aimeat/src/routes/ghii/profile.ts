@@ -232,7 +232,7 @@ export function registerProfileRoutes(
         // the account-security half. Their profile lives on their home node.
         if (isForeignPrincipal(req.auth)) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-                `This account lives on ${req.auth!.homeNode ?? 'another node'}, and its profile is read there.`));
+                `This account is on ${req.auth!.homeNode ?? 'another node'}, and its profile is read there.`));
             return;
         }
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);

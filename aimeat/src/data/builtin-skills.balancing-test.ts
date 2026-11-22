@@ -72,18 +72,18 @@ a different gap: ask the person for the purpose and the basis first, and write t
 
 \`not_allowed\` lists a register that holds special category data: health, biometric or genetic data,
 or another special category (ethnic origin, religion, political opinion, trade union membership,
-sexual orientation). Legitimate interests alone do not carry that data. The server drafts no test and
+sexual orientation). Legitimate interests alone do not cover that data. The server drafts no test and
 refuses a write with LIA_SPECIAL_CATEGORY. Tell the person plainly, and help them choose: a ground
 under GDPR art. 9(2) in the register (\`specialBasis\`) with the legal basis that goes with it, and an
 impact assessment (\`part: "dpias"\`).
 
-Employment data is allowed on legitimate interests, and always needs the test. The draft then carries
+Employment data is allowed on legitimate interests, and always needs the test. The draft then contains
 a reminder in \`facts.reminders\`: employment privacy law can ask more (in Finland, only data directly
 necessary for the employment relationship). Read the reminder to the person.
 
 ## Fill the draft with the person
 
-Each item of \`items\` is one test. It carries:
+Each item of \`items\` is one test. It contains:
 
 - \`facts\`: what the server read from the app. The purpose and legal basis (section 1), the data and a
   proposal of data the app may not need (section 3), the regulated data, the people, AI use and who
@@ -138,7 +138,7 @@ Then the same call approves nothing: it files a question to the owner and answer
 address in the answer. They allow it signed in themselves; another agent cannot. You hear the answer
 as a message. A test edited after you asked is not approved by the old question: ask again.
 
-An approved test carries who approved it and whether a person, an agent or an app did, who asked
+An approved test records who approved it and whether a person, an agent or an app did, who asked
 when the owner allowed an agent's question, and a review date twelve months on (\`review_months\` in
 \`set\` changes it).
 
@@ -153,7 +153,7 @@ when the owner allowed an agent's question, and a review date twelve months on (
 - **Open again.** \`standing.state\` is \`reopened\` when more people can see the data than at approval,
   or the app keeps new regulated data. The approval is kept; the owner reads the test against the
   change and approves again.
-- **Not suitable.** A test approved with \`not-suitable\` means legitimate interests do not carry the
+- **Not suitable.** A test approved with \`not-suitable\` means legitimate interests do not cover the
   processing: the register needs another basis, or the processing stops. Where the server requires
   the test it stays a gap until one of the two happens.
 - **Privacy contact.** An organism can name a member who hears when a test of an app shared with it is

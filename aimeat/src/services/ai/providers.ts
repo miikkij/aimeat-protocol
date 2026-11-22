@@ -420,7 +420,7 @@ export function parseAiProvider(
       addressProblems.push(`baseUrl: a local provider is on this machine (127.0.0.1, localhost or ::1); ${host} is somewhere else, so it is 'openai-compatible'.`);
     }
     if (baseUrl && source === 'owner' && config.securityProfile === 'public' && isLoopbackHost(host)) {
-      addressProblems.push('baseUrl: on this public node an owner\'s provider cannot be on the node\'s own machine. Your own computer connects through the desktop app, not by address.');
+      addressProblems.push('baseUrl: on this public server an owner\'s provider cannot be on the server\'s own machine. Your own computer connects through the desktop app, not by address.');
     }
     if (baseUrl && type === 'openai-compatible' && u?.protocol === 'http:' && !isLoopbackHost(host) && !listed) {
       addressProblems.push('baseUrl: a provider outside this machine is reached over https.');
@@ -481,7 +481,7 @@ function nodeKeyProvider(config: AimeatConfig): AiProvider | null {
   if (config.modelDefaultImage) caps.push('image');
   if (config.modelDefaultStt) caps.push('transcription');
   return {
-    id: NODE_OPENROUTER_ID, title: 'This node\'s OpenRouter key', type: 'openrouter', source: 'node', baseUrl,
+    id: NODE_OPENROUTER_ID, title: 'This server\'s OpenRouter key', type: 'openrouter', source: 'node', baseUrl,
     auth: { type: 'node' }, leaves: true, dataStatement: statementOf('openrouter', baseUrl),
     capabilities: capsOf('openrouter', caps), health: { byCapability: {} },
   };

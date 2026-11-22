@@ -21,7 +21,7 @@ import type { UiEntryWritten } from './types.js';
 export const LIST_ENTRIES: UiEntryWritten[] = [
     {
         id: 'list', name: 'List', kind: 'component', status: 'active',
-        summary: 'Things in rows of columns, one thing per row, between hairlines: a mark at the start (a picture, a tick, a thumbnail or a check box), the name in bold with a small grey typewriter line under it, what it is in grey, who has it, its figures at the right, its dates, and the actions at the end with the ⋯ menu. A row can open a raised panel under it, be picked, be selected, be dragged or carry a heavy rail in a warn or a chosen colour. The list says when it is loading or empty and groups rows under headings that fold; around it stand the filters with their counts, the search line and the line that shows more. As the app catalogue\'s index it is a numbered line per thing, the opened one on the sun; its tones draw the catalogue\'s detail lists (a history of versions, switches, a table of counts, entries, a log, pages, a tree, the saves of a working copy).',
+        summary: 'Things in rows of columns, one thing per row, between hairlines: a mark at the start (a picture, a tick, a thumbnail or a check box), the name in bold with a small grey typewriter line under it, what it is in grey, who has it, its figures at the right, its dates, and the actions at the end with the ⋯ menu. A row can open a raised panel under it, be picked, be selected, be dragged or have a heavy rail in a warn or a chosen colour. The list says when it is loading or empty and groups rows under headings that fold; around it stand the filters with their counts, the search line and the line that shows more. As the app catalogue\'s index it is a numbered line per thing, the opened one on the sun; its tones draw the catalogue\'s detail lists (a history of versions, switches, a table of counts, entries, a log, pages, a tree, the saves of a working copy).',
         module: '/components/List.js', sheet: '/css/components/list.css',
         data: {
             shape: 'List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, index, tone, id, rows, render, children }) · '
@@ -47,7 +47,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'List.tone': 'history | switches | counts | entries | log | pages | releases | tree | checkpoints: the app catalogue\'s detail lists, each with the old catalogue\'s own shape (list-tones.css draws them)',
                 'List.empty': 'what stands in the list\'s place when there are no rows: a string (the quiet line) or a node (words and a button)',
                 'List.loading': 'true (the loading line) or the words to say, in the list\'s place',
-                'List.dense': 'a list inside a panel or under a row: less air, smaller words',
+                'List.dense': 'a list inside a panel or under a row: less space, smaller words',
                 'List.under': 'it belongs to the row above it: it stands indented (not on a phone)',
                 'List.small': 'a checklist under a field: small grey words, no rules',
                 'List.scroll': 'a long pick list, capped at 17rem in a thin frame that scrolls; "medium" caps it at 300px',
@@ -77,13 +77,13 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'Row.quietDoors': 'the row\'s actions show only while the pointer or the keyboard is on the row, or it is open or selected; they stay in the tab order, and on a phone they show on the opened or selected row only',
                 'Row.below': 'what always shows under the row, across it, without a frame (the row\'s rule falls under it)',
                 'Row.panel': 'what the opened row shows, drawn in a Panel', 'Row.panelDoors': 'the actions at the foot of that panel',
-                'Row.id': 'the anchor a page scrolls to (the first cell carries it)',
+                'Row.id': 'the anchor a page scrolls to (the first cell has it)',
                 'Row.order': 'the row\'s place in the list (0, 1, 2…), which times its coming in on a List index',
                 'Row.children': 'the cells, in the order the cut names them, and a Panel',
                 'Name.onOpen': 'the name is a button into the thing', 'Name.href': 'the name is a link', 'Name.newTab': 'the link opens a new tab',
                 'Name.openLabel': 'the name of that button or link for a screen reader',
                 'Name.onFollow': 'with href: the link\'s own press, before the browser follows it; a page that opens the thing in place calls preventDefault, and the address stays for a new tab',
-                'Name.marks': 'tags in a wrapping line under the name\'s words (the parts a package carries)',
+                'Name.marks': 'tags in a wrapping line under the name\'s words (the parts a package contains)',
                 'Name.meta': 'the small grey typewriter line under the name (Jouni\'s decision "Meta line")', 'Name.warn': 'that line in coral',
                 'Name.clip': 'the meta line cut to one line with …; 2 keeps two lines',
                 'Name.desc': 'a sentence (or a list of them) under the name in the body\'s grey letters',
@@ -191,7 +191,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
             { name: 'sorts', class: 'list-sort', prop: 'head [{ label, onSort, sorted }]', when: 'a column\'s name that sorts the list; coral while the list is sorted by it (.is-sorted)' },
             { name: 'notice rail', class: 'list-row--notice', prop: 'Row rail="notice"', when: 'a thing past its limit: the heavy coral line at the row\'s start' },
             { name: 'quiet actions', class: 'list-row--quiet-doors', prop: 'Row quietDoors', when: 'a long list whose actions belong to one row at a time: they show under the pointer, in focus, open or selected' },
-            { name: 'name marks', class: 'list-marks', prop: 'Name marks', when: 'the parts a thing carries, as tags under its name' },
+            { name: 'name marks', class: 'list-marks', prop: 'Name marks', when: 'the parts a thing contains, as tags under its name' },
             { name: 'followed link', prop: 'Name href onFollow', when: 'a name that opens the thing in place and keeps its address for a new tab' },
             { name: 'menu divider', prop: 'Doors menu [{ divider: true }]', when: 'a ⋯ menu whose rows fall in two groups' },
             { name: 'find', prop: 'SearchLine find', when: 'an operator page\'s search, with the magnifier before the field (.search-line-glass, search-line.css)' },
@@ -212,6 +212,6 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
             cols: 'name-desc-doors', head: ['Skill', 'What it teaches', ''],
             rows: [{ name: 'aimeat-writing', meta: 'v1.4.0', desc: 'How prose is written on this project.' }, { name: 'meeting-notes', meta: 'v0.2.0', desc: 'Short meeting notes, decisions first.' }],
         },
-        note: 'Built on 2026-09-26 as one component for the Listing (listing.css, whose class names the admin pages share) and the other list kinds of Settings: the organism, record, page, device, to-do, uses, tier, requirement, offer, search-hit, notification, sent-log, access-log and app-picker rows. On 2026-09-27 the admin pages\' tables moved onto it: labels, stackWide, the sortable head, the notice rail, quietDoors, Name marks and onFollow, the menu\'s divider and SearchLine find came with them, each with the look main\'s admin sheet gave it. Also on 2026-09-27 appcat (the app catalogue rebuilt at /v1/appcat) added List index with Row order (the old catalogue\'s .cat-row and .cat-row-panel), SearchLine big and id (the old .cat-search), and List tone: history (the old .dtl-version-row), switches (.mk-row), counts (.vis-table), entries (.dtl-skill), log (.mk-log), pages (.lg-row), releases (.version-row), tree (.lineage-node) and checkpoints (the working copy\'s .dtl-version-row with .wc-ckpt-when and .wc-ckpt-note). list-tones.css draws the tones (its own entry list-tones), so their variants here name the prop only. It also wears listing.css (the cuts, the rows, the cells, the opened panel), search-line.css (SearchLine), more-line.css (More), key-name.css (Name asKey) and tab-row.css (Filters, the Tabs row\'s filter tone).',
+        note: 'Built on 2026-09-26 as one component for the Listing (listing.css, whose class names the admin pages share) and the other list kinds of Settings: the organism, record, page, device, to-do, uses, tier, requirement, offer, search-hit, notification, sent-log, access-log and app-picker rows. On 2026-09-27 the admin pages\' tables moved onto it: labels, stackWide, the sortable head, the notice rail, quietDoors, Name marks and onFollow, the menu\'s divider and SearchLine find came with them, each with the look main\'s admin sheet gave it. Also on 2026-09-27 appcat (the app catalogue rebuilt at /v1/appcat) added List index with Row order (the old catalogue\'s .cat-row and .cat-row-panel), SearchLine big and id (the old .cat-search), and List tone: history (the old .dtl-version-row), switches (.mk-row), counts (.vis-table), entries (.dtl-skill), log (.mk-log), pages (.lg-row), releases (.version-row), tree (.lineage-node) and checkpoints (the working copy\'s .dtl-version-row with .wc-ckpt-when and .wc-ckpt-note). list-tones.css draws the tones (its own entry list-tones), so their variants here name the prop only. It also uses listing.css (the cuts, the rows, the cells, the opened panel), search-line.css (SearchLine), more-line.css (More), key-name.css (Name asKey) and tab-row.css (Filters, the Tabs row\'s filter tone).',
     },
 ];

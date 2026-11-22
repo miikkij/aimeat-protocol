@@ -124,7 +124,7 @@ export function registerComplianceTools(
       // routes/compliance.ts): an agent session reads its owner's AI activity only on wallet:read.
       // This tool asked nothing (feature-list audit 159).
       if (!scopeIsCovered(sessionScopes, OWN_ACTIVITY_SCOPE)) {
-        return refuse(`Reading your owner's compliance slice needs the "${OWN_ACTIVITY_SCOPE}" permission, which this session does not carry. Ask your owner to grant it.`);
+        return refuse(`Reading your owner's compliance slice needs the "${OWN_ACTIVITY_SCOPE}" permission, which this session does not have. Ask your owner to grant it.`);
       }
       const ownerGhii = ownerGhiiOf(agentGaii);
       return text(await buildComplianceReport(storage, config, { ownerGhii, sinceDays: since_days, month }));

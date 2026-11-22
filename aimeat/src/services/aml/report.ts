@@ -124,7 +124,7 @@ export function amlObligations(f: AmlFacts, config: Pick<AimeatConfig, 'ftnEnabl
         + ` ${f.kyc.cards} card(s) on this server.`,
     },
     { code: 'aml-ob-monitoring', ref: AMLR_REFS.monitoring, status: f.kyc.due ? 'check' : 'evidence', evidence: { cards: f.kyc.cards, due: f.kyc.due },
-      text: `Each customer card carries its next review from its risk (high within 12 months, at most 5 years), and the people doing the work get a notice when reviews fall due.${f.kyc.due ? ` ${f.kyc.due} card(s) are due now.` : ''}` },
+      text: `Each customer card has its next review from its risk (high within 12 months, at most 5 years), and the people doing the work get a notice when reviews fall due.${f.kyc.due ? ` ${f.kyc.due} card(s) are due now.` : ''}` },
     {
       code: 'aml-ob-reporting', ref: AMLR_REFS.reporting,
       status: all(d => !!d.fiuRegisteredAt) ? 'evidence' : decls.length ? 'check' : 'missing',

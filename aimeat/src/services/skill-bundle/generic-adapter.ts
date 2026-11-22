@@ -148,7 +148,7 @@ aimeat_memory_write({
 ## Completing the onboarding test task (canonical task lifecycle)
 
 1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan for the test task.
-2. Wait for the owner to approve. The task transitions to \`active\` when approved (task-runner mode agents skip this gate -- their tasks land in \`active\` immediately).
+2. Wait for the owner to approve. The task transitions to \`active\` when approved (task-runner mode agents skip this gate -- their tasks go to \`active\` immediately).
 3. Mark each TODO 'done' with \`aimeat_task_todo\` (one call per TODO) as you finish the work.
 4. Call \`aimeat_task_complete\` ONCE with the task id.
 

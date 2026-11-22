@@ -449,7 +449,7 @@ export async function applyInstanceMigration(
             ok: false, status: 403, code: 'SCOPE_DENIED',
             message: lackingComponent
                 ? `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
-                    + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`
+                    + `and this session does not have ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`
                 : suppliedCode && !codeRefusal
                     ? `Component "${suppliedCode}" would take code this session supplied instead of the package's own. Doing that without the owner `
                         + `takes "${INSTALL_CODE_SCOPE}", which this session does not hold, so it waits for the owner to approve it. Nothing was changed.`

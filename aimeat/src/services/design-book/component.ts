@@ -182,19 +182,19 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 const TAG_START_REFUSAL = 'A tag starts with its element\'s name right after "<" or "</". With a space or anything but a letter there, a browser reads it as text or as a comment ending at the first ">", '
   + 'so the bench and the browser would disagree about what is markup. A "<" in text is written &lt;.';
-const ODD_ATTRIBUTE_REFUSAL = (element: string, key: string) => `On <${element}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket where a browser and this bench could read the tag differently. `
+const ODD_ATTRIBUTE_REFUSAL = (element: string, key: string) => `On <${element}>, the attribute "${key.slice(0, 40)}" contains a quote or an angle bracket where a browser and this bench could read the tag differently. `
   + 'Write every value in double quotes, with no quote, "<" or ">" inside it.';
 
 /** What the bench says when the HTML parser's reading keeps it from vouching for the markup (component-scan.ts readMarkup). */
 function markupRefusal(problem: MarkupProblem, html: string): string {
   switch (problem.kind) {
-    case 'comment': return 'A component\'s markup carries no comments: say what it is in `use`.';
+    case 'comment': return 'A component\'s markup contains no comments: say what it is in `use`.';
     case 'unclosed': return 'A component\'s markup has a "<" that never meets its ">". Every tag is closed, and a "<" in text is written &lt;.';
     case 'equals':
       return `On <${problem.element}>, an "=" stands where a browser expects an attribute's name. A browser reads the "=" and what follows it as the name, quotes included, and ends the tag at the first ">". `
         + 'Every attribute is a name, "=", and a value in double quotes.';
     case 'closing':
-      return `A closing tag carries nothing but its name: "</${problem.element}${problem.rest.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${problem.element}>.`;
+      return `A closing tag contains nothing but its name: "</${problem.element}${problem.rest.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${problem.element}>.`;
     case 'tag-start': return TAG_START_REFUSAL;
     case 'attribute': return ODD_ATTRIBUTE_REFUSAL(problem.element, problem.attribute);
     case 'duplicate':
@@ -221,39 +221,39 @@ function markupRefusal(problem: MarkupProblem, html: string): string {
 /** The markup's checks. It answers the elements it read, which the stylesheet's checks need too. */
 function checkMarkup(html: string, prefix: string): MarkupElement[] {
   // The parser's cost grows with how deep the markup nests, so it reads no more than the ceiling.
-  if (html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
+  if (html.length > COMPONENT_LIMITS.html) refuse(`A component holds its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
   // READ BY THE HTML PARSER (component-scan.ts readMarkup): the elements a browser builds, and every
   // attribute value decoded as a browser decodes it, so a check below reads what a browser uses.
   const { elements, problem } = readMarkup(html);
   if (problem) refuse(markupRefusal(problem, html));
   for (const { name, attrs } of elements) {
     if (!ELEMENTS.has(name)) {
-      refuse(`A component's markup may not carry <${name}>. It is structure and nothing else: no script, style, link, iframe, object, embed, form, img, video, audio or anchor. `
+      refuse(`A component's markup may not contain <${name}>. It is structure and nothing else: no script, style, link, iframe, object, embed, form, img, video, audio or anchor. `
         + 'A picture or a link is the app\'s to add, where it knows the address.');
     }
     for (const { name: key, value } of attrs) {
       if (key.includes('`') || value.includes('<') || value.includes('>')) refuse(ODD_ATTRIBUTE_REFUSAL(name, key));
       if (!(ATTRIBUTES.has(key) || key.startsWith('data-') || key.startsWith('aria-'))) {
-        refuse(`A component's markup may not carry the attribute "${key}" on <${name}>. Allowed: class, id, role, data-*, aria-*, the form and table attributes, and the SVG drawing attributes. `
+        refuse(`A component's markup may not contain the attribute "${key}" on <${name}>. Allowed: class, id, role, data-*, aria-*, the form and table attributes, and the SVG drawing attributes. `
           + 'An event handler is the app\'s to wire, in its own script.');
       }
       // A browser reads an SVG drawing attribute (fill, stroke, …) as a style value, where an escape
       // stands for another character: `u\72 l(` is url( to it, and the address check below would
       // read past it. No value a component needs holds a backslash.
       if (value.includes('\\')) {
-        refuse(`The attribute "${key}" on <${name}> carries a backslash. A browser reads an SVG attribute such as fill as a style value, where a backslash stands for another character, so the bench could not read the value the browser uses. `
+        refuse(`The attribute "${key}" on <${name}> contains a backslash. A browser reads an SVG attribute such as fill as a style value, where a backslash stands for another character, so the bench could not read the value the browser uses. `
           + 'Write the characters themselves.');
       }
       // A browser drops whitespace and control characters inside a scheme, so they go first.
       // eslint-disable-next-line no-control-regex -- control characters are exactly what is being removed
       const address = value.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
       if (address.startsWith('javascript:') || address.startsWith('data:') || address.startsWith('vbscript:') || address.includes('url(')) {
-        refuse(`The attribute "${key}" on <${name}> may not carry an address.`);
+        refuse(`The attribute "${key}" on <${name}> may not contain an address.`);
       }
       if (key === 'class') {
         for (const cls of value.split(/\s+/).filter(Boolean)) {
           if (cls !== prefix && !cls.startsWith(prefix + '-')) {
-            refuse(`Every class in a component's markup starts with its prefix, "${prefix}" or "${prefix}-…", so it cannot collide with the page it lands in: "${cls}" does not. `
+            refuse(`Every class in a component's markup starts with its prefix, "${prefix}" or "${prefix}-…", so it cannot collide with the page that uses it: "${cls}" does not. `
               + 'The kit\'s own classes (ak-) are the kit\'s: a component that needs a kit block asks the app to mount one beside it.');
           }
         }
@@ -268,22 +268,22 @@ function checkMarkup(html: string, prefix: string): MarkupElement[] {
 
 /** At-rules that load something from an address. */
 const LOADING_AT_RULES = new Set(['import', 'font-face', 'namespace']);
-const LOADS_NOTHING = 'A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).';
+const LOADS_NOTHING = 'A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page that uses it (var(--ak-font)).';
 /**
  * Inside @scope, "&" stands for the elements its prelude chooses, which can be outside the component,
  * and the component's own classes already keep every rule inside it. So @scope is refused, with the
  * same rule written on the component's own classes.
  */
-const SCOPE_REFUSAL = (prefix: string) => 'A component\'s stylesheet carries no @scope, and a component does not need it: its own classes already keep every rule inside it. '
+const SCOPE_REFUSAL = (prefix: string) => 'A component\'s stylesheet contains no @scope, and a component does not need it: its own classes already keep every rule inside it. '
   + 'Inside @scope, "&" stands for the elements its prelude chooses, and they can be outside the component. '
   + `Write the same rule on the component's own classes: "@scope (.${prefix}) { .${prefix}-cell { … } }" is ".${prefix} .${prefix}-cell { … }", or "& .${prefix}-cell { … }" inside ".${prefix} { … }".`;
 
 /** At-rules that act on the whole page by nature, each refused with what a component does instead. */
 const PAGE_AT_RULES = new Map<string, (prefix: string) => string>([
-  ['layer', prefix => 'A component\'s stylesheet carries no @layer: the order of cascade layers belongs to the whole page, and a component\'s stylesheet reaches only the component. '
+  ['layer', prefix => 'A component\'s stylesheet contains no @layer: the order of cascade layers belongs to the whole page, and a component\'s stylesheet reaches only the component. '
     + `To lose to the page where the two disagree, write the selector inside :where(): ":where(.${prefix}-cell) { … }".`],
-  ['page', () => 'A component\'s stylesheet carries no @page: it sets how the whole page prints, and a component\'s stylesheet reaches only the component. How a page prints is the page\'s to say.'],
-  ['view-transition', () => 'A component\'s stylesheet carries no @view-transition: it sets how the whole page changes to the next one, and a component\'s stylesheet reaches only the component. '
+  ['page', () => 'A component\'s stylesheet contains no @page: it sets how the whole page prints, and a component\'s stylesheet reaches only the component. How a page prints is the page\'s to say.'],
+  ['view-transition', () => 'A component\'s stylesheet contains no @view-transition: it sets how the whole page changes to the next one, and a component\'s stylesheet reaches only the component. '
     + 'How a page changes to the next is the page\'s to say.'],
 ]);
 
@@ -317,9 +317,9 @@ const listed = (a: { name: string; within: string | null }): boolean => CONDITIO
 
 /** Why an at-rule off the list is refused: in words of its own where a component reaches for one, and with the list either way. */
 function atRuleRefusal(name: string, prefix: string): string {
-  if (FEATURE_BLOCKS.has(name)) return `A component's stylesheet carries @${name} only inside the @font-feature-values it belongs to: it ${USES_ONLY}.`;
+  if (FEATURE_BLOCKS.has(name)) return `A component's stylesheet contains @${name} only inside the @font-feature-values it belongs to: it ${USES_ONLY}.`;
   const own = LOADING_AT_RULES.has(name) ? LOADS_NOTHING : name === 'scope' ? SCOPE_REFUSAL(prefix) : PAGE_AT_RULES.get(name)?.(prefix);
-  return own ? `${own} A component's stylesheet ${USES_ONLY}.` : `A component's stylesheet carries no @${name.slice(0, 40)}: it ${USES_ONLY}.`;
+  return own ? `${own} A component's stylesheet ${USES_ONLY}.` : `A component's stylesheet contains no @${name.slice(0, 40)}: it ${USES_ONLY}.`;
 }
 
 /**
@@ -453,12 +453,12 @@ const BINDINGS = new Set(['behavior', '-ms-behavior', '-moz-binding']);
 
 function checkStyles(css: string, prefix: string, elements: ReadonlyArray<MarkupElement>): void {
   // The parser's cost grows with how deep the stylesheet nests, so it reads no more than the ceiling.
-  if (css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
+  if (css.length > COMPONENT_LIMITS.css) refuse(`A component holds its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
   // A PAGE READS THE STYLESHEET INSIDE A <style> ELEMENT, the preview's and the one an app pastes it
   // into, and the first "</style" ends that element. With no "</" at all, the text every page reads is
   // the text the bench read.
   if (css.includes('</')) {
-    refuse('A component\'s stylesheet carries no "</": the page it lands in reads "</style" as the end of the stylesheet. Inside a string, write "<\\/", which reads the same.');
+    refuse('A component\'s stylesheet contains no "</": the page that uses it reads "</style" as the end of the stylesheet. Inside a string, write "<\\/", which reads the same.');
   }
   // READ BY THE CSS PARSER (component-scan.ts readStylesheet): the at-rules, functions and addresses
   // from its tokens, every name with its escapes resolved, since `u\72 l(` is url( to a browser; the
@@ -489,12 +489,12 @@ function checkStyles(css: string, prefix: string, elements: ReadonlyArray<Markup
   const counted = summaryCounterRefusal(elements, sheet.declarations, prefix) ?? listResetRefusal(elements, sheet.declarations);
   if (counted) refuse(counted);
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
-  if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
+  if (sheet.functions.some(loads)) refuse('A component\'s stylesheet contains no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {
     refuse(`A component's stylesheet nests brackets and blocks ${sheet.depth} deep. The bench reads a stylesheet ${MAX_NESTING} deep at most, and no component needs more.`);
   }
-  if (sheet.functions.includes('expression') || sheet.declarations.some(d => BINDINGS.has(d.property))) refuse('A component\'s stylesheet carries no expression(), behavior or binding.');
-  if (sheet.declarations.some(d => d.important)) refuse('A component\'s stylesheet carries no !important: it lands inside somebody else\'s page and must lose to it where they disagree.');
+  if (sheet.functions.includes('expression') || sheet.declarations.some(d => BINDINGS.has(d.property))) refuse('A component\'s stylesheet contains no expression(), behavior or binding.');
+  if (sheet.declarations.some(d => d.important)) refuse('A component\'s stylesheet contains no !important: it goes inside somebody else\'s page and must lose to it where they disagree.');
   // POSITION IS A WORD, read one declaration at a time: `position: var(--p)` with `--p: fixed`
   // is fixed to a browser, and no reading of this text short of the cascade could tell.
   for (const d of sheet.declarations) {
@@ -508,9 +508,9 @@ function checkStyles(css: string, prefix: string, elements: ReadonlyArray<Markup
   // A literal colour cannot follow the page it lands in. Inside var(--ak-x, #fallback) it is a fallback, which is fine.
   const [literal] = sheet.declarations.flatMap(d => d.literals);
   if (literal) {
-    refuse(`A component's colours are the page's tokens, never a literal ("${literal}"): it has to wear whatever page it lands in, a Swiss poster or a night board. `
+    refuse(`A component's colours are the page's tokens, never a literal ("${literal}"): it has to match whatever page uses it, a Swiss poster or a night board. `
       + 'Use var(--ak-bg), --ak-surface, --ak-surface-2, --ak-ink, --ak-ink-dim, --ak-line, --ak-accent, --ak-accent-ink, --ak-ok, --ak-warn, --ak-err, and color-mix() of those. '
-      + 'A genre hands the kit its own values through its bridge, so these are already the genre\'s.');
+      + 'A genre gives the kit its own values through its bridge, so these are already the genre\'s.');
   }
   if (!sheet.readsPageTokens) refuse('A component\'s stylesheet reads the page\'s tokens (var(--ak-…)) at least once: one that reads none cannot follow a look, a theme or a genre.');
   // EVERY RULE STAYS INSIDE THE COMPONENT, read to the END of its selector: a rule styles what its
@@ -548,7 +548,7 @@ const MAX_DEPTH = 4;
 type SelectorEscape = 'anchor' | 'page' | 'beside' | 'reach' | 'unreadable';
 
 const SELECTOR_REFUSAL: Record<SelectorEscape, (sel: string, prefix: string) => string> = {
-  anchor: (sel, prefix) => `Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"), and a rule nested inside another may start at "&": "${sel}" does not, so it would restyle the page it lands in.`,
+  anchor: (sel, prefix) => `Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"), and a rule nested inside another may start at "&": "${sel}" does not, so it would restyle the page that uses it.`,
   page: sel => `"${sel}" names the page itself (html, body, :root, :scope, :host, "&" outside a rule, or * at the start). A component's rules stay inside the component.`,
   beside: sel => `"${sel}" reaches from the component to an element beside it. After "+" or "~" the next element is one of the component's own classes too, or the rule would restyle the page around it.`,
   reach: sel => `"${sel}" reaches out of the element it styles. :is(), :where() and :not() take plain conditions on that element, and :has() looks only down into it, never beside or above it.`,
@@ -658,8 +658,8 @@ function selectorEscape(x: ComplexSelector | null, prefix: string, nested: boole
 function benchTexts(prefix: string, html: string, css: string): void {
   if (!PREFIX_RE.test(prefix)) refuse('A component names its class prefix: 2-12 lowercase letters and digits, starting with a letter, like "wkgrid". Every class it uses starts with it.');
   if (prefix === 'ak' || prefix === 'aimeat') refuse(`"${prefix}" is the kit's prefix. Choose one of the component's own.`);
-  if (!html || html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
-  if (!css || css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
+  if (!html || html.length > COMPONENT_LIMITS.html) refuse(`A component holds its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
+  if (!css || css.length > COMPONENT_LIMITS.css) refuse(`A component holds its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
   checkStyles(css, prefix, checkMarkup(html, prefix));
 }
 
@@ -672,15 +672,15 @@ export function validateComponentBody(raw: unknown): ComponentBody {
 
   const use = str(o.use).replace(/\s+/g, ' ').trim();
   if (use.length < 20 || use.length > COMPONENT_LIMITS.use) {
-    refuse(`A component says how an app uses it, in \`use\` (20-${COMPONENT_LIMITS.use} characters): what it fills, which data- hooks carry the values, and what the app wires itself, since a component carries no script.`);
+    refuse(`A component says how an app uses it, in \`use\` (20-${COMPONENT_LIMITS.use} characters): what it fills, which data- hooks hold the values, and what the app wires itself, since a component contains no script.`);
   }
 
   const j = (o.judgement ?? {}) as Record<string, unknown>;
   const reach = str(j.reach);
   const why = str(j.why).replace(/\s+/g, ' ').trim();
   if (reach !== 'general' && reach !== 'special') {
-    refuse('A component carries YOUR judgement of it: judgement.reach is "general" (another kind of app would use this) or "special" (it belongs to this one app). '
-      + 'Be honest: a special one is still kept and listed, and a general one that nobody else wants clutters the shelf every builder reads.');
+    refuse('A component holds YOUR judgement of it: judgement.reach is "general" (another kind of app would use this) or "special" (it belongs to this one app). '
+      + 'Be honest: a special one is still kept and listed, and a general one that nobody else wants clutters the list every builder reads.');
   }
   if (why.length < COMPONENT_LIMITS.whyMin || why.length > COMPONENT_LIMITS.why) {
     refuse(`judgement.why says in a sentence (${COMPONENT_LIMITS.whyMin}-${COMPONENT_LIMITS.why} characters) which other apps would use this, or why none would.`);
@@ -698,7 +698,7 @@ export function validateComponentBody(raw: unknown): ComponentBody {
  */
 export function componentSnippet(body: ComponentBody): { html: string; css: string; use: string; prefix: string } {
   const shown = componentBench(body);
-  if (!shown.passes) return refuse(`This component no longer passes the Design Book's bench, so it is not handed out. The bench says: ${shown.why} Its proposer can propose it again as the bench asks.`);
+  if (!shown.passes) return refuse(`This component no longer passes the Design Book's bench, so it is not given out. The bench says: ${shown.why} Its proposer can propose it again as the bench asks.`);
   return { html: shown.html, css: shown.css, use: body.use, prefix: body.prefix };
 }
 

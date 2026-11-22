@@ -138,13 +138,13 @@ const TOP_OWNERS = 50;
 const ACCOUNT_SCOPED_IDS: ReadonlySet<ExposureKind> = new Set(['memory', 'file', 'app', 'knowledge', 'skill', 'portfolio']);
 
 export const EXPOSURE_NOTES: readonly string[] = [
-  'A download address made to hand out one file (a presigned link) is not counted: it ends by itself, and the person gave it to someone on purpose.',
+  'A download address made to give out one file (a presigned link) is not counted: it ends by itself, and the person gave it to someone on purpose.',
   'An app with an access code, an app an operator hid, and a workspace share behind a password are not counted: a stranger needs the code or the password as well.',
   'Sharing groups, workspace rosters and records shared into a workspace are not counted: each names the people who read.',
   'A shared workspace page is counted as an anonymous visitor would be given it. It is listed for the workspace\'s creator and for the organism\'s creator, owners and admins, because each of them can close it.',
   'An exchange offering or need stays a public record after it leaves the market; it is counted until the record is deleted.',
   `Each kind lists at most ${EXPOSURE_ITEM_CAP} items. The counts include everything found.`,
-  'Some lists are read up to a limit of the store: exchange offerings and needs (5000 each on the node) and the records of one shared workspace space (5000).',
+  'Some lists are read up to a limit of the store: exchange offerings and needs (5000 each on this server) and the records of one shared workspace space (5000).',
 ];
 
 function emptyLevels(): Record<ExposureLevel, number> {
@@ -188,7 +188,7 @@ function noteCodesFor(ctx: ExposureContext): string[] {
   return signedInOnly(ctx.config) ? ['signed-in-node', ...EXPOSURE_NOTE_CODES] : [...EXPOSURE_NOTE_CODES];
 }
 
-export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts. The one exception is an app opened to the internet, with the forms it uses: it is listed as public until its opening ends.';
+export const NODE_SIGNED_IN_NOTE = 'This server shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts. The one exception is an app opened to the internet, with the forms it uses: it is listed as public until its opening ends.';
 
 /**
  * An item as the report hands it out: the content address a source attached stays behind, and the
@@ -251,7 +251,7 @@ export function exposureUnreadable(report: { failed: readonly unknown[] }): bool
 }
 
 /** The sentence both doors answer an unreadable report with. */
-export const EXPOSURE_UNREADABLE_MESSAGE = 'None of the places your content lives could be read just now, so no report was made. Try again in a moment.';
+export const EXPOSURE_UNREADABLE_MESSAGE = 'None of the places where your content is stored could be read just now, so no report was made. Try again in a moment.';
 
 /** Conflicts first, then the widest level, then the order of KINDS, then the title. */
 function byExposure(a: ReportedItem, b: ReportedItem): number {

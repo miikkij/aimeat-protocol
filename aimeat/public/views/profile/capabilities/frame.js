@@ -75,10 +75,10 @@ export const memberSummary = (g, c) => (c.summary && c.summary !== g.summary ? c
 /** The rule an agent gets with the page's slab. English, since it is for the model. */
 export function agentRule(nodeUrl) {
   return [
-    `Capabilities on this AIMEAT node: find first with aimeat_capabilities_list (search by word; callable=true for what runs here), read one with aimeat_capabilities_get (input and output shape), then call with aimeat_capabilities_invoke by id, e.g. "ext:tinki:listings".`,
+    `Capabilities on this AIMEAT: find first with aimeat_capabilities_list (search by word; callable=true for what runs here), read one with aimeat_capabilities_get (input and output shape), then call with aimeat_capabilities_invoke by id, e.g. "ext:tinki:listings".`,
     `Without MCP: GET ${nodeUrl}/v1/capabilities and POST ${nodeUrl}/v1/capabilities/<id>/invoke.`,
     'source app-tool and offering entries are discovery only: their usage names the contract MCP tools (aimeat_exchange_offerings → aimeat_exchange_accept, then aimeat_app_tool_invoke or aimeat_exchange_work). A cortex is a browser library the app loads; it is on the Libraries page, not callable here.',
-    `The node's own tools (memory, apps, organisms, ...) are a different catalogue: aimeat_discover.`,
+    `AIMEAT's own tools (memory, apps, organisms, ...) are a different catalogue: aimeat_discover.`,
   ].join('\n');
 }
 

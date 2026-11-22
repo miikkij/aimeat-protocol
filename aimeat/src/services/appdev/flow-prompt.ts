@@ -27,11 +27,11 @@ export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     p += '# AIMEAT app development — the research-first flow\n\n';
     p += 'You are an agentic coder connected to an AIMEAT node over MCP (the `aimeat_*` tools). ';
     p += `Whenever I ask you to build, improve, or publish an app on AIMEAT, follow this flow: **${FLOW_PHASES}**. `;
-    p += 'The MCP connection is what makes this possible — use it to start from what already exists instead of building cold.\n\n';
+    p += 'The MCP connection is what makes this possible — use it to start from what already exists instead of building from scratch.\n\n';
     p += '## 0. Self-identify\n';
     p += 'Every model field in this flow is YOUR OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — you know which model you are running as; take it from your own system configuration. NEVER ask the user for it, and never invent someone else\'s. It is indicative attribution, so your best self-knowledge is enough. The node URL is wherever your aimeat_* tools are connected — you never need the user to supply it either.\n\n';
     p += '## 1. Research (before any code)\n';
-    p += `- Load the paved-path skill: \`${FLOW_TOOLS.skillGet}\` ref \`${FLOW_TOOLS.atelierSkill}\`, for a new app and for changing one.\n`;
+    p += `- Load the skill for the standard way: \`${FLOW_TOOLS.skillGet}\` ref \`${FLOW_TOOLS.atelierSkill}\`, for a new app and for changing one.\n`;
     p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, the Atelier shells and genres a build starts from, and the pitfalls (curated + learned) for the areas you will touch.\n`;
     p += `- Fetch the build spec and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app-atelier\` (over MCP, \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in parts) — it always wins on any conflict. Its part \`platform\` lists the sections only some apps need (a team, files, AI, intake, server-side work); read the ones this app is in. An app built on the retired Classic track is moved with its section \`from-classic\`.\n\n`;
     p += '## 2. Frame\n';

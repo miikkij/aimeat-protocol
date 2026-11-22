@@ -272,7 +272,7 @@ person, not to the agent and not to the model vendor, and survives the session t
 Work happens in organisms: shared spaces holding workspaces, records and documents, with membership
 and access per space. Agents and people work on the same material.
 
-What agents produce can carry a price, which is where a capability stops being a demo and becomes
+What agents produce can have a price, which is where a capability stops being a demo and becomes
 something somebody buys.
 
 The vocabulary is in the [glossary]({{BASE_URL}}/v1/glossary); the full technical account is
@@ -334,8 +334,8 @@ approve it in your portal and choose its scopes, and it claims a token. Protocol
     description: 'The AIMEAT vocabulary: GHII, GAII and GEAI identities, morsels, organisms, workspaces, skills, capabilities and the rest, defined precisely.',
     changefreq: 'monthly',
     priority: '0.6',
-    markdown: `The AIMEAT vocabulary, defined precisely. Several of the terms are near-neighbours of each other,
-and guessing wrong is quiet rather than loud.
+    markdown: `The AIMEAT vocabulary, defined precisely. Several of the terms are close in meaning to each other,
+and a wrong guess gives no warning.
 
 The full set with forms, examples and cross-references is at
 [{{BASE_URL}}/v1/glossary.md]({{BASE_URL}}/v1/glossary.md), and as JSON at
@@ -369,15 +369,15 @@ change, each with a date, a kind, a title and a body in English and Finnish.
     path: '/v1/how-an-app-builds',
     ownContent: false,
     title: 'How an app gets built here, from one sentence to a live page',
-    description: 'From a sentence to an app on the front page in four beats, with any AI chat you already have and no connector: describe it, carry the prompt to your AI, bring the file back, and it is live at its own address.',
+    description: 'From a sentence to an app on the front page in four steps, with any AI chat you already have and no connector: describe it, copy the prompt to your AI, bring the file back, and it is live at its own address.',
     changefreq: 'monthly',
     priority: '0.7',
-    markdown: `How an app gets built on this node, in four beats.
+    markdown: `How an app gets built on this node, in four steps.
 
 1. Say what you need, in your own words, and pick how it should be built (the proven templates
    and packs, or the new track with living looks).
 2. Copy the prompt this node assembles (its own build guide plus what you chose) into any AI chat:
-   Claude, ChatGPT, Gemini, any of them. The AI asks a few questions and hands back one HTML file.
+   Claude, ChatGPT, Gemini, any of them. The AI asks a few questions and returns one HTML file.
    No connector is needed for this.
 3. Bring the file back: paste the code or upload the file, making an account on the way if you
    have none. If the AI you used is connected to this node, it publishes the app for you instead.
@@ -416,7 +416,7 @@ account. Browse them at [{{BASE_URL}}/v1/app-store]({{BASE_URL}}/v1/app-store).
 An application appears in a search engine only when its owner has asked for that; the list on the
 page is the complete one either way.
 
-For a machine reading this: the catalogue is \`GET {{BASE_URL}}/v1/apps\`, and each entry carries the
+For a machine reading this: the catalogue is \`GET {{BASE_URL}}/v1/apps\`, and each entry has the
 address to open, what it stores, and what it declares about the AI inside it.
 `,
   },
@@ -429,7 +429,7 @@ address to open, what it stores, and what it declares about the AI inside it.
     priority: '0.7',
     markdown: `The people on this node who have published a portfolio of their own.
 
-Each card carries a name, the AIMEAT identifier that name resolves to, and a link to that person's
+Each card shows a name, the AIMEAT identifier that name resolves to, and a link to that person's
 page. Browse them at [{{BASE_URL}}/v1/members]({{BASE_URL}}/v1/members).
 
 A portfolio is published by its owner and by nobody else, so this list is the people who chose to
@@ -464,14 +464,14 @@ markdown and MCP surfaces.
   that layer belongs to whoever runs the model.
 - A mark can be removed by copying. The record at its own address survives that, but nothing here
   makes text tamper-proof.
-- Content made before this node started recording carries no record and will not acquire one.
+- Content made before this node started recording has no record and will not acquire one.
 - A missing record means nothing was stated. It never means a person wrote it.
 
 ## Checking a piece of content
 
 Anyone can check content this node served, byte for byte, with no account:
 \`GET {{BASE_URL}}/v1/provenance/by-hash/{sha256}\`. It works where the node served you the same
-bytes it hashed; where the node re-assembles a document on the way out, use the record id from the
+bytes it hashed; where the node re-assembles a document before sending it, use the record id from the
 response's \`Link\` header instead.
 
 ## Who runs and supervises this node
@@ -479,7 +479,7 @@ response's \`Link\` header instead.
 Stated on the node's own live statement, [{{BASE_URL}}/v1/ai-transparency.md]({{BASE_URL}}/v1/ai-transparency.md),
 which is also where the Code of Practice signatory status is answered.
 
-Reporting content that should carry a label and does not: \`POST {{BASE_URL}}/v1/flags\` with
+Reporting content that should have a label and does not: \`POST {{BASE_URL}}/v1/flags\` with
 \`reason: "undisclosed_ai"\`.
 `,
   },

@@ -185,7 +185,7 @@ export async function grownGenreStanding(
     return { page: null, why: `The owner has not said ${name} turned out well (aimeat_designbook_keep). A finished build is not that.` };
   }
   if (!live.forkable) {
-    return { page: null, why: `${name} is not open for forking. A genre hands the page's source to every builder on this node, and that is the owner's to allow: they turn it on for the app (PATCH /v1/apps/${filename} { "forkable": true }, or the app's settings). Ask them; do not decide it for them.` };
+    return { page: null, why: `${name} is not open for forking. A genre gives the page's source to every builder on this node, and that is the owner's to allow: they turn it on for the app (PATCH /v1/apps/${filename} { "forkable": true }, or the app's settings). Ask them; do not decide it for them.` };
   }
   const kept = state.version === live.versionNumber ? live : await storage.getApp(ownerGhii, filename, state.version);
   if (!kept) return { page: null, why: `Version ${state.version} of ${name}, the one its owner kept, is no longer in the catalogue.` };

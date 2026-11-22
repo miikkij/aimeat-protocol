@@ -42,7 +42,7 @@ const AGENT_FIELDS = [
 /** What the backup leaves out, said in the backup itself so a restore knows what to set again. */
 export const BACKUP_OMITTED = [
   'Owner and agent fields not on the backup\'s list: passwords, private keys and tokens are never stored in a backup.',
-  'Agent webhook URL and signing secret (a webhook URL can carry its credential in the path). Set the webhook again after a restore.',
+  'Agent webhook URL and signing secret (a webhook URL can contain its credential in the path). Set the webhook again after a restore.',
   'Agent signed card (cardJws). It is issued again when the agent enrols.',
   'Memory records that hold a credential (AI provider keys, payment provider settings, decide keys) and workspace share passwords.',
 ];

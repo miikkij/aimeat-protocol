@@ -214,7 +214,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     defaultSpeed: 1,
     fps: 24,
     fitsLooks: ['lounge', 'aurora', 'vivid'],
-    note: 'Four sines per pixel over an eighth-resolution image (about eighteen thousand pixels at a laptop size), a sine table and a 256-entry colour ramp built once per palette, then one putImageData and the upscale: the upscale IS the softness. Every pixel carries pigment, so it is a field proven at peak × alpha.',
+    note: 'Four sines per pixel over an eighth-resolution image (about eighteen thousand pixels at a laptop size), a sine table and a 256-entry colour ramp built once per palette, then one putImageData and the upscale: the upscale IS the softness. Every pixel has pigment, so it is a field proven at peak × alpha.',
   },
   {
     id: 'lava',

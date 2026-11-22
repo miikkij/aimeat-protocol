@@ -708,7 +708,7 @@ export async function resolveSecretForHeaders(deps: {
     const at = new Date().toISOString();
     for (const name of fromVault) {
       void storage.noteSecretUse(ownerGhii, name, extName, at).catch(err => {
-        logger.warn('secrets: the use stamp did not land', { name, extension: extName, error: String(err) });
+        logger.warn('secrets: the use stamp was not written', { name, extension: extName, error: String(err) });
       });
     }
   }

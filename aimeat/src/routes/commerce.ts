@@ -230,7 +230,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         provider: psp.provider ?? null,
         keyHint: pspSecretHint(psp.secretKey),
         currencies: ['EUR', 'USD'],
-        note: 'Card settlement in real currency on YOUR OWN Stripe account: you are the merchant of record and the money lands on your balance. This node never holds the key or the funds.',
+        note: 'Card settlement in real currency on YOUR OWN Stripe account: you are the merchant of record and the money goes to your balance. This node never holds the key or the funds.',
       },
       invoice: {
         // Always available: it captures nothing, so it needs no credential. Worth reporting beside

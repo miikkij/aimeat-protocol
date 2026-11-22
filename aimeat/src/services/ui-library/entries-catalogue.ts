@@ -19,7 +19,7 @@ import type { UiEntryWritten } from './types.js';
 export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
     {
         id: 'index-frame', name: 'IndexFrame', kind: 'component', status: 'active',
-        summary: 'A page with its own index beside it: the index column at the start, 250px wide, and the main column beside it at a reading width of 1180px with the poster page\'s air. Under 900px the page is one column and the index stands on top. A foot on ink as the main column\'s last part reaches to the column\'s edges.',
+        summary: 'A page with its own index beside it: the index column at the start, 250px wide, and the main column beside it at a reading width of 1180px with the poster page\'s spacing. Under 900px the page is one column and the index stands on top. A foot on ink as the main column\'s last part reaches to the column\'s edges.',
         module: '/components/IndexFrame.js', sheet: '/css/components/index-frame.css',
         data: {
             shape: 'IndexFrame({ index, label, dense, children })',
@@ -50,7 +50,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
                 glyph: 'the thing\'s own sign before the title, a step larger (an app\'s icon)',
                 onEdit: 'a quiet pencil after the title that opens the thing\'s editor; leave it out while the editor is open',
                 editLabel: 'the pencil\'s name',
-                back: '{ label, onClick }: the way back at the top of the body, a coral typewriter line under a heavy rule',
+                back: '{ label, onClick }: the back link at the top of the body, a coral typewriter line under a heavy rule',
                 link: '{ href, label, mark, title }: a pill link at the bar\'s right end that opens in a new tab',
                 tools: 'what stands at the bar\'s right end',
                 onClose: 'the close square was pressed', closeLabel: 'the close square\'s name (Close by default)',
@@ -69,7 +69,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
             { name: 'fill', prop: 'fill', class: 'overlay--fill', when: 'a framed app edge to edge, under the glass bar' },
             { name: 'glyph', prop: 'glyph', class: 'overlay-glyph', when: 'the thing has a sign of its own before its title' },
             { name: 'edit', prop: 'onEdit', class: 'overlay-edit', when: 'the owner may open the thing\'s editor from the title' },
-            { name: 'back', prop: 'back', class: 'overlay-back', when: 'the way back to the list at the top of the body' },
+            { name: 'back', prop: 'back', class: 'overlay-back', when: 'the back link to the list at the top of the body' },
             { name: 'link', prop: 'link', class: 'overlay-link', when: 'a pill link out of the layer, into a new tab' },
             { name: 'normal leading', prop: 'normalLeading', class: 'overlay--normal-leading', when: 'the layer reads at the browser\'s own line height' },
             { name: 'small words', prop: 'smallWords', class: 'overlay--small-words', when: 'the small action links read at .78rem in the body face' },
@@ -170,7 +170,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
                 ISO_NUMERIC: 'alpha-2 to numeric, as the atlas spells it (leading zeros kept)',
                 shadeStep: '1 (fewest) to 5 (most), 0 for none',
                 projectPoint: 'equirectangular, the projection the atlas was built in',
-                zoomBox: 'a 2:1 view box around a country with air, never tighter than minSpan',
+                zoomBox: 'a 2:1 view box around a country with a margin, never tighter than minSpan',
                 placesOfCountry: 'the places of one country, most counted first',
             },
         },
@@ -181,7 +181,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'data-map', name: 'DataMap', kind: 'component', status: 'active',
-        summary: 'An app\'s data map read in full: what the app is, its facts as named rows, the parts under coral capitals over the ink rule, and one row per thing it holds (the key in the typewriter face, what it holds, where at the right, the facts and the why under them). A row nobody explained carries the coral bar at its left and its missing why in coral; a map that contradicts itself opens with the contradiction in a heavy coral frame.',
+        summary: 'An app\'s data map read in full: what the app is, its facts as named rows, the parts under coral capitals over the ink rule, and one row per thing it holds (the key in the typewriter face, what it holds, where at the right, the facts and the why under them). A row nobody explained has the coral bar at its left and its missing why in coral; a map that contradicts itself opens with the contradiction in a heavy coral frame.',
         module: '/components/DataMap.js', sheet: '/css/components/data-map.css',
         data: {
             shape: 'DataMap({ map, findings, say, loading }) · dataMapState(map)',
@@ -199,7 +199,7 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
             { name: 'unexplained', prop: 'a row without why', class: 'data-map-row--unexplained', when: 'a row nobody explained: the coral bar and the missing why in coral' },
             { name: 'contradicted', prop: 'a map that contradicts itself', class: 'data-map-contradiction', when: 'the contradiction opens the map in a heavy coral frame' },
             { name: 'personal', prop: 'row.personalData="yes"', class: 'data-map-personal', when: 'a row holds something about a person' },
-            { name: 'no recall', prop: 'leaves[].recallable=false', class: 'data-map-norecall', when: 'something that leaves the house and cannot be taken back' },
+            { name: 'no recall', prop: 'leaves[].recallable=false', class: 'data-map-norecall', when: 'something that leaves this server and cannot be taken back' },
             { name: 'missing', prop: 'map=null', when: 'the app has no map yet' },
             { name: 'loading', prop: 'loading', when: 'the map is on its way' },
         ],
@@ -274,6 +274,6 @@ export const CATALOGUE_ENTRIES: UiEntryWritten[] = [
             { name: 'title reference', prop: 'titleRef', class: 'dlg-title-ref', when: 'a filename after the title' },
         ],
         example: { title: 'Versions', titleRef: 'planner.html', leading: 'normal' },
-        note: 'Came with appcat. The dialog\'s look is the dialog entry (dialog.css); dialog.css is also copied into the old app catalogue\'s page at build time, so an option only the SPA draws lives in modal.css and that build stays as it is.',
+        note: 'Came with appcat. The dialog\'s look is the dialog entry (dialog.css); dialog.css is also copied into the old app catalogue\'s page at build time, so an option only the SPA draws is in modal.css and that build stays as it is.',
     },
 ];

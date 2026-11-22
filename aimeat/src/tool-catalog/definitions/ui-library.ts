@@ -36,7 +36,7 @@ export const uiLibraryTools = [
     },
     {
         name: 'aimeat_ui_component_get',
-        description: "Read one component of this node's own web interface whole: its data shape and every field, when to use it, its variants and the class or prop that selects each, one example data set, the theme tokens its stylesheet reads, the names its module exports, the files and pages that use it, and the themes of this node that carry CSS for it (with whether that CSS is served; aimeat_theme_component_css_set changes it). `id` is the id from aimeat_ui_component_list (for example 'step-card' or 'slab') or the module's name ('StepCard').",
+        description: "Read one component of this node's own web interface whole: its data shape and every field, when to use it, its variants and the class or prop that selects each, one example data set, the theme tokens its stylesheet reads, the names its module exports, the files and pages that use it, and the themes of this node that have CSS for it (with whether that CSS is served; aimeat_theme_component_css_set changes it). `id` is the id from aimeat_ui_component_list (for example 'step-card' or 'slab') or the module's name ('StepCard').",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

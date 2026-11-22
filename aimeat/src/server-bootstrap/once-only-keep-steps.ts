@@ -176,7 +176,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   const scopeStepsBegan = new Date().toISOString();
   // Awaited, so the kept apps hold storage:read and ext:invoke before the first request (P2, P3).
   await migrateToolScopeWordsOnce(storage, config.nodeId)
-    .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }))
+    .catch(err => logger.error('Failed to move existing agents onto the 2026-10-06 tool scopes; the next boot tries again', { error: String(err) }))
     // The REST scope gates of 4.0.0 (services/rest-scope-gates-migration.ts), once per node: the one new
     // word goes to every agent and approved ecosystem app that could reach its routes. Chained after
     // the line above because both rewrite an agent's whole scope list.
@@ -194,7 +194,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
     .then(() => keepStorageReadForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
     // ext:invoke for the published apps whose AI jobs bind on_done (services/app/on-done-keep-migration.ts).
     .then(() => keepOnDoneForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
-    .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
+    .catch(err => logger.error('Failed to give the scopes of the REST scope gates to existing principals; the next boot tries again', { error: String(err) }));
   // The agents and ecosystem apps that called app tools over HTTP before that route asked exchange:write
   // keep calling them (services/app/tool-invoke-keep.ts). After the chain, which it reads and does not
   // write; awaited, so no kept caller meets the refusal first.

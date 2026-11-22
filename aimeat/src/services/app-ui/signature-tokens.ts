@@ -89,7 +89,7 @@ export function unservedFirstFamily(stack: string): string | null {
  */
 export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-accent': 'The signature colour, as a LIGHT/DARK PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, e.g. "#0e7c66/#e8564a". Both values run the full contrast matrix at validation, each against its own mode, and a pair that breaks readability anywhere refuses with the numbers. Every accent derivation (text tint, gradient, spectrum, focus ring) follows the pair.',
-  '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp hand, "18px" for a soft one.',
+  '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp look, "18px" for a soft one.',
   '--ak-radius-sm': 'Corner rounding of rows and inputs.',
   '--ak-radius-pill': 'Rounding of pills and chips.',
   '--ak-gap': 'The grid gap between blocks.',
@@ -101,10 +101,10 @@ export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-text-hero': 'The hero title size, e.g. "clamp(2.2rem, 7vw, 4.4rem)".',
   '--ak-kinetic': 'The masthead letter-throw: "letters" (each glyph arrives on the look\'s spring), "words", or "none". One kinetic headline per screen; the hero runs it, apps call nothing.',
   '--ak-tilt': 'The playful tilt of cards and tiles, e.g. "1.2deg". "0deg" is calm.',
-  '--ak-motion': 'The base transition duration, e.g. "120ms" for a snappy hand.',
-  '--ak-ease': 'The curve every transition and entrance rides, e.g. "cubic-bezier(0.34, 1.56, 0.64, 1)" for a springy overshoot, "linear" for a machine hand.',
+  '--ak-motion': 'The base transition duration, e.g. "120ms" for a snappy feel.',
+  '--ak-ease': 'The curve every transition and entrance rides, e.g. "cubic-bezier(0.34, 1.56, 0.64, 1)" for a springy overshoot, "linear" for a mechanical feel.',
   '--ak-enter-distance': 'How far content travels on entry, e.g. "0px" turns reveals off.',
-  '--ak-enter-stagger': 'The gap between one entering element and the next, e.g. "0ms" lands everything at once, "90ms" deals them like cards.',
+  '--ak-enter-stagger': 'The gap between one entering element and the next, e.g. "0ms" shows everything at once, "90ms" shows them one after another.',
   '--ak-blur': 'The glass blur of the chrome, e.g. "0px" for solid chrome.',
   '--ak-spring-stiffness': 'How hard the look\'s spring pulls toward where a thing is going, a plain number from 60 to 600: higher is snappier, 170 is the default. The tab ink, the switch, the menus, the island and every spring() read it.',
   '--ak-spring-damping': 'How quickly the spring stops swinging, a plain number from 8 to 60: with stiffness 170, 26 lands without overshoot, 20 overshoots a little, 12 bounces.',

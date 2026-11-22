@@ -336,7 +336,7 @@ export function normaliseI18n(v: unknown): PackageI18n | undefined | string {
     if (typeof v !== 'object' || Array.isArray(v)) return 'i18n is { <language code>: { title?, description?, attribution? } }, e.g. { "fi": { "title": "..." } }.';
     const out: PackageI18n = {};
     const entries = Object.entries(v as Record<string, unknown>);
-    if (entries.length > I18N_MAX_LANGS) return `i18n carries at most ${I18N_MAX_LANGS} languages.`;
+    if (entries.length > I18N_MAX_LANGS) return `i18n holds at most ${I18N_MAX_LANGS} languages.`;
     for (const [lang, words] of entries) {
         if (!I18N_LANG_RE.test(lang)) return `i18n key "${lang}" must be a two-letter language code (fi, en, es).`;
         if (!words || typeof words !== 'object' || Array.isArray(words)) return `i18n.${lang} is { title?, description?, attribution? }.`;

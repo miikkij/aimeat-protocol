@@ -62,7 +62,7 @@ export async function setBoardVisibility(
     }
     // An organisation's board is never federated: its readers are the organism's members here.
     if (boardOrganismAudience(visibility ?? board.visibility) && federate === true) {
-        return bad('A board shared with an organisation stays on this node, so it cannot be federated.');
+        return bad('A board shared with an organisation stays on this server, so it cannot be federated.');
     }
     // The board's label caps its level (plan doc-mvdipuyqraas, L3.5), before the publish gate.
     if (input.publishGate && visibility !== undefined) {

@@ -45,12 +45,12 @@ CDN. The build step is yours, on your machine, and it produces exactly that file
     node publish.mjs          publish dist/<app>.html to the node
     node verify.mjs           check that what the node serves is what you published
 
-Sources live in src/. Nothing is edited in dist/ — it is generated, and build.mjs --check is what
+Sources are in src/. Nothing is edited in dist/ — it is generated, and build.mjs --check is what
 proves it.
 
-Assets do NOT live in this repository or in the app source. Upload each one once
+Assets are NOT stored in this repository or in the app source. Upload each one once
 (aimeat_storage_upload, visibility public) and reference it as
-https://<node>/v1/pub/<your-ghii>/<key>. An inlined data URI is carried in the source forever and
+https://<node>/v1/pub/<your-ghii>/<key>. An inlined data URI stays in the source forever and
 re-uploaded on every publish.
 
 === file: app.json ===

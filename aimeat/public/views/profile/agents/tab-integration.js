@@ -623,7 +623,7 @@ function renderOnboardingView({ onboarding, agentName, handleRerun, rerunning, c
             ? tOr('profile.agents.detail.integration.readinessHintGaps',
               'Some steps have not passed yet. Run Hello Integration again once the agent can complete them.')
             : tOr('profile.agents.detail.integration.onboardingHint',
-              'Nothing is ticked yet. The agent does these steps itself, over the connection above, once it can reach this node.')}
+              'Nothing is ticked yet. The agent does these steps itself, over the connection above, once it can reach this service.')}
         <//>
         <${Actions} under>
           <${Action} small onClick=${handleRerun} disabled=${rerunning}>

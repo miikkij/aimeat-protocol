@@ -147,7 +147,7 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     VALIDATION_ERROR: 'Change what the details name for each field, then send it again.',
     INSUFFICIENT_ROLE: 'You can turn this on for your assistant in Profile → Agents.',
     DATA_AREA_DENIED: 'You can widen what this app may reach in Profile → Apps.',
-    POLICY_DENIED: 'You can change this in your settings, or ask whoever runs this node.',
+    POLICY_DENIED: 'You can change this in your settings, or ask whoever runs this server.',
     RESERVED_KEY: 'This one is managed in your own settings rather than by an assistant.',
     // Nobody is signed in
     AUTH_REQUIRED: 'Sign in and try again.',
@@ -181,22 +181,22 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     INVALID_CODE: 'Ask for a new code and try again.',
     TOO_MANY_ATTEMPTS: 'Wait a few minutes and try again.',
     // Switched off here
-    FEATURE_DISABLED: 'Ask whoever runs this node whether it can be turned on.',
-    SEALED_CONFIG: 'Ask whoever runs this node to change it. You can still see what it is set to.',
+    FEATURE_DISABLED: 'Ask whoever runs this server whether it can be turned on.',
+    SEALED_CONFIG: 'Ask whoever runs this server to change it. You can still see what it is set to.',
     EXTENSION_INACTIVE: 'Turn it on in Profile → Extensions, then try again.',
     USAGE_TERMS_REQUIRED: 'Read the terms and accept them, then this will go through.',
-    NOT_FEDERATED: 'This node does not talk to that one yet.',
+    NOT_FEDERATED: 'This server does not talk to that one yet.',
     // Ours, and somebody else's
     INTERNAL_ERROR: 'This one is on us. It is already reported, and trying again often works.',
     INTERNAL: 'This one is on us. It is already reported, and trying again often works.',
     UPDATE_FAILED: 'This one is on us. It is already reported — try again in a moment.',
     IMPORT_FAILED: 'This one is on us. It is already reported — try again in a moment.',
     ZIP_ERROR: 'This one is on us. It is already reported — try again in a moment.',
-    ENCRYPTION_NOT_CONFIGURED: 'This one is on us, and whoever runs this node has been told.',
-    FEDERATION_ERROR: 'The other node did not answer. Not your doing — try again shortly.',
-    FEDERATION_PROXY_ERROR: 'The other node did not answer. Not your doing — try again shortly.',
-    FEDERATION_UNREACHABLE: 'The other node is not reachable right now. Try again shortly.',
-    FEDERATION_AUTH_FAILED: 'The two nodes could not agree on who you are. Whoever runs them can fix it.',
+    ENCRYPTION_NOT_CONFIGURED: 'This one is on us, and whoever runs this server has been told.',
+    FEDERATION_ERROR: 'The other server did not answer. Not your doing — try again shortly.',
+    FEDERATION_PROXY_ERROR: 'The other server did not answer. Not your doing — try again shortly.',
+    FEDERATION_UNREACHABLE: 'The other server is not reachable right now. Try again shortly.',
+    FEDERATION_AUTH_FAILED: 'The two servers could not agree on who you are. Whoever runs them can fix it.',
     PROVIDER_ERROR: 'The service behind this did not answer. Not your doing — try again shortly.',
     OPENROUTER_ERROR: 'The AI service did not answer. Not your doing — try again shortly.',
     // The AI provider answered, and said no. Sending the same call again gets the same no, so none of
@@ -217,7 +217,7 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
  */
 const NEXT_STEP_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
     [/_DISABLED$|^NO_[A-Z_]+_CONFIGURED$|_NOT_CONFIGURED$|_NOT_ENABLED$|_NOT_SETUP$/,
-        'This is not switched on here. Whoever runs this node can turn it on.'],
+        'This is not switched on here. Whoever runs this server can turn it on.'],
     [/_EXPIRED$|^SESSION_/, 'Start again and you will get a fresh one.'],
     [/^ALREADY_|_ALREADY_/, 'This one is already done. Start a new one if you need to.'],
     [/_TOO_LARGE$|_TOO_LOW$|_LIMIT_EXCEEDED$|^CONTENT_TOO_|_EXCEEDED$/,

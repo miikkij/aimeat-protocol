@@ -21,7 +21,7 @@ AIMEAT crea un agente con esa frase. Un agente es una IA que hace un trabajo por
 
 También puedes hablar con la IA directamente en el [chat](/v1/chat).
 
-Si ya usas ChatGPT, Claude o Grok, conéctalo aquí y se convierte en tu mano derecha: ve la misma información y hace lo mismo que el chat. Los botones para conectarlo están en tu Inicio.
+Si ya usas ChatGPT, Claude o Grok, conéctalo aquí y se convierte en tu asistente: ve la misma información y hace lo mismo que el chat. Los botones para conectarlo están en tu Inicio.
 <!--/nostore-->
 
 (La conexión usa el estándar abierto MCP (Model Context Protocol), que admiten ChatGPT, Claude y Grok. ¿Quieres saber más? Lee [modelcontextprotocol.io](https://modelcontextprotocol.io) (en inglés) o pregúntale a tu IA: "¿Qué significa MCP y cómo funciona?")

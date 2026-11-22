@@ -50,7 +50,7 @@ const MAX_WORDS = 60;
 
 /** PUT /v1/ai-standing's body: every permission that is to be on, at most MAX_WORDS. */
 const AiStandingBodySchema = z.object({
-  scopes: z.array(z.string().trim().min(1).max(INPUT_LIMITS.name).regex(/^[a-z][a-z0-9:_-]*$/, 'a permission word, e.g. publish:public')).max(MAX_WORDS),
+  scopes: z.array(z.string().trim().min(1).max(INPUT_LIMITS.name).regex(/^[a-z][a-z0-9:_-]*$/, 'a scope, e.g. publish:public')).max(MAX_WORDS),
 }).strict();
 
 export function registerAiStandingRoutes(router: Router, config: AimeatConfig, storage: Storage): void {

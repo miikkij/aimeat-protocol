@@ -91,7 +91,7 @@ export default function NodeChangeLog() {
       <${Collapsible}
         title=${html`
           <span class="ld-log-head">
-            <span class="ld-log-label">${tr('landing.logTitle', "What's new on this node")}</span>
+            <span class="ld-log-label">${tr('landing.logTitle', "What's new on this server")}</span>
             <span class="ld-log-latest">
               <span class="ld-log-date">${fmtDate(newest.date, lang)}</span>
               <span class=${'ld-log-kind ld-log-kind-' + (newest.kind || 'notice')}>

@@ -457,7 +457,7 @@ const iam = {
       if (op === 'decline') return nodeDecline(authFetch, app, args || {});
       // The node keeps WHO is a member, not what a role permits, so the vocabulary ops belong to the
       // extension. Refusing by name beats a silent no-op that looks like it worked.
-      return Promise.resolve({ ok: false, error: `"${op}" is not a node-roster operation; the capability vocabulary lives in the app's extension` });
+      return Promise.resolve({ ok: false, error: `"${op}" is not a node-roster operation; the capability vocabulary is in the app's extension` });
     }
     return callAdmin(authFetch, state.ext, state.dialect, op, args);
   },

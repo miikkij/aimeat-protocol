@@ -148,7 +148,7 @@ function hostOf(url: string | undefined): string | null {
   try {
     return new URL(url).host;
   } catch (err) {
-    logger.warn('hooks-overview: a bound action carries something that is not an address', { error: String(err) });
+    logger.warn('hooks-overview: a bound action contains something that is not an address', { error: String(err) });
     return null;
   }
 }
@@ -266,7 +266,7 @@ export async function setHookActions(
   actions: unknown,
 ): Promise<SetHookOutcome> {
   if (!HOOK_NAMES.includes(hookName as HookName)) {
-    return { ok: false, code: 'INVALID_INPUT', message: `Unknown hook "${hookName}". The moments are: ${HOOK_NAMES.join(', ')}` };
+    return { ok: false, code: 'INVALID_INPUT', message: `Unknown hook "${hookName}". The events are: ${HOOK_NAMES.join(', ')}` };
   }
   if (!Array.isArray(actions) || !actions.every((a: unknown) => typeof a === 'string' && a.trim())) {
     return { ok: false, code: 'INVALID_INPUT', message: 'actions must be an array of action reference strings' };
@@ -279,7 +279,7 @@ export async function setHookActions(
     await storage.deleteConfigValue(`hooks.${name}`);
     return {
       ok: true, hook: name, actions: [], cleared: true, unknown: [],
-      note: 'Nothing is bound to this moment any more. It no longer calls out.',
+      note: 'Nothing is bound to this event any more. It no longer calls out.',
     };
   }
 
@@ -318,8 +318,8 @@ export async function setHookActions(
   await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
 
   const note = hookKind(name) === 'gate'
-    ? `Bound. This moment now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
-    : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
+    ? `Bound. This event now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
+    : 'Bound. This event is sent after the fact; whatever the address answers, nothing is stopped.';
 
   return { ok: true, hook: name, actions: list, cleared: false, unknown: [], note };
 }
@@ -369,7 +369,7 @@ export const HOOK_BINDINGS_SETTLED_KEY = 'migrations.hook-bindings-settled';
 
 /** Said on the Hooks page, in section 04, for each reference taken off at start. */
 const REMOVED_AT_START = 'No action published on this node answered to this reference when the node started, so it was '
-  + 'taken off this moment: a hook binds only an action that is already published. Publish the action, then bind it again.';
+  + 'taken off this event: a hook binds only an action that is already published. Publish the action, then bind it again.';
 
 /**
  * Bring the stored bindings to the form setHookActions stores: every reference names the one

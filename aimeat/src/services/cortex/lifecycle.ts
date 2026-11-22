@@ -250,7 +250,7 @@ export function missingLibsMessage(missing: string[]): string {
     const list = missing.map(f => `"${f}"`).join(', ');
     return `The manifest declares lib ${list} but no content arrived for ${missing.length === 1 ? 'it' : 'them'}. `
         + `Send each file's source under "libs", keyed by its filename: { "manifest": "...", "libs": { ${JSON.stringify(missing[0])}: "<source>" } }. `
-        + 'A key spelled "lib", or a ZIP with the file outside libs/, carries no bytes, and the app would 404 on the script.';
+        + 'A key spelled "lib", or a ZIP with the file outside libs/, contains no bytes, and the app would 404 on the script.';
 }
 
 export interface CortexInstallResult {

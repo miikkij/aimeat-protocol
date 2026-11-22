@@ -77,7 +77,7 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   if (config.federationOpenJoin) w.push('AIMEAT_FEDERATION_OPEN_JOIN=true — any peer can federate without operator approval.');
   // A node whose first data key was removed after a rotation holds its secrets under the second.
   if (!config.encryptionKey && !config.encryptionKey1) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
-  if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
+  if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil risk.');
   if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
   // The rest of the knob table in security-development-dna.md §3 (QA audit S10-05, F7d-05).
   if (config.metricsAccess === 'public') w.push('AIMEAT_METRICS_ACCESS=public — the Prometheus metrics are exposed to anyone.');

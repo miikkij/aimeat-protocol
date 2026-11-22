@@ -55,7 +55,7 @@ export function handOff(
   const now = Date.now();
   sweep(now);
   if (heldBytes() + file.bytes.length > MAX_HELD_BYTES) {
-    return { error: 'this node is handing too many files to providers at once; try again in a few minutes' };
+    return { error: 'this node is sending too many files to providers at once; try again in a few minutes' };
   }
   const token = randomBytes(32).toString('base64url');
   held.set(token, { bytes: file.bytes, mimeType: file.mimeType, expiresAt: now + HANDOFF_TTL_MS });

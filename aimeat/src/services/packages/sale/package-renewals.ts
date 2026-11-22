@@ -85,7 +85,7 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
     const { storage, config } = deps;
     const buyerGhii = `${sub.buyer}@${config.nodeId}`;
     const entry = await catalogueEntry(storage, sub.repository, sub.group_id);
-    if (!entry || entry.state === 'ended') return { result: 'skipped', detail: 'this node no longer sells it' };
+    if (!entry || entry.state === 'ended') return { result: 'skipped', detail: 'this server no longer sells it' };
     const handler = getPaymentHandler(sub.payment!.handler);
     if (!handler?.chargeSaved) return { result: 'skipped', detail: `handler ${sub.payment!.handler} cannot charge a kept card` };
     const sellerGhii = `${entry.seller_of_record}@${config.nodeId}`;
@@ -121,8 +121,8 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
                 type: 'package_renewal_failed',
                 title: `The automatic renewal of ${entry.title ?? sub.group_id} did not go through`,
                 body: overLimit
-                    ? `The agent that turned automatic renewal on may not spend this today (${reason}). The card was not charged. The updates end on ${date} unless you renew by hand or raise the agent's limit; this node tries again each day until then.`
-                    : `The card could not be charged (${reason}). The updates end on ${date} unless you renew by hand; this node tries again each day until then.`,
+                    ? `The agent that turned automatic renewal on may not spend this today (${reason}). The card was not charged. The updates end on ${date} unless you renew by hand or raise the agent's limit; this server tries again each day until then.`
+                    : `The card could not be charged (${reason}). The updates end on ${date} unless you renew by hand; this server tries again each day until then.`,
                 link: packageLink(sub.group_id),
                 i18n: { key: overLimit ? 'package_renewal_agent_limit' : 'package_renewal_failed', vars: { name: entry.title ?? sub.group_id, date } },
             });

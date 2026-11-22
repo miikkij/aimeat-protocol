@@ -64,7 +64,7 @@ export const COLLECTION_METHOD_KEY = 'collection_method';
 /** Who was at a grant, by the caller's kind (services/caller-context.ts). */
 const WHO: Record<CallerKind, string> = {
   ecosystem: 'an ecosystem app', app: 'an app', agent: 'an agent', owner: 'the person',
-  visitor: 'a visitor from another node', anonymous: 'an anonymous caller',
+  visitor: 'a visitor from another AIMEAT server', anonymous: 'an anonymous caller',
 };
 
 /**

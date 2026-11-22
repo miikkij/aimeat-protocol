@@ -468,7 +468,7 @@ export async function updateWorkspaceMeta(
   const regRec: MemoryRecord = registration.record;
   const entry = registration.entry;
   if (entry.createdBy !== callerOwner && !isAdmin) {
-    throw new WorkspaceMetaError('NOT_CREATOR', 'Only the workspace creator (or an org admin) can update it. A member adds a space with aimeat_workspace_space_add and changes the sections of a document space with aimeat_workspace_sections_set; the workspace\'s own rule decides whether that lands at once or waits for an admin to approve it.');
+    throw new WorkspaceMetaError('NOT_CREATOR', 'Only the workspace creator (or an org admin) can update it. A member adds a space with aimeat_workspace_space_add and changes the sections of a document space with aimeat_workspace_sections_set; the workspace\'s own rule decides whether that takes effect at once or waits for an admin to approve it.');
   }
 
   const meta = (await storage.listAllMemory({ prefix: `${root}.meta.`, limit: 200 })).items;

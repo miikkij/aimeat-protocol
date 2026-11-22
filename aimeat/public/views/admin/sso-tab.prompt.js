@@ -37,7 +37,7 @@ export function buildSsoPrompt({ url = '', enabled = false, count = 0 } = {}) {
   aimeat_admin_sso_list {}   every company connected, plus the two site-wide switches
 Two fields decide whether any of it does anything. \`node.enabled\` is the master switch: while it is false the SAML sign-in endpoints and the SCIM directory endpoints all answer 503, whatever a connection says. \`node.locked\` means connection management is frozen and every change below will be refused.
 
-Each company carries \`state\`, \`can_sign_in\` and \`button_showing\`. Report those rather than the tick-boxes: "configured but nobody can use it" and "live" look identical in the raw fields and are completely different situations.
+Each company has \`state\`, \`can_sign_in\` and \`button_showing\`. Report those rather than the tick-boxes: "configured but nobody can use it" and "live" look identical in the raw fields and are completely different situations.
 
 == 2. Ask me what you need ==
 Before creating anything, ask me for:
@@ -49,7 +49,7 @@ Before creating anything, ask me for:
   aimeat_admin_sso_create { id, name, domains, login_visibility }
   aimeat_admin_sso_idp_metadata { id, url | xml }    the half their Entra or Okta gives back
   aimeat_admin_sso_scim_token { id }                 shown once; minting a new one kills the old
-After the first, tell me exactly what to send the person who administers their identity provider: the Identifier and the Reply URL, in the words their console uses, and what they should hand back.
+After the first, tell me exactly what to send the person who administers their identity provider: the Identifier and the Reply URL, in the words their console uses, and what they should send back.
 
 == 4. Finish honestly ==
 Tell me which of the six steps each company is on. If \`node.enabled\` is false, say so plainly at the end: nothing you set up reaches anybody until that switch is on, it is not one of your tools, and it is on the Config page as \`sso.enabled\`. An operator who is told the setup is complete while that switch is off will find out from a colleague who could not sign in.

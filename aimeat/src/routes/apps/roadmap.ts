@@ -113,7 +113,7 @@ export function registerRoadmapRoutes(
             inside_the_build: inside,
             meaning: road
                 ? 'Done lines are this app\'s changelog. Wanted lines are what people have asked for; the owner decides which stay.'
-                : 'Nobody has written one yet. A publish that carries a `roadmap` line starts it.',
+                : 'Nobody has written one yet. A publish that has a `roadmap` line starts it.',
         }));
     });
 

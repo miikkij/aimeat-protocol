@@ -125,13 +125,13 @@ in their record \`journey.state\`, and what goes on the card. Ask one question a
 language, and say back what you heard before the next one. Publish the card when they approve it
 (\`aimeat-welcome-pages\` has the publishing).
 
-Then hand over the address on its own line and say it opens in a new tab. That moment, a link that
+Then give the address on its own line and say it opens in a new tab. That moment, a link that
 was not there ten minutes ago opening on a real page with their name and their work on it, is the
-first time this node is something they have. It is also a skeleton: everything after it is "change
+first time this node is something they have. It is also a starting point: everything after it is "change
 my card", which is a far easier thing to ask for than "build me an app".
 
 The card is published as their welcome page, the page at their address. The introduction page step on their
-home page is the same interview for an AI that cannot connect: a prompt they carry to that AI, whose
+home page is the same interview for an AI that cannot connect: a prompt they take to that AI, whose
 answer they paste back. Call what you make with them their profile or their card.
 
 If they would rather start with something else, do that, and ask about their work as you go
@@ -142,7 +142,7 @@ If they would rather start with something else, do that, and ask about their wor
 The interview told you what they do, what they need, what gets in the way, what they repeat and
 what is unclear. Offer one thing that fits, as a result rather than a feature: a shared place for
 work they share with others, an app for a need, an agent for the work they repeat, or a clear
-write-up of what is unclear. \`aimeat-activating-a-person\` carries the rest of that conversation.
+write-up of what is unclear. \`aimeat-activating-a-person\` covers the rest of that conversation.
 
 ## And, once, the AI they already pay for
 
@@ -160,7 +160,7 @@ CLI tools connect.
 Say it once and let them decide. **If they say no, or if they have no subscription**, carry on
 exactly as before — this chat works for them either way, and the node is paying for it.
 
-## After the first thing lands
+## After the first result
 
 When the first real result exists — the card is live, or the first piece of work you took over is
 done — offer exactly one next step, as an \`aimeat-choices\` block (format in
@@ -172,10 +172,10 @@ is always "Maybe later — let's keep going".
 One offer per milestone, and a milestone is offered once. Keep one memory record under the key
 \`chat.nudges\` with visibility "owner", and read it before offering; a step already marked there has
 been answered, and the conversation moves on. When they pick "Maybe later", mark the step there and
-tell them once where it lives — "the AI keys page, /v1/profile?tab=ai , whenever you want it" —
+tell them once where it is — "the AI keys page, /v1/profile?tab=ai , whenever you want it" —
 which completes the offer. The phone-install nudge belongs to the page itself; leave it to the page.
 
-## Walking someone onto their own AI
+## Connecting someone's own AI
 
 When they want to connect the AI they already pay for, start with the claude.ai connector: it
 works on the free tier and needs nothing installed. One step at a time, waiting for them between
@@ -199,7 +199,7 @@ model such as DeepSeek V4 Pro. A strong model makes the setup go right the first
 default is where it goes wrong.
 
 ChatGPT's free tier, and any app without connector support, uses the other option: their own
-OpenRouter key, on the AI keys page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` carries
+OpenRouter key, on the AI keys page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` has
 the details.
 
 ## Coming back
@@ -227,7 +227,7 @@ their agent kept working.
         visibility: 'public',
         skillMd: `---
 name: aimeat-welcome-pages
-description: Publish somebody's welcome page or their company's page on an AIMEAT node — one HTML document, one tool call, one address to hand back. Use whenever the request is a portfolio, welcome page, landing page, "my page", "our company page" or a personal site. This is NOT the app builder; going through it is the mistake this skill exists to prevent.
+description: Publish somebody's welcome page or their company's page on an AIMEAT node — one HTML document, one tool call, one address to give back. Use whenever the request is a portfolio, welcome page, landing page, "my page", "our company page" or a personal site. This is NOT the app builder; going through it is the mistake this skill exists to prevent.
 license: MIT
 metadata:
   audience: agent
@@ -266,14 +266,14 @@ aimeat_portfolio_publish({ html: "<!DOCTYPE html>…", enable: true })
 - \`html\` is the **complete document**. It replaces whatever is there now.
 - The limit is 512 KB. A page that overruns it is refused with the size, so keep images as data URIs
   only when they are small, and prefer CSS to bitmaps.
-- The answer carries two addresses: \`url\`, the page on this node, and \`standalone_url\`, the
+- The answer has two addresses: \`url\`, the page on this node, and \`standalone_url\`, the
   person's own address when the node serves one. Give them whichever the answer actually returned,
   and never an address you worked out yourself.
 - \`enable: true\` makes the page public: send it when the person approved the page and wants it
   out. Without it the page is stored and stays as public or private as it was. When the answer says
   \`served: false\` after \`enable: true\`, the person switched their page off earlier, and they
   switch it on themselves on the Portfolio page, /v1/profile?tab=portfolio .
-- When the answer carries \`publish_request\`, this node asks the person before anything goes public:
+- When the answer contains \`publish_request\`, this node asks the person before anything goes public:
   the page is stored and stays off until they approve. Tell them in one sentence and give them the
   \`approve_url\` from the answer. A company page answers the same way when its address served
   nothing before.
@@ -297,7 +297,7 @@ aimeat_company_portfolio_publish({ company_id, html })
 
 A company page is a **different page with a different address and a different owner-facing meaning**
 from the person's own. Never publish a company's content to the personal page or the other way
-round: they are separate publications and one overwrites whatever it lands on. When a person says
+round: they are separate publications and one overwrites whatever it is published to. When a person says
 "our page", "the company page" or names a company, ask which company only if \`aimeat_company_list\`
 returns more than one; with exactly one, use it and say which one you used.
 
@@ -336,7 +336,7 @@ Do not sell it twice, and do not attach it to every answer.
 - The portfolio feature can be switched off node-wide, in which case the tool is not on your surface
   at all. Say that the operator has it disabled rather than trying the storage API by hand: a file
   written into \`portfolio/index.html\` on a node that does not serve it is a page at an address that
-  answers 404, and you would be handing over an address that does not work.
+  answers 404, and you would be giving them an address that does not work.
 `,
     },
     // aimeat-activating-a-person — as published on aimeat.io, sha256 f21704b99ed1…
@@ -360,13 +360,13 @@ of, what keeps slipping, what they wish somebody else would handle. One question
 their answer decide the next one.
 
 That conversation is the product. Everything here — memory, agents, apps, workspaces, messages — is
-scaffolding for somebody's actual work, and it means something the moment it is attached to a real
+support for somebody's actual work, and it means something the moment it is attached to a real
 thing they are doing. Somebody who says "I keep losing track of what our suppliers promised" has told
 you enough to build the whole thing; somebody reading a feature list has told you nothing.
 
 **Then propose.** One concrete thing you can do right now, named as a result rather than as a
 feature: "I can keep those promises in one place and tell you when one is due — want me to start
-with the three you just mentioned?" Offer it as a fork (see \`aimeat-offering-choices\`) so it takes a
+with the three you just mentioned?" Offer it as a choice (see \`aimeat-offering-choices\`) so it takes a
 tap, and do it as soon as they say yes.
 
 ## What this place is, when you have to say it
@@ -393,10 +393,10 @@ to get a place is to make something.
 
 Two are there from the start, because they come with having an account at all:
 
-- **The mailbox.** Messages, and it is more than it sounds: their own agents, other people's agents
-  and other people all write in the same place, so work can be handed to something that is not them
+- **Messages.** It is more than it sounds: their own agents, other people's agents
+  and other people all write in the same place, so work can be given to something that is not them
   and come back finished.
-- **Their agents.** Helpers that live here and work in their name — this chat is the first one, the
+- **Their agents.** Helpers that run here and work in their name — this chat is the first one, the
   one showing them around. They can bring the AI they already pay for alongside it and have both,
   each with the same identity and the same memory.
 
@@ -423,7 +423,7 @@ groups they work with, what they sell, what they spend. Mention one at the momen
 
 When a piece of work finishes, offer the next step rather than a summary: something similar that
 could run on a schedule from now on, the same thing done for the rest of the list, or a second agent
-that takes it over entirely. One offer, in the same breath as the result, and their answer decides.
+that takes it over entirely. One offer, in the same message as the result, and their answer decides.
 `,
     },
     // aimeat-offering-choices — as published on aimeat.io, sha256 4fd76b541293…
@@ -432,7 +432,7 @@ that takes it over entirely. One offer, in the same breath as the result, and th
         visibility: 'public',
         skillMd: `---
 name: aimeat-offering-choices
-description: How to offer a person a fork in the AIMEAT chat — a fenced aimeat-choices block whose lines the page draws as buttons, with the box still open underneath. Use when a request is ambiguous, when there is a real decision to make, or when a finished piece of work has an obvious next step.
+description: How to offer a person a choice in the AIMEAT chat — a fenced aimeat-choices block whose lines the page draws as buttons, with the box still open underneath. Use when a request is ambiguous, when there is a real decision to make, or when a finished piece of work has an obvious next step.
 license: MIT
 metadata:
   audience: agent
@@ -440,7 +440,7 @@ metadata:
 
 # Offering choices
 
-When there is a fork, name it. End your answer with a fenced block, one option per line:
+When there is a choice, name it. End your answer with a fenced block, one option per line:
 
 \`\`\`\`
 \`\`\`aimeat-choices
@@ -548,7 +548,7 @@ was asked again was still a call the provider billed, so it is counted against t
 
 **One step can come before all three: a key for a single agent.** The owner may give one agent a key
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls
-first, a daily cap can sit beside it, and no key is ever shown to the agent: for an agent that makes
+first, a daily cap can be set beside it, and no key is ever shown to the agent: for an agent that makes
 its own calls on the owner's computer, the owner gives the NAME of the environment variable instead.
 Whatever key pays, an agent's call is paid from its OWNER's account: it counts against the owner's
 daily budget and allowance, under the agent's name, and the three steps above are then the owner's.
@@ -561,7 +561,7 @@ step 2 does not exist for that operation: the person's own key (or their agent's
 key the answer is \`NO_API_KEY\`. There is no free model for either, so a spent allowance is a
 refusal (\`QUOTA_EXHAUSTED\`), not a weaker answer.
 
-Step 3 is the one to be honest about. The response carries \`degradedToFreeModel: true\` when it
+Step 3 is the one to be honest about. The response contains \`degradedToFreeModel: true\` when it
 happens, and a person whose answers quietly got worse and was never told will conclude the system
 broke. **Say it in one line when it applies** — "your allowance here is used up, so this came from a
 free model" — and then offer the two options below. Do not warn about it before it happens; a number
@@ -575,7 +575,7 @@ Two things this does NOT cover, and you should not imply otherwise:
   allowance neither stops it nor changes its model. \`GET /v1/chat/status\` says which (\`pays\`).
 - **A person's own OpenRouter account running out of credit is their account's business.** The node
   cannot see the balance. When OpenRouter refuses a call for it (402), a text call that named no
-  model is tried once more on the free router with the same key, and the answer carries
+  model is tried once more on the free router with the same key, and the answer contains
   \`degradedToFreeModel: true\` like step 3: say so in one line, and that topping up their
   OpenRouter credit is what brings their chosen model back. Any other provider's refusal surfaces as
   that provider's error.
@@ -624,7 +624,7 @@ MCP, with their identity and their memory on this node:
 - In a chat app, the claude.ai connector needs nothing installed — the walkthrough is in
   \`aimeat-first-conversation\`.
 - \`npx aimeat connect\` on their machine writes the configuration for CLI tools.
-- **Profile › Agents** carries the copy-paste instructions per platform.
+- **Profile › Agents** has the copy-paste instructions per platform.
 - Nothing extra is charged on either side: they are already paying for the subscription, and the
   node's key is left for people who have not brought one.
 
@@ -649,7 +649,7 @@ answer too.
         visibility: 'public',
         skillMd: `---
 name: aimeat-mail-to-data
-description: Bring a person's own mail into their node and turn it into something they can use. Covers connecting the mailbox, the search that finds the messages worth reading, decoding a message that arrives as base64url MIME, fetching attachments by reference, and where the result belongs. The paved path for "read my invoices out of my email" and everything shaped like it.
+description: Bring a person's own mail into their node and turn it into something they can use. Covers connecting the mailbox, the search that finds the messages worth reading, decoding a message that arrives as base64url MIME, fetching attachments by reference, and where the result belongs. The standard method for "read my invoices out of my email" and everything shaped like it.
 license: MIT
 metadata:
   audience: agent
@@ -658,7 +658,7 @@ metadata:
 # Mail into data
 
 Mail is the connector everybody already has. People forward themselves invoices, bookings, meter
-readings and receipts, and it sits in a mailbox no tool of theirs can see. This is how it reaches
+readings and receipts, and it is in a mailbox no tool of theirs can see. This is how it reaches
 their own node.
 
 ## Connect the mailbox first, once
@@ -727,7 +727,7 @@ This is the part that surprises people. A message is a tree of parts, and the te
   saying the same thing, and the plain one is already what you want.
 - Decode base64url, which is NOT base64: \`-\` for \`+\`, \`_\` for \`/\`, and the padding is often missing.
 
-An attachment part carries \`body.attachmentId\` rather than bytes. Fetch it with
+An attachment part has \`body.attachmentId\` rather than bytes. Fetch it with
 \`aimeat_mail_read\` again, passing \`attachment_id\` beside the \`message_id\` — that is the same
 tool, and the attachment comes back instead of the message. Fetch it only when you need it: that is
 a real download against the person's own rate limit, and most of the time the answer is in the
@@ -736,7 +736,7 @@ text.
 ## Then it is a table
 
 Once you have the fields, everything downstream is the same job reading numbers out of photographs
-is, and it goes through \`aimeat_datapackage_publish\`. Four rules carry it:
+is, and it goes through \`aimeat_datapackage_publish\`. Four rules apply:
 
 - **One growing package per subject**, by default. Not one per batch, and not one per month.
 - **A resource is the WHOLE table, not an append.** Publishing today's rows on their own REPLACES
@@ -751,7 +751,7 @@ Two things specific to mail:
 
 - **Keep the message id in a column.** Same reason a photograph keeps its address: a total nobody can
   trace back to the message it came from is a claim, and the person will want to check one.
-- **Store a PDF attachment instead of carrying its bytes.** \`aimeat_mail_read\` with \`attachment_id\`
+- **Store a PDF attachment instead of passing its bytes along.** \`aimeat_mail_read\` with \`attachment_id\`
   and \`store: true\` (plus \`filename\` and \`mime_type\` from the message parts) writes it to your
   private storage up to the node's per-file limit and answers its key. One answer without \`store\` is
   capped at about 3 MB of attachment. Do not transcribe a PDF by eye.
@@ -769,7 +769,7 @@ Two things specific to mail:
   or label, which is also the reason they could approve it without thinking hard. Sending is a
   SEPARATE connection they approve separately — \`google-mail-send\`, and then
   \`aimeat_mail_send\` — so if they ask for it, say that rather than that it cannot be done. Never
-  fold the two into one request: reading somebody's mail and writing in their name are different
+  combine the two into one request: reading somebody's mail and writing in their name are different
   consent, and neither implies the other.
 
 ## Say it in their words

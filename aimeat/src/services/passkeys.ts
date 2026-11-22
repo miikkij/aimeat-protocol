@@ -110,7 +110,7 @@ function expectedOrigins(config: AimeatConfig): string[] {
 
 function disabled(config: AimeatConfig): PasskeyResult<never> | null {
   if (config.passkeyEnabled) return null;
-  return { ok: false, status: 503, code: 'FEATURE_DISABLED', message: 'Passkeys are not enabled on this node.' };
+  return { ok: false, status: 503, code: 'FEATURE_DISABLED', message: 'Passkeys are not enabled on this server.' };
 }
 
 /**
@@ -487,7 +487,7 @@ export async function finishSigning(
   // eslint-disable-next-line aimeat/no-silent-catch -- unreadable client data leaves the origin empty, which the next line refuses as PASSKEY_INVALID
   } catch { /* refused below */ }
   if (!passkeyOriginAllowed(config, origin)) {
-    return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: 'That answer came from a page this node does not serve.' };
+    return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: 'That answer came from a page this server does not serve.' };
   }
   let verification;
   try {

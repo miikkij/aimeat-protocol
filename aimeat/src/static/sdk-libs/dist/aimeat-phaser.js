@@ -437,7 +437,7 @@
       };
       tag.onerror = function() {
         phaserPromise = null;
-        fail(new Error("The game engine could not be loaded from " + src + ". This node serves it; check that the address is reachable from where the page is running."));
+        fail(new Error("The game engine could not be loaded from " + src + ". This server serves it; check that the address is reachable from where the page is running."));
       };
       document.head.appendChild(tag);
     });
@@ -789,7 +789,7 @@
   function address(url, base, id, key) {
     if (typeof url !== "string" || !url.trim()) return null;
     if (url.slice(0, 5).toLowerCase() === "data:") {
-      console.warn('[aimeat-phaser] pack "' + id + '" entry "' + key + '" is a data: URI and was dropped. Serve the file (/v1/pub/<owner>/… or storage) and give the pack its address: a base64 blob is carried in the page on every single load.');
+      console.warn('[aimeat-phaser] pack "' + id + '" entry "' + key + '" is a data: URI and was dropped. Serve the file (/v1/pub/<owner>/… or storage) and give the pack its address: a base64 blob is sent inside the page on every single load.');
       return null;
     }
     return new URL(url, base).href;
@@ -859,7 +859,7 @@
   }
   function fromLibrary(lib) {
     if (!lib || typeof lib.toPack !== "function") {
-      throw new Error("fromLibrary() takes an aimeat-assets library: the object with toPack(), url() and t() that AIMEAT.assets.library({ app }) hands back. Await it first, or pass the promise straight to preloadPack(), which waits for it.");
+      throw new Error("fromLibrary() takes an aimeat-assets library: the object with toPack(), url() and t() that AIMEAT.assets.library({ app }) returns. Await it first, or pass the promise straight to preloadPack(), which waits for it.");
     }
     return pack(lib.toPack());
   }
@@ -3698,7 +3698,7 @@
     function copyAsJs() {
       const clip = navigator.clipboard;
       if (!clip || typeof clip.writeText !== "function") {
-        say("This browser keeps the clipboard closed. The rows are in the text box below.");
+        say("This browser blocks the clipboard. The rows are in the text box below.");
         return;
       }
       clip.writeText(asJs()).then(function() {

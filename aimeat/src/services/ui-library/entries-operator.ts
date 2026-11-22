@@ -104,7 +104,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 children: 'the page',
             },
         },
-        useFor: ['Every admin page: it carries the menu, the page\'s title and the way to read the data again.'],
+        useFor: ['Every admin page: it holds the menu, the page\'s title and the way to read the data again.'],
         variants: [
             { name: 'open', prop: 'menu + children', when: 'an operator is signed in and a page is open' },
             { name: 'reading', prop: 'refreshing', when: 'the data is being read again' },
@@ -245,7 +245,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'status-page-preview', name: 'StatusPagePreview', kind: 'component', status: 'active',
-        summary: 'The page a node serves in its own place (the 503 of maintenance), drawn small as a visitor gets it: the status line and the content type in typewriter letters on top, then the node\'s name, the headline in the poster face, the line the operator wrote and the line under it. Over it its row label, or while the page is live the coral "live" mark with its square; a grey hint under it.',
+        summary: 'The page a node serves in place of its pages (the 503 of maintenance), drawn small as a visitor gets it: the status line and the content type in typewriter letters on top, then the node\'s name, the headline in the poster face, the line the operator wrote and the line under it. Over it its row label, or while the page is live the coral "live" mark with its square; a grey hint under it.',
         module: '/components/StatusPagePreview.js', sheet: '/css/components/status-page-preview.css',
         data: {
             shape: 'StatusPagePreview({ status, type, node, head, message, sub, label, live, hint })',
@@ -266,7 +266,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'search-preview', name: 'SearchPreview', kind: 'component', status: 'active',
-        summary: 'How a site shows up elsewhere, drawn from what it serves: a search engine\'s result (the address in typewriter letters, the name as the coral link line, the sentence in grey) and the card a shared link unfolds into (the picture, or a dark place that says there is none, then the name, the sentence and the host). Each has its row label over it. The search card is the app catalogue\'s own preview of one app: the coral name, the sentence and the picture in one thin rounded frame, with no label.',
+        summary: 'How a site shows up elsewhere, drawn from what it serves: a search engine\'s result (the address in typewriter letters, the name as the coral link line, the sentence in grey) and the card a shared link is shown as (the picture, or a dark area that says there is none, then the name, the sentence and the host). Each has its row label over it. The search card is the app catalogue\'s own preview of one app: the coral name, the sentence and the picture in one thin rounded frame, with no label.',
         module: '/components/SearchPreview.js', sheet: '/css/components/search-preview.css',
         data: {
             shape: 'SearchResult({ label, url, title, desc }) · ShareCard({ label, image, noImage, title, desc, host }) · SearchCard({ image, noImage, title, desc })',
@@ -274,7 +274,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 label: 'SearchResult and ShareCard: the row label over the preview',
                 url: 'SearchResult: the address line', title: 'the site\'s or the app\'s name', desc: 'the site\'s or the app\'s sentence',
                 image: 'ShareCard and SearchCard: the picture\'s address',
-                noImage: 'ShareCard: the words in the dark place when there is no picture; SearchCard: the words in a dashed box when there is none yet',
+                noImage: 'ShareCard: the words in the dark area when there is no picture; SearchCard: the words in a dashed box when there is none yet',
                 host: 'ShareCard: the host under the words',
             },
         },
@@ -282,7 +282,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
             'An opened app in the app catalogue: what a search engine will show of that app (SearchCard).'],
         variants: [
             { name: 'search result', prop: 'SearchResult', when: 'how a search engine lists the site' },
-            { name: 'share card', class: 'search-preview--card', prop: 'ShareCard', when: 'how a shared link unfolds' },
+            { name: 'share card', class: 'search-preview--card', prop: 'ShareCard', when: 'how a shared link is shown' },
             { name: 'no picture', class: 'search-preview-img--none', prop: 'ShareCard without image', when: 'the site serves no share picture' },
             { name: 'search card', class: 'search-card', prop: 'SearchCard', when: 'one app as a search engine will show it: a thin grey rounded frame, the name in coral, the sentence in grey, the picture under them with rounded corners' },
             { name: 'search card, no picture yet', class: 'search-card-none', prop: 'SearchCard without image', when: 'the app has no picture yet: a dashed rounded box with grey words in the picture\'s place' },
@@ -406,7 +406,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['Where the refusals or the packages come from: counts per endpoint, per address, per author, read at a glance and pressed to narrow a list.'],
         variants: [
-            { name: 'hot', class: 'count-bars-bar--hot', prop: 'hot', when: 'a key the page names hot (an address the tarpit walled)' },
+            { name: 'hot', class: 'count-bars-bar--hot', prop: 'hot', when: 'a key the page names hot (an address the tarpit blocked)' },
             { name: 'warn', class: 'count-bars-bar--warn', prop: 'rows[].tone="warn"', when: 'a key the page cannot vouch for' },
             { name: 'words', class: 'count-bars-row--words', prop: 'words', when: 'the keys are words, and there is no bar' },
             { name: 'wide', class: 'count-bars--wide', prop: 'wide', when: 'a grouping that takes the section\'s width, with its title and why line' },
@@ -435,7 +435,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 items: 'PrintList: [{ key, text, help }], the help on its own line in grey; PrintToc: [{ id, num, label, note }], one linked line per part',
             },
         },
-        useFor: ['A register or a report an operator hands over on paper or as a PDF, printed from the page that edits it.'],
+        useFor: ['A register or a report an operator delivers on paper or as a PDF, printed from the page that edits it.'],
         variants: [
             { name: 'on screen', class: 'print-screen-only', prop: 'ScreenOnly', when: 'the working page, left out on paper' },
             { name: 'on paper', class: 'print-only', prop: 'PrintOnly', when: 'the document, hidden on screen' },
@@ -481,14 +481,14 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'shots', name: 'Shots', kind: 'component', status: 'active',
-        summary: 'Pictures of pages side by side, each with its caption: a page\'s screenshot in the Object box\'s frame, cut to its top, with a bold caption and a typewriter line under it; where a page has no picture, a grey place that says so. Two to a row, one on a narrow screen.',
+        summary: 'Pictures of pages side by side, each with its caption: a page\'s screenshot in the Object box\'s frame, cut to its top, with a bold caption and a typewriter line under it; where a page has no picture, a grey area that says so. Two to a row, one on a narrow screen.',
         module: '/components/Shots.js', sheet: '/css/components/shots.css',
         data: {
             shape: 'Shots({ items })',
             fields: {
                 items: '[{ key, src, alt, none, caption, sub }]; a falsy item is left out',
                 src: 'the picture\'s address, loaded lazily', alt: 'the picture\'s words for a screen reader',
-                none: 'the words in the grey place when there is no picture',
+                none: 'the words in the grey area when there is no picture',
                 caption: 'the words under the picture (what it is)', sub: 'the typewriter line under them (whose page it is)',
             },
         },

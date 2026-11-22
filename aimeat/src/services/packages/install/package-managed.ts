@@ -120,7 +120,7 @@ export async function managedChangeRefusal(
         code: 'MANAGED_BY_PACKAGE',
         message: `This ${NOUN[type]} is part of the managed install "${lock.label}" of package ${lock.packageGroupId}, `
             + `so its ${what} comes from the package and changes only when the package updates. `
-            + 'Its settings (name, description, access code, parking, search visibility, legal texts) are yours to change. '
+            + 'Its settings (name, description, access code, listing, search visibility, legal texts) are yours to change. '
             + `To change the ${what} yourself, fork the install: POST /v1/instances/${lock.instanceId}/fork, `
             + 'or the aimeat_package_fork MCP tool. A fork keeps every address and every record, and it receives no further updates.',
         details: {

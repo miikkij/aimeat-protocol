@@ -259,7 +259,7 @@ async function enable(session) {
   } catch (err) {
     return refuse('NODE_UNREACHABLE', 'Could not reach the node to read its notification key: ' + say(err));
   }
-  if (!keyRes || keyRes.ok !== true) return nodeRefusal(keyRes, 'The node would not hand out its notification key.');
+  if (!keyRes || keyRes.ok !== true) return nodeRefusal(keyRes, 'The node would not give out its notification key.');
   const vapidKey = keyRes.data ? keyRes.data.vapidPublicKey : null;
   if (typeof vapidKey !== 'string' || !vapidKey) {
     return refuse('PUSH_DISABLED', 'This node has push notifications switched off. Its operator has to configure the VAPID keys.');

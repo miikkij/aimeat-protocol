@@ -79,7 +79,7 @@ export async function scheduleActor(
   }
   const maker = makerOf(job);
   if (maker === 'unknown-app') {
-    return { ok: false, reason: 'An app made this schedule before 2026-10-05, and the node cannot tell which app, so it no longer runs with your whole authority. Open the app to make it again, or delete this schedule.' };
+    return { ok: false, reason: 'An app made this schedule before 2026-10-05, and the server cannot tell which app, so it no longer runs with your whole authority. Open the app to make it again, or delete this schedule.' };
   }
   if (maker.kind === 'owner') return { ok: true, principal: owner, roles: ['owner'], scopes: ['*'], isOwner: true, ai: { ...OWNER_CALLER } };
 

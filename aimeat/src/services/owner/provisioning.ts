@@ -177,7 +177,7 @@ export async function ownerRegistrationRefusal(
   const result = await executeHooks(config, storage, 'pre_owner_registration',
     { name: ctx.name, display_name: ctx.displayName, via: ctx.via });
   if (result.allowed) return null;
-  return result.reason ?? 'An extension on this node refused the registration.';
+  return result.reason ?? 'An extension on this server refused the registration.';
 }
 
 /** Tell the extensions bound to post_owner_registration that the account exists. Fire-and-forget. */
@@ -202,13 +202,13 @@ export function announceOwnerRegistered(
  */
 export function registrationRefusal(config: AimeatConfig, via: RegistrationVia): string | null {
   const mode = config.registrationMode;
-  if (mode === 'closed') return 'This node does not accept new accounts.';
+  if (mode === 'closed') return 'This server does not accept new accounts.';
   if (via === 'provisioning') return null;  // the operator configured the connection; only `closed` refuses
   if (mode === 'invite' && via !== 'invitation') {
-    return 'This node creates new accounts by invitation only. Ask a member of this node to send you an invitation.';
+    return 'This server creates new accounts by invitation only. Ask a member of this server to send you an invitation.';
   }
   if (mode === 'oauth' && via === 'direct') {
-    return 'This node creates new accounts by signing in with an approved identity provider, or by invitation. Registering with a username and password is not available here.';
+    return 'This server creates new accounts by signing in with an approved identity provider, or by invitation. Registering with a username and password is not available here.';
   }
   return null;
 }

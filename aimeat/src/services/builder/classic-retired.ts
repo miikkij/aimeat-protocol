@@ -33,7 +33,7 @@ import { ATELIER_PLATFORM } from './atelier-platform.js';
 
 /** The first thing every retired address says. */
 export const CLASSIC_RETIRED_NOTICE = '## This address now serves the Atelier specification\n'
-  + 'The Classic build specification that lived here was retired on 2026-11-19, with its T1/T2/T3 shells. '
+  + 'The Classic build specification that was served here was retired on 2026-11-19, with its T1/T2/T3 shells. '
   + 'What follows is the Atelier specification, the one guide every app on this node is built and changed with. '
   + 'Connected over MCP, read it in parts instead: `aimeat_handbook_get { tier: "build-app-atelier" }`. '
   + 'An app that was built on the Classic track is moved with its section `from-classic`.\n\n';

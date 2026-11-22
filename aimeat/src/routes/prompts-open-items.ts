@@ -60,7 +60,7 @@ export function registerOpenItemsPrompt(
       id: 'open-items',
       name: 'Your open items',
       description: 'Copy this into your own AI chat to go through what you are going to do here. '
-        + 'It does not carry the items; it tells your AI where to read them, so what it sees is '
+        + 'It does not contain the items; it tells your AI where to read them, so what it sees is '
         + 'what is on the list right now.',
       lang,
       prompt,
@@ -109,7 +109,7 @@ export function registerOpenItemsPrompt(
         : null,
     }, [
       { description: 'Paste the answer here', method: 'POST', url: '/v1/home/welcome-mat' },
-      { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
+      { description: 'The current state of your home', method: 'GET', url: '/v1/home/state' },
     ]));
   });
 

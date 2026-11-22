@@ -155,7 +155,7 @@ export default function ConnectStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b3Title1', 'Prove it')}</span><span class="ld-sh-accent">${tr('connectStory.b3Title2', 'with one prompt')}</span></h2>
-          <p class="ld-sh-text">${tr('connectStory.b3Text', 'A connection that looks fine and is not there fails quietly: the AI keeps answering and nothing errors. So the path hands you one prompt, you paste it into your chat, and one button here shows the answer. When it lands, you are in.')}</p>
+          <p class="ld-sh-text">${tr('connectStory.b3Text', 'A connection that looks fine and is not there fails quietly: the AI keeps answering and nothing errors. So the guided path gives you one prompt, you paste it into your chat, and one button here shows the answer. When the answer arrives, your AI is connected.')}</p>
           <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('connectStory.b3WhyLabel', 'Why this step exists:')}</span> ${tr('connectStory.b3Why', 'because with a silent failure you would build on a connection that is not there. Two minutes now, and you never wonder again.')}</div>
         </div>
         <img class="bs-picture bs-picture--ink" src="/img/connect-story/beat3-prove.jpg" width="1200" height="900" loading="lazy"

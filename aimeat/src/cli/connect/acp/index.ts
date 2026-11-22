@@ -50,7 +50,7 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
       // <cwd>/.aimeat, so this fires when somebody runs the command from the wrong checkout —
       // which is what happened the first time it was tried, with fifty agents one directory away.
       note(`Agent "${flags.agent}" is not in the connector home at ${getConfigDir()}.`);
-      note('Agents live in <this directory>/.aimeat. Change to the directory they were enrolled in,');
+      note('Agents are stored in <this directory>/.aimeat. Change to the directory they were enrolled in,');
       note('or set AIMEAT_HOME to it. `aimeat connect list` there shows what is available.');
       process.exit(1);
     }

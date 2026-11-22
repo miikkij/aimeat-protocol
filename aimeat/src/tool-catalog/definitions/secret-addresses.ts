@@ -23,7 +23,7 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const secretAddressTools = [
     {
         name: 'aimeat_secret_host_set',
-        description: "Give one secret in your owner's vault its address (host), without the value, when it has none yet. With an address, the secret goes only there, through any extension, from its next call on. Use it when an extension's call was refused because the secret had no address yet: set the address the extension needs, and the call works. Changing or removing an address the secret already has is the owner's own decision, signed in on the Access page: this tool answers IN_PERSON_ONLY for it, and an empty host (remove) too. Needs secrets:manage, which no wildcard carries.",
+        description: "Give one secret in your owner's secret store its address (host), without the value, when it has none yet. With an address, the secret goes only there, through any extension, from its next call on. Use it when an extension's call was refused because the secret had no address yet: set the address the extension needs, and the call works. Changing or removing an address the secret already has is the owner's own decision, signed in on the Access page: this tool answers IN_PERSON_ONLY for it, and an empty host (remove) too. Needs secrets:manage, which no wildcard includes.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set a Secret\'s Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -36,7 +36,7 @@ export const secretAddressTools = [
     },
     {
         name: 'aimeat_secret_approval_withdraw',
-        description: "Withdraw an approval your owner gave an extension to send one of their secrets to a host, or drop a request still waiting for an answer. aimeat_secret_list shows each secret's approvals (extension, installer, host, approvedAt; an entry without approvedAt is waiting). After this, that extension's next call to that host is refused and asks the owner again. Needs secrets:manage, which no wildcard carries.",
+        description: "Withdraw an approval your owner gave an extension to send one of their secrets to a host, or drop a request still waiting for an answer. aimeat_secret_list shows each secret's approvals (extension, installer, host, approvedAt; an entry without approvedAt is waiting). After this, that extension's next call to that host is refused and asks the owner again. Needs secrets:manage, which no wildcard includes.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Withdraw a Secret Approval', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -51,7 +51,7 @@ export const secretAddressTools = [
     },
     {
         name: 'aimeat_secret_host_ask',
-        description: "Your owner's setting \"Ask me before my secret is sent to a new address for the first time\". While it is on (the default), when code you or another of their agents wrote, or an address such an agent set, would send one of their stored secrets to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. While it is off, it is sent and the address is kept. Without `on`: the setting, whether the owner chose it, and the node's default. With `on: true`: switched on at once. With `on: false`: switched off at once if you hold secrets:manage; otherwise your owner is asked, the answer carries approval_request (give them its approve_url), and it stays on until they allow it. Change it only when your owner asks.",
+        description: "Your owner's setting \"Ask me before my secret is sent to a new address for the first time\". While it is on (the default), when code you or another of their agents wrote, or an address such an agent set, would send one of their stored secrets to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. While it is off, it is sent and the address is kept. Without `on`: the setting, whether the owner chose it, and the node's default. With `on: true`: switched on at once. With `on: false`: switched off at once if you hold secrets:manage; otherwise your owner is asked, the answer contains approval_request (give them its approve_url), and it stays on until they allow it. Change it only when your owner asks.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Ask Before a Secret Goes Somewhere New', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
