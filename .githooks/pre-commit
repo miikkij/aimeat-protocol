@@ -23,7 +23,7 @@
 # CI runs all of it after every push, so nothing is skipped; it is moved to where waiting for it
 # costs nobody an afternoon. CI blocks no push (work goes straight to main): its red run is printed
 # by the session-start hook, `pnpm gate` and the pre-push hook (QA audit 2026-10-16, P8-01). A
-# session says "done" only after `pnpm gate` is green (CLAUDE.md, "Git, sessions and the floor"); a person can push a text
+# session says "done" only after `pnpm gate` is green (CLAUDE.md, "Git, sessions and coordination"); a person can push a text
 # change and go on with their day.
 #
 # The pre-push hook keeps what a push must not do to other sessions (the list is in
