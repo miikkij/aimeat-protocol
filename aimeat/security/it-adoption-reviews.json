@@ -106,14 +106,14 @@
       "digest": "sha256:02d35fba7ef7594bbbe1d9f2"
     },
     "08-threat-model.md": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-22",
       "watches": [
         "docs/security/threat-model.md",
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/services/content/risk-core.ts",
         "aimeat/src/services/content/risk-read.ts"
       ],
-      "digest": "sha256:9e019437643159611440a06a"
+      "digest": "sha256:10334800f50460b1bf5c2adc"
     },
     "09-hardening-guide.md": {
       "reviewedOn": "2026-11-19",
@@ -371,7 +371,7 @@
     "08-threat-model.md": {
       "docs/security/threat-model.md": "10cf3cf1952417f9",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
-      "aimeat/src/services/content/risk-core.ts": "f38a7bed617ab7f1",
+      "aimeat/src/services/content/risk-core.ts": "ba8e62f541b1f519",
       "aimeat/src/services/content/risk-read.ts": "5b32b030fe04164c"
     },
     "09-hardening-guide.md": {
