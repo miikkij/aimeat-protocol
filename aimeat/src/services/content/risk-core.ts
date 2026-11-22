@@ -27,6 +27,9 @@
  *   behaviourAt · placeOf · markText
  * @usage const marks = await markText(deps, { subject, text, point: 'intake', writer });
  * @version-history
+ *   v1.2.1 — 2026-11-22 — A read never overwrites a kept entry of the same words (a read queued before the
+ *     shared-write point ran replaced its writer and point, seen as a flaky e2e-content-risk on
+ *     Postgres); a re-mark of the same words keeps the entry's writer.
  *   v1.2.0 — 2026-11-22 — emitRiskChange: a kept mark sends the live change `contentclass` to the people
  *     who decide it, so the Data Wallet's marked-content section reads again; placeOf is exported; the
  *     notice links to that section (#dw-risk).
@@ -232,6 +235,12 @@ export async function markText(deps: Deps, input: MarkInput): Promise<RiskMarks 
   const behaviour = behaviourAt(r, input.point);
   if (behaviour === 'off' || !r.kinds.length) return null;
   const hash = input.hash ?? hashText(input.text);
+  // A read keeps marks only for words nothing marked yet: a read queued before the intake or
+  // shared-write point ran must not overwrite that point's entry (its writer, its point, its hold).
+  if (input.point === 'read') {
+    const kept = await getRiskMarks(deps, input.subject);
+    if (kept && kept.contentHash === hash) return kept;
+  }
   const found = detectRiskRules(input.text, r.kinds);
   const marks = [...found.marks];
   let model: string | undefined;
@@ -272,7 +281,9 @@ export async function markText(deps: Deps, input: MarkInput): Promise<RiskMarks 
     v: 1, contentHash: hash, detect: r.detect, point: input.point, at: now, marks, kinds: r.kinds,
     ...(found.truncatedAt ? { truncatedAt: found.truncatedAt } : {}),
     ...(model ? { model } : {}), ...(modelSkipped ? { modelSkipped } : {}),
-    ...(hold ? { hold } : {}), ...(accepted ? { accepted } : {}), ...(input.writer ? { writtenBy: input.writer } : {}),
+    ...(hold ? { hold } : {}), ...(accepted ? { accepted } : {}),
+    // The writer of the same words stays named when a later point (a request) marks them again.
+    ...(input.writer ? { writtenBy: input.writer } : sameContent && before?.writtenBy ? { writtenBy: before.writtenBy } : {}),
     ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
   };
   await putRiskMarks(deps, input.subject, kept, input.measure);
