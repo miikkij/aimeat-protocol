@@ -109,7 +109,7 @@ export function StepMat({ onDone }) {
   const hasPaste = paste.trim().length > 0;
 
   return html`
-    <${StepCard} num="1" title=${tr('home.mat.title', 'Your welcome mat')}>
+    <${StepCard} num="1" title=${tr('home.mat.title', 'Your introduction page')}>
 
       <${StepLede}>
         ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}

@@ -508,7 +508,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     setBusy(true);
     try {
       const r = await orgService.publishDraft(orgId, wsId, ot.namespace, instanceId);
-      if (r?.data?.gated) showToast(t('organisms.publishGated') || 'Sent for review (publish gate is on)');
+      if (r?.data?.gated) showToast(t('organisms.publishGated') || 'Sent for review (publish review is on)');
       else showToast((t('organisms.published') || 'Published') + (r?.data?.version ? ` v${r.data.version}` : ''));
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to publish'); }
@@ -564,7 +564,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   const toggleGate = useCallback(async () => {
     setBusy(true);
-    try { await orgService.setPublishGate(orgId, !gateOn); setGateOn(!gateOn); showToast(t('organisms.gateToggled') || 'Publish gate updated'); }
+    try { await orgService.setPublishGate(orgId, !gateOn); setGateOn(!gateOn); showToast(t('organisms.gateToggled') || 'Publish review updated'); }
     catch (e) { showToast((e && e.message) || 'Failed to update gate'); }
     finally { setBusy(false); }
   }, [orgId, gateOn, showToast]);

@@ -296,7 +296,7 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
     <${FilePreview} title=${fKey} kind=${cat} src=${objUrl} text=${text} loading=${loading} error=${err}
       loadingLabel=${t('profile.files.previewLoading') || 'Loading preview…'}
       errorLabel=${t('profile.files.previewError') || 'Couldn’t load this file'}
-      noneLabel=${t('profile.files.noPreview') || 'No preview for this file type — download it instead'}
+      noneLabel=${t('profile.files.noPreview') || 'No preview for this file type: download it instead'}
       onClose=${onClose}
       doors=${html`
         <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗<//>

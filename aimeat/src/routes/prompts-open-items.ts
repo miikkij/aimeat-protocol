@@ -94,7 +94,7 @@ export function registerOpenItemsPrompt(
     }
     res.json(success(config.nodeId, {
       id: 'welcome-mat',
-      name: 'Your welcome mat',
+      name: 'Your introduction page',
       description: 'Paste into your own AI chat, then paste the answer back into the box on your home. '
         + 'The answer is one HTML page; it becomes your portfolio, and its metadata says which AI wrote it. '
         + 'The short variant asks only for a heading and a few paragraphs.',

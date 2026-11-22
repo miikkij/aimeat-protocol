@@ -616,7 +616,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'with a tab', class: 'signed-out-door-crumb-arrow', prop: 'path={[profile, tab]}', when: 'the address names a tab: "Settings & Controls → the tab"' },
             { name: 'the profile alone', prop: 'path={[profile]}', when: 'the address names no tab' },
         ],
-        example: { address: 'aimeat.io/v1/profile?tab=security', kicker: 'This address leads inside', title: 'This page is yours.', titleAccent: 'Sign in, and it opens.', path: ['Settings & Controls', 'Security'], tag: 'owner only' },
+        example: { address: 'aimeat.io/v1/profile?tab=security', kicker: 'This page needs sign-in', title: 'This page is yours.', titleAccent: 'Sign in to see it.', path: ['Settings & Controls', 'Security'], tag: 'owner only' },
         note: 'Moved unchanged on 2026-09-25 (the sheet was views/profile-door.css); on 2026-09-26 its markup became components/SignedOutDoor.js, and views/profile/door.js passes it the words. Since 2026-09-27 it draws its own names (.signed-out-door-*, formerly .pf-door-*).',
     },
 ];

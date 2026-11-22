@@ -173,7 +173,7 @@ examples: email, a calendar, meeting notes from a recording.
    request with a sample of what a person would give the agent ("Make a slogan for the product
    Morning Coffee"), never as an input with its result. A definition whose offer has no example is
    given the \`purpose\` as the task, which suits only an agent that needs no input.
-   **The model is the owner's pick on that page.** The page asks "Which model it thinks with" and
+   **The model is the owner's pick on that page.** The page asks "Which model it uses" and
    lists the models the chosen computer reaches; the pick goes with the approval (\`llm_choice\`) and
    is stored before the agent is handed to the connector, so the first run already uses it. With no
    pick the computer's own setting applies, and that can be a small, cheap model (measured on

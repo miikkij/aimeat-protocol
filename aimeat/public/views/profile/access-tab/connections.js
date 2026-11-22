@@ -499,7 +499,7 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
       ${open && html`
         <${Stack} gap="small">
           <${Note}>${t('profile.access.cxOwnWhy')
-            || 'Register an app at the service and paste its credentials here. Yours then carries its own rate limit, its own reputation and, where posting costs money, its own bill.'}<//>
+            || 'Register an app at the service and paste its credentials here. Yours then has its own rate limit, its own reputation and, where posting costs money, its own bill.'}<//>
           <${TextField} autoComplete="off"
             placeholder=${t('profile.access.cxOwnClientId') || 'Client ID'}
             ariaLabel=${t('profile.access.cxOwnClientId') || 'Client ID'}

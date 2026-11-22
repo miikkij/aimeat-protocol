@@ -72,7 +72,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
     try {
       const r = await retireEngagement(e.organism_id, e.ws, e.agent, e.contract);
       if (r?.ok === false) showToast?.(r?.error?.message || (t('organisms.retireFailed') || 'Could not retire the contract'), true);
-      else showToast?.(t('profile.agents.detail.contracts.retiredToast') || 'Retired — the agent will skip this workspace');
+      else showToast?.(t('profile.agents.detail.contracts.retiredToast') || 'Retired: the agent will skip this workspace');
       await load();
     } catch (err) { showToast?.(err?.message || 'Error', true); }
     finally { setBusy(''); }
@@ -83,7 +83,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
     try {
       await activateEngagement(e.organism_id, e.ws, e.agent, e.contract).catch(err => { swallowed('tab-contracts: readopt', err); });
       await adoptContractTask(agentName, { organismId: e.organism_id, ws: e.ws, contract: e.contract });
-      showToast?.(t('profile.agents.detail.contracts.readoptedToast') || 'Re-adopted — the agent will pick this workspace back up');
+      showToast?.(t('profile.agents.detail.contracts.readoptedToast') || 'Re-adopted: the agent will pick this workspace back up');
       await load();
     } catch (err) { showToast?.(err?.message || 'Error', true); }
     finally { setBusy(''); }

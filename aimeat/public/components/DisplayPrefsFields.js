@@ -193,7 +193,7 @@ export function DisplayPrefsFields({ region, timezone, onChange }) {
         ${matches.map(z => html`<option key=${z} value=${z}>${cityOf(z)} — ${z} (${offsetOf(z)})</option>`)}
       </select>
       <div class="poster-hint">${tr('profile.prefs.timezoneHint',
-    'Times are shown in this clock everywhere, including in email this site sends you, where your browser cannot be asked.')}</div>
+    'Times are shown in this time zone everywhere, including in email your AIMEAT sends you, where your browser cannot be asked.')}</div>
     </label>
 
     <div class="display-prefs-field">

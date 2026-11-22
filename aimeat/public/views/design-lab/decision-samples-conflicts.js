@@ -233,7 +233,7 @@ const BASIC_AGENTS = [['Concierge', 'Always on', 'The first contact. Takes what 
   ['Workflow manager', 'On demand', 'Orders work from your other agents and keeps track of what came back.']];
 /** The words of a server's setup steps carry their own number (profile.nodes.setupStep1-4). */
 const NODE_STEPS = ['1. Open a WebSocket tunnel to the address above, sending your token in the Authorization header.', '2. Send a heartbeat message every 30 seconds. Without it the server is marked offline.',
-  '3. When the server reconnects, whatever was waiting in its mailbox is delivered to it.', '4. Confirm each message you receive with a mailbox_ack message.'];
+  '3. When the server reconnects, whatever was waiting in its message queue is delivered to it.', '4. Confirm each message you receive with a mailbox_ack message.'];
 const ECO_STEPS = ['The app publishes fresh data on a schedule.', 'AIMEAT spots that data and hands it to your agent.', 'Your agent does the work and writes its insights back.',
   'You get the finished insights. Delivered to the app and reachable everywhere.'];
 const DECIDE_ORDER = ['Choose a decision provider above. A local decision model on this machine needs no key. For TypeSafe, set a key: your own above, or one for a single agent on that agent\'s page.',

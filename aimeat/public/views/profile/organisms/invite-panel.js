@@ -156,7 +156,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
       else {
         if (isEmail) {
           setEmResult({ accept_url: r?.data?.accept_url, email_sent: r?.data?.email_sent });
-          showToast(r?.data?.email_sent ? (t('organisms.inviteEmailSent') || 'Invitation email sent') : (t('organisms.inviteCreated') || 'Invitation created — share the link'));
+          showToast(r?.data?.email_sent ? (t('organisms.inviteEmailSent') || 'Invitation email sent') : (t('organisms.inviteCreated') || 'Invitation created: share the link'));
         } else {
           showToast(requireAccept ? (t('organisms.invitationSent') || 'Invitation sent') : (t('organisms.memberAdded') || 'Member added'));
         }
@@ -203,10 +203,10 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
 
         ${isEmail ? html`
           <${TextArea} label=${t('organisms.inviteMessageLabel') || 'Personal message (optional)'} rows=${2} value=${message} onInput=${setMessage} />
-          <${HeadDesc}>${t('organisms.emailInviteHint') || 'This looks like an email address — a registration invitation will be emailed.'}<//>
+          <${HeadDesc}>${t('organisms.emailInviteHint') || 'This looks like an email address: a registration invitation will be emailed.'}<//>
         ` : html`
           <${Check} checked=${requireAccept} onChange=${setRequireAccept}>
-            ${t('organisms.requireAcceptance') || 'Require acceptance — send an invitation instead of adding directly'}
+            ${t('organisms.requireAcceptance') || 'Require acceptance: send an invitation instead of adding directly'}
           <//>
           ${!requireAccept ? html`<${HeadDesc}>${t('organisms.directAddHint') || 'The member is added immediately with the selected rights. They are notified and can leave at any time.'}<//>` : null}
         `}

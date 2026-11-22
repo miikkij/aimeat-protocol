@@ -6,7 +6,7 @@ integration. The node stores the description and never makes the call itself.
 
 These ten examples ship with every node. The node reads them at start, serves them at
 `GET /v1/msm/templates` (one at a time, as raw YAML, at `GET /v1/msm/templates/{type}`), and the
-operator's MSM page shows them under "Ready-made ones that ship with this site". Each one is
+operator's MSM page shows them under "Ready-made ones that ship with this server". Each one is
 complete: authentication, actions, what each action takes and returns, and a health check. The
 quickest way to write your own is to open one, change the address and the fields, and register it
 with `POST /v1/msm`. How to do that, and where the integration then runs, is in the

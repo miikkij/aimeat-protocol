@@ -216,7 +216,7 @@ key and the connector starts it, with nothing for them to press. A person with m
 connector says which computer: \`aimeat_connector_list\` names them, and the proposal's
 \`connector\` carries the choice, so the agent waits for that computer and no other.
 
-Say which model the work needs, too. The approval page asks "Which model it thinks with" and lists
+Say which model the work needs, too. The approval page asks "Which model it uses" and lists
 the models the chosen computer reaches; the person's pick is stored before the first run. With no
 pick the computer uses the model in its own settings, which can be a small one: tell a person
 whose agent searches, reads sources or works in many steps to pick a strong model there. When the

@@ -319,10 +319,10 @@ function renderCover(ctx) {
         <${FoldSection} id="ws-map" num=${nMap} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
           <${Note}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
           <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} defaultOpen />
-          <${StructureOverview} label=${tr('organisms.structureOverviewWs', 'Workspace structure — table of contents')} load=${() => orgService.getWorkspaceOverview(orgId, wsId)} defaultOpen />
+          <${StructureOverview} label=${tr('organisms.structureOverviewWs', 'Workspace structure: table of contents')} load=${() => orgService.getWorkspaceOverview(orgId, wsId)} defaultOpen />
         <//>
         <${FoldSection} id="ws-ai" num=${nAi} title=${tr('organisms.forAiTitle', 'Bring your AI here')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
-          <${Note} kind="lead">${tr('organisms.ws.forAiLead', 'One instruction that brings your AI into this workspace with its real ids and structure. Paste it into a chat, hand it to a coding agent, or make a contract agent from it.')}<//>
+          <${Note} kind="lead">${tr('organisms.ws.forAiLead', 'One prompt that brings your AI into this workspace with its real ids and structure. Paste it into a chat, give it to a coding agent, or make a contract agent from it.')}<//>
           <${Actions}>${agentMenuItems.filter(m => !m.divider).map((m, i) => html`<${Action} small soft=${i === 2} key=${i} onClick=${m.onClick}>${m.label}<//>`)}<//>
         <//>`}
     <//>`;

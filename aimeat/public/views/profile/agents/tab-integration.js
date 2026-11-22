@@ -659,7 +659,7 @@ function renderProductionView(p) {
       ${p.postChecklist ? afterOnboardingSection(p.postChecklist) : null}
       ${attachSection(
         p.agent.name,
-        tOr('profile.agents.detail.integration.attachTitle', 'Attach this agent in another tool, or on another machine'),
+        tOr('profile.agents.detail.integration.attachTitle', 'Attach this agent in another tool, or on another computer'),
       )}
     <//>`;
 }

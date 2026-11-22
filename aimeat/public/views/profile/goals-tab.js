@@ -136,7 +136,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       ${mode === 'coordinator' && html`
         <${Select} label=${g('coordinator', 'Coordinator')} value=${coordinator} onChange=${setCoordinator} options=${agentOptions} />
         <${Choice} label=${g('substitute', 'When the coordinator is away')} help="goals.substitute" value=${substitute} onChange=${setSubstitute} options=${[
-          ['node', g('subNode', 'AIMEAT keeps it moving by its rules')], ['agent', g('subAgent', 'Another agent')], ['wait', g('subWait', 'Wait for the coordinator')]]} />
+          ['node', g('subNode', 'AIMEAT continues the work by its rules')], ['agent', g('subAgent', 'Another agent')], ['wait', g('subWait', 'Wait for the coordinator')]]} />
         ${substitute === 'agent' && html`<${Select} label=${g('substituteAgent', 'Substitute')} value=${subAgent} onChange=${setSubAgent} options=${agentOptions} />`}`}
       <${Check} checked=${anyAgent} onChange=${setAnyAgent}>${g('anyAgent', 'Any of my agents may take part')}<//>
       ${!anyAgent && html`
@@ -158,7 +158,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
     <//>`}
 
     <${PageSection} title=${label('concept.follow_up', g('reactionsTitle', 'Reactions: when this is done, who continues'))}>
-      ${goal.reactions.length === 0 && html`<${Note} kind="quiet">${g('noReactions', 'No reactions. Agents hand the next work on to each other themselves.')}<//>`}
+      ${goal.reactions.length === 0 && html`<${Note} kind="quiet">${g('noReactions', 'No reactions. Agents give the next work to each other themselves.')}<//>`}
       <${LineList} rows=${goal.reactions.map((r) => ({
         id: r.id,
         name: r.when.wants ? g('whenWants', 'When every "{s}" work is done').replace('{s}', r.when.wants) : g('whenWorks', 'When {n} named works are done').replace('{n}', String(r.when.works?.length ?? 0)),
@@ -178,7 +178,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
     <${PageSection} title=${label('concept.round', g('roundsTitle', 'Rounds'))}>
       <${Fields}>
       <${Choice} label=${g('trigger', 'A round starts')} value=${trigger} onChange=${setTrigger} options=${[
-        ['none', g('tNone', 'No rounds: the goal ends')], ['manual', g('tManual', 'When I start it')], ['clock', g('tClock', 'By the clock')], ['condition', g('tCondition', 'By the clock, only when a condition holds (a watch)')]]} />
+        ['none', g('tNone', 'No rounds: the goal ends')], ['manual', g('tManual', 'When I start it')], ['clock', g('tClock', 'On a schedule')], ['condition', g('tCondition', 'On a schedule, only when a condition holds (a watch)')]]} />
       ${(trigger === 'clock' || trigger === 'condition') && html`
         <${TextField} label=${g('cron', 'When (cron, for example 0 7 * * 1-5)')} value=${cron} onInput=${setCron} code help="goals.roundCron" />`}
       ${trigger === 'condition' && html`<${TextField} label=${g('condition', 'Act only when')} value=${condition} onInput=${setCondition} help="concept.watch" />`}

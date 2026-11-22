@@ -174,7 +174,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   const doDecide = (requester, decision) => after(orgService.decideWorkspaceAccess(orgId, wsId, requester, decision));
   const pending = (access?.requests || []).filter(r => r.status === 'pending');
   const members = access?.members || [];
-  const retireHint = t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.';
+  const retireHint = t('organisms.retireHint') || 'Stop this agent from working in THIS workspace: its loop skips it and the chip becomes “retired”. Its past work stays as history.';
 
   /** One of the viewer's contract agents: its chip holds its state words and the one way on. */
   const contractChip = (a) => {
@@ -204,7 +204,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
           <${Action} small disabled=${retireBusy === `${a.gaii}:*`} title=${retireHint}
             onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}<//>`
           : allRetired ? html`
-          <${Mark} kind="status" tone="off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace — its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}<//>
+          <${Mark} kind="status" tone="off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace: its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}<//>
           <${Action} small disabled=${adoptBusy === `${a.gaii}:*`}
             onClick=${() => readoptAll(a)}>${adoptBusy === `${a.gaii}:*` ? '…' : (t('organisms.bringBack') || 'Bring back')}<//>`
           : actions.map(c => {
@@ -216,7 +216,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
               <${Action} key=${c + ':a'} small disabled=${retireBusy === bkey} title=${retireHint}
                 onClick=${() => retire(a, c)}>${retireBusy === bkey ? '…' : (t('organisms.retire') || 'Retire')}<//>`;
             if (eng?.state === 'retired') return html`
-              <${Mark} key=${c + ':s'} kind="status" tone="off" title=${(t('organisms.retiredUntilHint') || 'Retired — this agent served here until this date. Its past work stays visible.')}>${label}${' · '}${t('organisms.retiredTag') || 'retired'} ${fmtDay(eng.retiredAt)}<//>
+              <${Mark} key=${c + ':s'} kind="status" tone="off" title=${(t('organisms.retiredUntilHint') || 'Retired: this agent served here until this date. Its past work stays visible.')}>${label}${' · '}${t('organisms.retiredTag') || 'retired'} ${fmtDay(eng.retiredAt)}<//>
               <${Action} key=${c + ':a'} small disabled=${adoptBusy === bkey}
                 onClick=${() => adopt(a, c)}>${adoptBusy === bkey ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}<//>`;
             return html`

@@ -46,7 +46,7 @@
  *     shared area and no workspace: on aimeat.io that day such an agent read the record it was
  *     woken for and had every write into the workspace refused. Elsewhere it shows on the
  *     workspace's contracts and on its own Contracts tab, as before.
- *   v1.8.0 — 2026-10-13 — "Which model it thinks with", before the agent starts: the models the
+ *   v1.8.0 — 2026-10-13 — "Which model it uses", before the agent starts: the models the
  *     chosen computer reaches, and the person's pick, which goes with the approval so the first
  *     work already uses it. With no pick the page says the computer uses its own setting and that
  *     this can be a small model (Jouni, 2026-10-13: "miksi se käyttää heikkoa mallia"; on aimeat.io
@@ -514,7 +514,7 @@ export default function AgentNewView({ navigate }) {
     && (definition?.agents ?? []).some((m) => Array.isArray(m?.tools) && m.tools.includes('workspace_write'));
   const whenOptions = [
     { value: 'ask', label: tr('home.agents.when.ask', 'When I ask'), hint: n('whenAskHint', 'You give it a task when you need one. Otherwise it does nothing.') },
-    { value: 'clock', label: tr('home.agents.when.clock', 'By the clock'), hint: n('whenClockHint', 'It gets the same task at the times you set.') },
+    { value: 'clock', label: tr('home.agents.when.clock', 'On a schedule'), hint: n('whenClockHint', 'It gets the same task at the times you set.') },
     { value: 'talk', label: tr('home.agents.when.talk', 'When someone writes to it'), hint: n('whenTalkHint', 'It answers a message within seconds, at any hour.') },
     {
       value: 'always', label: tr('home.agents.when.always', 'Always on'), disabled: !residentHere,
@@ -627,14 +627,14 @@ export default function AgentNewView({ navigate }) {
              käyttää heikkoa mallia"). The list is the chosen computer's own; with no pick the
              computer uses the model in its own settings, and the page says what that can mean. */''}
         ${machines.length > 0 && (llm.models.length > 0
-          ? html`<${Select} label=${n('model', 'Which model it thinks with')} help="crew.agent_model" value=${model} onChange=${setModel}
+          ? html`<${Select} label=${n('model', 'Which model it uses')} help="crew.agent_model" value=${model} onChange=${setModel}
               placeholder=${n('modelUnset', 'Not chosen: the computer picks')}
               hint=${model
                 ? n('modelHintSet', 'The agent uses this model from its first work. It is paid with the key that is on the computer. You can change it later on the agent\'s page.')
                 : n('modelHintUnset', 'With no choice, the computer uses the model in its own settings. That can be a small, cheap model whose work you need to check. Choose a model here when the work needs a strong one.')}
               options=${llm.models.map((m) => ({ value: `model:${m.label}`, label: m.label }))} />`
           : html`<${Facts} wide rows=${[{
-              k: n('model', 'Which model it thinks with'), v: n('modelComputer', 'The computer picks'),
+              k: n('model', 'Which model it uses'), v: n('modelComputer', 'The computer picks'),
               sub: n('modelNoList', 'No agent on this computer is connected to say which models it reaches, so the computer uses the model in its own settings. You can choose a model on the agent\'s page after it has started.'),
             }]} />`)}
 

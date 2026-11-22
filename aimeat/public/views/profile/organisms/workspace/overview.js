@@ -112,7 +112,7 @@ export function renderObjectives(ctx) {
               return {
                 key: k.name || ki, k: k.name,
                 v: `${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}`,
-                sub: tgt || k.computed === false ? html`${tgt ? html`<span>${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}${tgt && k.computed === false ? ' · ' : null}${k.computed === false ? html`<span title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}` : undefined,
+                sub: tgt || k.computed === false ? html`${tgt ? html`<span>${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}${tgt && k.computed === false ? ' · ' : null}${k.computed === false ? html`<span title=${t('organisms.kpiDeclaredHint') || 'Self-reported, not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}` : undefined,
               };
             })} />` : null}
           <//>`)}

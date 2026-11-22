@@ -62,7 +62,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
             { name: 'framed', class: 'card-menu-list--framed', prop: 'framed', when: 'the opened list in the ink frame with the sun shadow' },
             { name: 'disabled', prop: 'disabled', when: 'the dots or the words cannot be pressed while what the menu started runs' },
         ],
-        example: { state: 'open', label: 'Your welcome mat', actions: [{ label: 'Take it off your open items' }] },
+        example: { state: 'open', label: 'Your introduction page', actions: [{ label: 'Take it off your open items' }] },
         note: 'word, framed and disabled came with appcat on 2026-09-27: together they replaced the old app catalogue\'s "Backups and imports" (.cat-word #backup-btn) and the menu it opened (.backup-menu).',
     },
     {

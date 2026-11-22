@@ -119,7 +119,7 @@ export function line(item) {
     case 'account_created':
       return tr('home.feed.accountCreated', 'Your home exists.');
     case 'welcome_mat':
-      return tr('home.feed.welcomeMat', 'You made your welcome mat. Look at it.');
+      return tr('home.feed.welcomeMat', 'You made your introduction page. Look at it.');
     case 'agent_knocking':
       return tr('home.feed.agentKnocking', 'Your agent is asking to connect.');
     case 'agent_connected':

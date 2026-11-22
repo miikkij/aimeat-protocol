@@ -124,7 +124,7 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
     <${Box}>
       <${Line} wrap gap="medium" below="small">
         <${SubHeading} inline>${t('organisms.apps.title') || 'Apps'}<//>
-        <${Note} inline>${t('organisms.apps.hint') || 'Pinned to this workspace — they open with it as context.'}<//>
+        <${Note} inline>${t('organisms.apps.hint') || 'Pinned to this workspace: they open with it as context.'}<//>
         ${canEdit ? html`
           <${Action} small expanded=${showPicker} onClick=${() => setShowPicker(s => !s)}>
             ${showPicker ? (t('organisms.apps.done') || 'Done') : ('⚙ ' + (t('organisms.apps.manage') || 'Manage'))}
@@ -135,10 +135,10 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
         : html`<${Note} kind="quiet">${(t('organisms.apps.none') || 'No apps pinned yet.')}${canEdit ? ' ' + (t('organisms.apps.noneHint') || 'Pin a published app so members can launch it from here.') : ''}<//>`}
       ${showPicker ? html`
         <${Split} gap="small">
-          <${HeadDesc}>${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card — data access follows workspace access.'}<//>
+          <${HeadDesc}>${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card: data access follows workspace access.'}<//>
           <${TextField} search placeholder=${searchWords} ariaLabel=${searchWords} value=${q} onInput=${setQ} />
           <${List} cols="name-tags-doors" keepCols loading=${catalog === null ? '…' : false}
-            empty=${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}>
+            empty=${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on your AIMEAT yet.')}>
             ${pickerRows.map(a => {
               const pinned = bound.some(b => sameApp(a, b));
               return html`

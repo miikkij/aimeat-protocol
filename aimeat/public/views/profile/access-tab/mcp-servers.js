@@ -277,7 +277,7 @@ export function McpServersSection({ showToast, inRow }) {
           // Worth saying, because it is what a person cutting access actually cares about: the
           // node forgets its copy, and the far side is still theirs to revoke.
           showToast(t('profile.access.mcpRemoved')
-            || 'Removed. A token you made at the far side is still yours to revoke there.');
+            || 'Removed. A token you made on that server is still yours to revoke there.');
           await load();
         } catch (err) {
           swallowed('mcp-servers-remove', err);
@@ -298,7 +298,7 @@ export function McpServersSection({ showToast, inRow }) {
     try {
       await apiDelete('/v1/mcp-servers/' + encodeURIComponent(s.id) + '/sign-in');
       showToast(t('profile.access.mcpSignedOut')
-        || 'Signed out. Access you granted at the far side is still yours to revoke there.');
+        || 'Signed out. Access you granted in that service is still yours to revoke there.');
       await load();
     } catch (err) {
       swallowed('mcp-servers-sign-out', err);
@@ -331,7 +331,7 @@ export function McpServersSection({ showToast, inRow }) {
     <${ConfirmUI} />
     ${inRow ? null : html`<${SubHeading} level=${3}>${t('profile.access.mcpTitle') || 'MCP servers'}<//>
       <${Note}>${t('profile.access.mcpIntro')
-        || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.'}<//>`}
+        || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT: nothing acting for you ever sees it.'}<//>`}
 
     <${List} cols="name-doors" empty=${t(customerNode() ? 'profile.access.mcpEmptyPlace' : 'profile.access.mcpEmpty') || 'No MCP servers attached yet.'}>
       ${servers.map(s => html`

@@ -37,7 +37,7 @@ export const STEP_ENTRIES: UiEntryWritten[] = [
             { name: 'rule', class: 'poster-step--rule', prop: 'rule', when: 'a step of a guide inside a dialog (the prompt builder): under the heavy ink rule, its number on ink' },
             { name: 'question', class: 'poster-step--question', prop: 'question', when: 'one numbered question of a form (the tool editor): a hairline under it, its fields in line with its title' },
         ],
-        example: { num: '1', title: 'Your welcome mat', children: 'Copy the prompt below into your AI chat.' },
+        example: { num: '1', title: 'Your introduction page', children: 'Copy the prompt below into your AI chat.' },
         note: 'The done and limit looks were deleted on 2026-09-23 (Jouni\'s decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since 07f7040c5 (2026-09-09). rule and question came with appcat on 2026-09-27: rule replaced the old app catalogue\'s prompt builder step (.pb-step, .pb-step-head, .pb-step-num and the .pb-* parts inside it, whose looks step-card.css now gives the components drawn in a ruled step), question its tool editor\'s group (.mz-group).',
     },
     {

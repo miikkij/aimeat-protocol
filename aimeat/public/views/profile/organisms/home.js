@@ -285,7 +285,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         <${Note}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
         <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
         <${Actions}><${Action} href=${`/v1/home?overview=1&focus=${encodeURIComponent(`organism:${org.id}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//><//>
-        <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure — table of contents')}
+        <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure: table of contents')}
           load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
       <//>
 

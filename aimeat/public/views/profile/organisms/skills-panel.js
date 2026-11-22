@@ -130,7 +130,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
 
   const copyRef = (skill) => {
     copyToClipboard(skill.ref);
-    showToast(t('skills.refCopied') || 'Skill ref copied — link it to an agent from its Data Access tab');
+    showToast(t('skills.refCopied') || 'Skill ref copied: link it to an agent from its Data Access tab');
   };
 
   const zip = async (skill) => {
@@ -168,7 +168,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
       `}
 
       <${List} cols="name-doors" loading=${loading ? (t('organisms.loading') || 'Loading…') : false}
-        empty=${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'}>
+        empty=${t('skills.wsEmpty') || 'No workspace skills yet. Publish the first one.'}>
         ${skills.map(skill => html`
           <${ListRow} key=${skill.ref} open=${expanded === skill.ref && !!expandedSkill}
             panel=${expanded === skill.ref && expandedSkill ? detail(skill) : null}>

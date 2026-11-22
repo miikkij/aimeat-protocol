@@ -23,8 +23,8 @@ import type { TokenMap } from './builtin.js';
 export const CONTRAST_RULES: ReadonlyArray<[string, string, number, string]> = [
     ['--text', '--bg', 4.5, 'words on the page, and the page\'s colour on the dark block'],
     ['--text', '--card-bg', 4.5, 'words on a card'],
-    ['--text-dim', '--bg', 4.5, 'quiet words on the page'],
-    ['--text-dim', '--card-bg', 4.5, 'quiet words on a card'],
+    ['--text-dim', '--bg', 4.5, 'dim text on the page'],
+    ['--text-dim', '--card-bg', 4.5, 'dim text on a card'],
     ['--accent', '--bg', 3, 'the accent on the page'],
     ['--accent', '--card-bg', 3, 'the accent on a card'],
     ['--on-sun', '--sun', 4.5, 'words on the sun'],

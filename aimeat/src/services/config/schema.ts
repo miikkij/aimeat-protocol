@@ -563,13 +563,13 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
   // ── MCP sessions (mutable) ──
-  { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
+  { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a closed client re-initializes)', range: '0.05-1440' },
   { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: false, applies: 'restart', description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
   // The limits on what one account takes of what the node shares (config-schema-node-limits.ts).
   ...NODE_LIMITS_CONFIG_FIELDS,
 
   // ── Registration (mutable) ──
-  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
+  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation; no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
   { key: 'membersSeeEachOther', dotPath: 'registration.members_see_each_other', envVar: 'AIMEAT_MEMBERS_SEE_EACH_OTHER', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Members see each other (for a company node): every person of this node is in every other person\'s contacts, the member directory lists everyone, and a first message between two people of this node arrives without a request. Agents and apps still ask first; a block still applies. Off by default' },
 
   // ── Scoped Agent Capabilities (mutable) ──

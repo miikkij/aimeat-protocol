@@ -548,7 +548,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <${Cell} line>
           <${Mark} title=${typeLabel}>${typeLabel}<//>
           ${org.visibility !== 'public' ? html`<span title=${visLabel}>${LockMark}</span>` : null}
-          ${org.archived ? html`<${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}
+          ${org.archived ? html`<${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived: read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}
         <//>
         ${/* Four counts, always four: the tracks are what hold the row still, and a count left
               out would slide the ones after it into the wrong track. An absent count shows nothing

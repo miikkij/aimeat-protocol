@@ -158,7 +158,7 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
               <span class="contact-picker-item-label">${resolveState === 'busy' ? (t('contacts.resolving') || 'Looking up…') : (t('contacts.resolveAction') || 'Look up this email')}</span>
             </button>` : null}
           ${resolveState && resolveState !== 'busy' && !resolveState.found ? html`
-            <div class="contact-picker-item contact-picker-item-miss">${t('contacts.resolveMiss') || 'No account with that email — you can send an email invitation instead.'}</div>` : null}
+            <div class="contact-picker-item contact-picker-item-miss">${t('contacts.resolveMiss') || 'No account with that email. You can send an email invitation instead.'}</div>` : null}
         </div>` : null}
     </div>`;
 }

@@ -368,7 +368,7 @@ function renderCover(ctx) {
   const orgCount = cls.org.reduce((n, s) => n + s.count, 0);
   const nOwn = sec('mp-own', c('own', 'Mine'), ownCount);
   const nOrg = sec('mp-org', c('orgs', 'Organisms’'), orgCount);
-  const nSys = sec('mp-sys', c('sys', 'The machine’s bookkeeping'), sysCount, () => setSysOpen(true));
+  const nSys = sec('mp-sys', c('sys', 'System records'), sysCount, () => setSysOpen(true));
   // Every file, of which the page has read the first pages (memory-tab.js loadMoreFiles).
   const filesCount = ctx.filesTotal ?? (files || []).length;
   const nFiles = sec('mp-files', c('files', 'Files'), filesCount);
@@ -426,7 +426,7 @@ function renderCover(ctx) {
 
   return html`
     <${SettingsPage} name="mp" crumb=${crumb(ctx, [])} title=${t('profile.memory.title') || 'Memory'} help="concept.memory" marks=${marks}
-      desc=${c('desc', 'What you and your agents have written here: notes, settings, research and the organisms’ content. Yours, and yours to decide about.')}
+      desc=${c('desc', 'What you and your agents have written here: notes, settings, research and the organisms’ content (an organism is a group of people who share workspaces). Yours, and yours to decide about.')}
       actions=${actions} start=${start} strip=${strip} railTitle=${railTitle} sections=${sections} pages=${pageDoors(ctx, null)}>
       ${resultRows}
       <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${ownCount}
@@ -438,10 +438,10 @@ function renderCover(ctx) {
       <${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${orgCount}
         doors=${html`<${Action} small soft onClick=${() => openTab('organisms')}>${t('organisms.title') || 'Organisms'} →<//>`}>
         ${cls.org.length ? spaceTable(ctx, cls.org, { id: 'org' }) : none()}
-        <${Note} kind="hint">${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
+        <${Note} kind="hint">${c('orgHint', 'An organism’s content is stored in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
       <//>
 
-      <${Section} fold id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${keysN(sysCount)} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
+      <${Section} fold id="mp-sys" num=${nSys} title=${c('sys', 'System records')} sub=${`${keysN(sysCount)} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
         <${Note} kind="hint">${c('sysHint', 'What your environment and your agents write for their own use: notices, meters, receipts. Yours as well, but rarely for you to read.')}<//>
         ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : none()}
       <//>
@@ -647,7 +647,7 @@ function renderOther(ctx, id) {
           <${FileDrop} hidden accept="application/json,.json" inputRef=${importFileRef} onChange=${handleImportFile} />
         <//>
         ${!fullLoaded ? html`<${SettingBox} label=${t('profile.memory.loadContents') || 'Load all contents'}>
-          <${Note} kind="hint">${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}<//>
+          <${Note} kind="hint">${c('loadAllHint', 'The list contains only keys and sizes; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}<//>
           <${FormActions}><${Action} small onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}<//><//>
         <//>` : null}
       <//>`;

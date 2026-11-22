@@ -398,7 +398,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         open=${peopleOpen || reqOpen} panel=${html`${peopleOpen ? peopleList(w) : null}${reqOpen ? requestList(w) : null}`}>
         <${Lead} text=${'🗂'} />
         <${Name} onOpen=${locked ? undefined : () => onOpen(w.id)}
-          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
+          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived: read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
           meta=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}>${wsDisplayName(org, w.id, w.name || w.id)}<//>
         <${Cell} line>${locked ? html`<span>${'🔒'}</span>` : null}<//>
         <${Stats}>

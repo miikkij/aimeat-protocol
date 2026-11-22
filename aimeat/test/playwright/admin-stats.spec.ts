@@ -144,24 +144,24 @@ test.describe('Admin Stats Tab', () => {
     await expect(successRate).toBeVisible();
   });
 
-  // ── TC-05: Mailbox notification section renders ──
+  // ── TC-05: Message queue notification section renders ──
 
-  test('mailbox notification section renders', async ({ page }) => {
-    // Verify "Mailbox Notifications" section header exists
-    const mailboxHeader = page.locator('h3.adm-section-amber', { hasText: /Mailbox Notifications/i });
+  test('message queue notification section renders', async ({ page }) => {
+    // Verify "Message Queue Notifications" section header exists (the label said Mailbox until 2026-11-22)
+    const mailboxHeader = page.locator('h3.adm-section-amber', { hasText: /Message Queue Notifications/i });
     await expect(mailboxHeader).toBeVisible({ timeout: 10_000 });
 
-    // Verify stat cards (adm-card): Mailbox Sent, Mailbox Failed, Mailbox Blocked
+    // Verify stat cards (adm-card): Message Queue Sent, Failed, Blocked
     const mailboxGrid = mailboxHeader.locator('+ .adm-grid');
     await expect(mailboxGrid).toBeVisible();
 
-    const mailboxSent = mailboxGrid.locator('.adm-card', { hasText: /Mailbox Sent/i });
+    const mailboxSent = mailboxGrid.locator('.adm-card', { hasText: /Message Queue Sent/i });
     await expect(mailboxSent).toBeVisible();
 
-    const mailboxFailed = mailboxGrid.locator('.adm-card', { hasText: /Mailbox Failed/i });
+    const mailboxFailed = mailboxGrid.locator('.adm-card', { hasText: /Message Queue Failed/i });
     await expect(mailboxFailed).toBeVisible();
 
-    const mailboxBlocked = mailboxGrid.locator('.adm-card', { hasText: /Mailbox Blocked/i });
+    const mailboxBlocked = mailboxGrid.locator('.adm-card', { hasText: /Message Queue Blocked/i });
     await expect(mailboxBlocked).toBeVisible();
   });
 

@@ -105,7 +105,7 @@ const docTree = (props) => html`<${SettingsRoot}><${DocTree} words=${DOC_WORDS} 
   onRemoveSection=${noop} onMove=${noop} ...${props}><p>The open document.</p><//><//>`;
 
 const DOOR = {
-  kicker: 'This address leads inside', title: 'This page is yours.', titleAccent: 'Sign in, and it opens.',
+  kicker: 'This page needs sign-in', title: 'This page is yours.', titleAccent: 'Sign in to see it.',
   targetLabel: 'Where this address leads', tag: 'owner only',
   lead: 'The address you opened leads to a page inside your Settings & Controls, and that page opens only for you.',
   action: { label: 'Sign in', onClick: noop }, second: { label: 'Create an account', onClick: noop },

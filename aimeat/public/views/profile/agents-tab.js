@@ -80,7 +80,7 @@
  *     same component the MCP tab renders), open and first, and the npx CLI road folds into a
  *     "For developers" expander. ai-tool-setup.ts has ranked claude.ai first on purpose since it
  *     was written; this panel led every visitor to a terminal instead.
- *   v3.3.0 -- 2026-07-14 -- Task-runner section: add a "View the crewaimeat fleet on GitHub"
+ *   v3.3.0 -- 2026-07-14 -- Task-runner section: add a "View crewaimeat on GitHub"
  *     link (github.com/miikkij/crewaimeat) with the GitHub Octocat mark.
  *   v3.2.0 -- 2026-07-13 -- Split (max-file-lines): moved scope constants/labels, connect
  *     prompts + platform instructions, per-browser tab helpers, the filter bar / active-tasks

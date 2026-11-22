@@ -17,6 +17,10 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.8.0 — 2026-11-22 — PICTURE_WORDS gets the pictures the Settings and admin pages used in
+ *     place of a name (turned away, käännyttää and torjua for refused, the federation book, rung,
+ *     parked, the paste, kylvää, naapuri, tarjoilla, miehistö and the like), with its own baseline
+ *     security/locale-settings-baseline.json.
  *   v1.7.0 — 2026-11-21 — A key written twice in one file, flat and nested, fails (duplicateKeys in
  *     lib/locale-files.ts); the 33 such keys in en, fi and es kept the spelling the browser showed.
  *   v1.6.0 — 2026-11-15 — PICTURE_WORDS: the door ratchet's model for the other words used as a
@@ -235,6 +239,19 @@ const PICTURE_WORDS: PictureWord[] = [
     },
     baseline: new URL('../security/locale-image-baseline.json', import.meta.url),
     fix: 'name the thing: on offer here, nothing offered, automated requests, the price tiers, every setting, sent elsewhere',
+  },
+  {
+    // The Settings and admin pages, read whole on 2026-11-22. Only words with no ordinary use on
+    // these pages: "federaatiokirjautuminen" is a sign-in, and a real neighbourhood (naapurusto)
+    // in an example is a real neighbourhood, so neither is in the pattern.
+    word: 'turned away / federation book / rung / parked / the paste / seed, neighbour, serve (fi) / crew (fi, es)',
+    byLocale: {
+      en: /\b(?:turned away|parked|the paste|rungs?|federation book|bird's-eye|thinks with|budget guards?|blueprints?)\b/i,
+      fi: /(?<![\p{L}])(?:käännyt\p{L}*|käännytt\p{L}*|torju\p{L}*|torjun\p{L}*|naapuri\p{L}*|kylv\p{L}*|uudelleenkylv\p{L}*|tarjoil\p{L}*|parkissa|parkkeer\p{L}*|parkkiin|julkisivu\p{L}*|pohjapiirro\p{L}*|federaatiokirja(?!utu)\p{L}*|lintuperspektiiv\p{L}*|miehistö\p{L}*|käyttökirjanpi\p{L}*|ojenn\p{L}*|ojenta\p{L}*|kantama|kantaman|kantamaa|väki|väen|väkeä|väkensä|väellä|väelle|sydänmuru\p{L}*|noodi\p{L}*|applikaatio\p{L}*|taski\p{L}*)(?![\p{L}])/iu,
+      es: /\b(?:tripulación|tripulaciones|peldaños?|siembra|sembrar)\b/i,
+    },
+    baseline: new URL('../security/locale-settings-baseline.json', import.meta.url),
+    fix: 'say the plain word: refused / hylätty, the federation directory, tier / taso, unlisted / ei listalla, the prompt / kehote, asentaa uudelleen, vertainen, tarjota, crew, palvelin, sovellus, tehtävä (language context, 2026-11-22)',
   },
 ];
 
