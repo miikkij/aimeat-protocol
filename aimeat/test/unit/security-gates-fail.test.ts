@@ -20,6 +20,9 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-11-23 — A gate script may run 170 s (was 60 s) and the python group's test holds three such
+ *     runs; a killed run says so in its output. Under pnpm ready beside other sessions a run passed
+ *     60 s and the test went red with code -1 (incident ...-security-gates-fail-unit-test-red-once-...).
  *   2026-11-21 — check:scope-parity reports a word a route demands that APP_GRANTABLE_SCOPES does not
  *     list, and passes one whose orScope an app can hold (docs/pitfalls.md §6).
  *   2026-11-04 — check:python-daemon refuses a renamed route the package calls through decide.py
@@ -77,11 +80,17 @@ function tree(files: Record<string, string>): string {
     return root;
 }
 
-/** The real gate script, strict, with the fixture tree as its working directory. */
+/** How long one gate script may run. A script takes about 12 s alone; under a loaded machine
+ *  (pnpm ready beside other sessions) 60 s was too little, and the killed run answered -1. */
+const GATE_RUN_MS = 170_000;
+
+/** The real gate script, strict, with the fixture tree as its working directory. A run killed at
+ *  GATE_RUN_MS answers code -1 and says so in `out`, so a time limit never reads as a verdict. */
 function runGate(script: string, root: string, env: Record<string, string> = {}): { code: number; out: string } {
     const r = spawnSync(process.execPath, ['--import', TSX, join(AIMEAT, 'scripts', script), '--strict'],
-        { cwd: root, encoding: 'utf8', timeout: 60_000, env: { ...process.env, ...env } });
-    return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
+        { cwd: root, encoding: 'utf8', timeout: GATE_RUN_MS, env: { ...process.env, ...env } });
+    const killed = r.status === null ? `\n[killed by ${r.signal ?? 'an error'} after ${GATE_RUN_MS} ms: the machine's load, not the gate's verdict]` : '';
+    return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}${killed}` };
 }
 
 /** A parsed file with parents set, for the detectors that need no type checker. */
@@ -384,7 +393,8 @@ describe('the triage clock refuses an undated or stale clearance', () => {
 // Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille. The real scripts run on a
 // copy of the Python package's source (and of the allowlists), planted, through the environment
 // variables the scripts read for exactly this.
-describe('check:python-shapes and check:python-daemon refuse a difference nobody listed', { timeout: 180_000 }, () => {
+// One test runs a gate script up to three times, so the test's limit holds three full runs.
+describe('check:python-shapes and check:python-daemon refuse a difference nobody listed', { timeout: 3 * GATE_RUN_MS + 30_000 }, () => {
     const PY = join(AIMEAT, '..', 'python', 'aimeat-crewai', 'src', 'aimeat_crewai');
     const FIXTURE = join(AIMEAT, '..', 'python', 'aimeat-crewai', 'tests', 'fixtures', 'node-offer-schema.json');
     /** The package's source, with `edit` applied to one file, in a temp directory. */
