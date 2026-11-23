@@ -22,6 +22,12 @@
  *   one line when a step starts and one when it ends, and a red step's last lines go into the reason
  *   the refused session reads.
  *
+ *   THE OUTPUT REACHES THE LOG THROUGH A PIPE, NEVER AS THE CHILD'S OWN FILE. Git Bash cannot write
+ *   to a file opened for append that it is handed as its output: it exits 1 at its first line, with
+ *   nothing written (measured 2026-11-23). The worktree recipe is a bash script, and so is the
+ *   pre-push hook a `git push` runs, so a batch given the log as a file descriptor could make no
+ *   worktree and push nothing. A pipe is what every shell is started with.
+ *
  *   A RED STAGE'S PROBE is the narrowest command that shows the same red: the checks again; the red
  *   unit files alone; the red suites alone, from a build of the commit checked out. A file or a suite
  *   that does not exist on that commit (a later session of the batch added it) is green there, since
@@ -29,14 +35,14 @@
  * @structure TrainConfig · ensureTrain() · trainDeps()
  * @usage
  *   const cfg = { commonDir, stateDir, sessionAimeat, lanes, pgLanes, noMerge, logFile, say };
- *   ensureTrain(cfg);
+ *   await ensureTrain(cfg);
  *   const verdicts = await runBatch(trainDeps(cfg), entries, batchId);
  * @version-history
  *   v1.0.0 — 2026-11-23 — Initial (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
  */
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, createWriteStream, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { flakyLine, readRunResults } from './e2e-run-results.js';
 import type { BatchDeps, Stage, StageResult } from './ready-batch.js';
@@ -71,25 +77,46 @@ export interface TrainConfig {
     say: (line: string) => void;
 }
 
+interface RunOptions { cwd: string; env?: Record<string, string> }
+
 const trainRoot = (cfg: TrainConfig): string => path.join(path.dirname(cfg.commonDir), '.worktrees', TRAIN_WORKTREE);
 const trainAimeat = (cfg: TrainConfig): string => path.join(trainRoot(cfg), 'aimeat');
 
-/** Run one command with its output appended to the batch's log. Returns its exit status. */
-function runLogged(cfg: TrainConfig, title: string, cmd: string, args: string[], opts: { cwd: string; env?: Record<string, string> }): number | null {
+// Only pnpm needs the shell on Windows (it is a .cmd); node and git run as themselves, because a
+// path with a space in it (C:\Program Files\nodejs\node.exe) is split by the shell.
+const needsShell = (cmd: string): boolean => process.platform === 'win32' && cmd === 'pnpm';
+const header = (cfg: TrainConfig, title: string, cmd: string, args: string[]): void =>
     appendFileSync(cfg.logFile, `\n===== ${new Date().toISOString()} ${title}\n$ ${cmd} ${args.join(' ')}\n`);
-    const fd = openSync(cfg.logFile, 'a');
-    try {
-        // Only pnpm needs the shell on Windows (it is a .cmd); node and git run as themselves, because
-        // a path with a space in it (C:\Program Files\nodejs\node.exe) is split by the shell.
-        return spawnSync(cmd, args, {
-            cwd: opts.cwd,
-            stdio: ['ignore', fd, fd],
-            shell: process.platform === 'win32' && cmd === 'pnpm',
-            env: { ...process.env, ...opts.env },
-        }).status;
-    } finally {
-        closeSync(fd);
-    }
+
+/**
+ * Run one command with its output piped into the batch's log as it comes (header: why a pipe).
+ * Returns its exit status, null when it could not be started or did not exit by itself.
+ */
+async function runLogged(cfg: TrainConfig, title: string, cmd: string, args: string[], opts: RunOptions): Promise<number | null> {
+    header(cfg, title, cmd, args);
+    const out = createWriteStream(cfg.logFile, { flags: 'a' });
+    const child = spawn(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: needsShell(cmd), env: { ...process.env, ...opts.env } });
+    child.stdout.pipe(out, { end: false });
+    child.stderr.pipe(out, { end: false });
+    const status = await new Promise<number | null>((settle) => {
+        child.on('error', (e) => { out.write(`could not start ${cmd}: ${e.message}\n`); settle(null); });
+        child.on('close', code => settle(code));
+    });
+    await new Promise<void>(done => out.end(() => done()));
+    return status;
+}
+
+/**
+ * The same for a caller that cannot wait on a promise (scripts/lib/unit-rerun.ts takes a function
+ * that returns the status): the output is held until the command ends, then appended.
+ */
+function runLoggedSync(cfg: TrainConfig, title: string, cmd: string, args: string[], opts: RunOptions): number | null {
+    header(cfg, title, cmd, args);
+    const r = spawnSync(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: needsShell(cmd), env: { ...process.env, ...opts.env }, maxBuffer: 1024 * 1024 * 1024 });
+    appendFileSync(cfg.logFile, r.stdout ?? '');
+    appendFileSync(cfg.logFile, r.stderr ?? '');
+    if (r.error) appendFileSync(cfg.logFile, `could not run ${cmd}: ${r.error.message}\n`);
+    return r.status;
 }
 
 /** The last lines the log got since `from` (a byte offset): what a refused session reads first. */
@@ -109,17 +136,25 @@ function logTail(cfg: TrainConfig, from: number, lines = 25, chars = 2500): stri
 
 const logSize = (cfg: TrainConfig): number => { try { return statSync(cfg.logFile).size; } catch { return 0; } };
 
+/** A step line on the screen and in the log when it starts and when it ends, with how long it took. */
+async function timed<T>(cfg: TrainConfig, title: string, run: () => T | Promise<T>, green: (r: T) => boolean): Promise<T> {
+    const t0 = Date.now();
+    cfg.say(title);
+    const r = await run();
+    cfg.say(`${title}: ${green(r) ? 'green' : 'RED'} in ${Math.max(1, Math.round((Date.now() - t0) / 60_000))} min`);
+    return r;
+}
+
 /**
  * Make the batch's worktree when this machine has none (or one whose install never finished): the
- * recipe every worktree is made by, with the batch's own E2E port.
+ * recipe every worktree is made by.
  */
-export function ensureTrain(cfg: TrainConfig): void {
-    if (existsSync(path.join(trainAimeat(cfg), 'node_modules', '.bin'))) return;
-    cfg.say(`making the batch's worktree .worktrees/${TRAIN_WORKTREE} (once on a machine; it installs its own dependencies, which takes a few minutes)`);
-    // The recipe's test:env:init gives a worktree of this name its own port (lib/worktree-ports.ts
-    // TRAIN_PORT), so the driving session's AIMEAT_E2E_PORT, if it has one, does not reach it.
-    const status = runLogged(cfg, `the worktree recipe for ${TRAIN_WORKTREE}`, process.execPath, ['scripts/agent-session.mjs', 'worktree', TRAIN_WORKTREE], { cwd: cfg.sessionAimeat });
-    if (status !== 0 || !existsSync(path.join(trainAimeat(cfg), 'node_modules', '.bin'))) {
+export async function ensureTrain(cfg: TrainConfig): Promise<void> {
+    const installed = (): boolean => existsSync(path.join(trainAimeat(cfg), 'node_modules', '.bin'));
+    if (installed()) return;
+    cfg.say(`making the batch's worktree .worktrees/${TRAIN_WORKTREE} (once on a machine; it installs its own dependencies)`);
+    const status = await runLogged(cfg, `the worktree recipe for ${TRAIN_WORKTREE}`, process.execPath, ['scripts/agent-session.mjs', 'worktree', TRAIN_WORKTREE], { cwd: cfg.sessionAimeat });
+    if (status !== 0 || !installed()) {
         throw new Error(`the batch's worktree .worktrees/${TRAIN_WORKTREE} could not be made (exit ${status}); the log has the recipe's lines: ${cfg.logFile}`);
     }
 }
@@ -137,38 +172,29 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
     const installedMark = path.join(cfg.stateDir, 'train-installed');
     const lockHash = (): string => createHash('sha256').update(readFileSync(path.join(aimeat, 'pnpm-lock.yaml'))).digest('hex');
 
-    /** A step line on the screen and in the log, with how long the step took. */
-    const timed = <T>(title: string, run: () => T, green: (r: T) => boolean): T => {
-        const t0 = Date.now();
-        cfg.say(title);
-        const r = run();
-        cfg.say(`${title}: ${green(r) ? 'green' : 'RED'} in ${Math.max(1, Math.round((Date.now() - t0) / 60_000))} min`);
-        return r;
-    };
-
     /** dist/ holds the build of this tree; a build is made when the checkout is another one. */
     let builtTree: string | null = null;
-    const ensureBuilt = (): boolean => {
+    const ensureBuilt = async (): Promise<boolean> => {
         const now = tree();
         if (builtTree === now) return true;
-        const status = timed('the build the sweep starts its nodes from (pnpm build)', () => runLogged(cfg, 'pnpm build', 'pnpm', ['build'], { cwd: aimeat }), s => s === 0);
+        const status = await timed(cfg, 'the build the sweep starts its nodes from (pnpm build)', () => runLogged(cfg, 'pnpm build', 'pnpm', ['build'], { cwd: aimeat }), s => s === 0);
         builtTree = status === 0 ? now : null;
         return status === 0;
     };
 
     const checksStage = (): Stage => {
-        const run = (): number | null => runLogged(cfg, 'the checks', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push'], { cwd: aimeat });
+        const name = 'the checks (check:fast --before-push)';
+        const run = (): Promise<number | null> => runLogged(cfg, 'the checks', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push'], { cwd: aimeat });
         return {
-            name: 'the checks (check:fast --before-push)',
+            name,
             run: async (): Promise<StageResult> => {
                 const from = logSize(cfg);
-                if (timed('the checks (check:fast --before-push)', run, s => s === 0) === 0) return { ok: true };
-                const tail = logTail(cfg, from, 400, 64 * 1024);
-                const red = [...tail.matchAll(/^✗ (\S+)/gm)].map(m => m[1]);
+                if (await timed(cfg, name, run, s => s === 0) === 0) return { ok: true };
+                const red = [...logTail(cfg, from, 400, 64 * 1024).matchAll(/^✗ (\S+)/gm)].map(m => m[1]);
                 return {
                     ok: false,
                     detail: `${red.length ? red.join(', ') : 'see the log'}\n${logTail(cfg, from)}`,
-                    probe: async () => run() !== 0,
+                    probe: async () => await run() !== 0,
                 };
             },
         };
@@ -182,13 +208,14 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             const from = logSize(cfg);
             let report: string | null = null;
             let again: string[] = [];
+            // What the rule's own runs name: the report of the first, the files of the second.
             const run: RunCommand = (cmd, args, cwd) => {
                 report = args.find(a => a.startsWith('--outputFile.json='))?.slice('--outputFile.json='.length) ?? report;
                 const alone = args.indexOf('--no-file-parallelism');
                 if (alone >= 0) again = args.slice(alone + 1);
-                return runLogged(cfg, 'the unit suite', cmd, args, { cwd });
+                return runLoggedSync(cfg, 'the unit suite', cmd, args, { cwd });
             };
-            const r = timed('the unit suite', () => runUnitWithRerun({ cwd: aimeat, cmd: ['pnpm', 'exec', 'vitest', 'run'], tag: 'ready', run }), x => x.ok);
+            const r = await timed(cfg, 'the unit suite', () => runUnitWithRerun({ cwd: aimeat, cmd: ['pnpm', 'exec', 'vitest', 'run'], tag: 'ready', run }), x => x.ok);
             if (r.ok) {
                 passed?.add('unit');
                 return { ok: true, notes: r.passedAlone.map(f => `[unit-flaky] ${f}: red in the parallel run, green alone`) };
@@ -199,10 +226,10 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 ok: false,
                 detail: `${files.length ? `${files.length} unit file(s): ${names.slice(0, 8).join(', ')}${names.length > 8 ? ', …' : ''}` : 'no failed file could be read from the report'}\n${logTail(cfg, from)}`,
                 probe: async () => {
-                    if (files.length === 0) return runLogged(cfg, 'the unit suite again', 'pnpm', ['exec', 'vitest', 'run'], { cwd: aimeat }) !== 0;
+                    if (files.length === 0) return await runLogged(cfg, 'the unit suite again', 'pnpm', ['exec', 'vitest', 'run'], { cwd: aimeat }) !== 0;
                     const here = files.filter(f => existsSync(f));
                     if (here.length === 0) return false;
-                    return runLogged(cfg, 'the red unit files again, alone', 'pnpm', ['-s', 'exec', 'vitest', 'run', '--no-file-parallelism', ...here], { cwd: aimeat }) !== 0;
+                    return await runLogged(cfg, 'the red unit files again, alone', 'pnpm', ['-s', 'exec', 'vitest', 'run', '--no-file-parallelism', ...here], { cwd: aimeat }) !== 0;
                 },
             };
         },
@@ -215,18 +242,17 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             if (before) { cfg.say(`${name}: green on this same tree at ${before}, not run again`); return { ok: true }; }
             const env = { AIMEAT_E2E_NODE_ENTRY: 'dist', AIMEAT_E2E_SERVER_READY_MS: process.env.AIMEAT_E2E_SERVER_READY_MS ?? NODE_START_MS };
             const from = logSize(cfg);
-            if (!ensureBuilt()) {
-                return { ok: false, detail: `pnpm build failed\n${logTail(cfg, from)}`, probe: async () => !ensureBuilt() };
+            if (!await ensureBuilt()) {
+                return { ok: false, detail: `pnpm build failed\n${logTail(cfg, from)}`, probe: async () => !await ensureBuilt() };
             }
             // A path from the package folder, with no space in it: the command goes through a shell on Windows.
             const resultsArg = `test-results/ready-batch/${key.replace(/[^A-Za-z0-9]+/g, '-').slice(0, 60)}-${Date.now()}.json`;
-            const results = path.join(aimeat, resultsArg);
             const args = [script, '--retry-red', '--stop-on-lost-lane', `--workers=${lanes}`, ...suites.map(s => `--test=${s}`), `--results-out=${resultsArg}`];
-            const status = timed(name, () => runLogged(cfg, name, 'pnpm', args, { cwd: aimeat, env }), s => s === 0);
+            const status = await timed(cfg, name, () => runLogged(cfg, name, 'pnpm', args, { cwd: aimeat, env }), s => s === 0);
             let red: string[] = [];
             const notes: string[] = [];
             try {
-                const read = readRunResults(results);
+                const read = readRunResults(path.join(aimeat, resultsArg));
                 red = read.suites.filter(s => s.red).map(s => s.name);
                 for (const s of read.suites) if (s.flaky) notes.push(flakyLine(read.dbType, s.name, s.flaky));
             } catch { /* a run that ended before its summary wrote no results: the probe runs it whole */ }
@@ -235,11 +261,11 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 ok: false,
                 detail: `${red.length ? `${red.length} suite(s): ${red.slice(0, 10).join(', ')}${red.length > 10 ? ', …' : ''}` : 'the run ended without a result for its suites'}\n${logTail(cfg, from)}`,
                 probe: async () => {
-                    if (!ensureBuilt()) return true;
-                    if (red.length === 0) return runLogged(cfg, `${name} again`, 'pnpm', args.filter(a => !a.startsWith('--results-out=')), { cwd: aimeat, env }) !== 0;
+                    if (!await ensureBuilt()) return true;
+                    if (red.length === 0) return await runLogged(cfg, `${name} again`, 'pnpm', args.filter(a => !a.startsWith('--results-out=')), { cwd: aimeat, env }) !== 0;
                     const here = red.filter(s => existsSync(path.join(aimeat, 'test', `${s}.ts`))).slice(0, MAX_PROBE_SUITES);
                     if (here.length === 0) return false;
-                    return runLogged(cfg, `${name}: the red suites again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, here.length)}`, ...here.map(s => `--test=${s}`)], { cwd: aimeat, env }) !== 0;
+                    return await runLogged(cfg, `${name}: the red suites again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, here.length)}`, ...here.map(s => `--test=${s}`)], { cwd: aimeat, env }) !== 0;
                 },
             };
         },
@@ -257,7 +283,7 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             let have = '';
             try { have = readFileSync(installedMark, 'utf-8').trim(); } catch { /* never installed by a batch: install now */ }
             if (have !== want) {
-                const status = timed('the install for this lockfile (pnpm install --frozen-lockfile)', () => runLogged(cfg, 'pnpm install', 'pnpm', ['install', '--frozen-lockfile'], { cwd: aimeat }), s => s === 0);
+                const status = await timed(cfg, 'the install for this lockfile (pnpm install --frozen-lockfile)', () => runLogged(cfg, 'pnpm install', 'pnpm', ['install', '--frozen-lockfile'], { cwd: aimeat }), s => s === 0);
                 if (status !== 0) throw new Error(`pnpm install --frozen-lockfile failed in the batch's worktree (exit ${status}); log: ${cfg.logFile}`);
                 writeFileSync(installedMark, `${want}\n`, 'utf-8');
                 builtTree = null;
@@ -266,7 +292,7 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             // it was then. One made before that script knew this worktree's port has a hashed one,
             // which a session can hold too: the candidate's script writes the right one.
             if (envPortOf(aimeat) !== TRAIN_PORT) {
-                runLogged(cfg, 'pnpm test:env:init --force', 'pnpm', ['test:env:init', '--force'], { cwd: aimeat });
+                await runLogged(cfg, 'pnpm test:env:init --force', 'pnpm', ['test:env:init', '--force'], { cwd: aimeat });
                 if (envPortOf(aimeat) !== TRAIN_PORT) throw new Error(`the batch's worktree has E2E port ${envPortOf(aimeat)}, not ${TRAIN_PORT}, and pnpm test:env:init --force did not change it; log: ${cfg.logFile}`);
             }
         },
@@ -311,7 +337,7 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 }
             }
             const from = logSize(cfg);
-            const status = runLogged(cfg, 'the push to main', 'git', ['-C', root, 'push', 'origin', 'HEAD:main'], { cwd: root });
+            const status = await timed(cfg, 'the push to main', () => runLogged(cfg, 'the push to main', 'git', ['-C', root, 'push', 'origin', 'HEAD:main'], { cwd: root }), s => s === 0);
             if (status !== 0) return { ok: false, reason: `every stage was green, and the push to main was refused (the pre-push hook or the remote):\n${logTail(cfg, from)}` };
             return { ok: true, main: git('rev-parse', 'HEAD') };
         },

@@ -157,7 +157,7 @@ async function driveBatch(queue: ReadyQueue, mine: QueueEntry, commonDir: string
     let verdicts: Map<string, Verdict>;
     const started = Date.now();
     try {
-        ensureTrain(cfg);
+        await ensureTrain(cfg);
         verdicts = await runBatch(trainDeps(cfg), entries, batch);
     } catch (e) {
         // A fault of the run itself (the worktree, an install, git): nobody's commits were judged.
