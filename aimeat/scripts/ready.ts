@@ -19,60 +19,74 @@
  *   `pnpm check:fast` once when the work looks done and fix every red line in one go, then the full run
  *   before main, so that nothing reaches main red.
  *
- *   WHAT IT REFUSES. A dirty tree (what is tested must be what is committed), no AIMEAT_SESSION, commits
- *   that do not rebase onto origin/main without a conflict, and nothing to bring.
+ *   WHAT IT REFUSES AT ONCE. A dirty tree (what is tested must be what is committed), no AIMEAT_SESSION,
+ *   and nothing to bring.
  *
- *   ONE RUN AT A TIME, AND THAT RUN GETS THE MACHINE. The run holds the machine-wide `whole-run` lock
- *   (scripts/lib/machine-lock.ts holdMachineForRun; pnpm gate takes the same one) from before its
- *   checks until it has pushed, and a second session's run waits and says whom for. Until 2026-11-23 only a sentence here asked for that, and nothing held
- *   it: on that day several sessions ran their sweeps side by side, every node start passed its 60 s
- *   limit, each run went red for timing and started again, and a change of words took a working day
- *   to reach main. A run that waited starts from main as it is then: when HEAD is behind origin/main
- *   it is rebased first, so the run tests the work on today's main. Because one run has the machine,
- *   its sweep runs on as many lanes as the machine carries (scripts/lib/ready-lanes.ts) instead of the
- *   4 the package script names.
+ *   ONE RUN AT A TIME, FOR EVERY SESSION THAT IS WAITING. A pnpm ready writes what it asks for into the
+ *   machine's queue (scripts/lib/ready-queue.ts) and then waits for its verdict. The machine-wide
+ *   `whole-run` lock (scripts/lib/machine-lock.ts; pnpm gate takes the same one) lets one run have the
+ *   machine. The waiting pnpm ready that gets the lock drives a BATCH (scripts/lib/ready-batch.ts): the
+ *   commits of every session waiting at that moment, rebased in the order they asked onto main as it
+ *   is then, tested together in a worktree of the batch's own (scripts/lib/ready-train.ts), and pushed
+ *   as one. Every pnpm ready in the batch then reads its own verdict and ends: on main, or refused
+ *   with the reason. A session that asks while a batch runs is in the next one.
+ *     Before 2026-11-23 nothing held runs apart: several sessions ran their sweeps side by side, every
+ *   node start passed its 60 s limit, each run went red for timing and started again, and a change of
+ *   words took a working day to reach main. One run at a time ended that and left N waiting sessions
+ *   costing N runs; a batch costs one.
+ *
+ *   WHEN A BATCH IS RED. The stage's narrowest red (the red unit files, the red suites) is run on the
+ *   candidate's commits in order, and the first where it shows belongs to the session that brought it.
+ *   That session is refused, the candidate is built again without it, and every stage runs again: a
+ *   commit that lands was tested whole. A session whose commits do not apply is refused before any
+ *   stage runs. The others are not held up by either.
+ *
+ *   WHAT THE SCREEN SHOWS. One line when a step starts and one when it ends. Everything a step printed
+ *   is in the batch's log, whose path a refusal names beside the red step's last lines.
  *
  *   A SECOND RUN ON THE SAME TREE STARTS WHERE THE FIRST WAS RED. The unit suite and each sweep that
- *   were green on a tree are recorded (scripts/lib/ready-passed.ts) and not run again while the tree is
- *   the same; a fix or a rebase gives another tree and every step runs. The checks always run. `--fresh`
- *   runs every step.
+ *   were green on a tree are recorded (scripts/lib/ready-passed.ts) and not run again while the
+ *   candidate's tree is the same; a fix, a rebase or another session in the batch gives another tree
+ *   and every step runs. The checks always run. `--fresh` runs every step.
  *
- *   A SWEEP THAT HAS LOST A LANE STOPS. A lane whose node cannot start twice makes the run red; the
- *   sweep ends there (`--stop-on-lost-lane`) instead of finishing the other lanes, and a node gets
- *   180 s to start, not the runner's 60 (NODE_START_MS).
- *
- *   THE SWEEP'S NODES START FROM THE COMPILED BUILD. Before the first sweep the run builds the tree
- *   (`pnpm build`, under a minute) and the sweep starts every node from dist/ (AIMEAT_E2E_NODE_ENTRY,
- *   test/helpers/node-entry.ts), as the nightly on GitHub does and as production runs. A sweep restarts
- *   a node before every suite, and through the TypeScript loader those restarts were most of its time.
+ *   THE SWEEP. Its lanes follow the machine and, on PostgreSQL, the server's connection limit
+ *   (scripts/lib/ready-lanes.ts). Its nodes start from the compiled build (`pnpm build`, under a minute;
+ *   AIMEAT_E2E_NODE_ENTRY, test/helpers/node-entry.ts), as the nightly's on GitHub do and as production
+ *   runs: a sweep restarts a node before every suite, and through the TypeScript loader those restarts
+ *   were most of its time. A lane whose node cannot start twice ends the sweep (`--stop-on-lost-lane`),
+ *   and a node gets 180 s to start, not the runner's 60.
  *
  *   A SUITE RED FOR TIMING. The sweep runs with `--retry-red`: a red suite runs once more, alone
  *   (test/run-e2e-retry.ts). Red again, the run is red. Green alone, it does not stop the merge, and the
- *   runner prints it with the [e2e-flaky] mark: record each as an incident on Lifecycle Central.
+ *   verdict carries it with the [e2e-flaky] mark: record each as an incident on Lifecycle Central.
  *
  *   A UNIT FILE RED FOR TIMING. The unit suite runs whole, in parallel. A file red there runs once more
  *   alone (scripts/lib/unit-rerun.ts, the rule pnpm gate has had since 2026-11-14). Red again, the run
- *   is red. Green alone, it does not stop the merge, and the run prints it with the [unit-flaky] mark:
- *   record these as one incident on Lifecycle Central. Until 2026-11-23 any red unit file stopped the
- *   run, and with other sessions' suites on the machine a different 2 to 4 files timed out each run.
+ *   is red. Green alone, it does not stop the merge, and the verdict carries it with the [unit-flaky]
+ *   mark: record these as one incident on Lifecycle Central.
  *
- *   MAIN MOVED DURING THE RUN. Other sessions push while the run is going. When origin/main is no longer
- *   under HEAD at the end, the commits are rebased onto it and pushed; CI runs on main as always. They
- *   are not tested a second time, or a busy day would never end.
+ *   MAIN MOVED DURING THE RUN. Another machine or a person pushes while the batch is going. When
+ *   origin/main is no longer under the tested commit at the end, the commits are rebased onto it and
+ *   pushed; CI runs on main as always. They are not tested a second time, or a busy day would never end.
+ *
+ *   AFTER IT LANDS. The commits on main are the session's commits rebased, so they have new ids. The
+ *   session's own worktree is rebased onto main by its pnpm ready, which leaves it at main.
  * @usage
- *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # check, test, sweep, push main
- *   cd aimeat && pnpm ready --no-merge                         # stop after a green run
- *   cd aimeat && pnpm ready --no-checks                        # skip the static checks (just run on this tree)
+ *   cd aimeat && AIMEAT_SESSION=cc-alice-x pnpm ready         # wait for a batch: check, test, sweep, push main
+ *   cd aimeat && pnpm ready --no-merge                         # test this session's commits alone, push nothing
+ *   cd aimeat && pnpm ready --no-checks                        # skip the static checks (when every session of the batch asks)
  *   cd aimeat && pnpm ready --full                             # the full sweep even for a text change
  *   cd aimeat && pnpm ready --fresh                            # run every step, also one green on this tree
- *   cd aimeat && pnpm ready --workers=6                        # the sweep's lanes by hand (1 to 16)
+ *   cd aimeat && pnpm ready --workers=6                        # the sweep's lanes by hand (1 to 16), when this run drives
  *
- *   HOW MUCH OF THE SWEEP. A change that reaches code runs the full sweep. A change of words only
+ *   HOW MUCH OF THE SWEEP. A candidate that reaches code runs the full sweep. A change of words only
  *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
  *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22). A wide
  *   change of words (20 product files, or 100 removed texts) also runs the full sweep on SQLite, because
  *   the search misses a suite that quotes only a short part of a sentence (Jouni, 2026-11-23).
  * @version-history
+ *   v3.0.0 — 2026-11-23 — One run for every waiting session: a queue, a batch tested in a worktree of
+ *     its own, and a verdict for each session (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
  *   v2.4.0 — 2026-11-23 — One run at a time on a machine (the `whole-run` lock), a waiting run rebases onto
  *     main before it tests, the sweep's lanes follow the machine and the PostgreSQL server's
  *     connection limit and its nodes start from the compiled build, a step green on the same tree is
@@ -94,84 +108,87 @@
  *   v1.0.0 — 2026-11-15 — Initial.
  */
 import { execFileSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import path from 'node:path';
-import { holdMachineForRun } from './lib/machine-lock.js';
+import { releaseMachineLock, tryMachineLock, WHOLE_RUN_LOCK, WHOLE_RUN_WAIT_MS } from './lib/machine-lock.js';
+import { MAX_BATCH, runBatch } from './lib/ready-batch.js';
 import { postgresLaneNote, postgresLanes, postgresMaxConnections, sweepLanes } from './lib/ready-lanes.js';
-import { passedStore, type PassedStore } from './lib/ready-passed.js';
-import { readyScope } from './lib/ready-scope.js';
-import { runUnitWithRerun } from './lib/unit-rerun.js';
+import { readyQueue, type QueueEntry, type ReadyQueue, type Verdict } from './lib/ready-queue.js';
+import { ensureTrain, trainDeps, type TrainConfig } from './lib/ready-train.js';
 
-const sh = (cmd: string, args: string[], opts: { inherit?: boolean } = {}): string =>
-    execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
+const sh = (cmd: string, args: string[]): string =>
+    execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }) ?? '';
 const git = (...args: string[]): string => sh('git', args).trim();
+const short = (sha: string): string => sha.slice(0, 9);
+const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
 
 function refuse(msg: string): never {
     console.error(`[ready] ${msg}`);
     process.exit(1);
 }
 
-/** The steps that were green on this tree in an earlier run; null until the tree is known, and with --fresh. */
-let passed: PassedStore | null = null;
-
 /**
- * A test node gets this long to start in the sweep, unless the caller set its own limit. The runner's
- * 60 s is measured on a machine doing nothing else; a workstation with a virus scanner reading every
- * file a node opens passed it on 2026-11-23, and a start limit says nothing about the change.
+ * Drive one batch while this process holds the machine: the sessions waiting now (this one alone
+ * for `--no-merge`), tested together, each answered in the queue.
  */
-const NODE_START_MS = '180000';
+async function driveBatch(queue: ReadyQueue, mine: QueueEntry, commonDir: string, stateDir: string): Promise<void> {
+    const waiting = queue.waiting();
+    // A `--no-merge` entry is tested by its own session, alone, and joins nobody's batch.
+    const entries = mine.flags.noMerge ? waiting.filter(e => e.id === mine.id) : waiting.filter(e => !e.flags.noMerge).slice(0, MAX_BATCH);
+    if (entries.length === 0) return;
 
-/**
- * One step of the run; a red step stops the run with what to do. With `key`, a step that was green on
- * this same tree is not run again (scripts/lib/ready-passed.ts); the checks have no key, because some
- * of them read the commits and not only the tree.
- */
-function step(name: string, cmd: string, args: string[], key?: string, env: Record<string, string> = {}): void {
-    const before = key ? passed?.at(key) : null;
-    if (before) {
-        console.log(`\n[ready] ${name}: green on this same tree at ${before}, not run again (pnpm ready --fresh runs every step)`);
-        return;
-    }
-    const t0 = Date.now();
-    console.log(`\n[ready] ${name}`);
+    const batch = `batch-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}-${mine.session}`;
+    const logFile = queue.logFile(batch);
+    const say = (line: string): void => {
+        console.log(`[ready] ${line}`);
+        appendFileSync(logFile, `[ready] ${new Date().toISOString()} ${line}\n`);
+    };
+    say(`${batch}: ${entries.length} session(s) waiting, tested in one run: ${entries.map(e => e.session).join(', ')}. Log: ${logFile}`);
+
+    // The sweep's lanes follow the machine, and on PostgreSQL the server's connection limit
+    // (scripts/lib/ready-lanes.ts).
+    const lanes = sweepLanes(undefined, process.argv.find(a => a.startsWith('--workers='))?.slice('--workers='.length));
+    const pgLimit = await postgresMaxConnections();
+    const pgLanes = postgresLanes(lanes, pgLimit);
+    const pgNote = postgresLaneNote(lanes, pgLanes, pgLimit);
+    if (pgNote) say(pgNote);
+
+    const cfg: TrainConfig = { commonDir, stateDir, sessionAimeat: process.cwd(), lanes, pgLanes, noMerge: mine.flags.noMerge, logFile, say };
+    let verdicts: Map<string, Verdict>;
+    const started = Date.now();
     try {
-        // Only pnpm needs the shell on Windows (it is a .cmd); node runs as itself, because its path
-        // (C:\Program Files\nodejs\node.exe) has a space the shell would split.
-        execFileSync(cmd, args, {
-            stdio: 'inherit',
-            shell: process.platform === 'win32' && cmd === 'pnpm',
-            env: { ...process.env, AIMEAT_E2E_SERVER_READY_MS: process.env.AIMEAT_E2E_SERVER_READY_MS ?? NODE_START_MS, ...env },
-        });
-    } catch {
-        refuse(`${name}: red (above). Main is not touched: fix every red line in one go, commit, and run pnpm ready again. The steps that were green are not run again while the tree stays the same.`);
+        ensureTrain(cfg);
+        verdicts = await runBatch(trainDeps(cfg), entries, batch);
+    } catch (e) {
+        // A fault of the run itself (the worktree, an install, git): nobody's commits were judged.
+        const reason = `the batch stopped on a fault of its own, not on anybody's commits: ${(e as Error).message.split('\n')[0]} Run pnpm ready again.`;
+        say(reason);
+        verdicts = new Map(entries.map(entry => [entry.id, { status: 'refused', reason, batch, log: logFile } satisfies Verdict]));
     }
-    if (key) passed?.add(key);
-    console.log(`[ready] ${name}: green in ${Math.round((Date.now() - t0) / 60_000)} min`);
+    for (const entry of entries) {
+        queue.settle(entry, verdicts.get(entry.id) ?? { status: 'refused', reason: 'the batch gave no verdict for this entry; run pnpm ready again.', batch, log: logFile });
+    }
+    say(`${batch}: ended after ${Math.max(1, Math.round((Date.now() - started) / 60_000))} min.`);
 }
 
-/**
- * The unit suite. A file red in the parallel run runs once more alone (scripts/lib/unit-rerun.ts);
- * the ones green alone are returned, so the closing lines name them. Green on this same tree in an
- * earlier run, it is not run again (scripts/lib/ready-passed.ts).
- */
-function unitStep(): string[] {
-    const name = 'the unit suite';
-    const before = passed?.at('unit');
-    if (before) {
-        console.log(`\n[ready] ${name}: green on this same tree at ${before}, not run again (pnpm ready --fresh runs every step)`);
-        return [];
+/** After its commits landed: put this worktree on main, where they now are under new ids. */
+function followMain(head: string): void {
+    if (git('rev-parse', 'HEAD') !== head || git('status', '--porcelain', '--untracked-files=no')) {
+        console.log(`[ready] this worktree changed while it waited, so it is left as it is. The commits up to ${short(head)} are on main: git rebase origin/main brings the rest over them.`);
+        return;
     }
-    const t0 = Date.now();
-    console.log(`\n[ready] ${name}`);
-    const r = runUnitWithRerun({ cwd: process.cwd(), cmd: ['pnpm', 'exec', 'vitest', 'run'], tag: 'ready' });
-    if (!r.ok) refuse(`${name}: red (above). Main is not touched: fix every red line in one go, commit, and run pnpm ready again.`);
-    for (const f of r.passedAlone) console.log(`[ready] [unit-flaky] ${f}: red in the parallel run, green alone`);
-    passed?.add('unit');
-    console.log(`[ready] ${name}: green in ${Math.round((Date.now() - t0) / 60_000)} min`);
-    return r.passedAlone;
+    try {
+        git('fetch', '-q', 'origin', 'main');
+        git('rebase', '-q', 'origin/main');
+        console.log(`[ready] this worktree is on main now (${short(git('rev-parse', 'HEAD'))}).`);
+    } catch {
+        try { git('rebase', '--abort'); } catch { /* no rebase was left open */ }
+        console.log(`[ready] this worktree is still at ${short(head)}; its commits are on main under new ids: git rebase origin/main.`);
+    }
 }
 
 async function main(): Promise<void> {
-    const noMerge = process.argv.includes('--no-merge');
+    const flag = (name: string): boolean => process.argv.includes(name);
     const session = process.env.AIMEAT_SESSION?.trim();
     if (!session) refuse('AIMEAT_SESSION is not set.');
     if (git('status', '--porcelain', '--untracked-files=no')) refuse('the tree has uncommitted changes; commit them first, so the run tests what is committed.');
@@ -179,92 +196,61 @@ async function main(): Promise<void> {
     git('fetch', '-q', 'origin', 'main');
     const ahead = Number(git('rev-list', '--count', 'origin/main..HEAD'));
     if (ahead === 0) refuse('nothing to bring: HEAD is origin/main.');
-
-    // One run at a time on this machine, in the order the lock comes free. Runs side by side took
-    // each other's cores and disk until every one of them was red for timing (header, ONE RUN AT A TIME).
-    await holdMachineForRun('ready', { session: session!, worktree: process.cwd() });
-
-    // Main as it is when the run starts, which is after the wait: the run before this one has pushed.
-    git('fetch', '-q', 'origin', 'main');
-    const behind = Number(git('rev-list', '--count', 'HEAD..origin/main'));
-    if (behind > 0) {
-        console.log(`[ready] HEAD is ${behind} commit(s) behind origin/main; rebasing onto it before the run, so the run tests the work on today's main.`);
-        try {
-            sh('git', ['rebase', 'origin/main'], { inherit: true });
-        } catch {
-            try { sh('git', ['rebase', '--abort']); } catch { /* no rebase was left open */ }
-            refuse('the commits do not rebase onto origin/main without a conflict. The tree is as it was: git rebase origin/main, resolve, and run pnpm ready again.');
-        }
-    }
     const head = git('rev-parse', 'HEAD');
-    // The sweep's lanes follow the machine, and on PostgreSQL the server's connection limit
-    // (scripts/lib/ready-lanes.ts). The flag comes after the package script's own, and the last wins.
-    const lanes = sweepLanes(undefined, process.argv.find(a => a.startsWith('--workers='))?.slice('--workers='.length));
-    const pgLimit = await postgresMaxConnections();
-    const pgLanes = postgresLanes(lanes, pgLimit);
-    const pgNote = postgresLaneNote(lanes, pgLanes, pgLimit);
-    if (pgNote) console.log(`[ready] ${pgNote}`);
-    // `--stop-on-lost-lane`: a lane that cannot restart its node ends the sweep at once (run-e2e-lane.ts).
-    const onSqlite = ['test:e2e:sqlite', '--retry-red', '--stop-on-lost-lane', `--workers=${lanes}`];
-    const onPostgres = ['test:e2e:postgres-kysely', '--retry-red', '--stop-on-lost-lane', `--workers=${pgLanes}`];
-    // What was green on this tree in an earlier run is not run again (scripts/lib/ready-passed.ts).
-    if (!process.argv.includes('--fresh')) {
-        passed = passedStore(path.join(path.resolve(git('rev-parse', '--git-common-dir')), 'aimeat-ready'), git('rev-parse', 'HEAD^{tree}'));
-    }
-    const started = Date.now();
-    console.log(`[ready] ${ahead} commit(s) at ${head.slice(0, 9)}: checks, unit suite and the E2E suites the change needs, on this machine`);
 
-    if (!process.argv.includes('--no-checks')) {
-        step('the checks (check:fast --before-push)', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push']);
-    }
-    const unitFlaky = unitStep();
+    const commonDir = path.resolve(git('rev-parse', '--git-common-dir'));
+    const stateDir = path.join(commonDir, 'aimeat-ready');
+    const queue = readyQueue(stateDir);
+    // The commit stays reachable while it waits, whatever the session does with its HEAD meanwhile.
+    const ref = `refs/aimeat-ready/${session}`;
+    git('update-ref', ref, head);
+    const mine = queue.enqueue({
+        session: session!, worktree: process.cwd(), sha: head,
+        flags: { full: flag('--full'), fresh: flag('--fresh'), noChecks: flag('--no-checks'), noMerge: flag('--no-merge') },
+    });
+    process.on('exit', () => {
+        queue.forget(mine);
+        try { git('update-ref', '-d', ref); } catch { /* removed already, or git is gone with the process */ }
+    });
+    console.log(`[ready] ${ahead} commit(s) at ${short(head)} in the queue. One run tests every waiting session's commits together, on this machine.`);
 
-    // How much of the sweep the change needs (scripts/lib/ready-scope.ts): all of it for code, the
-    // suites that quote the changed words for text. --full runs all of it whatever the change is.
-    const scope = process.argv.includes('--full') ? { full: true, code: ['(--full)'], suites: [], wide: null } : readyScope(path.resolve('..'), 'origin/main');
-    // A sweep's nodes start from the compiled build, as the nightly's do (test/helpers/node-entry.ts):
-    // through the TypeScript loader a node start cost 12.8 s a suite on 2026-11-23, 59 % of the sweep's
-    // time. The tree is committed and clean, so the build made here is the tree under test.
-    let built = false;
-    const sweep = (name: string, args: string[], key: string): void => {
-        if (!passed?.at(key) && !built) {
-            step('the build the sweep starts its nodes from (pnpm build)', 'pnpm', ['build']);
-            built = true;
+    const owner = { session: session!, worktree: process.cwd() };
+    let verdict: Verdict | null = null;
+    let told = '';
+    for (;;) {
+        verdict = queue.verdictFor(mine);
+        if (verdict) break;
+        const { held, holder } = tryMachineLock(WHOLE_RUN_LOCK, owner, { staleMs: WHOLE_RUN_WAIT_MS });
+        if (held) {
+            try {
+                // Answered while the lock was changing hands: the batch before this one took it.
+                if (!queue.verdictFor(mine)) await driveBatch(queue, mine, commonDir, stateDir);
+            } finally {
+                releaseMachineLock(held);
+            }
+            continue;
         }
-        step(name, 'pnpm', args, key, { AIMEAT_E2E_NODE_ENTRY: 'dist' });
-    };
-    if (scope.full) {
-        console.log(`\n[ready] the change reaches code (${scope.code.slice(0, 5).join(', ')}${scope.code.length > 5 ? ` and ${scope.code.length - 5} more` : ''}): the full sweep on both backends, ${lanes} lanes on SQLite and ${pgLanes} on PostgreSQL`);
-        sweep('the full E2E sweep on SQLite', onSqlite, 'sqlite:full');
-        sweep('the full E2E sweep on PostgreSQL', onPostgres, 'postgres:full');
-    } else if (scope.wide) {
-        // A wide text change: the search for quoted words misses short quotes (ready-scope.ts header).
-        const tests = scope.suites.map(s => `--test=${s}`);
-        console.log(`\n[ready] the change is text only but wide (${scope.wide}): the full sweep on SQLite${scope.suites.length ? `, and on PostgreSQL the ${scope.suites.length} suite(s) that changed or quote the changed words: ${scope.suites.join(', ')}` : ''}`);
-        sweep('the full E2E sweep on SQLite', onSqlite, 'sqlite:full');
-        if (tests.length) sweep('the changed-text suites on PostgreSQL', [...onPostgres, ...tests], `postgres:${scope.suites.join(',')}`);
-    } else if (scope.suites.length) {
-        const tests = scope.suites.map(s => `--test=${s}`);
-        console.log(`\n[ready] the change is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
-        sweep('the changed-text suites on SQLite', [...onSqlite, ...tests], `sqlite:${scope.suites.join(',')}`);
-        sweep('the changed-text suites on PostgreSQL', [...onPostgres, ...tests], `postgres:${scope.suites.join(',')}`);
-    } else {
-        console.log('\n[ready] the change is text only, and no E2E suite changed or quotes the changed words: no sweep. CI runs on main after the push.');
+        const line = holder
+            ? `waiting: ${holder.session} has the machine for its run in ${holder.worktree} (since ${holder.at}). If that run is a batch this entry is in, the verdict comes when it ends; otherwise the next batch takes it.`
+            : 'waiting: another run has the machine.';
+        if (line !== told) { told = line; console.log(`[ready] ${line}`); }
+        await sleep(2000);
     }
 
-    const minutes = Math.round((Date.now() - started) / 60_000);
-    if (git('rev-parse', 'HEAD') !== head) refuse('HEAD moved during the run; run pnpm ready again on the commit you mean.');
-    console.log(`\n[ready] GREEN after ${minutes} min. A suite marked [e2e-flaky] above was red once and green alone: record it as an incident on Lifecycle Central.`);
-    if (unitFlaky.length > 0) console.log(`[ready] [unit-flaky] ${unitFlaky.length} unit file(s) were red in the parallel run and green alone, the machine's load and not the change: ${unitFlaky.join(', ')}. Record them as one incident on Lifecycle Central.`);
-    if (noMerge) { console.log('[ready] --no-merge: main is not touched.'); return; }
-
-    git('fetch', '-q', 'origin', 'main');
-    if (git('rev-list', '--count', 'HEAD..origin/main') !== '0') {
-        console.log('[ready] main moved during the run; rebasing the commits onto it.');
-        sh('git', ['rebase', 'origin/main'], { inherit: true });
+    for (const note of 'notes' in verdict ? verdict.notes : []) console.log(`[ready] ${note}`);
+    if (verdict.status === 'refused') {
+        console.error(`[ready] REFUSED (${verdict.batch}): ${verdict.reason}`);
+        if (verdict.log) console.error(`[ready] Everything the run printed: ${verdict.log}`);
+        console.error('[ready] Main is not touched by these commits. Fix every red line in one go, commit, and run pnpm ready again.');
+        process.exit(1);
     }
-    sh('git', ['push', 'origin', 'HEAD:main'], { inherit: true });
-    console.log(`[ready] on main: ${git('rev-parse', '--short', 'HEAD')}. CI runs there now.`);
+    if (verdict.status === 'green') {
+        console.log(`[ready] GREEN (${verdict.batch}). --no-merge: main is not touched.`);
+        return;
+    }
+    console.log(`[ready] on main: ${short(verdict.main)} (${verdict.batch}${verdict.with.length ? `, together with ${verdict.with.join(', ')}` : ''}). CI runs there now.`);
+    if (verdict.notes.some(n => /\[(e2e|unit|batch)-flaky\]/.test(n))) console.log('[ready] A line marked flaky above was red once and green when run again: record it as an incident on Lifecycle Central.');
+    followMain(head);
 }
 
 await main();

@@ -30,6 +30,8 @@
  *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
  *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.5.0 -- 2026-11-23 -- The worktree named ready-train (pnpm ready's batch) gets port 40500, which
+ *     no session can ask for.
  *   v1.4.0 -- 2026-11-21 -- The derived port steps past every port a test file writes down, which
  *     the runner refuses to start on, and an explicit one of those is warned about (incident
  *     "test:env:init can derive a worktree port that an E2E suite owns").
@@ -49,7 +51,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { derivePort, portConflicts, portsNamedByTests } from './lib/worktree-ports.js';
+import { derivePort, portConflicts, portsNamedByTests, TRAIN_PORT, TRAIN_WORKTREE } from './lib/worktree-ports.js';
 import { worktreeSlug } from './lib/e2e-databases.js';
 import { pruneE2eDatabases } from './test-db-prune.js';
 
@@ -87,6 +89,9 @@ const PORT_MIN = 40251;
 const PORT_MAX = 40499;
 
 function portFor(slug: string): number {
+  // The worktree pnpm ready's batch tests in has one port on every machine, outside the range a
+  // session claims, so no claim and no hash can land on it (lib/worktree-ports.ts TRAIN_PORT).
+  if (slug === worktreeSlug(TRAIN_WORKTREE)) return TRAIN_PORT;
   const raw = process.env.AIMEAT_E2E_PORT?.trim();
   if (raw) {
     const explicit = Number(raw);

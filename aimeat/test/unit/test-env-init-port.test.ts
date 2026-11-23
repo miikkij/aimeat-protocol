@@ -7,6 +7,7 @@
  *   script in an empty directory, so a refusal writes nothing and a port in range stops at the
  *   missing example file without touching any database.
  * @version-history
+ *   v1.2.0 -- 2026-11-23 -- The worktree named ready-train gets 40500, and no session can ask for it.
  *   v1.1.0 -- 2026-11-15 -- A claimed port that the existing env file does not carry is refused
  *     without --force (instruction review, final round N1).
  *   v1.0.0 -- 2026-11-15 -- Initial.
@@ -60,5 +61,25 @@ describe('test:env:init and an explicit E2E port', { timeout: 120_000 }, () => {
         const r = init('40499');
         expect(r.out).not.toContain('is refused');
         expect(r.out).toMatch(/port\s+40499/);
+    });
+
+    it('refuses 40500 from a session: it is the port of pnpm ready\'s batch worktree', () => {
+        const r = init('40500');
+        expect(r.status, r.out).toBe(1);
+        expect(r.out).toContain('AIMEAT_E2E_PORT=40500 is refused');
+        expect(r.wrote).toBe(false);
+    });
+
+    it('gives the worktree named ready-train port 40500, with no port asked for and whatever port is', () => {
+        for (const asked of [undefined, '40300']) {
+            const cwd = join(scratch, `m-${Math.random().toString(36).slice(2)}`, 'ready-train', 'aimeat');
+            mkdirSync(cwd, { recursive: true });
+            const env = { ...process.env, ...(asked ? { AIMEAT_E2E_PORT: asked } : {}) };
+            if (!asked) delete (env as Record<string, string | undefined>).AIMEAT_E2E_PORT;
+            const r = spawnSync(process.execPath, [TSX, SCRIPT], { cwd, env, encoding: 'utf8', timeout: 60_000 });
+            const out = `${r.stdout}${r.stderr}`;
+            expect(out).not.toContain('is refused');
+            expect(out).toMatch(/port\s+40500/);
+        }
     });
 });

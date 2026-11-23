@@ -13,6 +13,7 @@
  * @structure envPortOf(aimeatDir) · portsOfOtherCheckouts(aimeatDir) · portsNamedByTests(aimeatDir) · portConflicts(aimeatDir, port)
  * @usage import { portConflicts } from './lib/worktree-ports.js';
  * @version-history
+ *   v1.2.0 — 2026-11-23 — TRAIN_WORKTREE and TRAIN_PORT: the worktree of pnpm ready's batch and its port.
  *   v1.1.0 — 2026-11-21 — portsNamedByTests(): the 40xxx numbers the test files write down, which
  *     test:env:init no longer derives a port onto.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit D8-09, P9).
@@ -73,6 +74,14 @@ export function portsNamedByTests(aimeatDir: string): Map<number, string[]> {
   }
   return out;
 }
+
+/**
+ * The worktree pnpm ready's batch tests in (scripts/lib/ready-train.ts) and its E2E port: the first
+ * one past the range the board hands out and test:env:init accepts from a session (40251-40499), so
+ * no claim can name it, and below the sandboxes (40600 upward). No test file writes it down.
+ */
+export const TRAIN_WORKTREE = 'ready-train';
+export const TRAIN_PORT = 40500;
 
 /** The band a derived worktree port falls in: clear of the dev server and of the lane ports. */
 export const DERIVED_PORT_MIN = 40251;

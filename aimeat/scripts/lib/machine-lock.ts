@@ -14,12 +14,14 @@
  *   a non-recursive mkdir, so EEXIST is the answer "somebody holds it". The holder writes who it is.
  *   A lock whose holder process is gone, or that is older than `staleMs`, is passed over. A waiting
  *   run says once whom it waits for, and keeps waiting until `timeoutMs`.
- * @structure machineLockRoot() · acquireMachineLock(name, owner, opts) · releaseMachineLock(held) ·
+ * @structure machineLockRoot() · acquireMachineLock(name, owner, opts) · tryMachineLock(name, owner, opts) ·
+ *   releaseMachineLock(held) ·
  *   WHOLE_RUN_LOCK · WHOLE_RUN_WAIT_MS · holdMachineForRun(what, owner, opts)
  * @usage
  *   const held = await acquireMachineLock('check-fast', { session, worktree }, { onWait: h => console.log(...) });
  *   try { ... } finally { releaseMachineLock(held); }
  * @version-history
+ *   v1.2.0 — 2026-11-23 — tryMachineLock: one try without a wait, for pnpm ready's batch queue.
  *   v1.1.0 — 2026-11-23 — holdMachineForRun: pnpm ready and pnpm gate hold one lock for their whole run.
  *   v1.0.0 — 2026-11-15 — Initial: check:fast runs one at a time on a machine.
  */
@@ -95,6 +97,30 @@ export async function acquireMachineLock(name: string, owner: MachineLockOwner, 
         }
         await new Promise(r => setTimeout(r, pollMs));
     }
+}
+
+/**
+ * Take the lock `name` when it is free or left behind, without waiting: the held lock, or null with
+ * the holder when another live run has it. For a caller that has something else to look at between
+ * tries (pnpm ready reads its verdict from the batch another session drives).
+ */
+export function tryMachineLock(name: string, owner: MachineLockOwner, opts: MachineLockOptions = {}): { held: { dir: string } | null; holder: MachineLockRecord | null } {
+    const root = opts.root ?? machineLockRoot();
+    const dir = join(root, name);
+    mkdirSync(root, { recursive: true });
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            mkdirSync(dir);
+            const record: MachineLockRecord = { ...owner, name, pid: opts.pid ?? process.pid, at: new Date().toISOString() };
+            writeFileSync(join(dir, 'owner.json'), JSON.stringify(record), 'utf-8');
+            return { held: { dir }, holder: null };
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+            if (!abandoned(dir, opts.staleMs ?? 90 * 60_000)) break;
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }
+    return { held: null, holder: holderOf(dir) };
 }
 
 /** Give the lock back. Safe to call twice. */

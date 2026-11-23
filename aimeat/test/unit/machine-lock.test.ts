@@ -8,6 +8,7 @@
  *   holder.
  * @usage pnpm exec vitest run test/unit/machine-lock.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-23 — tryMachineLock: one try, no wait.
  *   v1.1.0 — 2026-11-23 — holdMachineForRun: one whole run at a time, and a live run older than the
  *     default age limit keeps its lock.
  *   v1.0.0 — 2026-11-15 — Initial.
@@ -16,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { acquireMachineLock, holdMachineForRun, releaseMachineLock, WHOLE_RUN_LOCK, type MachineLockRecord } from '../../scripts/lib/machine-lock.js';
+import { acquireMachineLock, holdMachineForRun, releaseMachineLock, tryMachineLock, WHOLE_RUN_LOCK, type MachineLockRecord } from '../../scripts/lib/machine-lock.js';
 
 const owner = (session: string) => ({ session, worktree: `/w/${session}` });
 
@@ -52,6 +53,31 @@ describe('acquireMachineLock', () => {
         const first = await acquireMachineLock('check-fast', owner('a'), { root });
         await expect(acquireMachineLock('check-fast', owner('b'), { root, pollMs: 20, timeoutMs: 100 })).rejects.toThrow(/held by a/);
         releaseMachineLock(first);
+    });
+});
+
+describe('tryMachineLock', () => {
+    it('takes a free lock at once, and answers with the holder instead of waiting when it is held', () => {
+        const root = mkdtempSync(join(tmpdir(), 'mlock-'));
+        const first = tryMachineLock(WHOLE_RUN_LOCK, owner('a'), { root });
+        expect(first.held).not.toBeNull();
+        const second = tryMachineLock(WHOLE_RUN_LOCK, owner('b'), { root });
+        expect(second.held).toBeNull();
+        expect(second.holder?.session).toBe('a');
+        releaseMachineLock(first.held!);
+        const third = tryMachineLock(WHOLE_RUN_LOCK, owner('b'), { root });
+        expect(third.held).not.toBeNull();
+        releaseMachineLock(third.held!);
+    });
+
+    it('takes a lock whose holder process is gone', () => {
+        const root = mkdtempSync(join(tmpdir(), 'mlock-'));
+        const dir = join(root, WHOLE_RUN_LOCK);
+        mkdirSync(dir);
+        writeFileSync(join(dir, 'owner.json'), JSON.stringify({ name: WHOLE_RUN_LOCK, session: 'gone', worktree: '/w/gone', pid: 2 ** 22 + 12345, at: new Date().toISOString() }));
+        const taken = tryMachineLock(WHOLE_RUN_LOCK, owner('a'), { root });
+        expect(taken.held).not.toBeNull();
+        releaseMachineLock(taken.held!);
     });
 });
 
