@@ -52,6 +52,10 @@
  *                                          # the same node on PostgreSQL, with its own state file
  *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
  * @version-history
+ *   v1.11.1 — 2026-11-23 — The start waits up to three minutes for the node, not one. With other
+ *     sessions' suites running on the machine the node took longer than 60 s to answer, so the run
+ *     stopped before seeding and left an unseeded node on the port. The wait ends as soon as the node
+ *     answers, so a quiet machine waits no longer than before.
  *   v1.11.0 — 2026-11-21 — The state records the node's public key, and "up" means up with that key:
  *     `--status` no longer says UP for another worktree's node on the recorded port, and `pnpm sandbox`
  *     starts this sandbox on a free port instead of asking that node for tokens (docs/pitfalls.md §77b).
@@ -484,7 +488,7 @@ async function ensureMailbox(s: SandboxState): Promise<SandboxState> {
     return next;
 }
 
-async function waitUntilUp(baseUrl: string, timeoutMs = 60_000): Promise<void> {
+async function waitUntilUp(baseUrl: string, timeoutMs = 180_000): Promise<void> {
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
         if (await isUp(baseUrl)) return;
