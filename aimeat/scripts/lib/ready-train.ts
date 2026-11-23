@@ -82,9 +82,16 @@ interface RunOptions { cwd: string; env?: Record<string, string> }
 const trainRoot = (cfg: TrainConfig): string => path.join(path.dirname(cfg.commonDir), '.worktrees', TRAIN_WORKTREE);
 const trainAimeat = (cfg: TrainConfig): string => path.join(trainRoot(cfg), 'aimeat');
 
-// Only pnpm needs the shell on Windows (it is a .cmd); node and git run as themselves, because a
-// path with a space in it (C:\Program Files\nodejs\node.exe) is split by the shell.
-const needsShell = (cmd: string): boolean => process.platform === 'win32' && cmd === 'pnpm';
+/**
+ * How a command is started. Only pnpm needs the shell on Windows (it is a .cmd); node and git run as
+ * themselves, because a path with a space in it (C:\Program Files\nodejs\node.exe) is split by the
+ * shell. Through the shell the command is one string, an argument with a space in it in double
+ * quotes: Node warns about an argument list given to a shell, which it joins without quoting.
+ */
+function startOf(cmd: string, args: string[]): { file: string; args: string[]; shell: boolean } {
+    if (!(process.platform === 'win32' && cmd === 'pnpm')) return { file: cmd, args, shell: false };
+    return { file: [cmd, ...args.map(a => (/\s/.test(a) ? `"${a}"` : a))].join(' '), args: [], shell: true };
+}
 const header = (cfg: TrainConfig, title: string, cmd: string, args: string[]): void =>
     appendFileSync(cfg.logFile, `\n===== ${new Date().toISOString()} ${title}\n$ ${cmd} ${args.join(' ')}\n`);
 
@@ -95,7 +102,8 @@ const header = (cfg: TrainConfig, title: string, cmd: string, args: string[]): v
 async function runLogged(cfg: TrainConfig, title: string, cmd: string, args: string[], opts: RunOptions): Promise<number | null> {
     header(cfg, title, cmd, args);
     const out = createWriteStream(cfg.logFile, { flags: 'a' });
-    const child = spawn(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: needsShell(cmd), env: { ...process.env, ...opts.env } });
+    const start = startOf(cmd, args);
+    const child = spawn(start.file, start.args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: start.shell, env: { ...process.env, ...opts.env } });
     child.stdout.pipe(out, { end: false });
     child.stderr.pipe(out, { end: false });
     const status = await new Promise<number | null>((settle) => {
@@ -112,7 +120,8 @@ async function runLogged(cfg: TrainConfig, title: string, cmd: string, args: str
  */
 function runLoggedSync(cfg: TrainConfig, title: string, cmd: string, args: string[], opts: RunOptions): number | null {
     header(cfg, title, cmd, args);
-    const r = spawnSync(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: needsShell(cmd), env: { ...process.env, ...opts.env }, maxBuffer: 1024 * 1024 * 1024 });
+    const start = startOf(cmd, args);
+    const r = spawnSync(start.file, start.args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: start.shell, env: { ...process.env, ...opts.env }, maxBuffer: 1024 * 1024 * 1024 });
     appendFileSync(cfg.logFile, r.stdout ?? '');
     appendFileSync(cfg.logFile, r.stderr ?? '');
     if (r.error) appendFileSync(cfg.logFile, `could not run ${cmd}: ${r.error.message}\n`);
