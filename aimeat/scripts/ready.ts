@@ -28,6 +28,12 @@
  *   (test/run-e2e-retry.ts). Red again, the run is red. Green alone, it does not stop the merge, and the
  *   runner prints it with the [e2e-flaky] mark: record each as an incident on Lifecycle Central.
  *
+ *   A UNIT FILE RED FOR TIMING. The unit suite runs whole, in parallel. A file red there runs once more
+ *   alone (scripts/lib/unit-rerun.ts, the rule pnpm gate has had since 2026-11-14). Red again, the run
+ *   is red. Green alone, it does not stop the merge, and the run prints it with the [unit-flaky] mark:
+ *   record these as one incident on Lifecycle Central. Until 2026-11-23 any red unit file stopped the
+ *   run, and with other sessions' suites on the machine a different 2 to 4 files timed out each run.
+ *
  *   MAIN MOVED DURING THE RUN. Other sessions push while the run is going. When origin/main is no longer
  *   under HEAD at the end, the commits are rebased onto it and pushed; CI runs on main as always. They
  *   are not tested a second time, or a busy day would never end.
@@ -43,6 +49,8 @@
  *   change of words (20 product files, or 100 removed texts) also runs the full sweep on SQLite, because
  *   the search misses a suite that quotes only a short part of a sentence (Jouni, 2026-11-23).
  * @version-history
+ *   v2.3.0 — 2026-11-23 — A unit file red in the parallel run runs once more alone; one green alone is
+ *     listed as [unit-flaky], not red (wish-pnpm-ready-a-red-unit-file-runs-once-more-alone-before-the-r).
  *   v2.2.0 — 2026-11-23 — A wide text change runs the full sweep on SQLite and the picked suites on
  *     PostgreSQL.
  *   v2.1.1 — 2026-11-22 — The checks step runs node without a shell on Windows: the shell split
@@ -59,6 +67,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { readyScope } from './lib/ready-scope.js';
+import { runUnitWithRerun } from './lib/unit-rerun.js';
 
 const sh = (cmd: string, args: string[], opts: { inherit?: boolean } = {}): string =>
     execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'] }) ?? '';
@@ -83,6 +92,21 @@ function step(name: string, cmd: string, args: string[]): void {
     console.log(`[ready] ${name}: green in ${Math.round((Date.now() - t0) / 60_000)} min`);
 }
 
+/**
+ * The unit suite. A file red in the parallel run runs once more alone (scripts/lib/unit-rerun.ts);
+ * the ones green alone are returned, so the closing lines name them.
+ */
+function unitStep(): string[] {
+    const name = 'the unit suite';
+    const t0 = Date.now();
+    console.log(`\n[ready] ${name}`);
+    const r = runUnitWithRerun({ cwd: process.cwd(), cmd: ['pnpm', 'exec', 'vitest', 'run'], tag: 'ready' });
+    if (!r.ok) refuse(`${name}: red (above). Main is not touched: fix every red line in one go, commit, and run pnpm ready again.`);
+    for (const f of r.passedAlone) console.log(`[ready] [unit-flaky] ${f}: red in the parallel run, green alone`);
+    console.log(`[ready] ${name}: green in ${Math.round((Date.now() - t0) / 60_000)} min`);
+    return r.passedAlone;
+}
+
 async function main(): Promise<void> {
     const noMerge = process.argv.includes('--no-merge');
     const session = process.env.AIMEAT_SESSION?.trim();
@@ -101,7 +125,7 @@ async function main(): Promise<void> {
     if (!process.argv.includes('--no-checks')) {
         step('the checks (check:fast --before-push)', process.execPath, ['--import', 'tsx', 'scripts/check-fast.ts', '--before-push']);
     }
-    step('the unit suite', 'pnpm', ['exec', 'vitest', 'run']);
+    const unitFlaky = unitStep();
 
     // How much of the sweep the change needs (scripts/lib/ready-scope.ts): all of it for code, the
     // suites that quote the changed words for text. --full runs all of it whatever the change is.
@@ -128,6 +152,7 @@ async function main(): Promise<void> {
     const minutes = Math.round((Date.now() - started) / 60_000);
     if (git('rev-parse', 'HEAD') !== head) refuse('HEAD moved during the run; run pnpm ready again on the commit you mean.');
     console.log(`\n[ready] GREEN after ${minutes} min. A suite marked [e2e-flaky] above was red once and green alone: record it as an incident on Lifecycle Central.`);
+    if (unitFlaky.length > 0) console.log(`[ready] [unit-flaky] ${unitFlaky.length} unit file(s) were red in the parallel run and green alone, the machine's load and not the change: ${unitFlaky.join(', ')}. Record them as one incident on Lifecycle Central.`);
     if (noMerge) { console.log('[ready] --no-merge: main is not touched.'); return; }
 
     git('fetch', '-q', 'origin', 'main');

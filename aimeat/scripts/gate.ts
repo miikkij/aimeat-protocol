@@ -46,6 +46,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-11-23 -- The second run of failed unit files moved to scripts/lib/unit-rerun.ts, which pnpm
+ *     ready uses too; more than 40 failed files are not run again.
  *   2026-11-21 -- The unit tests whose text names a changed file run too (docs/pitfalls.md §108), and
  *     the test tree is typechecked against a shrink-only per-file baseline (§26).
  *   2026-11-15 -- The suites that executed a changed line of src/ run too, chosen from the nightly's
@@ -84,6 +86,7 @@ import { describeState, readCiState } from './lib/ci-runs.mjs';
 import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
 import { COVERAGE_SUITE_CAP, coverageSelection, type GateCoverage } from './lib/gate-coverage.js';
 import { testsNamingChanged } from './lib/gate-text-tests.js';
+import { runUnitWithRerun } from './lib/unit-rerun.js';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -385,34 +388,14 @@ async function main(): Promise<void> {
 }
 
 /**
- * A vitest step whose failed files are run again alone, one at a time, before the gate refuses.
- *
- * WHY. Run whole on a machine where other sessions run their own suites, 10 to 15 of the 14 700 unit
- * tests ran past their 5 s limit, a different set each run, and every one passed alone (2026-11-14):
- * the gate refused for the machine's load and said nothing about the change. A file that fails again
- * alone refuses; one that passes alone is named in the closing lines, so the load is visible and is
- * never read as the change.
+ * A vitest step whose failed files are run again alone, one at a time, before the gate refuses
+ * (scripts/lib/unit-rerun.ts has the rule and why). A file that passes alone is named in the closing
+ * lines, so the load is visible and is never read as the change.
  */
 function runUnit(s: Step, notes: string[]): boolean {
-    const report = join(mkdtempSync(join(tmpdir(), 'aimeat-gate-unit-')), 'report.json');
-    const shell = process.platform === 'win32';
-    const first = spawnSync(s.cmd[0], [...s.cmd.slice(1), '--reporter=default', '--reporter=json', `--outputFile.json=${report}`], { cwd: AIMEAT, stdio: 'inherit', shell });
-    if (first.status === 0) return true;
-    let failed: string[] = [];
-    try {
-        const body = JSON.parse(readFileSync(report, 'utf8')) as { testResults?: Array<{ name: string; status: string }> };
-        failed = (body.testResults ?? []).filter(r => r.status === 'failed').map(r => r.name);
-    } catch {
-        console.error('[gate] the unit report could not be read, so the failed files cannot be run again alone');
-        return false;
-    }
-    if (failed.length === 0) return false;
-    console.log(`\n[gate] ${failed.length} unit file(s) failed; running them again alone, one at a time…`);
-    const again = spawnSync('pnpm', ['-s', 'exec', 'vitest', 'run', '--no-file-parallelism', ...failed], { cwd: AIMEAT, stdio: 'inherit', shell });
-    if (again.status !== 0) return false;
-    const names = failed.map(f => f.replace(/\\/g, '/').replace(/^.*?\/aimeat\//, ''));
-    notes.push(`${names.length} unit file(s) failed in the parallel run and passed alone: the machine's load, not the change. ${names.join(', ')}`);
-    return true;
+    const r = runUnitWithRerun({ cwd: AIMEAT, cmd: s.cmd, tag: 'gate' });
+    if (r.passedAlone.length > 0) notes.push(`${r.passedAlone.length} unit file(s) failed in the parallel run and passed alone: the machine's load, not the change. ${r.passedAlone.join(', ')}`);
+    return r.ok;
 }
 
 void main();
