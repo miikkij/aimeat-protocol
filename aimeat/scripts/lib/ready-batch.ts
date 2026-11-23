@@ -101,7 +101,12 @@ export function buildCandidate(deps: Pick<BatchDeps, 'git' | 'log'>, base: strin
         }
         if (deps.git('rev-list', '--count', `${fork}..${entry.sha}`) === '0') { present.push(entry); continue; }
         try {
-            deps.git('rebase', '-q', '--onto', tip, fork, entry.sha);
+            // The candidate is the upstream: git replays the entry's commits that are not in it, and
+            // drops those whose change is in it already under another id. That is a session whose
+            // work stands on another waiting session's commits. With `--onto <tip> <fork>` every one
+            // of those was replayed, and the first of several that touch one file stopped on a
+            // conflict with its own later state (seen on 2026-11-23, in the first batch of two).
+            deps.git('rebase', '-q', tip, entry.sha);
         } catch {
             let files = '';
             try { files = deps.git('diff', '--name-only', '--diff-filter=U').split('\n').filter(Boolean).slice(0, 8).join(', '); } catch { /* the names are a help, not the verdict */ }

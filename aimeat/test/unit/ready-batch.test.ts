@@ -261,6 +261,31 @@ describe('runBatch', { timeout: 120_000 }, () => {
         expect(l.git('log', '--format=%s', 'origin/main')).toBe('work of cc-bob-b\nwork of cc-alice-a\nbase');
     });
 
+    it('lands a session stacked on another whose several commits rewrite one file, also when main moved under both', async () => {
+        for (const mainMoved of [false, true]) {
+            const l = lab();
+            // Alice: two commits on one file. Replayed one by one over her own final state, the first
+            // would stop on a conflict.
+            const alice = l.session('cc-alice-a', { 'shared.txt': 'first draft\n' });
+            l.git('checkout', '-q', '-f', '--detach', alice.sha);
+            writeFileSync(join(l.repo, 'shared.txt'), 'second draft, every line changed\n');
+            l.git('add', '-A');
+            l.git('commit', '-q', '-m', 'work of cc-alice-a, again');
+            alice.sha = l.git('rev-parse', 'HEAD');
+            writeFileSync(join(l.repo, 'bob.txt'), 'b\n');
+            l.git('add', '-A');
+            l.git('commit', '-q', '-m', 'work of cc-bob-b');
+            const bob: QueueEntry = { ...alice, id: 'cc-bob-b-2', session: 'cc-bob-b', sha: l.git('rev-parse', 'HEAD'), at: new Date(Date.UTC(2026, 10, 23, 10, 0, 30)).toISOString() };
+            // With main moved, Alice's commits get new ids in the candidate and are still hers.
+            if (mainMoved) l.onMain({ 'elsewhere.txt': 'e\n' });
+            const verdicts = await runBatch(l.deps({ checks: never }), [alice, bob], 'batch-1');
+
+            expect([alice, bob].map(e => statusOf(verdicts, e)), `main moved: ${mainMoved}`).toEqual(['landed', 'landed']);
+            expect(l.git('show', 'origin/main:shared.txt')).toBe('second draft, every line changed');
+            expect(l.git('log', '--format=%s', 'origin/main').split('\n').slice(0, 3)).toEqual(['work of cc-bob-b', 'work of cc-alice-a, again', 'work of cc-alice-a']);
+        }
+    });
+
     it('builds on main as another machine left it, and keeps that commit under the batch', async () => {
         const l = lab();
         const alice = l.session('cc-alice-a', { 'alice.txt': 'a\n' });
