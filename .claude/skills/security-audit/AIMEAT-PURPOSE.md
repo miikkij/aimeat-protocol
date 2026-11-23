@@ -103,8 +103,8 @@ one of them is wrong even when it closes the hole.
 3. **Tests in this order** (CLAUDE.md, Git). The suites the change reaches, on both backends, while
    the work is in progress; `pnpm check:fast` once when it looks done, every red line fixed in one
    go; then `pnpm ready`, which runs the full E2E sweep (the purpose suites of wish
-   `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni` included) and the builds on
-   GitHub and puts the round on `main` only when green. A round that changes a behaviour waits for
+   `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni` included) on this machine,
+   one run at a time, and puts the round on `main` only when green. A round that changes a behaviour waits for
    the developer's approval of the list above before `pnpm ready`.
 
 **The purpose tier** is the automated form of the list above: `PURPOSE_SUITES` in

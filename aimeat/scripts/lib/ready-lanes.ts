@@ -42,10 +42,10 @@ const FLOOR = 4;
 const CEILING = 12;
 
 /**
- * The lanes of the SQLite sweep. `set` (AIMEAT_READY_WORKERS, 1 to 16) names the number by hand, for
- * a machine that is doing something else as well.
+ * The lanes of the SQLite sweep. `set` (pnpm ready's `--workers=N`, 1 to 16) names the number by
+ * hand, for a machine that is doing something else as well.
  */
-export function sweepLanes(cores: number = cpus().length, set: string | undefined = process.env.AIMEAT_READY_WORKERS): number {
+export function sweepLanes(cores: number = cpus().length, set?: string): number {
     const asked = Number(set);
     if (set && Number.isInteger(asked) && asked >= 1 && asked <= 16) return asked;
     return Math.max(FLOOR, Math.min(CEILING, Math.floor(cores / 2.6)));

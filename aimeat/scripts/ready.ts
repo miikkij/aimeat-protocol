@@ -65,7 +65,7 @@
  *   cd aimeat && pnpm ready --no-checks                        # skip the static checks (just run on this tree)
  *   cd aimeat && pnpm ready --full                             # the full sweep even for a text change
  *   cd aimeat && pnpm ready --fresh                            # run every step, also one green on this tree
- *   cd aimeat && AIMEAT_READY_WORKERS=6 pnpm ready             # the sweep's lanes by hand (1 to 16)
+ *   cd aimeat && pnpm ready --workers=6                        # the sweep's lanes by hand (1 to 16)
  *
  *   HOW MUCH OF THE SWEEP. A change that reaches code runs the full sweep. A change of words only
  *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
@@ -199,7 +199,7 @@ async function main(): Promise<void> {
     const head = git('rev-parse', 'HEAD');
     // The sweep's lanes follow the machine, and on PostgreSQL the server's connection limit
     // (scripts/lib/ready-lanes.ts). The flag comes after the package script's own, and the last wins.
-    const lanes = sweepLanes();
+    const lanes = sweepLanes(undefined, process.argv.find(a => a.startsWith('--workers='))?.slice('--workers='.length));
     const pgLimit = await postgresMaxConnections();
     const pgLanes = postgresLanes(lanes, pgLimit);
     const pgNote = postgresLaneNote(lanes, pgLanes, pgLimit);
