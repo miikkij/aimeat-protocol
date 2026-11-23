@@ -10,6 +10,7 @@
  *   another one.
  * @usage pnpm test -- agent-draft-known
  * @version-history
+ *   v1.3.1 — 2026-11-23 — The recorded drafts name invented apps and the owner alice, not apps on aimeat.io.
  *   v1.3.0 — 2026-10-13 — Whether a record-woken agent goes onto its organism's agent list (joinsAgentList).
  *   v1.2.0 — 2026-10-13 — The model a person picks for a new agent (llmChoiceOf).
  *   v1.1.0 — 2026-10-12 — An agent that works on a workspace's records: the prompt text, the
@@ -486,75 +487,75 @@ describe('a browser on the agent\'s computer', () => {
 
 describe('a tool address the model wrote in a form the runtime cannot call', () => {
     // Measured on 2026-10-13 with the model production drafts with (qwen/qwen3.7-plus), nine drafts
-    // from the home sentences of Postinjalostamo and MUISTIO on a prompt of production size: three
+    // from the home sentences of a mail intake app and a meeting minutes app on a prompt of production size: three
     // wrote the full address, two left the prefix out, four copied the prompt's own placeholder
     // and named the tools beside it. The task texts below are those drafts' own.
-    const POSTI = { filename: 'postinjalostamo.html', name: 'Postinjalostamo', tools: ['new_messages', 'read_message', 'save_note'].map((name) => ({ name, sku: `app-tool:happydude500001/postinjalostamo.html:${name}`, description: '' })) };
-    const MUISTIO = { filename: 'muistio.html', name: 'MUISTIO', tools: ['notes_to_read', 'read_note', 'save_findings', 'open_actions', 'update_action', 'save_reminder'].map((name) => ({ name, sku: `app-tool:happydude500001/muistio.html:${name}`, description: '' })) };
-    const known = { apps: [POSTI, MUISTIO], places: [] };
+    const MAIL = { filename: 'mail-intake.html', name: 'Mail intake', tools: ['new_messages', 'read_message', 'save_note'].map((name) => ({ name, sku: `app-tool:alice/mail-intake.html:${name}`, description: '' })) };
+    const MINUTES = { filename: 'minutes.html', name: 'MINUTES', tools: ['notes_to_read', 'read_note', 'save_findings', 'open_actions', 'update_action', 'save_reminder'].map((name) => ({ name, sku: `app-tool:alice/minutes.html:${name}`, description: '' })) };
+    const known = { apps: [MAIL, MINUTES], places: [] };
     const one = (description: string) => ({ ...def(description, ['app_tools']) });
     const text = (d: any) => d.tasks[0].description as string;
     const namesOf = (d: any) => namedIn(d, known).apps.map((a: any) => `${a.filename}:${a.tools.map((x: any) => x.name).join(',')}`);
 
     it('an address without its prefix gets the prefix', () => {
-        const d = withToolSkus(one('Use the app_tools to call happydude500001/postinjalostamo.html:new_messages to list messages. For each, call happydude500001/postinjalostamo.html:read_message. {{ctx.prompt}}'), known);
-        expect(text(d)).toContain('call app-tool:happydude500001/postinjalostamo.html:new_messages to list');
-        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message']);
+        const d = withToolSkus(one('Use the app_tools to call alice/mail-intake.html:new_messages to list messages. For each, call alice/mail-intake.html:read_message. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('call app-tool:alice/mail-intake.html:new_messages to list');
+        expect(namesOf(d)).toEqual(['mail-intake.html:new_messages,read_message']);
     });
 
     it('the prompt\'s placeholder becomes the addresses of the tools the same task names beside it', () => {
-        const d = withToolSkus(one('Use the Postinjalostamo app tools [app-tool:happydude500001/postinjalostamo.html:<tool>] to process the daily mail. First, call `new_messages`. Then call `read_message`. Finally, call `save_note` for each message. {{ctx.prompt}}'), known);
-        expect(text(d)).toContain('[app-tool:happydude500001/postinjalostamo.html:new_messages, app-tool:happydude500001/postinjalostamo.html:read_message, app-tool:happydude500001/postinjalostamo.html:save_note]');
+        const d = withToolSkus(one('Use the Mail intake app tools [app-tool:alice/mail-intake.html:<tool>] to process the daily mail. First, call `new_messages`. Then call `read_message`. Finally, call `save_note` for each message. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('[app-tool:alice/mail-intake.html:new_messages, app-tool:alice/mail-intake.html:read_message, app-tool:alice/mail-intake.html:save_note]');
         expect(text(d)).not.toContain('<tool>');
-        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message,save_note']);
+        expect(namesOf(d)).toEqual(['mail-intake.html:new_messages,read_message,save_note']);
     });
 
     it('each task gets the tools that task names, and every placeholder in it', () => {
         const d = withToolSkus({ ...def('{{ctx.prompt}}', ['app_tools']), tasks: [
-            { id: 'a', agent: 'worker', description: 'Fetch all open actions from MUISTIO [app-tool:happydude500001/muistio.html:<tool>] using the open_actions tool. {{ctx.prompt}}' },
-            { id: 'b', agent: 'worker', description: 'Create a reminder draft using MUISTIO [app-tool:happydude500001/muistio.html:<tool>] with the save_reminder tool, from app-tool:happydude500001/muistio.html:<tool>.' },
+            { id: 'a', agent: 'worker', description: 'Fetch all open actions from MINUTES [app-tool:alice/minutes.html:<tool>] using the open_actions tool. {{ctx.prompt}}' },
+            { id: 'b', agent: 'worker', description: 'Create a reminder draft using MINUTES [app-tool:alice/minutes.html:<tool>] with the save_reminder tool, from app-tool:alice/minutes.html:<tool>.' },
         ] }, known);
-        expect(d.tasks[0].description).toContain('[app-tool:happydude500001/muistio.html:open_actions]');
-        expect(d.tasks[1].description.split('app-tool:happydude500001/muistio.html:save_reminder').length - 1).toBe(2);
+        expect(d.tasks[0].description).toContain('[app-tool:alice/minutes.html:open_actions]');
+        expect(d.tasks[1].description.split('app-tool:alice/minutes.html:save_reminder').length - 1).toBe(2);
         expect(JSON.stringify(d)).not.toContain('<tool>');
     });
 
     it('a placeholder with no tool of that app named beside it is left as it came, and the page names no app for it', () => {
-        const d = withToolSkus(one('Use MUISTIO [app-tool:happydude500001/muistio.html:<tool>] to do the work. {{ctx.prompt}}'), known);
+        const d = withToolSkus(one('Use MINUTES [app-tool:alice/minutes.html:<tool>] to do the work. {{ctx.prompt}}'), known);
         expect(text(d)).toContain(':<tool>]');
         expect(namesOf(d)).toEqual([]);
     });
 
     it('a full address is left alone, and a word that is only part of a longer name is not a tool', () => {
-        const full = one('Call app-tool:happydude500001/muistio.html:read_note, then save. {{ctx.prompt}}');
+        const full = one('Call app-tool:alice/minutes.html:read_note, then save. {{ctx.prompt}}');
         expect(withToolSkus(full, known)).toBe(full);
         // "read_note" is inside "read_notes_later" and inside the address of another owner's app.
-        const d = withToolSkus(one('MUISTIO [app-tool:happydude500001/muistio.html:<tool>]: read_notes_later, and someone/muistio.html:read_note. {{ctx.prompt}}'), known);
+        const d = withToolSkus(one('MINUTES [app-tool:alice/minutes.html:<tool>]: read_notes_later, and someone/minutes.html:read_note. {{ctx.prompt}}'), known);
         expect(text(d)).toContain(':<tool>]');
     });
 
-    // Seen twice with the production draft model on 2026-10-13 (LUUKKU's sentence in a measurement,
-    // Postinjalostamo's on aimeat.io): the model wrote the app's address with no tool part and
+    // Seen twice with the production draft model on 2026-10-13 (a customer window app's sentence in a
+    // measurement, a mail intake app's on aimeat.io): the model wrote the app's address with no tool part and
     // named the tools beside it, and the page showed no app before the person approved.
     it('an app\'s address with no tool part becomes the addresses of the tools the same task names', () => {
-        const d = withToolSkus(one('If a record is present, use app_tools to call the Postinjalostamo tools under sku happydude500001/postinjalostamo.html: list with new_messages, read with read_message, and save with save_note. {{ctx.prompt}}'), known);
-        expect(text(d)).toContain('under sku app-tool:happydude500001/postinjalostamo.html:new_messages, app-tool:happydude500001/postinjalostamo.html:read_message, app-tool:happydude500001/postinjalostamo.html:save_note: list with');
-        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message,save_note']);
+        const d = withToolSkus(one('If a record is present, use app_tools to call the Mail intake tools under sku alice/mail-intake.html: list with new_messages, read with read_message, and save with save_note. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('under sku app-tool:alice/mail-intake.html:new_messages, app-tool:alice/mail-intake.html:read_message, app-tool:alice/mail-intake.html:save_note: list with');
+        expect(namesOf(d)).toEqual(['mail-intake.html:new_messages,read_message,save_note']);
         // With the prefix and in brackets, as the other draft wrote it.
-        const e = withToolSkus(one('Use the MUISTIO app tools (sku: app-tool:happydude500001/muistio.html) and the \'read_note\' tool, then the \'save_findings\' tool. {{ctx.prompt}}'), known);
-        expect(text(e)).toContain('(sku: app-tool:happydude500001/muistio.html:read_note, app-tool:happydude500001/muistio.html:save_findings)');
-        expect(namesOf(e)).toEqual(['muistio.html:read_note,save_findings']);
+        const e = withToolSkus(one('Use the MINUTES app tools (sku: app-tool:alice/minutes.html) and the \'read_note\' tool, then the \'save_findings\' tool. {{ctx.prompt}}'), known);
+        expect(text(e)).toContain('(sku: app-tool:alice/minutes.html:read_note, app-tool:alice/minutes.html:save_findings)');
+        expect(namesOf(e)).toEqual(['minutes.html:read_note,save_findings']);
     });
 
     it('an app\'s address with no tool named beside it, and another owner\'s app of the same file, are left as they came', () => {
-        const none = one('Open happydude500001/muistio.html and do the work. {{ctx.prompt}}');
+        const none = one('Open alice/minutes.html and do the work. {{ctx.prompt}}');
         expect(withToolSkus(none, known)).toBe(none);
-        const other = one('Call someone/muistio.html with read_note. {{ctx.prompt}}');
+        const other = one('Call someone/minutes.html with read_note. {{ctx.prompt}}');
         expect(withToolSkus(other, known)).toBe(other);
     });
 
     it('a definition with no tasks, and an account with no app tools, come back as they were', () => {
-        const d = one('happydude500001/muistio.html:read_note {{ctx.prompt}}');
+        const d = one('alice/minutes.html:read_note {{ctx.prompt}}');
         expect(withToolSkus(d, { apps: [], places: [] })).toBe(d);
         expect(withToolSkus(null as any, known)).toBe(null);
         expect(withToolSkus({ agents: [] } as any, known)).toEqual({ agents: [] });

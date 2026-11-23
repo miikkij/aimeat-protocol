@@ -8,8 +8,8 @@
  *   developer on 2026-10-13: "sovelluksen tietuetila ottaa agentin kirjoituksen vain sovelluksen
  *   oman laajennuksen kautta".
  *
- *   WHAT WAS MEASURED. On aimeat.io on 2026-10-13 an agent made from the home page for the app
- *   MUISTIO wrote decision and action records directly into the app's spaces with the plain
+ *   WHAT WAS MEASURED. On aimeat.io on 2026-10-13 an agent made from the home page for a meeting
+ *   minutes app wrote decision and action records directly into the app's spaces with the plain
  *   workspace-write tool, past the app's own tool: a quote with spelling slips the tool would have
  *   refused, a decision the note said was not decided, and an author field the model typed wrongly.
  *
@@ -47,6 +47,7 @@
  *   manifest they start from had already lost its list. The set-up, the owner's "Guard:" and the
  *   clean-up pass.
  * @version-history
+ *   v1.1.3 — 2026-11-23 — The header names the kind of app it was measured on, not the app.
  *   v1.1.2 — 2026-11-08 — The agent-owned legacy form is stored by the agent itself. Since
  *     secaudit2026nov08b round 15 (services/intake/form-owner.ts) a form writes as the identity that
  *     stored its config record, never as a name inside the value, so the owner storing a config that

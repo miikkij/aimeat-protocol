@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description services/home/ideas.ts parseHomeIdeas against what an operator can save, and the
  *   seeded documents (services/prompt-defaults/home-ideas.ts) against each other: every language
- *   parses with no problem and carries the same ids, groups, kinds and apps.
+ *   parses with no problem and has the same ids, groups and kinds, and the same ideas have an app.
  * @version-history
+ *   v1.1.0 — 2026-11-23 — The apps are named by kind in each language; the seed names no app ready.
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
 import { describe, it, expect } from 'vitest';
@@ -72,13 +73,22 @@ describe('the seeded home ideas', () => {
       const { ideas } = parseHomeIdeas(text);
       return {
         groups: ideas.groups.map((g) => g.id),
-        agents: ideas.agents.map((a) => [a.id, a.group, a.when, a.app]),
+        // The app is named in each language, so the shape is only whether an idea has one.
+        agents: ideas.agents.map((a) => [a.id, a.group, a.when, a.app !== null]),
         apps: ideas.apps.map((p) => [p.id, p.ready_app, p.agent]),
       };
     };
     const en = shape(docs.en);
     expect(shape(docs.fi)).toEqual(en);
     expect(shape(docs.es)).toEqual(en);
+  });
+
+  it('names no app as ready and no app by an app\'s own name, because a new node has none of them', () => {
+    for (const text of Object.values(docs)) {
+      const { ideas } = parseHomeIdeas(text);
+      expect(ideas.apps.filter((p) => p.ready_app)).toEqual([]);
+      expect(text).not.toMatch(/MUISTIO|LUUKKU|Postinjalostamo|ERÄPÄIVÄ|SAATAVAT|HAASTATTELUT|PEREHDYTYS|OMA TERVEYS/);
+    }
   });
 
   it('files every agent idea under a group the list has', () => {

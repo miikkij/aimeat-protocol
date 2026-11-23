@@ -57,7 +57,7 @@ video, ten scenes, 2:56).
    selector list (AIMEAT Pages lists some), CADENCE with real customer rows, and admin pages that list people's names or e-mails (use compliance,
    statistics and federation). SUUNTA's competitor matrix is shown only when Jouni says so for
    that video.
-5. **His own e-mail is on some surfaces** (hatchery dashboard top bar, M-ROOM deliver panel). Say
+5. **His own e-mail is on some surfaces** (the M-ROOM deliver panel). Say
    so in the report and let him decide whether to crop.
 6. **Clips come from the clean masters** in `genimages/videos/<name>/<name>.mp4`. The copies in
    `assets/video/` have burned-in captions that collide with new cards. `captions.ass` and

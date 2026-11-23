@@ -31,6 +31,7 @@
  * @usage
  *   if (isShippedDefaultText(record.id, record)) { ...the stored text is a shipped default... }
  * @version-history
+ *   2026-11-23 — home-ideas' new text (apps named by kind, none ready) joins its list.
  *   2026-11-22 — sixteen default prompt texts lose their picture words (carries, hands, lives in, node in a person's text) and join their lists.
  *   2026-11-22 — operator-welcome's new text (introduction page for welcome mat) joins its list.
  *   2026-11-15 — playbook-marketplace's new text (the same handler, not the same door) joins its list.
@@ -51,7 +52,7 @@ export const SHIPPED_PROMPT_HASHES: Readonly<Record<string, readonly string[]>> 
   'chat-session-quick': ['6fc4a98f0ded81ae040f7fb975d407ce'],
   'contacts-mcp': ['6a8750d4088b5b053777be89ad9efbd6', '4a631fa71e66c5524058d579f7e17ec0'],
   'email-mcp': ['937cb7c16e1391cb965d3e8d8b111666', '508fa60f19bf5a426fcc22ef250e60df', '9eef971834b21ac3617abb5ba4afdc3e'],
-  'home-ideas': ['3aaeceff89c6882bffd2e9463d6152ff', '2ed25706f48ba35340615e427172df52'],
+  'home-ideas': ['3aaeceff89c6882bffd2e9463d6152ff', '2ed25706f48ba35340615e427172df52', 'b400f6c25dcae2e14a37c3cd860bce2a'],
   'knowledge-packager-agent': [
     '66fcce9b0063c71d77af4d31c608154f', 'e04f196617ee32f1c4f489716e1b5167', '9b0e6bd0f09590689ee50f7e68246326',
     '4af902ad40b86a6b26482d56bd4ff615', 'b42ea1e9d5e9920d137d04105cd7e68e',

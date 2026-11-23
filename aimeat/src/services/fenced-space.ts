@@ -10,8 +10,8 @@
  *   Ruled by the developer on 2026-10-13: "sovelluksen tietuetila ottaa agentin kirjoituksen vain
  *   sovelluksen oman laajennuksen kautta".
  *
- *   WHAT WAS MEASURED. On aimeat.io on 2026-10-13 an agent made from the home page for the app
- *   MUISTIO wrote decision and action records directly into the app's spaces with the plain
+ *   WHAT WAS MEASURED. On aimeat.io on 2026-10-13 an agent made from the home page for a meeting
+ *   minutes app wrote decision and action records directly into the app's spaces with the plain
  *   workspace-write tool, past the app's own tool: a quote with spelling slips the tool would have
  *   refused, a decision the note said was not decided, and an author field the model typed wrongly.
  *   The app's tool is an extension action that checks what it writes; the workspace write tools
@@ -103,6 +103,7 @@
  *   if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
  *   const changed = fenceChangeRefusal(manifestBefore, manifestAfter, { principal, roles, scopes });
  * @version-history
+ *   v1.2.1 — 2026-11-23 — The header names the kind of app it was measured on, not the app.
  *   v1.2.0 — 2026-11-21 — fencedSpaceRefusal asks the space's writeRole after the fence
  *     (services/organism/write-role.ts spaceWriteRoleRefusal), so every code path that asks the fence
  *     enforces writeRole on memory-backed spaces too; the manifest is read once for both. The caller

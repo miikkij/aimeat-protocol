@@ -13,6 +13,7 @@
  *   an entry that lacks a field is left out and named while the rest still shows.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=home-ideas
  * @version-history
+ *   v1.1.0 — 2026-11-23 — The seed names the apps by kind in each language and calls none ready.
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
 
@@ -69,8 +70,8 @@ await test('Finnish: ten agent ideas, six app ideas, six groups, no problems', a
     assert(d.agents.length === 10 && d.apps.length === 6 && d.groups.length === 6, `counts ${d.agents.length}/${d.apps.length}/${d.groups.length}`);
     assert(d.problems.length === 0, `no problems: ${JSON.stringify(d.problems)}`);
     const minutes = d.agents.find((a: any) => a.id === 'minutes');
-    assert(minutes?.name === 'Kokouskirjuri' && minutes.app === 'MUISTIO' && minutes.when === 'records', `minutes: ${JSON.stringify(minutes)}`);
-    assert(/MUISTIOon/.test(minutes.say), 'the sentence is the Finnish one it was made from');
+    assert(minutes?.name === 'Kokouskirjuri' && minutes.app === 'Kokousmuistiot' && minutes.when === 'records', `minutes: ${JSON.stringify(minutes)}`);
+    assert(/Kokousmuistiot-sovellukseen/.test(minutes.say), 'the sentence is the Finnish one, naming the app in Finnish');
     assert(!d.agents.some((a: any) => a.id === 'messages'), 'the idea that never ran is not offered');
 });
 
@@ -78,7 +79,7 @@ await test('Every app idea names an agent idea the list has, or none', async () 
     const { body } = await json('/v1/prompts/home-ideas?lang=en');
     const ids = new Set(body.data.agents.map((a: any) => a.id));
     for (const app of body.data.apps) assert(app.agent === null || ids.has(app.agent), `${app.id} names ${app.agent}`);
-    assert(body.data.apps.filter((a: any) => a.ready_app).length === 3, 'three app ideas are apps that exist');
+    assert(body.data.apps.filter((a: any) => a.ready_app).length === 0, 'a new node has none of the apps, so the seed calls none ready');
     assert(/aimeat_agent_propose/.test(body.data.about), 'the list tells an AI how to use it');
 });
 

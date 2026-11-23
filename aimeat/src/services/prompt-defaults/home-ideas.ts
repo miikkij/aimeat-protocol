@@ -9,14 +9,21 @@
  *   EVERY AGENT IDEA HAS RUN. Each one was made on aimeat.io from its sentence and ran with a real
  *   model in October 2026 (the October agents plan, production runs of 2026-10-13 and 2026-10-14).
  *   An idea that has not run is not offered: "Viestivastaaja" was left out for that reason (Jouni,
- *   2026-10-14). The app ideas say whether an app of that kind is on aimeat.io (`ready_app`) or is
+ *   2026-10-14). The app ideas say whether an app of that kind is on the node (`ready_app`) or is
  *   an idea a person's AI builds.
+ *
+ *   THE APPS ARE NAMED BY KIND, NOT BY AN APP ON ONE NODE. The October runs used apps on aimeat.io
+ *   by their own names. An app can be removed, and a new node has none of them, so since 2026-11-23
+ *   an idea names the kind of app ("Meeting notes") in each language and the seed calls no app
+ *   ready. The sentences are the ones that ran with only the app's name changed. An operator whose
+ *   node has such an app names it on the Prompts page.
  *
  *   THE THREE LANGUAGES ARE WRITTEN, NOT TRANSLATED: the same facts composed in English, Finnish
  *   and Spanish (es-419, tú). The ids, groups, `when` and `ready_app` are the same in each.
  * @structure HOME_IDEAS_SEEDS: PromptSeedEntry[]
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.0 — 2026-11-23 — The apps are named by kind in each language, and no app idea is ready.
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
 
@@ -35,9 +42,9 @@ type Words = Record<Lang, string>;
 
 /** What does not change between languages. */
 /** `area` is the group an idea is filed under; it is written `group` in the document. */
-const AGENTS: Array<{ id: string; area: string; when: string; app: string | null; name: Words; gets: Words; say: Words }> = [
+const AGENTS: Array<{ id: string; area: string; when: string; app: Words | null; name: Words; gets: Words; say: Words }> = [
   {
-    id: 'minutes', area: 'work', when: 'records', app: 'MUISTIO',
+    id: 'minutes', area: 'work', when: 'records', app: { en: 'Meeting notes', fi: 'Kokousmuistiot', es: 'Actas de reunión' },
     name: { en: 'Meeting scribe', fi: 'Kokouskirjuri', es: 'Secretario de reuniones' },
     gets: {
       en: 'Decisions and agreed actions from every note, each on the note\'s own sentence, and a question to you where the note names no doer or date.',
@@ -45,13 +52,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Las decisiones y las tareas acordadas de cada acta, cada una con la frase del acta, y una pregunta para ti cuando falta quién o para cuándo.',
     },
     say: {
-      en: 'Read every meeting note saved in MUISTIO as soon as it arrives: record its decisions and agreed actions, who does what and by when, each on the note\'s own sentence, and ask me when the note does not say who or by when.',
-      fi: 'Lue jokainen MUISTIOon tallennettu kokousmuistio heti kun se tulee: kirjaa siitä päätökset ja sovitut tehtävät, kuka tekee ja mihin mennessä, jokainen muistion omalla lauseella, ja kysy minulta, jos muistio ei kerro tekijää tai päivää.',
-      es: 'Lee cada acta de reunión guardada en MUISTIO en cuanto llegue: anota sus decisiones y las tareas acordadas, quién hace qué y para cuándo, cada una con la frase del acta, y pregúntame cuando el acta no diga quién ni para cuándo.',
+      en: 'Read every meeting note saved in the Meeting notes app as soon as it arrives: record its decisions and agreed actions, who does what and by when, each on the note\'s own sentence, and ask me when the note does not say who or by when.',
+      fi: 'Lue jokainen Kokousmuistiot-sovellukseen tallennettu kokousmuistio heti kun se tulee: kirjaa siitä päätökset ja sovitut tehtävät, kuka tekee ja mihin mennessä, jokainen muistion omalla lauseella, ja kysy minulta, jos muistio ei kerro tekijää tai päivää.',
+      es: 'Lee cada acta de reunión guardada en la aplicación Actas de reunión en cuanto llegue: anota sus decisiones y las tareas acordadas, quién hace qué y para cuándo, cada una con la frase del acta, y pregúntame cuando el acta no diga quién ni para cuándo.',
     },
   },
   {
-    id: 'desk', area: 'customers', when: 'records', app: 'LUUKKU',
+    id: 'desk', area: 'customers', when: 'records', app: { en: 'Customer window', fi: 'Asiakasluukku', es: 'Ventanilla de clientes' },
     name: { en: 'Front desk', fi: 'Asiakaspalvelija', es: 'Recepción' },
     gets: {
       en: 'Visitors on your page get an answer within a minute. A booking, a price or anything odd comes to you with the reason.',
@@ -59,13 +66,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Quien visita tu página recibe respuesta en un minuto. Una reserva, un precio o algo raro te llega a ti con el motivo.',
     },
     say: {
-      en: 'Answer the questions that arrive at LUUKKU from my opening hours and services, and pass every booking, price or unusual request to me with the reason.',
-      fi: 'Vastaa LUUKKUun tuleviin kysymyksiin aukioloaikojeni ja palveluideni perusteella, ja siirrä jokainen varaus, hinta ja epätavallinen pyyntö minulle syyn kanssa.',
-      es: 'Responde las preguntas que llegan a LUUKKU con mis horarios y servicios, y pásame cada reserva, precio o pedido inusual con el motivo.',
+      en: 'Answer the questions that arrive at the Customer window app from my opening hours and services, and pass every booking, price or unusual request to me with the reason.',
+      fi: 'Vastaa Asiakasluukku-sovellukseen tuleviin kysymyksiin aukioloaikojeni ja palveluideni perusteella, ja siirrä jokainen varaus, hinta ja epätavallinen pyyntö minulle syyn kanssa.',
+      es: 'Responde las preguntas que llegan a la aplicación Ventanilla de clientes con mis horarios y servicios, y pásame cada reserva, precio o pedido inusual con el motivo.',
     },
   },
   {
-    id: 'quotes', area: 'customers', when: 'clock', app: 'Postinjalostamo',
+    id: 'quotes', area: 'customers', when: 'clock', app: { en: 'Incoming mail', fi: 'Saapuva posti', es: 'Correo entrante' },
     name: { en: 'Quote replies', fi: 'Tarjousvastaaja', es: 'Respuestas a cotizaciones' },
     gets: {
       en: 'A reply draft for every request for a quote in your mail. You read it and send it yourself.',
@@ -73,13 +80,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Un borrador de respuesta para cada solicitud de cotización de tu correo. Tú lo lees y lo envías.',
     },
     say: {
-      en: 'Read the new requests for a quote in Postinjalostamo every hour and write a reply draft to each one, which I approve before it is sent.',
-      fi: 'Lue Postinjalostamon uudet tarjouspyynnöt tunnin välein ja kirjoita jokaiseen vastausluonnos, jonka hyväksyn ennen lähetystä.',
-      es: 'Lee cada hora las nuevas solicitudes de cotización en Postinjalostamo y escribe un borrador de respuesta para cada una, que yo apruebo antes de enviarlo.',
+      en: 'Read the new requests for a quote in the Incoming mail app every hour and write a reply draft to each one, which I approve before it is sent.',
+      fi: 'Lue Saapuva posti -sovelluksen uudet tarjouspyynnöt tunnin välein ja kirjoita jokaiseen vastausluonnos, jonka hyväksyn ennen lähetystä.',
+      es: 'Lee cada hora las nuevas solicitudes de cotización en la aplicación Correo entrante y escribe un borrador de respuesta para cada una, que yo apruebo antes de enviarlo.',
     },
   },
   {
-    id: 'due', area: 'money', when: 'clock', app: 'ERÄPÄIVÄ',
+    id: 'due', area: 'money', when: 'clock', app: { en: 'Due dates', fi: 'Eräpäivät', es: 'Vencimientos' },
     name: { en: 'Due-date watch', fi: 'Eräpäivävahti', es: 'Vigía de vencimientos' },
     gets: {
       en: 'Every Monday: what is late and what falls due this week. It pays nothing.',
@@ -87,13 +94,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Cada lunes: qué está atrasado y qué vence esta semana. No paga nada.',
     },
     say: {
-      en: 'Every Monday morning, tell me which bills in ERÄPÄIVÄ are late and which fall due this week. Pay nothing.',
-      fi: 'Kerro joka maanantaiaamu, mitkä ERÄPÄIVÄn laskut ovat myöhässä ja mitkä erääntyvät tällä viikolla. Älä maksa mitään.',
-      es: 'Cada lunes por la mañana, dime qué facturas de ERÄPÄIVÄ están atrasadas y cuáles vencen esta semana. No pagues nada.',
+      en: 'Every Monday morning, tell me which bills in the Due dates app are late and which fall due this week. Pay nothing.',
+      fi: 'Kerro joka maanantaiaamu, mitkä Eräpäivät-sovelluksen laskut ovat myöhässä ja mitkä erääntyvät tällä viikolla. Älä maksa mitään.',
+      es: 'Cada lunes por la mañana, dime qué facturas de la aplicación Vencimientos están atrasadas y cuáles vencen esta semana. No pagues nada.',
     },
   },
   {
-    id: 'reminders', area: 'money', when: 'clock', app: 'SAATAVAT',
+    id: 'reminders', area: 'money', when: 'clock', app: { en: 'Receivables', fi: 'Saatavat', es: 'Cuentas por cobrar' },
     name: { en: 'Reminder writer', fi: 'Muistutusten kirjoittaja', es: 'Redactor de recordatorios' },
     gets: {
       en: 'A polite reminder draft for each invoice more than a week late. No fees, nothing sent.',
@@ -101,13 +108,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Un borrador de recordatorio amable para cada factura con más de una semana de atraso. Sin recargos y sin enviar nada.',
     },
     say: {
-      en: 'Write a polite reminder draft for every invoice in SAATAVAT that is more than a week late. Add no fees and send nothing.',
-      fi: 'Kirjoita kohtelias muistutusluonnos jokaisesta SAATAVAT-laskusta, joka on yli viikon myöhässä. Älä lisää maksuja äläkä lähetä mitään.',
-      es: 'Escribe un borrador de recordatorio amable para cada factura de SAATAVAT con más de una semana de atraso. No agregues recargos y no envíes nada.',
+      en: 'Write a polite reminder draft for every invoice in the Receivables app that is more than a week late. Add no fees and send nothing.',
+      fi: 'Kirjoita kohtelias muistutusluonnos jokaisesta Saatavat-sovelluksen laskusta, joka on yli viikon myöhässä. Älä lisää maksuja äläkä lähetä mitään.',
+      es: 'Escribe un borrador de recordatorio amable para cada factura de la aplicación Cuentas por cobrar con más de una semana de atraso. No agregues recargos y no envíes nada.',
     },
   },
   {
-    id: 'interviews', area: 'people', when: 'records', app: 'HAASTATTELUT + KALENTERI',
+    id: 'interviews', area: 'people', when: 'records', app: { en: 'Interviews + Calendar', fi: 'Haastattelut + Kalenteri', es: 'Entrevistas + Calendario' },
     name: { en: 'Interview scheduler', fi: 'Haastattelujen sopija', es: 'Coordinador de entrevistas' },
     gets: {
       en: 'Two free times from your calendar and an invitation draft for each new applicant. It does not judge anyone.',
@@ -115,13 +122,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Dos horarios libres de tu calendario y un borrador de invitación para cada postulante nuevo. No evalúa a nadie.',
     },
     say: {
-      en: 'When a new applicant arrives in HAASTATTELUT, offer them two interview times from the free times in KALENTERI and write the invitation draft. Do not assess the applicants.',
-      fi: 'Kun HAASTATTELUIHIN tulee uusi hakija, ehdota hänelle kaksi haastatteluaikaa KALENTERIN vapaista ajoista ja kirjoita kutsuluonnos. Älä arvioi hakijoita.',
-      es: 'Cuando llegue un postulante nuevo a HAASTATTELUT, ofrécele dos horarios de entrevista entre los libres de KALENTERI y escribe el borrador de invitación. No evalúes a los postulantes.',
+      en: 'When a new applicant arrives in the Interviews app, offer them two interview times from the free times in the Calendar app and write the invitation draft. Do not assess the applicants.',
+      fi: 'Kun Haastattelut-sovellukseen tulee uusi hakija, ehdota hänelle kaksi haastatteluaikaa Kalenteri-sovelluksen vapaista ajoista ja kirjoita kutsuluonnos. Älä arvioi hakijoita.',
+      es: 'Cuando llegue un postulante nuevo a la aplicación Entrevistas, ofrécele dos horarios de entrevista entre los libres de la aplicación Calendario y escribe el borrador de invitación. No evalúes a los postulantes.',
     },
   },
   {
-    id: 'onboarding', area: 'people', when: 'talk', app: 'PEREHDYTYS',
+    id: 'onboarding', area: 'people', when: 'talk', app: { en: 'Onboarding', fi: 'Perehdytys', es: 'Incorporación' },
     name: { en: 'Onboarding guide', fi: 'Perehdyttäjä', es: 'Guía de incorporación' },
     gets: {
       en: 'A new employee asks and gets the approved instruction by name, or the person to ask.',
@@ -129,13 +136,13 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Una persona nueva en el equipo pregunta y recibe la instrucción aprobada por su nombre, o a quién preguntar.',
     },
     say: {
-      en: 'Answer a new employee\'s questions from the approved instructions in PEREHDYTYS, and name the person to ask when the instructions do not answer.',
-      fi: 'Vastaa uuden työntekijän kysymyksiin PEREHDYTYKSEN hyväksyttyjen ohjeiden mukaan, ja kerro, keneltä kysyä, jos ohjeissa ei ole vastausta.',
-      es: 'Responde las preguntas de una persona nueva en el equipo con las instrucciones aprobadas de PEREHDYTYS, y di a quién preguntar cuando las instrucciones no respondan.',
+      en: 'Answer a new employee\'s questions from the approved instructions in the Onboarding app, and name the person to ask when the instructions do not answer.',
+      fi: 'Vastaa uuden työntekijän kysymyksiin Perehdytys-sovelluksen hyväksyttyjen ohjeiden mukaan, ja kerro, keneltä kysyä, jos ohjeissa ei ole vastausta.',
+      es: 'Responde las preguntas de una persona nueva en el equipo con las instrucciones aprobadas de la aplicación Incorporación, y di a quién preguntar cuando las instrucciones no respondan.',
     },
   },
   {
-    id: 'health', area: 'self', when: 'clock', app: 'OMA TERVEYS',
+    id: 'health', area: 'self', when: 'clock', app: { en: 'My health', fi: 'Oma terveys', es: 'Mi salud' },
     name: { en: 'Health reminders', fi: 'Terveysmuistuttaja', es: 'Recordatorios de salud' },
     gets: {
       en: 'The day\'s reminders each morning and a weekly summary of what you recorded. No medical advice.',
@@ -143,9 +150,9 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
       es: 'Los recordatorios del día cada mañana y un resumen semanal de lo que anotaste. Sin consejos médicos.',
     },
     say: {
-      en: 'Remind me every morning of the day\'s medicines in OMA TERVEYS and summarise the measurements I recorded at the end of each week. Give no medical advice.',
-      fi: 'Muistuta minua joka aamu päivän lääkkeistä OMASSA TERVEYDESSÄ ja tee viikon lopuksi tiivistelmä kirjaamistani mittauksista. Älä anna lääketieteellisiä neuvoja.',
-      es: 'Recuérdame cada mañana los medicamentos del día en OMA TERVEYS y resume al final de cada semana las mediciones que anoté. No des consejos médicos.',
+      en: 'Remind me every morning of the day\'s medicines in the My health app and summarise the measurements I recorded at the end of each week. Give no medical advice.',
+      fi: 'Muistuta minua joka aamu Oma terveys -sovelluksen päivän lääkkeistä ja tee viikon lopuksi tiivistelmä kirjaamistani mittauksista. Älä anna lääketieteellisiä neuvoja.',
+      es: 'Recuérdame cada mañana los medicamentos del día en la aplicación Mi salud y resume al final de cada semana las mediciones que anoté. No des consejos médicos.',
     },
   },
   {
@@ -180,7 +187,7 @@ const AGENTS: Array<{ id: string; area: string; when: string; app: string | null
 
 const APPS: Array<{ id: string; ready_app: string | null; agent: string | null; name: Words; you: Words; agent_uses: Words; app_shows: Words }> = [
   {
-    id: 'meeting-notes', ready_app: 'MUISTIO', agent: 'minutes',
+    id: 'meeting-notes', ready_app: null, agent: 'minutes',
     name: { en: 'Meeting notes', fi: 'Kokousmuistiot', es: 'Actas de reunión' },
     you: { en: 'Save the meeting note.', fi: 'Tallennat kokousmuistion.', es: 'Guardas el acta de la reunión.' },
     agent_uses: {
@@ -195,7 +202,7 @@ const APPS: Array<{ id: string; ready_app: string | null; agent: string | null; 
     },
   },
   {
-    id: 'customer-window', ready_app: 'LUUKKU', agent: 'desk',
+    id: 'customer-window', ready_app: null, agent: 'desk',
     name: { en: 'Customer window', fi: 'Asiakasluukku', es: 'Ventanilla de clientes' },
     you: { en: 'Visitors write on your public page.', fi: 'Vierailijat kirjoittavat julkiselle sivullesi.', es: 'Las visitas escriben en tu página pública.' },
     agent_uses: {
@@ -210,7 +217,7 @@ const APPS: Array<{ id: string; ready_app: string | null; agent: string | null; 
     },
   },
   {
-    id: 'receivables', ready_app: 'SAATAVAT', agent: 'reminders',
+    id: 'receivables', ready_app: null, agent: 'reminders',
     name: { en: 'Receivables', fi: 'Saatavat', es: 'Cuentas por cobrar' },
     you: { en: 'Keep your open invoices in the app.', fi: 'Pidät avoimet laskusi sovelluksessa.', es: 'Llevas tus facturas pendientes en la app.' },
     agent_uses: {
@@ -283,7 +290,8 @@ const GROUPS: Array<{ id: string; name: Words }> = [
 /** Written to an AI that reads the list, in English whatever the language of the rest. */
 const ABOUT = 'Ideas for a person who does not yet know what to ask for. agents: each was made from its `say` sentence and ran for real; '
   + 'offer the two or three that fit what the person does, in their language, and use the sentence they choose as the purpose of the agent you '
-  + 'propose (aimeat_agent_propose). An agent idea with an `app` works through that app: the person opens the app once first. '
+  + 'propose (aimeat_agent_propose). An agent idea with an `app` works through an app of that kind: when the person has one, they open it once first; '
+  + 'when they have none, build it with them before the agent. '
   + 'apps: an app and the agent that works through it. `ready_app` names an app already on this node; an idea with none is one you build '
   + 'with the person (aimeat_handbook_get { tier: "build-app-atelier" }), giving the agent a tool that writes into the app.';
 
@@ -291,7 +299,7 @@ function documentIn(lang: Lang): string {
   return JSON.stringify({
     about: ABOUT,
     groups: GROUPS.map((g) => ({ id: g.id, name: g.name[lang] })),
-    agents: AGENTS.map((a) => ({ id: a.id, group: a.area, name: a.name[lang], gets: a.gets[lang], say: a.say[lang], when: a.when, app: a.app })),
+    agents: AGENTS.map((a) => ({ id: a.id, group: a.area, name: a.name[lang], gets: a.gets[lang], say: a.say[lang], when: a.when, app: a.app ? a.app[lang] : null })),
     apps: APPS.map((p) => ({
       id: p.id, name: p.name[lang], ready_app: p.ready_app, agent: p.agent,
       you: p.you[lang], agent_uses: p.agent_uses[lang], app_shows: p.app_shows[lang],

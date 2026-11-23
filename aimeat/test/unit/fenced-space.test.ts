@@ -17,6 +17,7 @@
  *   over and read as a removal where it does not.
  * @usage cd aimeat && pnpm exec vitest run test/unit/fenced-space.test.ts
  * @version-history
+ *   v1.1.2 — 2026-11-23 — The test extension is alice/minutes, an invented name.
  *   v1.1.1 — 2026-10-15 — fencesMet: trailing dots, and linear time on a run of dots.
  *   v1.1.0 — 2026-10-13 — organism:direct, mayChangeFence, protectedFenceChanges and
  *     fenceChangeRefusal, and the manifest record as a target of the rule.
@@ -61,7 +62,7 @@ function store(objectTypes: unknown[] | null, opts: { archived?: boolean } = {})
     return { deps: { storage, config: { nodeId: NODE } }, reads };
 }
 
-const DECISIONS = { name: 'decision', namespace: 'app.decisions', backing: 'memory', extensions: ['Alice/Muistio'] };
+const DECISIONS = { name: 'decision', namespace: 'app.decisions', backing: 'memory', extensions: ['Alice/Minutes'] };
 const NOTES = { name: 'note', namespace: 'shared.notes', backing: 'memory' };
 
 describe('callerIsFenced: roles first, then the identity\'s shape', () => {
@@ -99,8 +100,8 @@ describe('callerIsFenced: roles first, then the identity\'s shape', () => {
 
 describe('fenceOf: what counts as a fence', () => {
     it('reads the valid entries, trimmed and lower-cased, once each', () => {
-        expect(fenceOf({ ...DECISIONS, extensions: [' Alice/Muistio ', 'alice/muistio', 'bob/other'] }))
-            .toEqual({ space: 'decision', namespace: 'app.decisions', extensions: ['alice/muistio', 'bob/other'] });
+        expect(fenceOf({ ...DECISIONS, extensions: [' Alice/Minutes ', 'alice/minutes', 'bob/other'] }))
+            .toEqual({ space: 'decision', namespace: 'app.decisions', extensions: ['alice/minutes', 'bob/other'] });
     });
 
     it('declares no fence when the field is absent or the list is empty', () => {
@@ -110,19 +111,19 @@ describe('fenceOf: what counts as a fence', () => {
     });
 
     it('FAILS CLOSED: a list whose entries are all invalid is a fence that opens to no extension', () => {
-        for (const extensions of [['muistio'], ['alice muistio/x y'], ['alice/'], ['/muistio'], ['a/b/c'], [42], [null], 'alice/muistio', { 0: 'alice/muistio' }]) {
+        for (const extensions of [['minutes'], ['alice minutes/x y'], ['alice/'], ['/minutes'], ['a/b/c'], [42], [null], 'alice/minutes', { 0: 'alice/minutes' }]) {
             expect(fenceOf({ ...DECISIONS, extensions })?.extensions, JSON.stringify(extensions)).toEqual([]);
         }
         // One valid entry beside invalid ones opens the space to that one and to nothing else.
-        expect(fenceOf({ ...DECISIONS, extensions: ['not valid', 'alice/muistio'] })?.extensions).toEqual(['alice/muistio']);
+        expect(fenceOf({ ...DECISIONS, extensions: ['not valid', 'alice/minutes'] })?.extensions).toEqual(['alice/minutes']);
     });
 
     it('applies to a memory-backed space only: a row space reads the field under its own rule', () => {
         expect(fenceOf({ ...DECISIONS, backing: 'rows' })).toBeNull();
         expect(fenceOf({ ...DECISIONS, backing: 'tasks' })).toBeNull();
         // A missing backing is memory, as on every read path.
-        expect(fenceOf({ name: 'decision', namespace: 'app.decisions', extensions: ['alice/muistio'] })?.extensions).toEqual(['alice/muistio']);
-        expect(fenceOf({ name: 'no namespace', extensions: ['alice/muistio'] })).toBeNull();
+        expect(fenceOf({ name: 'decision', namespace: 'app.decisions', extensions: ['alice/minutes'] })?.extensions).toEqual(['alice/minutes']);
+        expect(fenceOf({ name: 'no namespace', extensions: ['alice/minutes'] })).toBeNull();
         expect(fencesOf({ objectTypes: [DECISIONS, NOTES, { ...DECISIONS, namespace: 'q.rows', backing: 'rows' }] }).map(f => f.namespace)).toEqual(['app.decisions']);
     });
 });
@@ -180,19 +181,19 @@ describe('fencedSpaceRefusal: the rule', () => {
         const { deps } = store([DECISIONS, NOTES]);
         const refusal = await fencedSpaceRefusal(deps, agent, ORG, WS, { key });
         expect(refusal).toEqual({
-            status: 403, code: 'ACCESS_DENIED', message: fencedSpaceMessage(['alice/muistio']),
-            details: { reason: 'FENCED_SPACE', space: 'decision', extensions: ['alice/muistio'] },
+            status: 403, code: 'ACCESS_DENIED', message: fencedSpaceMessage(['alice/minutes']),
+            details: { reason: 'FENCED_SPACE', space: 'decision', extensions: ['alice/minutes'] },
         });
-        expect(refusal?.message).toContain('alice/muistio');
+        expect(refusal?.message).toContain('alice/minutes');
     });
 
     it('lets the same agent through a named extension, compared lower-cased, and through no other', async () => {
         const { deps } = store([DECISIONS, NOTES]);
-        expect(await fencedSpaceRefusal(deps, { ...agent, extension: extensionMarker('Alice', 'Muistio') }, ORG, WS, { key })).toBeNull();
-        expect(await fencedSpaceRefusal(deps, { ...agent, extension: 'ALICE/MUISTIO ' }, ORG, WS, { key })).toBeNull();
+        expect(await fencedSpaceRefusal(deps, { ...agent, extension: extensionMarker('Alice', 'Minutes') }, ORG, WS, { key })).toBeNull();
+        expect(await fencedSpaceRefusal(deps, { ...agent, extension: 'ALICE/MINUTES ' }, ORG, WS, { key })).toBeNull();
         expect((await fencedSpaceRefusal(deps, { ...agent, extension: 'alice/other' }, ORG, WS, { key }))?.code).toBe('ACCESS_DENIED');
         // The installer is half of the name: another member's extension of the same name is not it.
-        expect((await fencedSpaceRefusal(deps, { ...agent, extension: 'bob/muistio' }, ORG, WS, { key }))?.code).toBe('ACCESS_DENIED');
+        expect((await fencedSpaceRefusal(deps, { ...agent, extension: 'bob/minutes' }, ORG, WS, { key }))?.code).toBe('ACCESS_DENIED');
         expect((await fencedSpaceRefusal(deps, { ...agent, extension: '' }, ORG, WS, { key }))?.code).toBe('ACCESS_DENIED');
     });
 
@@ -203,8 +204,8 @@ describe('fencedSpaceRefusal: the rule', () => {
     });
 
     it('FAILS CLOSED: a space whose list holds only an invalid entry refuses the extension too', async () => {
-        const { deps } = store([{ ...DECISIONS, extensions: ['alice x/muistio'] }]);
-        const refusal = await fencedSpaceRefusal(deps, { ...agent, extension: 'alice/muistio' }, ORG, WS, { key });
+        const { deps } = store([{ ...DECISIONS, extensions: ['alice x/minutes'] }]);
+        const refusal = await fencedSpaceRefusal(deps, { ...agent, extension: 'alice/minutes' }, ORG, WS, { key });
         expect(refusal?.status).toBe(403);
         expect(refusal?.details.extensions).toEqual([]);
         expect(refusal?.message).toBe(fencedSpaceMessage([]));
@@ -230,7 +231,7 @@ describe('fencedSpaceRefusal: the rule', () => {
 
     it('asks every fence an archived subtree holds: one extension does not open a second space', async () => {
         const { deps } = store([DECISIONS, { name: 'action', namespace: 'app.actions', extensions: ['alice/tasks'] }]);
-        const through = { ...agent, extension: 'alice/muistio' };
+        const through = { ...agent, extension: 'alice/minutes' };
         expect(await fencedSpaceRefusal(deps, through, ORG, WS, { subtree: `${ROOT}.app.decisions` })).toBeNull();
         expect((await fencedSpaceRefusal(deps, through, ORG, WS, { subtree: `${ROOT}.app` }))?.details.space).toBe('action');
     });
@@ -333,9 +334,9 @@ describe('fenceChangeRefusal: the protected change', () => {
             ['removed', { name: DECISIONS.name, namespace: DECISIONS.namespace, backing: DECISIONS.backing }],
             ['emptied', { ...DECISIONS, extensions: [] }],
             ['null', { ...DECISIONS, extensions: null }],
-            ['widened', { ...DECISIONS, extensions: ['Alice/Muistio', 'alice/other'] }],
-            ['replaced', { ...DECISIONS, extensions: ['bob/muistio'] }],
-            ['respelled', { ...DECISIONS, extensions: ['alice/muistio'] }],
+            ['widened', { ...DECISIONS, extensions: ['Alice/Minutes', 'alice/other'] }],
+            ['replaced', { ...DECISIONS, extensions: ['bob/minutes'] }],
+            ['respelled', { ...DECISIONS, extensions: ['alice/minutes'] }],
         ];
         for (const [what, ot] of changes) {
             expect(touched(replace('decision', () => ot as Record<string, unknown>)), what).toEqual([{ space: 'decision', change: 'extensions' }]);
@@ -358,7 +359,7 @@ describe('fenceChangeRefusal: the protected change', () => {
     });
 
     it('protects a fence that opens to nobody too: correcting its one invalid entry is a change of the list', () => {
-        const closed = { objectTypes: [{ ...DECISIONS, extensions: ['alice x/muistio'] }] };
+        const closed = { objectTypes: [{ ...DECISIONS, extensions: ['alice x/minutes'] }] };
         expect(protectedFenceChanges(closed, { objectTypes: [DECISIONS] })).toEqual([{ space: 'decision', change: 'extensions' }]);
         expect(protectedFenceChanges(closed, closed)).toEqual([]);
     });
@@ -371,7 +372,7 @@ describe('fenceChangeRefusal: the protected change', () => {
             ['the fenced space under a new name', replace('decision', o => ({ ...o, name: 'ruling' }))],
             ['a space with no fence, changed', replace('note', o => ({ ...o, namespace: 'shared.other', backing: 'tasks' }))],
             ['a space with no fence, removed', replace('note', () => null)],
-            ['a space with no fence that now names an extension', replace('note', o => ({ ...o, extensions: ['alice/muistio'] }))],
+            ['a space with no fence that now names an extension', replace('note', o => ({ ...o, extensions: ['alice/minutes'] }))],
             ['a row space\'s list, which is the row service\'s', replace('log', o => ({ ...o, extensions: [] }))],
             ['a row space removed', replace('log', () => null)],
             ['a new object type that names extensions', { ...before, objectTypes: [...before.objectTypes, { name: 'action', namespace: 'app.actions', extensions: ['alice/tasks'] }] }],
@@ -457,8 +458,8 @@ describe('the manifest record as a target of the rule', () => {
 
 describe('fencedSpaceMessage: one sentence, in plain words', () => {
     it('names the extensions and says what to do', () => {
-        expect(fencedSpaceMessage(['alice/muistio'])).toBe("This space takes an agent's write only through the app's own tool. Use an action of the extension alice/muistio to add, change or remove a record here.");
-        expect(fencedSpaceMessage(['alice/muistio', 'bob/other'])).toContain('one of the extensions alice/muistio, bob/other');
+        expect(fencedSpaceMessage(['alice/minutes'])).toBe("This space takes an agent's write only through the app's own tool. Use an action of the extension alice/minutes to add, change or remove a record here.");
+        expect(fencedSpaceMessage(['alice/minutes', 'bob/other'])).toContain('one of the extensions alice/minutes, bob/other');
         expect(fencedSpaceMessage([])).toContain("only through the app's own tool");
         expect(fencedSpaceMessage([])).toContain('Ask');
     });
