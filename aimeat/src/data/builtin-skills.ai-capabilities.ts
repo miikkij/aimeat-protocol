@@ -18,6 +18,9 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.6.1 — 2026-11-23 — Plain verbs: an answer or an error has or includes a field, a job's answer is
+ *     stored in the owner's namespace, and an off capability gives three fields that say how to fix
+ *     it. The instructions are otherwise the same; measured before and after with the eval suite.
  *   v1.6.0 — 2026-11-07 — Section 1 names `main`, `power` and `needs`, what the sign-in pill shows, so an
  *     AI answers "is my AI working" from the same answer.
  *   v1.5.2 — 2026-10-22 — The extension paragraph: ctx.ai.start also answers SCOPE_DENIED for a private
@@ -91,7 +94,7 @@ No provider key ever reaches the app: it gets the answer, the usage and the cost
 
 Before you plan, call \`aimeat_ai_capabilities\` (an app: \`AIMEAT.ai.capabilities({ app_id })\`). For
 each capability it answers \`on\`, the \`model\` and \`provider\` a call would use, the \`price\`, and a
-\`howTo\` line. For one that is off it answers \`reason\` and three ways to the fix:
+\`howTo\` line. For one that is off it answers \`reason\` and three fields that say how to fix it:
 
 - \`fix\`: the sentence for the person, already in their language, with no tool names. Say it to them.
 - \`settingsUrl\`: their AI settings, opened at the provider to fix, with its test chosen when a test
@@ -112,7 +115,7 @@ each capability it answers \`on\`, the \`model\` and \`provider\` a call would u
 Tell the person \`fix\` and give them \`settingsUrl\`. Do not build around a capability that is off,
 and do not promise a feature the node cannot run for them.
 
-The same answer carries what the person sees in their sign-in pill, so when they ask "is my AI
+The same answer also has what the person sees in their sign-in pill, so when they ask "is my AI
 working" or "how much AI do I have left", answer from it in their words:
 
 - \`main.connected\`: their own AI is connected (an agent, or the node's chat with a model that runs).
@@ -141,13 +144,13 @@ working" or "how much AI do I have left", answer from it in their words:
 5. **Tell the price before an expensive call**: a picture, a long transcription, a large embedding run.
    The price is in the capabilities answer; \`confirm: true\` on \`AIMEAT.ai.image()\` and \`speak()\` shows it.
 
-Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\`), AI_MODEL_NOT_ALLOWED
-(with the \`allowed\` list), QUOTA_EXHAUSTED, and RATE_LIMITED (429). A refusal the person can fix carries
+Errors have \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\`), AI_MODEL_NOT_ALLOWED
+(with the \`allowed\` list), QUOTA_EXHAUSTED, and RATE_LIMITED (429). A refusal the person can fix includes
 \`err.fix\` and \`err.settingsUrl\`, as a capability does: show the sentence and the link; never an empty result.
 
 When the provider itself says no, the code says whether to try again. PROVIDER_REJECTED (422): the
 provider refused the call as sent, and \`details.provider_message\` says why; the same call fails again,
-so change the model, the format or the voice (speech in mp3 carries \`details.hint\`: ask for pcm).
+so change the model, the format or the voice (speech in mp3 includes \`details.hint\`: ask for pcm).
 CONTENT_REFUSED (422): the provider's moderation refused it. PROVIDER_NO_CREDIT (402): the key that pays
 has no credit left. INVALID_VOICE (400): the voice is not one of the model's, and \`details.voices\` lists
 them. Only PROVIDER_ERROR (502) and RATE_LIMITED (429, after its \`Retry-After\`) are worth trying again.
@@ -253,7 +256,7 @@ result.
   \`on_done: { extension, action }\` calls that action with \`{ job_id, state, result_key, result }\` when
   the job is done: \`result\` is the answer, or \`result_too_large: true\` when it is over 64 kB.
   \`ctx.ai.result(job_id)\` reads the answer of a job the extension started, at any later time:
-  \`{ ok: true, state, value }\`, or AI_JOB_NOT_FOUND / AI_JOB_RESULT_GONE. The answer lands in the
+  \`{ ok: true, state, value }\`, or AI_JOB_NOT_FOUND / AI_JOB_RESULT_GONE. The answer is stored in the
   owner's namespace, so \`ctx.memory.get(result_key)\` does not reach it; keep it private and read it
   with these two. \`ctx.ai\` can be absent: check \`if (!ctx.ai)\` and go on without it.
 - A workflow's \`ai\` step takes the same \`op\`, \`audio_key\` and \`provider\`.

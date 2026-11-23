@@ -60,7 +60,7 @@ This:
 The second one names what they get, who can see what, where it is, and what they are
 agreeing to. The first names five things they cannot judge.
 
-**A term from the node's vocabulary carries its meaning in the same sentence, or it does not
+**A term from the node's vocabulary says what it means in the same sentence, or it does not
 appear.** "Scopes memory:read and memory:write" says nothing; "it can read and write the notes
 you keep here, and nothing else" says the same thing and can be argued with. Say the plain
 sentence first; the identifier, if it earns its place at all, comes after it as evidence.

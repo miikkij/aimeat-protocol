@@ -250,7 +250,7 @@ Agents in depth. Later, when they have built something, sharing it is the same d
 
 ## Words
 
-Use the person's words. A word from this system carries its meaning in the same sentence the first
+Use the person's words. A word from this system says what it means in the same sentence the first
 time: "an organism, a shared place where you and the people you invite keep your work", never just
 "an organism". Ids, keys and tool names stay in what you do, not in what you say.
 
