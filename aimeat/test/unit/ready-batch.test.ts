@@ -219,16 +219,30 @@ describe('runBatch', { timeout: 120_000 }, () => {
         expect(l.ran).toEqual({ checks: 1, sweep: 1 });
     });
 
-    it('refuses a session waiting alone when a stage is red, without a probe, and pushes nothing', async () => {
+    it('refuses a session waiting alone when a stage is red and red again on its commit, and pushes nothing', async () => {
         const l = lab();
         const alice = l.session('cc-alice-a', { 'alice.txt': 'a\n', 'breaks-unit.txt': 'x\n' });
         let pushes = 0;
         const deps = l.deps({ unit: has => has('breaks-unit.txt') }, { push: async () => { pushes += 1; return { ok: true, main: 'x' }; } });
         const verdicts = await runBatch(deps, [alice], 'batch-1');
 
-        expect(reasonOf(verdicts, alice)).toBe('unit is red: unit rule');
+        expect(reasonOf(verdicts, alice)).toBe('unit is red, and red again when what was red was run once more: unit rule');
         expect(pushes).toBe(0);
         expect(l.mainFiles()).toEqual(['base.txt']);
+    });
+
+    it('lands a session waiting alone when a red does not repeat on its commit, and says so in its verdict', async () => {
+        const l = lab();
+        const alice = l.session('cc-alice-a', { 'alice.txt': 'a\n' });
+        let first = true;
+        const once = (): boolean => { const red = first; first = false; return red; };
+        const verdicts = await runBatch(l.deps({ sweep: once, after: never }), [alice], 'batch-1');
+
+        expect(statusOf(verdicts, alice)).toBe('landed');
+        const v = verdicts.get(alice.id);
+        expect(v?.status === 'landed' && v.notes.join('\n')).toContain('[batch-flaky] sweep was red on the candidate');
+        expect(l.ran).toEqual({ sweep: 1, after: 1 });
+        expect(l.mainFiles()).toEqual(['alice.txt', 'base.txt']);
     });
 
     it('tells a session whose commits are on main already that they have landed, and runs nothing for it', async () => {

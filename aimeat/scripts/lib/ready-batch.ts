@@ -25,7 +25,8 @@
  *   every stage runs again from the first: the commit that lands was tested whole, never assembled
  *   from parts that were tested apart. When the probe is green on every tip, the last one included,
  *   the red did not repeat on the same tree; that is what a second run alone already means for a unit
- *   file or a suite, so it is noted and the stages go on.
+ *   file or a suite, so it is noted and the stages go on. A session waiting alone has one tip, and
+ *   the same holds for it: red again, it is refused; green, the red is noted and the stages go on.
  *
  *   NOTHING HERE STARTS A PROCESS OR KNOWS A PATH. Git, the checkout, the stages and the push come in
  *   as BatchDeps (scripts/lib/ready-train.ts has the real ones), so the whole decision is tested on
@@ -35,6 +36,8 @@
  *   const verdicts = await runBatch(deps, queue.waiting().slice(0, MAX_BATCH), batchId);
  *   for (const e of entries) queue.settle(e, verdicts.get(e.id)!);
  * @version-history
+ *   v1.2.0 — 2026-11-23 — A session waiting alone gets the probe too: a red stage is run once more
+ *     on its commit before it is refused.
  *   v1.1.0 — 2026-11-23 — A verdict is handed to BatchDeps.settle when it is known, not when the batch
  *     ends, and the driver's screen gets the first line of a reason, not the red step's output.
  *   v1.0.1 — 2026-11-23 — The candidate is the rebase's upstream, so a session stacked on another
@@ -176,21 +179,23 @@ export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: st
             await deps.checkout(final);
             const result = await stage.run();
             if (result.ok) { notes.push(...(result.notes ?? [])); continue; }
-            if (tips.length === 1) {
-                blamed = tips[0];
-                why = `${stage.name} is red: ${result.detail}`;
-                break;
-            }
-            // Whose red it is: the first tip of the chain where the same red shows.
-            deps.log(`${stage.name} is red on the candidate (${firstLine(result.detail)}); looking for the session that brought it.`);
+            // Whose red it is: the first tip of the chain where the same red shows. A session waiting
+            // alone gets the same second look on its one tip. Without it, six suites that lost their
+            // database connections in one moment refused a 77-minute run (2026-11-23): the runner's own
+            // second run of a red suite stops at five, and a red check had none.
+            deps.log(tips.length === 1
+                ? `${stage.name} is red on the candidate (${firstLine(result.detail)}); running what was red once more.`
+                : `${stage.name} is red on the candidate (${firstLine(result.detail)}); looking for the session that brought it.`);
             for (const t of tips) {
                 await deps.checkout(t.tip);
                 if (await result.probe()) { blamed = t; break; }
-                deps.log(`  green with the commits up to ${t.entry.session}.`);
+                if (tips.length > 1) deps.log(`  green with the commits up to ${t.entry.session}.`);
             }
             if (blamed) {
                 const before = tips.slice(0, tips.indexOf(blamed)).map(t => t.entry.session);
-                why = `${stage.name} is red with its commits and green without them${before.length ? ` (the sessions before it in the batch: ${before.join(', ')})` : ''}: ${result.detail}`;
+                why = before.length
+                    ? `${stage.name} is red with its commits and green without them (the sessions before it in the batch: ${before.join(', ')}): ${result.detail}`
+                    : `${stage.name} is red, and red again when what was red was run once more: ${result.detail}`;
                 break;
             }
             // Green on every tip, the candidate's own included: the red did not repeat on the same tree.

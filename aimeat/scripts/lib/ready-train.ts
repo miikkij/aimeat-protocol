@@ -38,6 +38,8 @@
  *   await ensureTrain(cfg);
  *   const verdicts = await runBatch(trainDeps(cfg), entries, batchId);
  * @version-history
+ *   v1.0.1 — 2026-11-23 — A sweep's probe answers green only when every red suite ran again: it ran
+ *     the first 20 and answered for all of them.
  *   v1.0.0 — 2026-11-23 — Initial (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
  */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -54,8 +56,8 @@ import { envPortOf, TRAIN_PORT, TRAIN_WORKTREE } from './worktree-ports.js';
 
 /** A test node gets this long to start in a sweep (the runner's own limit is 60 s, for a quiet machine). */
 const NODE_START_MS = '180000';
-/** A probe runs at most this many red suites again: enough to see the red, whatever its size. */
-const MAX_PROBE_SUITES = 20;
+/** A probe runs this many red suites first: enough to see a red early, whatever its size. The rest run only when these were green. */
+const FIRST_PROBE_SUITES = 20;
 /** The colour codes a test runner prints, which a reason read as plain text does not want. */
 const COLOUR_CODES = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
@@ -272,9 +274,14 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 probe: async () => {
                     if (!await ensureBuilt()) return true;
                     if (red.length === 0) return await runLogged(cfg, `${name} again`, 'pnpm', args.filter(a => !a.startsWith('--results-out=')), { cwd: aimeat, env }) !== 0;
-                    const here = red.filter(s => existsSync(path.join(aimeat, 'test', `${s}.ts`))).slice(0, MAX_PROBE_SUITES);
+                    const here = red.filter(s => existsSync(path.join(aimeat, 'test', `${s}.ts`)));
                     if (here.length === 0) return false;
-                    return await runLogged(cfg, `${name}: the red suites again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, here.length)}`, ...here.map(s => `--test=${s}`)], { cwd: aimeat, env }) !== 0;
+                    const again = async (some: string[]): Promise<boolean> =>
+                        await runLogged(cfg, `${name}: ${some.length} red suite(s) again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, some.length)}`, ...some.map(s => `--test=${s}`)], { cwd: aimeat, env }) !== 0;
+                    // Red is known from the first of them. Green is known only when every one ran: the
+                    // batch reads a green probe as a red that did not repeat, and goes on to the push.
+                    if (await again(here.slice(0, FIRST_PROBE_SUITES))) return true;
+                    return here.length > FIRST_PROBE_SUITES && await again(here.slice(FIRST_PROBE_SUITES));
                 },
             };
         },
