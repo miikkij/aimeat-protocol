@@ -32,6 +32,8 @@
  *   PostgreSQL.
  * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope()
  * @version-history
+ *   v1.3.0 — 2026-11-23 — public/changelog.json is text: a changelog entry alone ran the full sweep
+ *     on both backends.
  *   v1.2.0 — 2026-11-23 — A wide text change (WIDE_FILES files or WIDE_TEXTS removed texts) also runs
  *     the full sweep on SQLite (Jouni, 2026-11-23).
  *   v1.1.0 — 2026-11-22 — openapi.yaml with only its prose changed is text; a prose string that
@@ -51,7 +53,9 @@ const gitShow = (repo: string, base: string, file: string): string | null => {
 };
 
 /** Paths whose content is words for a person or a session, or the checks that read them. */
-const TEXT_PATH = /^(?:aimeat\/locales\/[a-z]{2}\.json$|.*\.md$|docs\/|\.claude\/|\.githooks\/|aimeat\/scripts\/|aimeat\/security\/|aimeat\/test\/|aimeat\/public\/data\/everything\.|aimeat\/public\/THIRD-PARTY-NOTICES\.md$|THIRD-PARTY-NOTICES\.md$|aimeat\/src\/services\/prompt-defaults\/shipped-hashes\.ts$|aimeat\/src\/services\/ui-library\/facts\.generated\.ts$)/;
+const TEXT_PATH = /^(?:aimeat\/locales\/[a-z]{2}\.json$|aimeat\/public\/changelog\.json$|.*\.md$|docs\/|\.claude\/|\.githooks\/|aimeat\/scripts\/|aimeat\/security\/|aimeat\/test\/|aimeat\/public\/data\/everything\.|aimeat\/public\/THIRD-PARTY-NOTICES\.md$|THIRD-PARTY-NOTICES\.md$|aimeat\/src\/services\/prompt-defaults\/shipped-hashes\.ts$|aimeat\/src\/services\/ui-library\/facts\.generated\.ts$)/;
+// changelog.json is the landing page's list of entries, words a person reads; check:changelog holds
+// its shape and order, and no route reads it for anything but display.
 // shipped-hashes.ts lists the hash of every default prompt text; it changes only with that text, and
 // a unit test holds the two together. facts.generated.ts is the component library's index of which
 // file uses which class and token, read from the source by pnpm build:ui-library and shown on the
