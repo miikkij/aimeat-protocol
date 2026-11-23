@@ -168,7 +168,7 @@ export function gmailResources(API: string, READ: string): NonNullable<OutboundP
  * so it cannot appear on a real node. The server behind it is scripts/lib/fake-mail-server.ts: an
  * OAuth round that approves itself, and a mailbox of sample messages with PDF attachments.
  *
- * It exists so a mail pipeline (the refinery, an app like Postinjalostamo) can be run end to end on a
+ * It exists so a mail pipeline (the refinery, or a mail intake app) can be run end to end on a
  * developer's machine without a real mailbox: the same resources, the same read path, the same token
  * handling, against messages whose right answers are known.
  */

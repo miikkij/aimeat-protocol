@@ -1,6 +1,6 @@
 /**
  * @file atelier/workbench-parts.js
- * @description Two more workbench pieces, drawn in the approved Postinjalostamo design and built by
+ * @description Two more workbench pieces, drawn in the approved mail intake app design and built by
  *   hand in that app before they came here (wish kittiin-kehotepaneeli, 2026-09-29):
  *
  *     promptPanel  the way a person's OWN AI helps without a key on this node: step 1 shows a short

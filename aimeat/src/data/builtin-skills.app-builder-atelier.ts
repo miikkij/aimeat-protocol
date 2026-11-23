@@ -368,7 +368,7 @@ changed after you fetched it says so.
    data, the kit's parts where they fit, the drawing's measures where they do not), let the owner
    look at that genre running and approve it, and only then fork the app from it. An app built
    straight from a drawing drifts from it screen by screen, and the owner is the one who finds each
-   difference (Postinjalostamo, 2026-09-28: three rounds of corrections).
+   difference (a mail intake app, 2026-09-28: three rounds of corrections).
 3. **Build** — on the level \`fine\` (and on a page that states no level), start from a GENRE, never
    from the bare shell; a \`proto\` or \`plain\` page starts from the shell \`shell-atelier\` and skips
    the genre and the register. The shell shows a signed-out visitor only "Log in to continue": an

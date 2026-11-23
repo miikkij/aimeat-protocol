@@ -11,7 +11,7 @@
  *   so a page that is opened twice, or a schedule that fires during a person's batch, cannot read the
  *   same page of mail twice and race each other's cursor.
  * @structure startRun · getRun · runningFor · runViewerOf · RunViewer
- * @usage const run = startRun(deps, caller, 'postinjalostamo', {}); … getRun(run.id, caller.ownerGhii, runViewerOf(caller))
+ * @usage const run = startRun(deps, caller, 'mail', {}); … getRun(run.id, caller.ownerGhii, runViewerOf(caller))
  *
  *   A RUN THAT DOES NOT FINISH IS STALLED, NOT RUNNING. A batch still marked running STALL_MS after
  *   it started is marked failed as stalled when the next start asks, so a batch whose promise never

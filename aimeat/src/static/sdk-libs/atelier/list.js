@@ -35,7 +35,7 @@
  *     has typed in it and its item is still in the list; it drew the pane again and the text was
  *     gone. `keepDetail: 'always' | false` chooses otherwise; select(id) always draws.
  *   v0.57.0 — 2026-09-29 — A row's badge takes `badgeTone` (ok, warn, err, quiet): a queue or a
- *     status reads by its colour as the approved Postinjalostamo drawing shows, with no app CSS.
+ *     status reads by its colour as the approved mail intake app drawing shows, with no app CSS.
  *   v0.50.0 — 2026-09-05 — THE CHANGE IS A MOVE, not three separate ones. The whole reconcile runs
  *     inside `settle`, so a row that arrived rises in on the LOOK's distance and pace, a row that
  *     left fades out where it stood instead of blinking away, and a row that moved glides from

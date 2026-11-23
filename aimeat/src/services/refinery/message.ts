@@ -6,7 +6,7 @@
  *   plain record, the redaction that keeps addresses off the wire, a learned rule's match, the
  *   extraction prompt, and the queue a message lands in. No I/O here, so every rule is a unit test.
  *
- *   These are Postinjalostamo's browser functions moved to the node, unchanged in what they decide,
+ *   These are a mail intake app's browser functions moved to the node, unchanged in what they decide,
  *   so the app's rows read the same whichever side wrote them.
  * @structure MailMessage · parseMessage · listPage · redact · senderAddress · senderDomain ·
  *   ruleFor · extractionPrompt · queueFor · QUEUES

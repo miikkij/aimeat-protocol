@@ -2,8 +2,7 @@
  * @file organism/first-run.js
  * @description An app's first run, for AIMEAT.organism: list the caller's organisms with the role
  *   they hold, find the app's workspace in one of them or create it, and remember the choice in the
- *   owner's memory so the app does not ask again. Five apps wrote this by hand (cadence, lahetin,
- *   lattice, postinjalostamo, suppilo). Every method calls existing node routes: GET /v1/organisms,
+ *   owner's memory so the app does not ask again. Five apps wrote this by hand. Every method calls existing node routes: GET /v1/organisms,
  *   POST /v1/organisms, GET and POST /v1/organisms/:id/workspaces, GET /v1/organisms/:id/workspace,
  *   and /v1/memory (through AIMEAT.data when it is loaded). A refusal throws the node's own message.
  *   An app may also keep the private choice (no shared workspace, as LATTICE offers) and a list of

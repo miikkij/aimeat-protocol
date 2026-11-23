@@ -86,7 +86,7 @@
  *     its cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-29 — THE APP ORIGIN IS ON, at `apps.localhost`. With it off, an app ran in an
  *     opaque frame (origin null) and the browser refused its sign-in (CORS on a credentialed
- *     request), so Postinjalostamo could be looked at only after it reached production and three
+ *     request), so a mail intake app could be looked at only after it reached production and three
  *     rounds of corrections were found by Jouni rather than by the session. Every browser resolves
  *     *.localhost to loopback with no hosts file; the node derives the port-carrying redirect itself.
  *   v1.2.0 — 2026-09-19 — The free-port probe asks the wildcard, 127.0.0.1 and ::1 in turn, and

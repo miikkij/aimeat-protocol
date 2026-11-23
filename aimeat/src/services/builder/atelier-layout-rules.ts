@@ -10,7 +10,7 @@
  *   WHY. The kit's form filled the width of its container and grouped nothing, and the page itself
  *   defaults to the full width of the screen (--ak-main-max: 100%). On a 2600 px screen an app built
  *   by the book showed every field as a line across the room, with no grouping, and its owner
- *   called it ugly, impractical and confusing (Postinjalostamo, 2026-09-28). The rules are from
+ *   called it ugly, impractical and confusing (a mail intake app, 2026-09-28). The rules are from
  *   NN/g, Baymard, GOV.UK, Shopify Polaris, Material 3 and IBM Carbon, researched the same day.
  *   The owner then approved a drawn design for the same app and asked why such a layout was not
  *   in the Design Book to begin with; its pieces are now the kit's workbench (workbench.js), the
@@ -113,5 +113,5 @@ export function atelierLayoutRules(): string {
     + 'becomes a GENRE first (the drawing\'s screens as one page on sample data), the owner looks at '
     + 'it running and approves it, and only then is the app forked from that genre. An app built '
     + 'straight from a drawing out of kit parts drifts from it screen by screen, and the owner finds '
-    + 'every difference himself (Postinjalostamo, 2026-09-28: three rounds).\n\n';
+    + 'every difference on their own (a mail intake app, 2026-09-28: three rounds).\n\n';
 }

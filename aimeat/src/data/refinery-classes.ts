@@ -16,7 +16,7 @@
  * @usage import { CLASS_PACKS, classPack } from '../data/refinery-classes.js';
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial: receipt, invoice, order, booking, job, system, support,
- *     newsletter, personal (Postinjalostamo's five, generalised, and four more its inbox showed).
+ *     newsletter, personal (a mail intake app's five, generalised, and four more its inbox showed).
  */
 
 export interface RefineryField {

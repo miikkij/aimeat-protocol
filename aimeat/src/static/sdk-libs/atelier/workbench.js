@@ -2,7 +2,7 @@
  * @file atelier/workbench.js
  * @description The WORKBENCH pieces: the parts a working tool is built from once the app has
  *   more than one screen and a person comes back to it every day. They were drawn first for the
- *   mail intake app (Postinjalostamo) on 2026-09-28, approved as a design, and moved here so the
+ *   mail intake app on 2026-09-28, approved as a design, and moved here so the
  *   next tool starts from them instead of re-drawing them:
  *
  *     sideNav         the left navigation: grouped entries, a count and a tone dot each
@@ -60,7 +60,7 @@
  *     (the first was always chosen), and `keepKicker: true` keeps an item's own kicker on the chosen card.
  *   v0.2.0 — 2026-09-28 — settingsGroup names `.ak-setgroups`, the one-card container for a
  *     settings page (workbench.css).
- *   v0.1.0 — 2026-09-28 — Initial: the approved Postinjalostamo design, moved into the kit
+ *   v0.1.0 — 2026-09-28 — Initial: the approved mail intake app design, moved into the kit
  *     (wish-ty-p-yt-asettelu-atelieriin-ja-design-bookiin-postinjalostam).
  */
 import { el, clear, resolve, enter, countUp, attention } from './dom.js';

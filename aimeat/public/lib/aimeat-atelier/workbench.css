@@ -5,7 +5,7 @@
  * @description The workbench pieces (atelier/workbench.js) and the shell's workbench frame: the
  *   brand cluster (logo and name), the side-navigation frame, sideNav, statusBand, checkGrid,
  *   choiceCards, settingsGroup, progressFigure, callout, the tone helpers they share, and the
- *   per-field widths of the form. Drawn from the approved Postinjalostamo design (2026-09-28).
+ *   per-field widths of the form. Drawn from the approved design of a mail intake app (2026-09-28).
  *
  *   EVERY VALUE IS A TOKEN. Colours come from the contract (ink, ink-dim, surface, line, accent
  *   and the ok/warn/err pairs the contrast matrix proves); the sizes a builder would reach for are
@@ -415,7 +415,7 @@ button.ak-checkgrid__tile:focus-visible { outline: 2px solid var(--ak-focus); ou
 /* ── Inputs on the workbench look ─────────────────────────────────────────────────────────── */
 /* The kit's input takes the page ground, which on most looks reads as a well in the card. On the
    workbench the ground is the grey-blue desk, and a field that colour on a white card read as a
-   disabled one (the owner's words on Postinjalostamo, 2026-09-28): the field is the card's white,
+   disabled one (the owner's words on a mail intake app, 2026-09-28): the field is the card's white,
    and its border carries the edge. */
 [data-ak-look='workbench'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
 

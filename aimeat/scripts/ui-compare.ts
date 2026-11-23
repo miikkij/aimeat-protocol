@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Compare an app's screen with the approved one BEFORE a person is shown it (wish
- *   visuaalinen-vertailu, 2026-09-29). Postinjalostamo went to Jouni with a grey paste box, the
+ *   visuaalinen-vertailu, 2026-09-29). A mail intake app went to Jouni with a grey paste box, the
  *   settings in separate boxes instead of one card with hairlines, and the batch rows in another
  *   look than the approved drawing; each was visible in a side-by-side, and nobody had put one there.
  *
@@ -21,8 +21,8 @@
  *   sign-in cannot see the node's login on the sandbox, see signInByPopup.)
  * @structure args · signIn · grantApp · signInByPopup · capture · pixelDiff · compareParts · main
  * @usage
- *   pnpm ui:compare --ref http://genre-workbench.apps.localhost:40603/ --app http://postinjalostamo.apps.localhost:40603/ \
- *     --login sandbox:<password> --node http://localhost:40603 --app-ref sandbox/postinjalostamo.html
+ *   pnpm ui:compare --ref http://genre-workbench.apps.localhost:40603/ --app http://mail-intake.apps.localhost:40603/ \
+ *     --login sandbox:<password> --node http://localhost:40603 --app-ref sandbox/mail-intake.html
  *   pnpm ui:compare --ref approved.png --app <url>          (a picture: pixels only)
  *   Options: --width 1440 --height 900 --wait 1500 --out <dir> --click "<text>" (open a view on both first)
  * @version-history

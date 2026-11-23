@@ -49,7 +49,7 @@ const WORDS = {
 
 /**
  * Give the kit the console's words ONCE. The kit tells the page when words arrive, and a page that
- * rebuilds itself on that (Postinjalostamo does, to change language) would call console() again,
+ * rebuilds itself on that (a mail intake app did, to change language) would call console() again,
  * which added the words again: a loop that froze the tab. So the words go in when this library
  * loads, before the page listens, and at most once more if the kit arrived later.
  */

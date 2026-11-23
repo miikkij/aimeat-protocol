@@ -56,7 +56,7 @@
  *     next to the field instead of "Label: required". Types email, url and tel carry their format.
  *   v0.62.0 — 2026-10-01 — `type: 'model'`: a select of the models a `capability` can use, read from
  *     AIMEAT.ai.models() when the library is on the page, and a text field without it. Two apps
- *     wrote a free-text model field by hand (postinjalostamo, puhe). The other kinds are unchanged.
+ *     wrote a free-text model field by hand. The other kinds are unchanged.
  *   v0.55.0 — 2026-09-28 — A `toggle` field is the kit's switch (role="switch", the knob stretches
  *     when pressed and travels on two edge springs) and a `range` field shows its filled share
  *     and stretches when pulled past an end (controls.js switchMotion and rangeMotion).

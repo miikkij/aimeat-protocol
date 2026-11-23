@@ -37,7 +37,7 @@ export const refineryTools = [
         scope: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],
         surfaces: ['agent'],
         input: {
-            prefix: { type: 'string', required: true, description: 'Names the definition, `<prefix>.config`: lowercase letters, digits, - or _ (e.g. postinjalostamo).' },
+            prefix: { type: 'string', required: true, description: 'Names the definition, `<prefix>.config`: lowercase letters, digits, - or _ (e.g. mail).' },
             message_ids: { type: 'array', description: 'Run exactly these messages again (at most 50), whether or not they already have rows.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
         },
     },

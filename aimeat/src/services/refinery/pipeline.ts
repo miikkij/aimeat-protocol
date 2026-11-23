@@ -11,12 +11,12 @@
  *
  *   THE DEFINITION IS THE OWNER'S MEMORY RECORD `<prefix>.config` (private), with `<prefix>.cursor`
  *   (where the last batch stopped) and `<prefix>.runs` (the last fifty batches) beside it. The prefix
- *   is the app's word (`postinjalostamo`), so an app keeps the data it already wrote.
+ *   is the app's own word (for example `mail`), so an app keeps the data it already wrote.
  *
  *   IT NEVER SENDS. Approving a record and sending it onward is a person's act in the app, through
  *   their own allowlist; a batch that runs at night only reads, decides and files.
  * @structure RefineryDefinition · RefineryCaller · RunState · Ctx · loadDefinition · readAttachments · runBatch
- * @usage const run = await runBatch(deps, caller, 'postinjalostamo', { onProgress });
+ * @usage const run = await runBatch(deps, caller, 'mail', { onProgress });
  * @version-history
  *   v1.1.0 — 2026-11-21 — A filed message's row gets its content risk marks at the intake point.
  *   v1.0.1 — 2026-11-20 — The default app's file name comes from htmlFilenameOf (services/app/app-ref.ts).

@@ -393,7 +393,7 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
     imagery: 'clean flat vector marks on a light ground, one coral accent, crisp outlines, no scenery',
     structures: [],
     grounds: {
-      // The approved Postinjalostamo design (2026-09-28): a blue-grey desk a step under white
+      // The approved design of a mail intake app (2026-09-28): a blue-grey desk a step under white
       // cards (1.18 between them), and a hairline that still reads against the card (1.38).
       light: {
         '--ak-bg': '#e9edf5',

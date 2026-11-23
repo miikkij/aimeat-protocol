@@ -128,7 +128,7 @@
  *   v0.54.0 — 2026-09-28 — THE WORKBENCH: workbench.css joins the imports (the side-navigation
  *     frame, the brand cluster, sideNav, statusBand, checkGrid, choiceCards, settingsGroup,
  *     progressFigure, callout and the form's per-field widths), and nine per-component tokens
- *     join the base block at the sizes of the approved Postinjalostamo design.
+ *     join the base block at the sizes of the approved mail intake app design.
  *   v0.53.3 — 2026-09-20 — No rules changed. The version is pinned to AIMEAT.atelier.version, and
  *     that moved for the mosaic's layout read: it asks for the arrangement alone
  *     (`?catalogue=none`) and stops carrying 89 kB it never used. e2e-libs holds the two versions

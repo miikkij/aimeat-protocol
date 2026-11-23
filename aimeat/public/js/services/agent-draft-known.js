@@ -272,7 +272,7 @@ const replaceAddress = (text, token, to) =>
  *   and a missing row is the safe mistake;
  * - the app's address with no tool part ("<owner>/<file>", with the prefix or without it) is
  *   replaced the same way. Seen twice on 2026-10-13, once in a measurement and once on aimeat.io
- *   ("the Postinjalostamo tools under sku happydude500001/postinjalostamo.html: … open_requests,
+ *   ("the <app> tools under sku <owner>/<file>.html: … open_requests,
  *   … save_reply_draft"). A task that names no tool beside it keeps it as it came.
  * Nothing is added that the task does not name. Returns the same object when nothing changed.
  */

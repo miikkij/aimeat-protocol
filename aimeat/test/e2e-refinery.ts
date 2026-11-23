@@ -288,7 +288,7 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
   const DEF = {
     v: 2, connectionId: mailbox, provider: 'fake-mail', since: new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10),
     batchSize: 6, query: '', organismId: org, workspaceId: ws, thresholds: { clear: 0.8, unclear: 0.5 },
-    models: { text: '', vision: '' }, rules: [], app: 'postinjalostamo.html',
+    models: { text: '', vision: '' }, rules: [], app: 'mail-intake.html',
     classes: ['receipt', 'invoice', 'order', 'booking', 'job', 'system', 'support', 'newsletter', 'personal'],
   };
   await saveDefinition(A, 'mt', DEF);

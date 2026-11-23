@@ -22,8 +22,8 @@
  *   <script src="/v1/libs/aimeat-auth.js"></script>
  *   <script src="/v1/libs/aimeat-atelier.js"></script>   (only for console())
  *   <script src="/v1/libs/aimeat-refinery.js"></script>
- *   const def = await AIMEAT.refinery.definition('postinjalostamo');
- *   const run = await AIMEAT.refinery.run('postinjalostamo', { onProgress: function (r) { paint(r); } });
+ *   const def = await AIMEAT.refinery.definition('mail');
+ *   const run = await AIMEAT.refinery.run('mail', { onProgress: function (r) { paint(r); } });
  *   const { rows } = await AIMEAT.refinery.rows(def, { queue: 'selkea' });
  * @version-history
  *   v1.0.0 - 2026-09-29 - Initial (wish aimeat-refinery).

@@ -58,7 +58,7 @@ const ANSWER = {
 
 /** A decision row as GET /v1/ai/decisions/:id gives it: the record keeps the thresholds, not `passed`. */
 const ROW = {
-  id: 'dec_9', ownerGhii: 'alice@node', principal: 'eco:postinjalostamo#alice@node', appId: 'postinjalostamo',
+  id: 'dec_9', ownerGhii: 'alice@node', principal: 'eco:mail-intake#alice@node', appId: 'mail-intake',
   subject: 'mail:42', model: 'jev-1', createdAt: '2026-09-30T10:00:00.000Z', rule: null, ruleVersion: null, outcome: null,
   keyScope: 'own', provider: 'typesafe', providerKind: 'hosted',
   record: {

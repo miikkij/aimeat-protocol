@@ -153,7 +153,7 @@
  *     figures on the empty sides of a wide frame, the person's home choice when the app hands it over.
  *   v0.57.0 — 2026-09-29 — A list row's badge takes `badgeTone` (ok, warn, err, quiet), styled in shell.css.
  *   v0.56.0 — 2026-09-29 — promptPanel (copy the prompt, paste the answer, parsed) and queueRow
- *     (the content of a queue list row), from the approved Postinjalostamo design (workbench-parts.js).
+ *     (the content of a queue list row), from the approved mail intake app design (workbench-parts.js).
  *   v0.55.1 — 2026-09-28 — The workbench stylesheet carries `.ak-setgroups` (a settings page's
  *     groups in one card) and white inputs on the workbench look.
  *   v0.55.0 — 2026-09-28 — THE TEN MOTION PARTS (Jouni's ask of 2026-09-28: controls that answer
@@ -168,7 +168,7 @@
  *     a spring; the palette grows from its button, glides its rows and turns into the toast.
  *   v0.54.0 — 2026-09-28 — THE WORKBENCH (workbench.js): sideNav, statusBand, checkGrid,
  *     choiceCards, settingsGroup, progressFigure and callout, the pieces of the approved
- *     Postinjalostamo design; app() takes `logo` and `nav: 'side'`, and form fields take `width`.
+ *     mail intake app design; app() takes `logo` and `nav: 'side'`, and form fields take `width`.
  *   v0.53.3 — 2026-09-20 — The mosaic reads its stored arrangement with ?catalogue=none
  *     (mosaic-layout.js): the route sent its whole 89 kB catalogue on every open of every app.
  *   v0.53.2 — 2026-09-13 — A section's fill runs with its body in the page, and a throwing fill no
