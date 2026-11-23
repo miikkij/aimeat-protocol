@@ -24,6 +24,9 @@
  * @structure SuiteResult · suiteTimeLimitMs() · NO_RUNNER_NODE_BASE · runLane() · runTest() · endTree()
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.4.0 -- 2026-11-23 -- LaneOptions.stop (`--stop-on-lost-lane`): a lane that cannot restart its
+ *     node stops every lane before its next suite, instead of leaving the others to finish a run that
+ *     is red already.
  *   v1.3.0 -- 2026-11-19 -- SuiteResult.flaky, set by --retry-red (test/run-e2e-retry.ts).
  *   v1.2.0 -- 2026-11-15 -- A suite on RUNNER_NODE_FREE gets its database emptied and no node started,
  *     and its E2E_BASE points at a port nothing listens on (NO_RUNNER_NODE_BASE). With two targets a
@@ -89,6 +92,15 @@ export interface LaneOptions {
     isGuard: (name: string) => boolean;
     /** Whether a suite talks to the runner's node; false for RUNNER_NODE_FREE (test/run-e2e-plan.ts). */
     needsNode?: (name: string) => boolean;
+    /**
+     * One object for every lane of a run, given with `--stop-on-lost-lane` (pnpm ready's sweep). A
+     * lane that cannot restart its node writes the reason here, and every lane reads it before its
+     * next suite and reports the rest NOT RUN. The run is red from the moment a lane is lost, so
+     * going on only holds the machine: on 2026-11-23 a sweep with three of four lanes lost ran 75
+     * more minutes on the fourth. Without the object a lost lane leaves the other lanes running,
+     * which is what the nightly wants: every result it can get.
+     */
+    stop?: { reason?: string };
 }
 
 /**
@@ -153,6 +165,17 @@ export async function runLane(lane: number, targets: RunnerTarget | RunnerTarget
             // (ANONYMOUS_OFF_SUITES in run-e2e-server.ts). An external node has its own setting.
             const anonymous = external ? 'external' : !needsNode(name) ? 'no node' : anonymousModeFor(name) === 'false' ? 'off' : 'on';
 
+            // Another lane lost its node and the run stops on that (LaneOptions.stop).
+            if (opts.stop?.reason) {
+                const reason = `the run stopped: ${opts.stop.reason}`;
+                for (const rest of suites.slice(i)) {
+                    const restName = basename(rest, '.ts');
+                    console.error(`${tag}! ${restName}  NOT RUN (${reason})`);
+                    results.push({ name: restName, passed: 0, failed: 0, skipped: 0, total: 0, time: '0.00s', exitCode: 1, lane, cycleMs: 0, anonymous, notRun: reason });
+                }
+                break;
+            }
+
             let cycleMs = 0;
             if (!external) {
                 const c0 = Date.now();
@@ -168,6 +191,7 @@ export async function runLane(lane: number, targets: RunnerTarget | RunnerTarget
                     // The run goes on: this suite and the rest of the lane are reported NOT RUN with
                     // the reason, and the other lanes' results reach the summary (QA audit P1-09).
                     const reason = `the lane's node could not be restarted: ${(e as Error).message.split('\n')[0]}`;
+                    if (opts.stop && !opts.stop.reason) opts.stop.reason = `lane ${lane} could not restart its node for ${name}`;
                     for (const rest of suites.slice(i)) {
                         const restName = basename(rest, '.ts');
                         console.error(`${tag}! ${restName}  NOT RUN (${reason})`);

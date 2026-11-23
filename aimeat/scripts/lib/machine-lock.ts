@@ -14,11 +14,13 @@
  *   a non-recursive mkdir, so EEXIST is the answer "somebody holds it". The holder writes who it is.
  *   A lock whose holder process is gone, or that is older than `staleMs`, is passed over. A waiting
  *   run says once whom it waits for, and keeps waiting until `timeoutMs`.
- * @structure machineLockRoot() · acquireMachineLock(name, owner, opts) · releaseMachineLock(held)
+ * @structure machineLockRoot() · acquireMachineLock(name, owner, opts) · releaseMachineLock(held) ·
+ *   WHOLE_RUN_LOCK · WHOLE_RUN_WAIT_MS · holdMachineForRun(what, owner, opts)
  * @usage
  *   const held = await acquireMachineLock('check-fast', { session, worktree }, { onWait: h => console.log(...) });
  *   try { ... } finally { releaseMachineLock(held); }
  * @version-history
+ *   v1.1.0 — 2026-11-23 — holdMachineForRun: pnpm ready and pnpm gate hold one lock for their whole run.
  *   v1.0.0 — 2026-11-15 — Initial: check:fast runs one at a time on a machine.
  */
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -98,4 +100,29 @@ export async function acquireMachineLock(name: string, owner: MachineLockOwner, 
 /** Give the lock back. Safe to call twice. */
 export function releaseMachineLock(held: { dir: string }): void {
     rmSync(held.dir, { recursive: true, force: true });
+}
+
+/** The lock of a run that needs the whole machine: pnpm ready and pnpm gate take the same one. */
+export const WHOLE_RUN_LOCK = 'whole-run';
+/**
+ * How long such a run waits for the one before it, and the age past which its lock is taken as left
+ * behind: longer than the longest run (a full sweep on both backends on a slow machine), because a
+ * lock passed over while its run is alive puts two runs on the machine, which is what the lock is for.
+ */
+export const WHOLE_RUN_WAIT_MS = 8 * 60 * 60_000;
+
+/**
+ * Hold the machine for this process's run (`what` is its log tag: "ready", "gate"), waiting while another
+ * such run holds it, and give it back when the process exits. The unit suite and the E2E sweep of two
+ * runs side by side take each other's cores and disk; on 2026-11-23 several did, every test node
+ * passed its start limit, and each run went red for timing and began again.
+ */
+export async function holdMachineForRun(what: string, owner: MachineLockOwner, opts: MachineLockOptions = {}): Promise<void> {
+    const held = await acquireMachineLock(WHOLE_RUN_LOCK, owner, {
+        timeoutMs: WHOLE_RUN_WAIT_MS,
+        staleMs: WHOLE_RUN_WAIT_MS,
+        onWait: h => console.log(`[${what}] waiting: ${h ? `${h.session} holds the machine for its run in ${h.worktree} (since ${h.at})` : 'another run holds the machine'}; one such run at a time on this machine, and this one starts when that one ends.`),
+        ...opts,
+    });
+    process.on('exit', () => releaseMachineLock(held));
 }

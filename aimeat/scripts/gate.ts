@@ -46,6 +46,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-11-23 -- The run holds the machine's whole-run lock, the one pnpm ready holds, so a gate and a
+ *     ready (or two gates) no longer run side by side (scripts/lib/machine-lock.ts holdMachineForRun).
  *   2026-11-23 -- The second run of failed unit files moved to scripts/lib/unit-rerun.ts, which pnpm
  *     ready uses too; more than 40 failed files are not run again.
  *   2026-11-21 -- The unit tests whose text names a changed file run too (docs/pitfalls.md §108), and
@@ -86,6 +88,7 @@ import { describeState, readCiState } from './lib/ci-runs.mjs';
 import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
 import { COVERAGE_SUITE_CAP, coverageSelection, type GateCoverage } from './lib/gate-coverage.js';
 import { testsNamingChanged } from './lib/gate-text-tests.js';
+import { holdMachineForRun } from './lib/machine-lock.js';
 import { runUnitWithRerun } from './lib/unit-rerun.js';
 
 const args = process.argv.slice(2);
@@ -368,6 +371,10 @@ async function main(): Promise<void> {
     for (const line of await contextLines()) console.log(`  ${line}`);
     console.log('');
     if (PLAN_ONLY) return;
+
+    // One whole run at a time on this machine, pnpm ready's included: the unit tests and the tiers of
+    // two runs side by side turn each other red for timing (scripts/lib/machine-lock.ts).
+    await holdMachineForRun('gate', { session: process.env.AIMEAT_SESSION || '(no session)', worktree: AIMEAT });
 
     const t0 = Date.now();
     const loadNotes: string[] = [];

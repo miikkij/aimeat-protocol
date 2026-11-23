@@ -12,6 +12,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-23 -- `--workers` reads the last value given, so a caller of a package script can add its
+ *     own after the script's (pnpm ready names the lanes its machine carries). `--stop-on-lost-lane`:
+ *     a lane that cannot restart its node ends the run (test/run-e2e-lane.ts LaneOptions.stop).
  *   2026-11-23 -- e2e-file-open-link.ts joins the list (not the guard tier): a file link opened in a new
  *     tab with no session goes to /v1/file-open.
  *   2026-11-21 -- e2e-workspace-write-role.ts joins the list (not the guard tier): a record space's
@@ -2609,7 +2612,8 @@ function parseArgs(): string[] {
 // with one lane it streams as before.
 
 function parseWorkers(): number {
-    const arg = process.argv.find(a => a.startsWith('--workers='));
+    // The last one given: `pnpm test:e2e:sqlite --workers=12` adds its flag after the script's own.
+    const arg = process.argv.findLast(a => a.startsWith('--workers='));
     const raw = arg ? arg.slice('--workers='.length) : (process.env.AIMEAT_E2E_WORKERS ?? '1');
     const n = Number(raw);
     if (!Number.isInteger(n) || n < 1 || n > 16) {
@@ -2872,8 +2876,11 @@ async function main() {
         // lane either way (QA audit P1-09).
         // A purpose suite is held to the guard tier's verdict: a skipped test in it is red.
         const guards = new Set([...GUARD_SUITES, ...PURPOSE_SUITES].map(g => basename(g, '.ts')));
+        // `--stop-on-lost-lane` (pnpm ready's sweep): a lane that cannot restart its node stops the
+        // run (LaneOptions.stop in run-e2e-lane.ts). The retry below runs one suite alone and gets none.
+        const stop = process.argv.includes('--stop-on-lost-lane') ? {} : undefined;
         const laneOpts = { session: RUN_SESSION, isGuard: (n: string) => guards.has(n), needsNode: needsRunnerNode };
-        const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1, laneOpts)));
+        const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1, { ...laneOpts, stop })));
         results = settled.flatMap((s, k): SuiteResult[] => {
             if (s.status === 'fulfilled') return s.value;
             const reason = `lane ${k} failed: ${(s.reason as Error).message.split('\n')[0]}`;

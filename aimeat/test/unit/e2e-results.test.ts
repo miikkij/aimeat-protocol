@@ -99,4 +99,31 @@ describe('a lane whose node cannot be restarted does not end the run', { timeout
             expect(classify(r, { guard: false })).toMatchObject({ status: 'not-run', red: true });
         }
     });
+
+    it('with the run\'s stop object, the lost lane names itself there and another lane stops before its next suite', async () => {
+        const dead = target({ external: false, dbType: 'postgres-kysely', dbUrl: 'postgresql://nobody:nothing@127.0.0.1:1/none' });
+        const stop: { reason?: string } = {};
+        await runLane(2, dead, ['test/e2e-a.ts'], false, { session: 'unit', isGuard: () => false, stop });
+        expect(stop.reason).toBe('lane 2 could not restart its node for e2e-a');
+
+        // A lane on a node somebody else runs needs no restart, so only the stop object can end it.
+        const suite = join(scratch, 'e2e-would-pass.ts');
+        writeFileSync(suite, `console.log('  ✅ one');\nconsole.log('1 passed, 0 failed out of 1');\n`);
+        const stopped = await runLane(0, target(), [suite, suite], false, { session: 'unit', isGuard: () => false, stop });
+        expect(stopped).toHaveLength(2);
+        for (const r of stopped) {
+            expect(r.notRun).toBe('the run stopped: lane 2 could not restart its node for e2e-a');
+            expect(classify(r, { guard: false })).toMatchObject({ status: 'not-run', red: true });
+        }
+    });
+
+    it('without a lost lane the stop object changes nothing', async () => {
+        const suite = join(scratch, 'e2e-passes.ts');
+        writeFileSync(suite, `console.log('  ✅ one');\nconsole.log('1 passed, 0 failed out of 1');\n`);
+        const stop: { reason?: string } = {};
+        const [r] = await runLane(0, target(), [suite], false, { session: 'unit', isGuard: () => false, stop });
+        expect(r.notRun).toBeUndefined();
+        expect(r).toMatchObject({ passed: 1, total: 1, exitCode: 0 });
+        expect(stop.reason).toBeUndefined();
+    });
 });
