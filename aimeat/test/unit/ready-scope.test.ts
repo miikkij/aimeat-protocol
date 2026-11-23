@@ -6,12 +6,13 @@
  *   a text change runs only the suites that quote the old words, so a code change read as text would
  *   reach main without its sweep. Each case below is one way code can hide inside a string or a tag.
  * @version-history
+ *   v1.2.0 — 2026-11-23 — Where a text change becomes wide enough for the full SQLite sweep.
  *   v1.1.0 — 2026-11-22 — A prose string that became one word, an apostrophe in a quoted attribute,
  *     and the API contract with only its prose changed.
  *   v1.0.0 — 2026-11-22 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { codeShape, htmlShape, sameCode, contractShape } from '../../scripts/lib/ready-scope.js';
+import { codeShape, htmlShape, sameCode, contractShape, isWideText, WIDE_FILES, WIDE_TEXTS } from '../../scripts/lib/ready-scope.js';
 
 const same = (a: string, b: string, file = 'x.ts') => codeShape(a, file).shape === codeShape(b, file).shape;
 
@@ -78,5 +79,17 @@ describe('the API contract', () => {
     expect(contractShape(doc('x'))).not.toBe(contractShape(doc('x').replace('/v1/x', '/v1/y')));
     expect(contractShape('a: { type: string }')).not.toBe(contractShape('a: { type: integer }'));
     expect(contractShape('a: { enum: [one, two] }')).not.toBe(contractShape('a: { enum: [one, three] }'));
+  });
+});
+
+describe('a wide text change', () => {
+  const many = (n: number, f: (i: number) => string) => Array.from({ length: n }, (_, i) => f(i));
+  it('is WIDE_FILES product files or WIDE_TEXTS removed texts, and also runs the full SQLite sweep', () => {
+    expect(isWideText(many(WIDE_FILES, i => `aimeat/src/x${i}.ts`), 0)).toBe(`${WIDE_FILES} product files changed`);
+    expect(isWideText(['aimeat/locales/en.json'], WIDE_TEXTS)).toBe(`${WIDE_TEXTS} texts removed`);
+  });
+  it('is not a narrow one, and Markdown, docs/ and the session guides do not count as product files', () => {
+    expect(isWideText(many(WIDE_FILES - 1, i => `aimeat/public/x${i}.js`), WIDE_TEXTS - 1)).toBeNull();
+    expect(isWideText([...many(50, i => `docs/x${i}.txt`), ...many(50, i => `aimeat/x${i}.md`), ...many(50, i => `.claude/skills/x${i}.json`)], 0)).toBeNull();
   });
 });

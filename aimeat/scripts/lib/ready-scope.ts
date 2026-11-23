@@ -21,9 +21,19 @@
  *   changed. Anything the rule cannot read (a new file under src/, a binary) is code.
  *
  *   WHICH SUITES, FOR TEXT. Every E2E suite file that changed, and every suite that contains, word for
- *   word, an English locale value or a string literal the change removed (at least eight characters).
- * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · readyScope()
+ *   word, an English locale value or a string literal the change removed (at least 20 characters).
+ *
+ *   A WIDE TEXT CHANGE ALSO RUNS THE FULL SWEEP ON SQLITE. The search above misses a suite that quotes
+ *   a part of a sentence shorter than 20 characters, and on 2026-11-22 a terminology change of 624
+ *   files passed its 7 picked suites while 8 other suites quoted the old words; the full SQLite sweep
+ *   found all 10 failures. A text change is wide when it changes WIDE_FILES or more files a person or
+ *   an AI reads in the product (not Markdown, docs/ or the session guides), or removes WIDE_TEXTS or
+ *   more texts. Then the full sweep runs on SQLite, the faster backend, and the picked suites on
+ *   PostgreSQL.
+ * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope()
  * @version-history
+ *   v1.2.0 — 2026-11-23 — A wide text change (WIDE_FILES files or WIDE_TEXTS removed texts) also runs
+ *     the full sweep on SQLite (Jouni, 2026-11-23).
  *   v1.1.0 — 2026-11-22 — openapi.yaml with only its prose changed is text; a prose string that
  *     became one word is still prose; an attribute value in double quotes may hold an apostrophe.
  *   v1.0.0 — 2026-11-22 — Initial.
@@ -169,8 +179,11 @@ function flatStrings(o: unknown, out: Record<string, string> = {}, p = ''): Reco
   return out;
 }
 
-/** The texts the change took out: old English locale values and removed string literals. */
-function removedTexts(repo: string, base: string, files: string[]): string[] {
+/**
+ * The texts the change took out: old English locale values and removed string literals. `count` is
+ * how many there were; `parts` are the pieces of 20 characters or more that a suite can be searched for.
+ */
+function removedTexts(repo: string, base: string, files: string[]): { count: number; parts: string[] } {
   const texts = new Set<string>();
   for (const f of files) {
     const before = gitShow(repo, base, f);
@@ -189,7 +202,22 @@ function removedTexts(repo: string, base: string, files: string[]): string[] {
   // ("this site", "the paste") is in too many unrelated strings to point at a suite.
   const parts = new Set<string>();
   for (const t of texts) for (const p of t.split(/\{\{?\w+\}?\}|\$\{[^}]*\}/)) if (p.trim().length >= 20) parts.add(p.trim());
-  return [...parts];
+  return { count: texts.size, parts: [...parts] };
+}
+
+/** How many product files or removed texts make a text change wide (see the header). */
+export const WIDE_FILES = 20;
+export const WIDE_TEXTS = 100;
+
+/**
+ * Why a text change is wide, or null when it is not. A product file is one a person or an AI reads
+ * in the running product: everything but Markdown, docs/ and the session guides under .claude/.
+ */
+export function isWideText(files: string[], removedCount: number): string | null {
+  const product = files.filter(f => !/\.md$/.test(f) && !f.startsWith('docs/') && !f.startsWith('.claude/'));
+  if (product.length >= WIDE_FILES) return `${product.length} product files changed`;
+  if (removedCount >= WIDE_TEXTS) return `${removedCount} texts removed`;
+  return null;
 }
 
 /** A file's code with only its comments dropped: what a suite does, whatever its comments say. */
@@ -206,8 +234,8 @@ function withoutComments(source: string, file: string): string {
   return parts.join(' ');
 }
 
-/** The E2E suites (by name) a text change can reach. */
-export function targetedSuites(repo: string, base: string, files: string[]): string[] {
+/** The E2E suites (by name) a text change can reach; `texts` are removedTexts' parts. */
+export function targetedSuites(repo: string, base: string, files: string[], texts = removedTexts(repo, base, files).parts): string[] {
   const testDir = path.join(repo, 'aimeat', 'test');
   const suites = readdirSync(testDir).filter(n => /^e2e-.*\.ts$/.test(n));
   const picked = new Set<string>();
@@ -220,7 +248,6 @@ export function targetedSuites(repo: string, base: string, files: string[]): str
     if (before === null || withoutComments(before, f) !== withoutComments(after, f)) picked.add(m[1]);
   }
   // A suite whose strings hold a text the change removed: it may assert the old words.
-  const texts = removedTexts(repo, base, files);
   if (texts.length) {
     for (const n of suites) {
       const literals = codeShape(readFileSync(path.join(testDir, n), 'utf8'), n).strings.join('\n');
@@ -230,11 +257,17 @@ export function targetedSuites(repo: string, base: string, files: string[]): str
   return [...picked].sort();
 }
 
-export interface ReadyScope { full: boolean; code: string[]; suites: string[] }
+/** `wide` says why a text change also runs the full SQLite sweep, or is null. */
+export interface ReadyScope { full: boolean; code: string[]; suites: string[]; wide: string | null }
 
-/** The whole sweep when any changed file is code; otherwise the suites the text change can reach. */
+/**
+ * The whole sweep when any changed file is code; otherwise the suites the text change can reach, and
+ * for a wide text change the reason it also runs the full sweep on SQLite.
+ */
 export function readyScope(repo: string, base: string): ReadyScope {
   const files = changedFiles(repo, base);
   const code = files.filter(f => !isTextOnly(repo, base, f));
-  return code.length ? { full: true, code, suites: [] } : { full: false, code: [], suites: targetedSuites(repo, base, files) };
+  if (code.length) return { full: true, code, suites: [], wide: null };
+  const removed = removedTexts(repo, base, files);
+  return { full: false, code: [], suites: targetedSuites(repo, base, files, removed.parts), wide: isWideText(files, removed.count) };
 }

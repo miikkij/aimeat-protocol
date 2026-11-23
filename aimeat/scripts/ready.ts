@@ -39,8 +39,12 @@
  *
  *   HOW MUCH OF THE SWEEP. A change that reaches code runs the full sweep. A change of words only
  *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
- *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22).
+ *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22). A wide
+ *   change of words (20 product files, or 100 removed texts) also runs the full sweep on SQLite, because
+ *   the search misses a suite that quotes only a short part of a sentence (Jouni, 2026-11-23).
  * @version-history
+ *   v2.2.0 — 2026-11-23 — A wide text change runs the full sweep on SQLite and the picked suites on
+ *     PostgreSQL.
  *   v2.1.1 — 2026-11-22 — The checks step runs node without a shell on Windows: the shell split
  *     node's path at the space in "Program Files", and the step was red before it began.
  *   v2.1.0 — 2026-11-22 — The sweep's size follows the change: full for code, the suites that quote
@@ -101,11 +105,17 @@ async function main(): Promise<void> {
 
     // How much of the sweep the change needs (scripts/lib/ready-scope.ts): all of it for code, the
     // suites that quote the changed words for text. --full runs all of it whatever the change is.
-    const scope = process.argv.includes('--full') ? { full: true, code: ['(--full)'], suites: [] } : readyScope(path.resolve('..'), 'origin/main');
+    const scope = process.argv.includes('--full') ? { full: true, code: ['(--full)'], suites: [], wide: null } : readyScope(path.resolve('..'), 'origin/main');
     if (scope.full) {
         console.log(`\n[ready] the change reaches code (${scope.code.slice(0, 5).join(', ')}${scope.code.length > 5 ? ` and ${scope.code.length - 5} more` : ''}): the full sweep on both backends`);
         step('the full E2E sweep on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red']);
         step('the full E2E sweep on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red']);
+    } else if (scope.wide) {
+        // A wide text change: the search for quoted words misses short quotes (ready-scope.ts header).
+        const tests = scope.suites.map(s => `--test=${s}`);
+        console.log(`\n[ready] the change is text only but wide (${scope.wide}): the full sweep on SQLite${scope.suites.length ? `, and on PostgreSQL the ${scope.suites.length} suite(s) that changed or quote the changed words: ${scope.suites.join(', ')}` : ''}`);
+        step('the full E2E sweep on SQLite', 'pnpm', ['test:e2e:sqlite', '--retry-red']);
+        if (tests.length) step('the changed-text suites on PostgreSQL', 'pnpm', ['test:e2e:postgres-kysely', '--retry-red', ...tests]);
     } else if (scope.suites.length) {
         const tests = scope.suites.map(s => `--test=${s}`);
         console.log(`\n[ready] the change is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
