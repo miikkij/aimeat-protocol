@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-11-23 — POST /token with authorization_code answers the owner's display_name, as the silent bridge does; an app's login pill showed the full GHII after a sign-in through the consent window until a reload.
  *   2026-11-20 — /authorize and the silent bridge take `app` named without `.html`, settled before any
  *     check reads it (services/app/app-ref.ts).
  *   2026-11-04 — The pending authorize requests and the authorization codes are kept in the node's storage (oneTimeStore 'app-grant-request' and 'app-grant-code'), so a request or code made on one process is used on another; lifetimes and answers are unchanged (codebase analysis 2026-11-03, HA stage 2).
@@ -732,12 +733,15 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         await liveAppGrantFor(storage, ac.owner, ac.app),
       );
       const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes, grantId, app: ac.app });
-      // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
-      // grant-gear state correct when the session came through the visible consent flow instead.
+      // app + own + display_name: the same metadata the silent bridge returns, so the SDK's login
+      // pill shows the same grant-gear state and the same name when the session came through the
+      // visible consent flow instead. Without display_name the pill showed the full GHII until a
+      // reload took the silent bridge.
+      const ghiiRec = await storage.getGHII(ac.gaii);
       return res.json(success(config.nodeId, {
         access_token: token, token_type: 'Bearer', expires_in: expiresIn,
         refresh_token: rawRefresh, scope: scopes.join(' '), grant_id: grantId,
-        app: ac.app, own: ac.own,
+        app: ac.app, own: ac.own, display_name: ghiiRec?.displayName ?? '',
       }));
     }
 

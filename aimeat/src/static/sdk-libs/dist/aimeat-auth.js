@@ -1079,8 +1079,11 @@
             if (!t || !t.access_token) throw new Error("App session expired — the owner is not logged in on the node.");
             session.jwt = t.access_token;
             session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+            var nameChanged = typeof t.display_name === "string" && t.display_name && t.display_name !== session.displayName;
+            if (nameChanged) session.displayName = t.display_name;
             persistSession(session);
             scheduleAutoRefresh(session);
+            if (nameChanged) emit("session-updated", session);
             return session;
           }
           if (session.federated) {

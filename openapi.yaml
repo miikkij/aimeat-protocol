@@ -11207,8 +11207,9 @@ paths:
         (+ PKCE `code_verifier`) the node creates the persistent grant and returns a short-lived
         **scoped** access JWT (role `app`, the granted scopes, an `app_grant` claim) + a rotating
         refresh token — never the owner's session. The code-exchange response also includes `app`
-        (owner/filename) and `own` (origin-bound request approved by the app's own owner) so the
-        SDK's login-pill metadata matches the silent bridge. With `grant_type=refresh_token` it
+        (owner/filename), `own` (origin-bound request approved by the app's own owner) and
+        `display_name` (the owner's display name, `''` when none) so the SDK's login-pill metadata
+        matches the silent bridge. With `grant_type=refresh_token` it
         rotates the refresh token and re-mints the access JWT **with the stored grant's scopes**
         (a refresh never widens scopes on its own). A revoked grant yields `401`, and so does a
         grant whose account is gone, deactivated, or was made after the grant because the name was

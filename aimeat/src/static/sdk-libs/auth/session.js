@@ -14,6 +14,8 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.10.1 — 2026-11-23 — An app-origin session's refresh adopts the display name the silent bridge
+ *     answers, as the owner-session refresh does, and emits 'session-updated' when it changed.
  *   v1.10.0 — 2026-11-21 — login() called inside a click that finds nothing to restore says so once in
  *     the console, naming signIn() (curated appdev pitfall login-is-silent-only). It still answers
  *     null and opens nothing; the restore itself moved unchanged to auth._restore().
@@ -311,8 +313,14 @@ export function createSession(data) {
         if (!t || !t.access_token) throw new Error('App session expired — the owner is not logged in on the node.');
         session.jwt = t.access_token;
         session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        // The silent bridge answers the owner's display name; adopt it as the owner-session refresh
+        // below does, so a session that started without one gets it on its next refresh, and tell
+        // the login pill ('session-updated' re-renders it).
+        var nameChanged = typeof t.display_name === 'string' && t.display_name && t.display_name !== session.displayName;
+        if (nameChanged) session.displayName = t.display_name;
         persistSession(session);
         scheduleAutoRefresh(session);
+        if (nameChanged) emit('session-updated', session);
         return session;
       }
       // Federated sessions can't self-refresh yet — user must re-login.
