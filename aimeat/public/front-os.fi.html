@@ -2,9 +2,11 @@
 <!--
   @file front-os.fi.html
   @description The Finnish sibling of front-os.html, composed in Finnish rather than
-    translated (aimeat-writing skill; this page's register is technical, so node and agent
-    stay as the terms its audience uses). Same skeleton, CSS and /front-os.js.
+    translated (aimeat-writing skill). A reader of this page is a customer, so it says palvelin
+    where the English page says server, and agent stays. Same skeleton, CSS and /front-os.js.
   @version-history
+    v1.0.3 - 2026-11-23 - Sivu sanoo palvelin, ei node, kuten englanninkielinen sivu sanoo server.
+      Hintatasot ovat Oma palvelin ja Oma palvelin Pro.
     v1.0.2 - 2026-11-15 - Sovellusikkunan odotusrivi neuvoo painamaan Kokeile käyttöjärjestelmää -painiketta.
     v1.0.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does, so the
       root has WebMCP tools whichever front page it serves.
@@ -15,7 +17,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AIMEAT — tekoälyn Linux</title>
-  <meta name="description" content="Avoin, itse isännöitävä tekoälyn käyttöjärjestelmä. Sinun agenttisi, sinun appisi, sinun muistisi, nodella, jonka omistat. Käyttöjärjestelmä on ilmainen; me myymme hyvin hoidetun noden." />
+  <meta name="description" content="Avoin, itse isännöitävä tekoälyn käyttöjärjestelmä. Sinun agenttisi, sinun appisi, sinun muistisi, palvelimella, jonka omistat. Käyttöjärjestelmä on ilmainen; me myymme hyvin hoidetun palvelimen." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <script src="/front-os.js" defer></script>
   <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
@@ -215,7 +217,7 @@
     <h1>AIMEAT, tekoälyn Linux</h1>
     <p class="fos-sub">
       Avoin, itse isännöitävä tekoälyn käyttöjärjestelmä. Sinun agenttisi, sinun appisi,
-      sinun muistisi, nodella, jonka omistat.
+      sinun muistisi, palvelimella, jonka omistat.
     </p>
     <div class="fos-cta-row">
       <a class="fos-btn fos-btn-hot" href="/v1/portal">Kokeile käyttöjärjestelmää</a>
@@ -229,14 +231,14 @@
       </div>
       <div class="fos-windows">
         <div class="fos-win">
-          <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> sovellukset — livenä tältä nodelta</div>
+          <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> sovellukset — livenä tältä palvelimelta</div>
           <ul class="fos-win-body" id="fos-win-apps">
             <li><span class="d">$ aimeat apps --live · jos tämä rivi jää, paina yllä Kokeile käyttöjärjestelmää ja katso itse</span></li>
           </ul>
         </div>
         <div class="fos-col">
           <div class="fos-win">
-            <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> noden tila</div>
+            <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> palvelimen tila</div>
             <div class="fos-win-body" id="fos-win-status"><span class="d">$ aimeat status</span><br />connecting…</div>
           </div>
           <div class="fos-win">
@@ -244,7 +246,7 @@
             <div class="fos-win-body">
               <span class="g">lisenssi:</span> MIT, koko komeus<br />
               <span class="g">spec:</span> AIMEAT RFC v4.0, avoin<br />
-              <span class="g">datasi:</span> sinun nodellasi, piste
+              <span class="g">datasi:</span> sinun palvelimellasi, piste
             </div>
           </div>
         </div>
@@ -258,7 +260,7 @@
       <span><b>3 870</b> committia</span>
       <span><a href="https://github.com/miikkij/aimeat-protocol/tree/main/docs" rel="noopener"><b>RFC</b> v4.0</a></span>
       <span><a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" rel="noopener"><b>MIT</b>-lisensoitu</a></span>
-      <span class="fos-proof-note" id="fos-proof-note">Luvut luetaan tältä nodelta; commitit laskettu repositoriosta 2026-08-19.</span>
+      <span class="fos-proof-note" id="fos-proof-note">Luvut luetaan tältä palvelimelta; commitit laskettu repositoriosta 2026-08-19.</span>
     </div>
   </header>
 
@@ -271,7 +273,7 @@
       <div class="fos-story">
         <b>CRM, joka korvasi HubSpotin</b>
         Rakennettu kuvailemalla, pyörittää oikean yrityksen myyntiputkea tänään.
-        Mobiili ensin, versioitu, omistajan omalla nodella.
+        Mobiili ensin, versioitu, omistajan omalla palvelimella.
       </div>
       <div class="fos-story">
         <b>Agentit, jotka ajavat ilman sinua</b>
@@ -287,13 +289,13 @@
   </section>
 
   <section class="fos-carousel">
-    <h2><b id="fos-c-count">130</b> oikeaa appia tällä nodella — rakennettu puhumalla, tallessa pysyvästi</h2>
+    <h2><b id="fos-c-count">130</b> oikeaa appia tällä palvelimella — rakennettu puhumalla, tallessa pysyvästi</h2>
     <div class="fos-track" id="fos-track"></div>
   </section>
 
   <section class="fos-pricing">
-    <h2>Käyttöjärjestelmä on ilmainen. Me myymme hyvin hoidetun noden.</h2>
-    <p class="fos-price-line">Linux-diili: aja itse ilmaiseksi, tai maksa nodesta, joka on jonkun työ.</p>
+    <h2>Käyttöjärjestelmä on ilmainen. Me myymme hyvin hoidetun palvelimen.</h2>
+    <p class="fos-price-line">Linux-diili: aja itse ilmaiseksi, tai maksa palvelimesta, joka on jonkun työ.</p>
     <div class="fos-price-grid">
       <div class="fos-tier fos-tier-free">
         <h3>Isännöi itse</h3>
@@ -302,13 +304,13 @@
         <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">git clone →</a>
       </div>
       <div class="fos-tier">
-        <h3>Oma node</h3>
+        <h3>Oma palvelin</h3>
         <span class="fos-price">49 €/kk</span>
         <p>Sinun instanssisi, hoidettuna puolestasi, osoitteessa, jossa lukee sinun nimesi.</p>
         <a href="/v1/pricing">Lisätiedot →</a>
       </div>
       <div class="fos-tier">
-        <h3>Oma node Pro</h3>
+        <h3>Oma palvelin Pro</h3>
         <span class="fos-price">99 €/kk</span>
         <p>Sama, mutta enemmän tilaa ja enemmän puhtia.</p>
         <a href="/v1/pricing">Lisätiedot →</a>
@@ -316,7 +318,7 @@
       <div class="fos-tier">
         <h3>Avaimet käteen</h3>
         <span class="fos-price">990 €+</span>
-        <p>Pystytetty, migroitu ja luovutettu käynnissä. Päälle kuukausittainen node.</p>
+        <p>Pystytetty, migroitu ja luovutettu käynnissä. Päälle kuukausittainen palvelin.</p>
         <a href="/v1/pricing">Lisätiedot →</a>
       </div>
       <div class="fos-tier">
