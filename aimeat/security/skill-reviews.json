@@ -578,7 +578,7 @@
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:0267ba9f4b6fa6d5db308884",
+      "digest": "sha256:d91da31a12e0a74b298ec707",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -642,7 +642,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:31d1a76a35d564d2a3381c31",
+      "digest": "sha256:b0deb24977a1d2bbcaabf91b",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -650,7 +650,7 @@
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:c7fb03b9fbd3754f88b39a80",
+      "digest": "sha256:b0ceb33b1da6226418ddae0f",
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
@@ -659,7 +659,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:31d1a76a35d564d2a3381c31",
+      "digest": "sha256:b0deb24977a1d2bbcaabf91b",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -684,7 +684,7 @@
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:c7fb03b9fbd3754f88b39a80",
+      "digest": "sha256:b0ceb33b1da6226418ddae0f",
       "note": "It checks pages on the session's sandbox node against the decisions the lead points it at."
     },
     "agent:ui-design-review": {
@@ -693,7 +693,7 @@
         "aimeat/scripts/sandbox.ts",
         ".claude/rules/page-guidance.md"
       ],
-      "digest": "sha256:4094b519dba716201a6b67bb",
+      "digest": "sha256:43e752ffdc416830fe3739fe",
       "note": "It looks at pages on the session's sandbox node and judges them by the page-guidance rule and skill aimeat-design-language."
     }
   },
@@ -858,7 +858,7 @@
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21",
+      "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "5db1f174d56d40f5",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02"
@@ -1056,14 +1056,14 @@
       "aimeat/src/services/help/report.ts": "cf9d739e7771cd37"
     },
     "project:security-audit": {
-      "aimeat/scripts/gate.ts": "06be512fde3bde50",
+      "aimeat/scripts/gate.ts": "53702e87b64dcfe7",
       "aimeat/test/run-e2e-ci.ts": "446936049365fae5"
     },
     "agent:browser-verifier": {
-      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21"
+      "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc"
     },
     "agent:gatekeeper": {
-      "aimeat/scripts/gate.ts": "06be512fde3bde50",
+      "aimeat/scripts/gate.ts": "53702e87b64dcfe7",
       "aimeat/test/run-e2e-ci.ts": "446936049365fae5"
     },
     "agent:module-builder": {
@@ -1074,10 +1074,10 @@
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {
-      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21"
+      "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc"
     },
     "agent:ui-design-review": {
-      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21",
+      "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc",
       ".claude/rules/page-guidance.md": "72c61fac8b14df0c"
     },
     "node:aimeat-goal-recipes": {
