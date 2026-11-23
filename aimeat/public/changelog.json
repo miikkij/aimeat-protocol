@@ -4,6 +4,29 @@
     {
       "date": "2026-11-23",
       "kind": "feature",
+      "id": "2026-11-23-background-agents-can-see-when-suggestions-are-switched-off",
+      "highlight": false,
+      "audience": [
+        "agent",
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "Background agents can see when suggestions are switched off",
+        "fi": "Taustalla toimivat agentit näkevät, kun ehdotukset on kytketty pois"
+      },
+      "body": {
+        "en": "An agent or an app that works for you in the background can now read whether your AI may suggest things here. It also sees when whoever runs your AIMEAT has turned suggestions off for everyone, so it stops suggesting too.",
+        "fi": "Puolestasi taustalla toimiva agentti tai sovellus voi nyt lukea, saako tekoälysi ehdottaa täällä asioita. Se näkee myös, kun oman AIMEATisi ylläpitäjä on kytkenyt ehdotukset pois kaikilta, ja lakkaa silloin itsekin ehdottamasta."
+      },
+      "summary": {
+        "en": "Agents working in the background can now see when suggestions are switched off.",
+        "fi": "Taustalla toimivat agentit näkevät nyt, kun ehdotukset on kytketty pois."
+      }
+    },
+    {
+      "date": "2026-11-23",
+      "kind": "feature",
       "id": "2026-11-23-my-apps-says-what-an-app-is-missing-and-how-to-fix-it",
       "highlight": false,
       "audience": [
