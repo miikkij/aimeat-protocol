@@ -8,7 +8,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
- *   2026-11-23 -- POST /token (authorization_code) answers the owner's display_name, as the silent bridge does.
+ *   2026-11-23 -- POST /token (authorization_code) answers the owner's display_name, as the silent bridge does. The
+ *     source was broken: without it an app's login pill showed the full GHII after a sign-in through the consent
+ *     window until a reload took the silent bridge. The owner registers with display name 'Grant Demo Owner'.
  *   2026-11-15 -- Audit L023: the owner's write to ai-usage.* is 201 and reads back, not merely "not RESERVED_KEY".
  *   2026-10-31 -- GET /v1/app-grant is served with the static developer footer hidden (v27 follow-up B).
  *   2026-10-31 -- GET /authorize carries `lang` (en, fi, es) to the consent page and drops any other (v27 P1).
@@ -45,7 +47,6 @@ import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `grant${Date.now() % 100000}`;
-const OWNER_DISPLAY_NAME = 'Grant Demo Owner';
 const FILENAME = 'grant-demo.html';
 const REDIRECT = 'http://localhost:9911/callback';
 
@@ -105,7 +106,7 @@ async function main() {
     console.log('Phase 0: Setup');
 
     await test('register owner + token + publish app', async () => {
-        ownerToken = (await registerOwner(BASE, owner, { displayName: OWNER_DISPLAY_NAME })).token;
+        ownerToken = (await registerOwner(BASE, owner, { displayName: 'Grant Demo Owner' })).token;
         const pub = await json('/v1/apps', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
             body: JSON.stringify({ filename: FILENAME, content: b64('<!DOCTYPE html><html><body>grant</body></html>'), name: 'Grant Demo', description: 'grant demo app', category: 'utility' }),
@@ -220,11 +221,7 @@ async function main() {
         appRefreshBeforeReconsent = appRefresh; // Phase 2d proves re-consent kills this one
         grantId = r.body.data.grant_id;
         assert(!!appAccess && !!appRefresh && !!grantId, 'access+refresh+grant_id present');
-        assert(r.body.data.scope === 'memory:read', 'scope echoed');
-        // The source was broken: the silent bridge answered display_name and this exchange did not,
-        // so an app's login pill showed the full GHII after a sign-in through the consent window
-        // until a reload took the silent bridge.
-        assert(r.body.data.display_name === OWNER_DISPLAY_NAME, `display_name is the owner's display name, got ${JSON.stringify(r.body.data.display_name)}`);
+        assert(r.body.data.scope === 'memory:read' && r.body.data.display_name === 'Grant Demo Owner', `scope and the owner's display_name echoed, got ${r.body.data.scope} / ${JSON.stringify(r.body.data.display_name)}`);
     });
 
     await test('the code is single-use (replay fails)', async () => {

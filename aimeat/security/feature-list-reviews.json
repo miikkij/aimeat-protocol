@@ -67,7 +67,7 @@
       "digest": "sha256:bdddd8c7a12eea724f90f0c7"
     },
     "4. Access, consent and sharing": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/services/access-guard.ts",
         "aimeat/src/services/consent.ts",
@@ -86,7 +86,7 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:8d7765da3a0b2cb1da7323df"
+      "digest": "sha256:3881a3a9d7ca543d17d470eb"
     },
     "5. Memory, files and search": {
       "reviewedOn": "2026-11-22",
@@ -594,7 +594,7 @@
       "aimeat/src/services/consent/consent-read.ts": "3c7055035950899c",
       "aimeat/src/services/consent/write.ts": "6cd8bd4cab9acc57",
       "aimeat/src/routes/consent.ts": "6213aa166ff91905",
-      "aimeat/src/routes/app-grants.ts": "06c88c7d284b3012",
+      "aimeat/src/routes/app-grants.ts": "feae44d6756dd138",
       "aimeat/src/tool-catalog/definitions/exposure.ts": "95757219276e7f53",
       "aimeat/src/services/publish-gate.ts": "cd5ee0a0b03ff157",
       "aimeat/src/services/internet-opening/opening-door.ts": "41a835d8a373d62d",
