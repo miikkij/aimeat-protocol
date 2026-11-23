@@ -15,6 +15,9 @@
  *   has that case too.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-kit-defaults.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-23 — The timeline cases no longer read a dotted date as a time of day: on a
+ *     machine whose locale is fi-FI the kit prints 3.3.1940, which the old pattern matched, so the
+ *     whole unit suite was red there. The kit's output was right; the pattern is tested by itself now.
  *   v1.0.0 — 2026-11-21 — Initial (atelier 0.70.0).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -240,16 +243,26 @@ describe('timeline() adds no time of day to a date that has none', () => {
     return tl.el.querySelector('.ak-timeline__when').textContent as string;
   };
 
+  // A time of day: one or two digits, a colon or a dot (Finnish writes 10.30), two digits. A date
+  // written with dots is not one (3.3.1940 on a machine whose locale is fi-FI), so the digits must
+  // not sit inside a longer dotted number: no digit and no dot on either side.
+  const TIME_OF_DAY = /(?<![\d.])\d{1,2}[:.]\d{2}(?![.\d])/;
+
   it('"3 Mar 1940" and "Sun Mar 03 1940" are printed as dates', () => {
     for (const ts of ['3 Mar 1940', 'Sun, 3 Mar 1940', 'Sun Mar 03 1940']) {
       const out = when(ts);
       expect(out, ts).toContain('1940');
-      expect(out, ts).not.toMatch(/\d{1,2}[:.]\d{2}/);
+      expect(out, ts).not.toMatch(TIME_OF_DAY);
     }
   });
 
+  it('the time-of-day pattern reads a dotted date as a date, in any locale the machine has', () => {
+    for (const date of ['3.3.1940', '03.03.1940', '3/3/1940', 'March 3, 1940']) expect(date, date).not.toMatch(TIME_OF_DAY);
+    for (const time of ['3.3.1940 klo 10.30', '3/3/1940, 10:30 AM', '10.30']) expect(time, time).toMatch(TIME_OF_DAY);
+  });
+
   it('a moment with a time keeps its time, and a string the kit does not read is printed as given', () => {
-    expect(when('3 Mar 1940 10:30')).toMatch(/\d{1,2}[:.]\d{2}/);
+    expect(when('3 Mar 1940 10:30')).toMatch(TIME_OF_DAY);
     expect(when('07/09, 04:10')).toBe('07/09, 04:10');
   });
 });
