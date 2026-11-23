@@ -679,7 +679,7 @@ components:
               name: { type: string, nullable: true }
               published: { type: boolean, description: Whether this reference names an action published here. A bare id never does. }
               has_address: { type: boolean, description: A published action without one is bound and does nothing }
-              host: { type: string, nullable: true, description: The address's host, never the whole address }
+              host: { type: string, nullable: true, description: "The address's host, never the whole address" }
               ambiguous:
                 type: array
                 items: { type: string }
@@ -720,19 +720,19 @@ components:
         status: { type: integer, nullable: true }
         ms: { type: integer, description: How long the call took }
         allowed: { type: boolean, description: Whether this call let the thing through. A notify hook is always true - it cannot stop anything }
-        subject: { type: string, description: What the thing was, in a few words, so a refusal names who was refused }
-        reason: { type: string, description: The reason the address gave, when it gave one }
+        subject: { type: string, description: "What the thing was, in a few words, so a refusal names who was refused" }
+        reason: { type: string, description: "The reason the address gave, when it gave one" }
     IndexNowRun:
       type: object
       description: One instant-update notice to IndexNow, as the node recorded it
       properties:
         at: { type: string, format: date-time }
-        urlCount: { type: integer, description: Addresses sent, over every host }
-        hosts: { type: integer, description: Hosts they were grouped into, one POST each under that host's key file }
+        urlCount: { type: integer, description: "Addresses sent, over every host" }
+        hosts: { type: integer, description: "Hosts they were grouped into, one POST each under that host's key file" }
         ok: { type: boolean, description: Every host was accepted (200 or 202) }
-        status: { type: integer, nullable: true, description: The first refusal's status when one host was refused, otherwise the accepted status; null when a request never completed }
+        status: { type: integer, nullable: true, description: "The first refusal's status when one host was refused, otherwise the accepted status; null when a request never completed" }
         failed: { type: array, items: { type: string }, description: The hosts whose batch was refused or never answered }
-        scope: { type: string, enum: [app, pages, all, dataset], description: What the notice covered; dataset is one public data package's page, sent when a public version was published }
+        scope: { type: string, enum: [app, pages, all, dataset], description: "What the notice covered; dataset is one public data package's page, sent when a public version was published" }
         by: { type: string, description: Who asked for an explicit notice; absent when a publish fired it }
     IndexNowPlan:
       type: object
@@ -870,7 +870,7 @@ components:
       required: [id, app, trigger, agents, enabled, created_at, updated_at]
       properties:
         id: { type: string }
-        app: { type: string, description: The app segment, e.g. feedback-desk. }
+        app: { type: string, description: "The app segment, e.g. feedback-desk." }
         trigger:
           type: object
           required: [kind, keyGlob]
@@ -992,9 +992,9 @@ components:
           type: object
           additionalProperties: { $ref: '#/components/schemas/DecideQuestion' }
           description: Your ids (`[A-Za-z0-9_.-]{1,64}`) to questions. Ask everything in one call. Required unless `rule` is given.
-        subject: { type: string, description: What the decision is about (a memory key, a record id). }
+        subject: { type: string, description: "What the decision is about (a memory key, a record id)." }
         gates: { type: string, description: What the answer decides. }
-        thresholds: { type: object, description: The thresholds the caller will apply, recorded with the decision. }
+        thresholds: { type: object, description: "The thresholds the caller will apply, recorded with the decision." }
         names: { type: array, items: { type: string }, description: Extra person names to scrub. }
         public_content: { type: boolean, description: Skip scrubbing for public content; honoured per the owner's policy. }
         cache: { type: boolean, default: true, description: Reuse an identical earlier decision. }
@@ -1012,7 +1012,7 @@ components:
       properties:
         id: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}$', description: The id in the path wins over one in the body. }
         title: { type: string, maxLength: 120 }
-        decides: { type: string, maxLength: 500, description: What the rule gates, in plain words. }
+        decides: { type: string, maxLength: 500, description: "What the rule gates, in plain words." }
         sends:
           type: array
           items: { type: string }
@@ -1043,10 +1043,10 @@ components:
         gate: { type: boolean, default: false, description: What the gate switch starts at for an agent whose owner never set it. }
         sample: { description: A state to try the rule on. }
         provider: { type: string, description: 'The decision provider it always runs on. Refused at write time (400 PROVIDER_CANNOT_CARRY) when that provider cannot answer the questions.' }
-        version: { type: integer, readOnly: true, description: Bumped when the questions change, and only then. }
+        version: { type: integer, readOnly: true, description: "Bumped when the questions change, and only then." }
         createdAt: { type: string, format: date-time, readOnly: true }
         updatedAt: { type: string, format: date-time, readOnly: true }
-        proposedBy: { type: string, readOnly: true, description: The principal that proposed it, when it began as a proposal. }
+        proposedBy: { type: string, readOnly: true, description: "The principal that proposed it, when it began as a proposal." }
 
     AgentAiKeys:
       type: object
@@ -1055,11 +1055,11 @@ components:
         agent: { type: string }
         decide: { $ref: '#/components/schemas/AgentAiKeyState' }
         openrouter: { $ref: '#/components/schemas/AgentAiKeyState' }
-        daily_usd: { type: number, nullable: true, description: The agent's daily AI cap in USD, or null when it has none of its own. }
+        daily_usd: { type: number, nullable: true, description: "The agent's daily AI cap in USD, or null when it has none of its own." }
         spent_today_usd: { type: number }
         gate: { type: string, enum: ['on', 'off', 'rule'], description: "`rule` means each rule's own `gate` default applies." }
         quality: { type: object, description: 'This agent''s decisions: { decisions, outcomes: { act, ask, stop }, gateStops, overridden, confirmed, costUsd, lastAt }.' }
-        quality_by_rule: { type: object, description: The same numbers per decision rule, for this agent only. }
+        quality_by_rule: { type: object, description: "The same numbers per decision rule, for this agent only." }
 
     AgentAiKeyState:
       type: object
@@ -1111,7 +1111,7 @@ components:
       description: One place in a role's order for a capability.
       properties:
         provider: { type: string, description: 'One of the owner''s provider ids (GET /v1/ai/providers).' }
-        model: { type: string, description: The model id as the provider names it; omitted, the provider's own for the capability. }
+        model: { type: string, description: "The model id as the provider names it; omitted, the provider's own for the capability." }
     AiOwnerRole:
       type: object
       description: >-
@@ -1138,7 +1138,7 @@ components:
             - type: 'null'
           description: A ceiling per call in US dollars, tighter than the owner's routing rule.
         builtIn: { type: boolean, description: 'reasoning or execution: cannot be removed.' }
-        legacy: { type: boolean, description: A built-in role the owner has not set, showing the legacy setting it replaces. Read only. }
+        legacy: { type: boolean, description: "A built-in role the owner has not set, showing the legacy setting it replaces. Read only." }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time, description: 'When a call last ran as this role (at most once a day). Read only.' }
@@ -1212,8 +1212,8 @@ components:
             type: object
             properties:
               currency: { type: string }
-              per_day: { type: number, nullable: true, description: Major units; null means no limit set, so no spending }
-              spent_today: { type: number, description: Major units, spent since 00:00 UTC }
+              per_day: { type: number, nullable: true, description: "Major units; null means no limit set, so no spending" }
+              spent_today: { type: number, description: "Major units, spent since 00:00 UTC" }
         note: { type: string }
     AgentConnector:
       type: object
@@ -1291,7 +1291,7 @@ components:
           description: 'For an allowed program, how the machine came to trust it: connected there with aimeat connect, adopted at the first start, or approved by the owner on the node'
         since: { type: string, format: date-time, nullable: true, description: When the machine came to trust it }
         reported_at: { type: string, format: date-time }
-        request_id: { type: string, nullable: true, description: The approval request that waits for the owner, while one does }
+        request_id: { type: string, nullable: true, description: "The approval request that waits for the owner, while one does" }
     AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
@@ -2536,7 +2536,7 @@ components:
             properties:
               organism: { type: string }
               objective: { type: string }
-        until: { type: string, description: The date the objective is meant to hold until, as written. }
+        until: { type: string, description: "The date the objective is meant to hold until, as written." }
         kpis:
           type: array
           items:
@@ -5194,7 +5194,7 @@ components:
           description: >
             What shape of app this is, which decides what its map has to contain. `unstated` is a
             real answer and never a default the node invents.
-        summary: { type: string, description: One line for a list, built from the rows. }
+        summary: { type: string, description: "One line for a list, built from the rows." }
         heldRows: { type: integer, description: Rows describing what this app holds. }
         rowsWithoutWhy: { type: integer, description: Rows that say where data goes and not why it goes there. }
         missing: { type: boolean, description: True when nobody has written a map for this app. }
@@ -5283,13 +5283,13 @@ components:
                 type: string
                 enum: [must, info]
                 description: A failing `must` counts in summary.failed; an `info` check never fails the run.
-              detail: { type: string, description: One plain sentence, written for whoever built the app. }
-              ms: { type: integer, description: How long the check took, where the number means something. }
+              detail: { type: string, description: "One plain sentence, written for whoever built the app." }
+              ms: { type: integer, description: "How long the check took, where the number means something." }
             required: [id, ok, severity, detail]
         console:
           type: object
           properties:
-            errors: { type: array, items: { type: string }, description: At most ten, quoted as the browser gave them. }
+            errors: { type: array, items: { type: string }, description: "At most ten, quoted as the browser gave them." }
             warnings: { type: integer }
         summary:
           type: object
@@ -5339,9 +5339,9 @@ components:
         dev_level_name: { type: string, enum: [full, publisher, drafter] }
         building_for: { type: string, description: Owner whose app the caller helps build. }
         roadmap_hint: { type: string, description: Publication warning when an unshared app was published without a roadmap line. }
-        design_spec_hint: { type: string, description: Publication hint when a shared app has no design spec, or this version moved past the version the spec was written against. Never a refusal. }
-        operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
-        operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
+        design_spec_hint: { type: string, description: "Publication hint when a shared app has no design spec, or this version moved past the version the spec was written against. Never a refusal." }
+        operator_hidden: { type: boolean, description: "True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it)" }
+        operator_hide_reason: { type: string, nullable: true, description: "Optional operator-supplied reason, shown to the owner" }
         has_screenshot: { type: boolean }
         downloads: { type: integer }
         forks: { type: integer, description: Number of direct forks of this app }
@@ -5502,7 +5502,7 @@ components:
           description: The permissions the caller lacks, e.g. memory:write-as-owner.
         expires_at: { type: string, format: date-time, description: Seven days from the request. }
         already_waiting: { type: boolean, description: True when this is a request the same caller already filed. }
-        next_step: { type: string, description: What happens now, in a sentence an agent can pass on. }
+        next_step: { type: string, description: "What happens now, in a sentence an agent can pass on." }
 
     PackageInstallRequest:
       type: object
@@ -5540,7 +5540,7 @@ components:
         requested_by:
           type: object
           properties:
-            principal: { type: string, description: The agent's GAII, or the app's eco identity. }
+            principal: { type: string, description: "The agent's GAII, or the app's eco identity." }
             kind: { type: string, enum: [agent, app] }
             app: { type: string, description: 'owner/filename, for an app grant.' }
         missing:
@@ -6100,7 +6100,7 @@ components:
         detect: { type: string, enum: [rules, rules+ai] }
         checked_at: { type: string, format: date-time }
         point: { type: string, enum: [intake, shared-write, read, request], description: Where the marks were made. }
-        warning: { type: string, description: One line for the reading AI, present when the item is marked and the reader's setting is mark+warn. }
+        warning: { type: string, description: "One line for the reading AI, present when the item is marked and the reader's setting is mark+warn." }
         held:
           type: object
           description: The item is held from this reader; its content fields are null in this answer. Nothing was changed or deleted.
@@ -6183,7 +6183,7 @@ components:
         beside the profile itself in facts.profile.
       properties:
         stale: { type: boolean, description: A newer version of the document was published since it was made. }
-        made_by: { type: string, description: Who asked for it, and whose AI key paid. }
+        made_by: { type: string, description: "Who asked for it, and whose AI key paid." }
         made_at: { type: string, format: date-time }
         doc_version: { type: integer, description: The document version it was made from; 0 when not known. }
         read_from: { type: string, description: The sha256 of the document text it was made from. }
@@ -6243,11 +6243,11 @@ components:
             prompt: { type: string, description: The version of the instruction that made it. }
             model: { type: string, description: 'The text model: all of it, or with labels decide the headings, claims and topics.' }
             labels: { type: string, enum: [model, decide], description: 'Who marked the sections: the text model, or the decision model (content_class.profile_labels). Seals made the two ways are not compared.' }
-            labelModel: { type: string, description: With labels decide, the decision model. }
-            decisionIds: { type: array, items: { type: string }, description: With labels decide, its decision records. }
+            labelModel: { type: string, description: "With labels decide, the decision model." }
+            decisionIds: { type: array, items: { type: string }, description: "With labels decide, its decision records." }
             provenanceId: { type: string }
             at: { type: string, format: date-time }
-            kind: { type: string, description: What the item is, in its own language. }
+            kind: { type: string, description: "What the item is, in its own language." }
             topics:
               type: array
               items:
@@ -6260,7 +6260,7 @@ components:
                   axes: { type: object, additionalProperties: { type: number } }
             sections: { type: array, items: { type: array, items: {} } }
             axes: { type: object, additionalProperties: { type: number } }
-            detailKey: { type: string, description: Absent on a workspace document's shared fingerprint, whose sections are kept with it. }
+            detailKey: { type: string, description: "Absent on a workspace document's shared fingerprint, whose sections are kept with it." }
             truncatedAt: { type: integer, description: Set when only the first part of a long text was profiled. }
             corrected:
               type: object
@@ -6322,7 +6322,7 @@ components:
         startedAt: { type: string, format: date-time }
         finishedAt: { type: string, format: date-time }
         n: { type: integer, description: Messages in this batch. }
-        i: { type: integer, description: The message being worked on, 1-based. }
+        i: { type: integer, description: "The message being worked on, 1-based." }
         step: { type: string, enum: ['', list, read, classify, attach, extract, save] }
         subject: { type: string }
         counts:
@@ -6333,7 +6333,7 @@ components:
             unclear: { type: integer }
             bad: { type: integer }
             skip: { type: integer }
-            skipped_seen: { type: integer, description: Already filed by an earlier batch, so passed over. }
+            skipped_seen: { type: integer, description: "Already filed by an earlier batch, so passed over." }
         rows:
           type: array
           description: The rows written so far, newest first.
@@ -7076,14 +7076,14 @@ components:
             Where the owner's Messages list puts the row: other people and their agents, the owner's own
             agents (threads between the owner and their agents, or between those agents), a heading a
             group rule names (`group`), or the archive.
-        group: { type: string, description: The heading a group rule names, when section is group. }
+        group: { type: string, description: "The heading a group rule names, when section is group." }
         archived:
           type: object
           description: Why the row is archived, and since when. Present only when section is archive.
           properties:
             reason: { type: string, enum: [manual, rule, age] }
             since: { type: string, format: date-time }
-            rule: { type: string, description: The rule's name, for a rule archive. }
+            rule: { type: string, description: "The rule's name, for a rule archive." }
         fold:
           type: object
           description: >-
@@ -7109,7 +7109,7 @@ components:
           type: object
           description: Every condition given must hold. The first enabled rule that matches a thread decides for it.
           properties:
-            with: { type: string, maxLength: 200, description: Part of an identity in the thread (the other party, who opened it, to whom, or who wrote last). }
+            with: { type: string, maxLength: 200, description: "Part of an identity in the thread (the other party, who opened it, to whom, or who wrote last)." }
             subject: { type: string, maxLength: 200, description: Text the subject contains. }
             body: { type: string, maxLength: 200, description: Text the newest message contains. }
             scope: { type: string, enum: [agents, all], description: 'agents (default): only threads between the owner and their own agents, or between those agents.' }
@@ -8634,8 +8634,8 @@ components:
         name: { type: string, minLength: 1, maxLength: 200 }
         birthDate: { type: string, maxLength: 10, description: YYYY-MM-DD }
         country: { type: string, minLength: 2, maxLength: 56 }
-        share: { type: number, minimum: 0, maximum: 100, description: Ownership share in percent, when ownership is the ground. }
-        control: { type: string, maxLength: 500, description: Control by other means (AMLR art. 52), in words. }
+        share: { type: number, minimum: 0, maximum: 100, description: "Ownership share in percent, when ownership is the ground." }
+        control: { type: string, maxLength: 500, description: "Control by other means (AMLR art. 52), in words." }
     KycIdentity:
       type: object
       description: How the customer's identity was verified.
@@ -8647,8 +8647,8 @@ components:
         verifiedAt: { type: string, minLength: 10, maxLength: 40 }
         expiresAt: { type: string, minLength: 10, maxLength: 40 }
         faceToFace: { type: boolean, default: false }
-        ghii: { type: string, maxLength: 200, description: The person's account on this node, when they gave their own verification through the identify link. Set by the server. }
-        evidence: { type: string, maxLength: 500, description: The document or register extract the verification rests on (number, issuer). }
+        ghii: { type: string, maxLength: 200, description: "The person's account on this node, when they gave their own verification through the identify link. Set by the server." }
+        evidence: { type: string, maxLength: 500, description: "The document or register extract the verification rests on (number, issuer)." }
     KycScreeningHit:
       type: object
       required: [source, id, kind, matchedName, listedName, score, reasons, programme, subject, verdict]
@@ -8698,7 +8698,7 @@ components:
             organism: { type: string }
             n: { type: integer, minimum: 1, description: The version number. }
             at: { type: string, description: When this version was written. }
-            by: { type: string, description: Who wrote it (a GHII, or an agent's GAII). }
+            by: { type: string, description: "Who wrote it (a GHII, or an agent's GAII)." }
             change: { type: string, enum: [opened, updated, identified, screened, hit-decided, rated, approved, reviewed, ended, hold-extended, reopened] }
             note: { type: string, maxLength: 2000 }
             identity: { oneOf: [{ $ref: '#/components/schemas/KycIdentity' }, { type: 'null' }] }
@@ -8738,7 +8738,7 @@ components:
             lastReviewedAt: { type: string }
             nextReviewAt: { type: [string, 'null'] }
             endedAt: { type: string }
-            retainUntil: { type: string, description: The day the card is deleted, relationship end + 5 years (AMLR art. 77) or later by a hold. }
+            retainUntil: { type: string, description: "The day the card is deleted, relationship end + 5 years (AMLR art. 77) or later by a hold." }
             holdBasis: { type: string }
     KycCustomerHead:
       type: object
@@ -8820,7 +8820,7 @@ components:
                 level: { type: string }
                 method: { type: string }
                 at: { type: string }
-        verifyPath: { type: [string, 'null'], description: Where to verify first, when the person has no strong verification. }
+        verifyPath: { type: [string, 'null'], description: "Where to verify first, when the person has no strong verification." }
     KycCustomerVersionEnvelope:
       allOf:
         - $ref: '#/components/schemas/AimeatEnvelope'
@@ -8877,10 +8877,10 @@ components:
               properties:
                 open: { type: integer }
                 ended: { type: integer }
-                byKind: { type: object, additionalProperties: { type: integer }, description: person, entity }
-                byStatus: { type: object, additionalProperties: { type: integer }, description: open, active, blocked }
-                byRisk: { type: object, additionalProperties: { type: integer }, description: low, medium, high, prohibited, unrated }
-                byDueDiligence: { type: object, additionalProperties: { type: integer }, description: simplified, standard, enhanced, unrated }
+                byKind: { type: object, additionalProperties: { type: integer }, description: "person, entity" }
+                byStatus: { type: object, additionalProperties: { type: integer }, description: "open, active, blocked" }
+                byRisk: { type: object, additionalProperties: { type: integer }, description: "low, medium, high, prohibited, unrated" }
+                byDueDiligence: { type: object, additionalProperties: { type: integer }, description: "simplified, standard, enhanced, unrated" }
             countries:
               type: array
               items:
@@ -8901,7 +8901,7 @@ components:
                 remoteBelowSubstantial: { type: integer }
             cashIntensive: { type: integer }
             complexOwnership: { type: integer, description: Entities with more than two ownership layers or nominee or bearer shares. }
-            productRisk: { type: object, additionalProperties: { type: integer }, description: low, medium, high, unset }
+            productRisk: { type: object, additionalProperties: { type: integer }, description: "low, medium, high, unset" }
             purposeUnknown: { type: integer }
             sourceOfFundsUnknown: { type: integer }
             openSanctionsHits: { type: integer }
@@ -9305,7 +9305,7 @@ components:
                       already_waiting: { type: boolean }
                       approve_url: { type: string }
                       decision: { type: string, enum: [person] }
-                      decide_yourself_at: { type: string, description: The app the extension gates, or the account's Extensions page, where the person makes the decision themselves. }
+                      decide_yourself_at: { type: string, description: "The app the extension gates, or the account's Extensions page, where the person makes the decision themselves." }
                       next_step: { type: string }
 
     OdpsFieldTooLong:
@@ -9856,7 +9856,7 @@ paths:
                                   action: { type: string, description: The app action it asks for. }
                                   registrant: { type: string, description: The owner GHII behind the capability. }
                                   name: { type: string }
-                                  input: { type: string, description: The asking call's input as JSON text, cut to 500 characters. }
+                                  input: { type: string, description: "The asking call's input as JSON text, cut to 500 characters." }
                                   requestedAt: { type: string, format: date-time }
                                   requestedBy: { type: string }
                                   approvedAt: { type: string, format: date-time }
@@ -9889,7 +9889,7 @@ paths:
         '200': { description: The question and its facts }
         '400': { description: INVALID_INPUT (no capability) }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: IN_PERSON_ONLY, or owner role required }
+        '403': { description: "IN_PERSON_ONLY, or owner role required" }
         '404': { description: APPROVAL_NOT_FOUND }
   /v1/ecosystem-apps/{app}/capability-approvals:
     post:
@@ -9919,7 +9919,7 @@ paths:
         '200': { description: 'The approval: { capability, action, registrant, name, input, requestedAt, requestedBy, approvedAt, approvedBy }' }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: IN_PERSON_ONLY, or owner role required }
+        '403': { description: "IN_PERSON_ONLY, or owner role required" }
         '404': { description: 'APPROVAL_NOT_FOUND: the question no longer waits (the app was removed, the question was answered, or the capability changed); nothing is allowed' }
     delete:
       operationId: ecosystemCapabilityApprovalWithdraw
@@ -9964,7 +9964,7 @@ paths:
         '200': { description: '{ declined: true } when a question was removed, false when none waited' }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: IN_PERSON_ONLY, or owner role required }
+        '403': { description: "IN_PERSON_ONLY, or owner role required" }
   /v1/ecosystem-apps/{app}/data:
     get:
       operationId: ecosystemAppData
@@ -12066,7 +12066,7 @@ paths:
                             description: One sentence for the person, naming approval_url.
                           proposal: { type: object }
         '400': { description: 'A name, purpose or crew definition that could not work, or a connector the account does not have (UNKNOWN_CONNECTOR, AMBIGUOUS_CONNECTOR)' }
-        '403': { description: Another owner, an app or ecosystem principal, or more scope than the proposer holds }
+        '403': { description: "Another owner, an app or ecosystem principal, or more scope than the proposer holds" }
         '409': { description: An agent of that name already exists on this account }
     get:
       operationId: listAgentProposals
@@ -12229,7 +12229,7 @@ paths:
                             description: The agent's work given once now. Null when the body asked for none or the agent has no definition to run. `problem` is present when the task could not be created; the agent is made either way.
                             properties:
                               task_id: { type: string, nullable: true }
-                              started: { type: boolean, description: True when the task started at once; false when it waits (for the agent's computer, or for the owner). }
+                              started: { type: boolean, description: "True when the task started at once; false when it waits (for the agent's computer, or for the owner)." }
                               problem:
                                 type: object
                                 properties:
@@ -12251,7 +12251,7 @@ paths:
         '403': { description: Not the account holder in person }
         '404': { description: No such proposal on this account }
         '409': { description: 'Already settled, the name has been taken since, or a connector the account does not have (UNKNOWN_CONNECTOR)' }
-        '502': { description: The definition could not be seeded, so nothing was created }
+        '502': { description: "The definition could not be seeded, so nothing was created" }
 
   /v1/agents/v2/connectors:
     get:
@@ -12342,7 +12342,7 @@ paths:
                         properties:
                           connector:
                             $ref: '#/components/schemas/AgentConnector'
-        '400': { description: An empty name, or one over 60 characters }
+        '400': { description: "An empty name, or one over 60 characters" }
         '403': { description: 'Not the account holder, and no agent:write; or an app or ecosystem principal' }
         '404': { description: No such connector on this account }
         '409': { description: 'Another connector has that name (NAME_TAKEN), or the name given as address fits more than one (AMBIGUOUS_CONNECTOR)' }
@@ -12427,7 +12427,7 @@ paths:
                             items: { $ref: '#/components/schemas/ConnectorProgram' }
         '400': { description: A decision that is not allow or deny }
         '403': { description: 'No agent:write (SCOPE_DENIED), or an app or ecosystem principal' }
-        '404': { description: No such connector on this account, or it reports no programs under that hash }
+        '404': { description: "No such connector on this account, or it reports no programs under that hash" }
         '409': { description: The name given as address fits more than one connector (AMBIGUOUS_CONNECTOR) }
 
   /v1/agents/{name}/programs:
@@ -12468,8 +12468,8 @@ paths:
                 status: { type: string, enum: [allowed, waiting] }
                 runner: { type: string, nullable: true, maxLength: 1000, description: The runner command and its arguments }
                 wake: { type: string, nullable: true, maxLength: 1000, description: The wake command }
-                source: { type: string, nullable: true, enum: [connected, adopted, approved, null], description: For an allowed hash, how the machine came to trust it }
-                since: { type: string, format: date-time, nullable: true, description: For an allowed hash, when }
+                source: { type: string, nullable: true, enum: [connected, adopted, approved, null], description: "For an allowed hash, how the machine came to trust it" }
+                since: { type: string, format: date-time, nullable: true, description: "For an allowed hash, when" }
       responses:
         '200':
           description: The owner's decision on the reported hash
@@ -12490,9 +12490,9 @@ paths:
                           decision: { type: string, nullable: true, enum: [allowed, declined, null] }
                           decided_at: { type: string, format: date-time, nullable: true }
                           request_id: { type: string, nullable: true, description: The approval request that waits for the owner }
-                          approve_url: { type: string, description: Where the owner answers, while the programs wait }
-        '400': { description: A malformed hash, status or command, or a hash with no command }
-        '403': { description: Not the agent itself (another agent, the owner, an app) }
+                          approve_url: { type: string, description: "Where the owner answers, while the programs wait" }
+        '400': { description: "A malformed hash, status or command, or a hash with no command" }
+        '403': { description: "Not the agent itself (another agent, the owner, an app)" }
         '409': { description: 'The agent is not on a connected computer right now (NOT_ON_A_CONNECTOR)' }
 
   /v1/agents/v2/agents/{name}/attach:
@@ -12548,8 +12548,8 @@ paths:
                           agent: { type: object, nullable: true }
         '403': { description: Not the account holder in person }
         '404': { description: No agent of this account by that name }
-        '409': { description: Already attached, a v1 agent, or no connector is running }
-        '502': { description: The connector could not be reached, or did not take it on }
+        '409': { description: "Already attached, a v1 agent, or no connector is running" }
+        '502': { description: "The connector could not be reached, or did not take it on" }
 
   /v1/agents/v2/agents/{name}/move:
     post:
@@ -12625,7 +12625,7 @@ paths:
         '403': { description: Not the account holder in person }
         '404': { description: No agent of this account by that name }
         '409': { description: 'No such connector (UNKNOWN_CONNECTOR), the agent already runs there (ALREADY_THERE), the connector is not connected (DAEMON_NOT_CONNECTED), or a v1 agent (V1_AGENT)' }
-        '502': { description: The connector could not be reached, or did not take the agent }
+        '502': { description: "The connector could not be reached, or did not take the agent" }
 
   /v1/agents/v2/agent-proposals/{id}/decline:
     post:
@@ -15028,7 +15028,7 @@ paths:
       responses:
         '201': { description: Switched on. }
         '400': { description: Invalid input }
-        '409': { description: The list is full, or it changed while writing. }
+        '409': { description: "The list is full, or it changed while writing." }
 
   /v1/open-items/count:
     get:
@@ -15051,7 +15051,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200': { description: Counts by state, origin and who switched things on. }
+        '200': { description: "Counts by state, origin and who switched things on." }
 
   /v1/open-items/{id}:
     patch:
@@ -17430,7 +17430,7 @@ paths:
                           has_result: { type: boolean, description: False while the agent has finished nothing. }
                           context: { type: string }
                           prompt: { type: string }
-                          content: { type: string, description: With `part=context`, the section and a pointer to the specification. }
+                          content: { type: string, description: "With `part=context`, the section and a pointer to the specification." }
                           spec_token: { type: string }
         '400': { description: Not an agent name }
         '401': { description: No session }
@@ -18101,7 +18101,7 @@ paths:
           in: query
           schema: { type: string, enum: [txt] }
       responses:
-        '200': { description: The prompt, plus the skill name. }
+        '200': { description: "The prompt, plus the skill name." }
 
   /v1/prompts/hello-integration:
     get:
@@ -18144,7 +18144,7 @@ paths:
           in: query
           schema: { type: string, enum: [txt] }
       responses:
-        '200': { description: The block, in each of its paste targets. }
+        '200': { description: "The block, in each of its paste targets." }
         '404': { description: No organism yet — the block is built from a real one. }
 
   /v1/prompts/welcome-mat:
@@ -18337,8 +18337,8 @@ paths:
                                       filename: { type: string }
                                       name: { type: string }
                                       url: { type: string, nullable: true, description: The address a person opens the app at. }
-                                      made_for: { type: boolean, description: True when the app was built for this agent's work, false when it uses it among other things. }
-                                      holds: { type: string, description: What the row says the app holds from the agent, in the app's own words. }
+                                      made_for: { type: boolean, description: "True when the app was built for this agent's work, false when it uses it among other things." }
+                                      holds: { type: string, description: "What the row says the app holds from the agent, in the app's own words." }
                                 work_goes_to:
                                   type: object
                                   nullable: true
@@ -18508,7 +18508,7 @@ paths:
                                 records: { type: integer, description: "With `include=counts`: how many published records the space holds now. A draft is not counted." }
         '400': { description: organism_id or workspace_id is missing }
         '403': { description: Not the account holder in person }
-        '404': { description: No such workspace, or the caller may not read it }
+        '404': { description: "No such workspace, or the caller may not read it" }
 
   /v1/agents/{name}/workplace:
     put:
@@ -18544,8 +18544,8 @@ paths:
                 workspace_id: { type: string }
       responses:
         '200': { description: 'Stored. `data.workplace` is the record: agent, organism_id, workspace_id, since, set_by.' }
-        '400': { description: No organism_id or workspace_id, or not an agent name }
-        '404': { description: No such agent on this account, no such organism the owner is a member of, or no such workspace in it }
+        '400': { description: "No organism_id or workspace_id, or not an agent name" }
+        '404': { description: "No such agent on this account, no such organism the owner is a member of, or no such workspace in it" }
     delete:
       operationId: clearAgentWorkplace
       summary: Keep an agent's finished work in its own memory again
@@ -19993,7 +19993,7 @@ paths:
             schema:
               type: object
               properties:
-                share: { type: boolean, description: true = public (platform-wide), false = owner-private }
+                share: { type: boolean, description: "true = public (platform-wide), false = owner-private" }
                 status: { type: string, enum: [active, outdated] }
                 verified: { type: boolean, enum: [true], description: Record a re-check against this node now }
                 retired_by: { type: string, maxLength: 200, description: 'With status outdated: what retired the entry' }
@@ -20374,7 +20374,7 @@ paths:
                                 key: { type: string }
                                 owner_gaii: { type: string, description: The identity the record is stored under. }
                                 value: {}
-                                bytes: { type: integer, description: With include=meta, the value's size in place of the value. }
+                                bytes: { type: integer, description: "With include=meta, the value's size in place of the value." }
                                 visibility: { $ref: '#/components/schemas/Visibility' }
                                 zone: { type: string }
                                 tags:
@@ -20548,7 +20548,7 @@ paths:
         '200':
           description: Stored. `hints` says what is still unfinished; it never refuses.
         '400': { description: Not a data map }
-        '403': { description: Another account's map, or a granted app }
+        '403': { description: "Another account's map, or a granted app" }
         '404': { description: No such app }
         '422': { description: The map could not be stored }
 
@@ -20583,8 +20583,8 @@ paths:
       responses:
         '200': { description: 'The map after the change, with `stamp` and `findings`.' }
         '400': { description: Not an app reference or not an agent name }
-        '403': { description: Another account's map, or a granted app }
-        '404': { description: No such app, or no such agent on this account }
+        '403': { description: "Another account's map, or a granted app" }
+        '404': { description: "No such app, or no such agent on this account" }
     delete:
       summary: Take the tie between an app and an agent away
       description: |
@@ -20598,8 +20598,8 @@ paths:
         - { name: agent, in: path, required: true, schema: { type: string } }
       responses:
         '200': { description: 'The map after the change, with `stamp` and `findings`.' }
-        '403': { description: Another account's map, or a granted app }
-        '404': { description: No such app, or the app is not tied to that agent }
+        '403': { description: "Another account's map, or a granted app" }
+        '404': { description: "No such app, or the app is not tied to that agent" }
 
   /v1/classification/policy:
     get:
@@ -20615,7 +20615,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
-        - { name: organism_id, in: query, schema: { type: string }, description: The organism, at level organism. }
+        - { name: organism_id, in: query, schema: { type: string }, description: "The organism, at level organism." }
       responses:
         '200':
           description: 'The level: { level, subject, mode, active, stored, effective, proposal, history, dropped }.'
@@ -20636,7 +20636,7 @@ paths:
                       proposal: { type: object, nullable: true }
                       history: { type: array, items: { type: object } }
                       dropped: { type: array, items: { type: string }, description: 'What the server dropped from the stored layer because the node now covers it.' }
-        '404': { description: No such organism, or the caller is not a member. }
+        '404': { description: "No such organism, or the caller is not a member." }
     put:
       summary: Replace the classification policy at one level
       description: |
@@ -20667,13 +20667,13 @@ paths:
               properties:
                 level: { type: string, enum: [node, owner, organism], default: owner }
                 organism_id: { type: string }
-                policy: { type: object, description: The whole level. The node level is the whole policy; an owner or organism level holds only what it adds or tightens, and `enabled`. }
+                policy: { type: object, description: "The whole level. The node level is the whole policy; an owner or organism level holds only what it adds or tightens, and `enabled`." }
                 humanSaid: { type: string, description: "The person's own words, verbatim, when an AI relays their instruction." }
       responses:
-        '200': { description: Applied, or kept as a proposal. }
-        '400': { description: INVALID_POLICY or POLICY_DILUTES, listing every problem. }
+        '200': { description: "Applied, or kept as a proposal." }
+        '400': { description: "INVALID_POLICY or POLICY_DILUTES, listing every problem." }
         '403': { description: Not an operator (node level). }
-        '404': { description: No such organism, or the caller is not its creator or an admin. }
+        '404': { description: "No such organism, or the caller is not its creator or an admin." }
 
   /v1/classification/policy/review:
     post:
@@ -20700,7 +20700,7 @@ paths:
       responses:
         '200': { description: Applied or rejected. }
         '403': { description: 'PERSON_REQUIRED from an AI credential, or OPERATOR_REQUIRED at the node level.' }
-        '404': { description: NO_PROPOSAL, or no such organism, or not its creator or an admin. }
+        '404': { description: "NO_PROPOSAL, or no such organism, or not its creator or an admin." }
 
   /v1/classification/scan:
     post:
@@ -20753,7 +20753,7 @@ paths:
       responses:
         '200': { description: '{ level, subject, rows, note? }.' }
         '403': { description: Not an operator (node level). }
-        '404': { description: No such organism, or not its creator or an admin. }
+        '404': { description: "No such organism, or not its creator or an admin." }
 
   /v1/classification/exceptions:
     get:
@@ -20782,7 +20782,7 @@ paths:
         '200': { description: '{ level, subject, exceptions, note? }. Each: id, at, by, byKind (human|app|ai), scope, ownerGaii, organismId, target { kind, key } or null, label, action, reason, auto, until, count, lastAt, destination, app, withdrawnAt, withdrawnBy.' }
         '400': { description: action or since is not valid. }
         '403': { description: Not an operator (node level). }
-        '404': { description: No such organism, or not its creator or an admin. }
+        '404': { description: "No such organism, or not its creator or an admin." }
     post:
       summary: Make an exception for one item
       description: |
@@ -20819,13 +20819,13 @@ paths:
                 owner: { type: [string, 'null'], description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent, null or empty: the owner's own." }
                 action: { type: string, enum: [leave, ai-send, audience] }
                 reason: { type: string, maxLength: 1000 }
-                until: { type: string, format: date-time, description: When the exception ends. Absent, until it is withdrawn. }
+                until: { type: string, format: date-time, description: "When the exception ends. Absent, until it is withdrawn." }
       responses:
         '201': { description: The exception. }
         '400': { description: 'INVALID_INPUT: no reason, an unknown action, or until not in the future. JUSTIFICATION_REQUIRED: an audience exception without a reason.' }
-        '403': { description: PERSON_REQUIRED for an AI credential, and for an app making an audience exception. }
-        '404': { description: No such content, or not the caller's to change. }
-        '409': { description: EXCEPTION_LIMIT, the month's list is full. }
+        '403': { description: "PERSON_REQUIRED for an AI credential, and for an app making an audience exception." }
+        '404': { description: "No such content, or not the caller's to change." }
+        '409': { description: "EXCEPTION_LIMIT, the month's list is full." }
 
   /v1/classification/exceptions/{id}:
     delete:
@@ -20839,9 +20839,9 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The exception, withdrawn. }
+        '200': { description: "The exception, withdrawn." }
         '403': { description: PERSON_REQUIRED for an AI credential. }
-        '404': { description: No such exception, or not the caller's to withdraw. }
+        '404': { description: "No such exception, or not the caller's to withdraw." }
 
   /v1/classification/labels:
     get:
@@ -20869,9 +20869,9 @@ paths:
       responses:
         '200':
           description: '{ level, subject, items, next, scanned, note? }. Each item: kind, key, scope, organismId, owner, label, labelDetail, source, locked, suggestion (with its labelDetail), justification, humanSaid, setBy, updatedAt.'
-        '400': { description: A field is not valid, or the cursor is not one this list gave out. }
+        '400': { description: "A field is not valid, or the cursor is not one this list gave out." }
         '401': { description: Not signed in. }
-        '404': { description: No such organism, or not its creator or an admin. }
+        '404': { description: "No such organism, or not its creator or an admin." }
 
   /v1/classification/switch:
     put:
@@ -20895,7 +20895,7 @@ paths:
                 mode: { type: string, enum: ['off', owner, all] }
       responses:
         '200': { description: '{ applied, mode, from }. applied is false when the switch already had that value.' }
-        '400': { description: mode is not off, owner or all. }
+        '400': { description: "mode is not off, owner or all." }
         '403': { description: 'OPERATOR_REQUIRED, SEALED_CONFIG, or PERSON_REQUIRED for an AI loosening.' }
 
   /v1/classification/label:
@@ -20926,7 +20926,7 @@ paths:
       responses:
         '200': { description: '{ target, label, labelDetail, effective: { label, from, labelDetail }, source, locked, suggestion, history, note? }.' }
         '403': { description: "NOT_ALLOWED: a member who is not the organism's creator or an admin, or another owner's board everyone can read." }
-        '404': { description: No such content, or not the caller's to read. }
+        '404': { description: "No such content, or not the caller's to read." }
     put:
       summary: Set the classification of one piece of content
       description: |
@@ -20968,10 +20968,10 @@ paths:
                 confidence: { type: number, minimum: 0, maximum: 1 }
                 reason: { type: string }
       responses:
-        '200': { description: Applied, or kept as a suggestion. }
-        '400': { description: LABEL_UNKNOWN, JUSTIFICATION_REQUIRED or INVALID_INPUT. }
+        '200': { description: "Applied, or kept as a suggestion." }
+        '400': { description: "LABEL_UNKNOWN, JUSTIFICATION_REQUIRED or INVALID_INPUT." }
         '403': { description: "AI_LABELLING_OFF, or NOT_ALLOWED for a container the caller may see but not classify." }
-        '404': { description: No such content, or not the caller's to label. }
+        '404': { description: "No such content, or not the caller's to label." }
 
   /v1/classification/label/review:
     post:
@@ -21006,7 +21006,7 @@ paths:
       responses:
         '200': { description: Accepted or rejected. }
         '403': { description: PERSON_REQUIRED. }
-        '404': { description: NO_SUGGESTION, or no such content. }
+        '404': { description: "NO_SUGGESTION, or no such content." }
 
   /v1/classification/packs:
     get:
@@ -21116,7 +21116,7 @@ paths:
                                 deletes: { type: integer }
                                 first_at: { type: string, format: date-time }
                                 last_at: { type: string, format: date-time }
-                                namespace: { type: string, description: Whose store the key is in, which is not the same as who wrote it. }
+                                namespace: { type: string, description: "Whose store the key is in, which is not the same as who wrote it." }
                           counted_doors:
                             type: array
                             description: Which ways of writing this number covers, in plain words.
@@ -23906,7 +23906,7 @@ paths:
               required: [rule, reason]
               properties:
                 rule: { $ref: '#/components/schemas/DecisionRule' }
-                reason: { type: string, minLength: 10, maxLength: 1000, description: Why this rule should exist, in a sentence the owner can decide from. }
+                reason: { type: string, minLength: 10, maxLength: 1000, description: "Why this rule should exist, in a sentence the owner can decide from." }
       responses:
         '202':
           description: '`data` is `{ proposal_id, rule_id, already_waiting, next_step }`.'
@@ -24019,7 +24019,7 @@ paths:
                   type: object
                   properties:
                     api_key: { type: string, nullable: true, description: The TypeSafe key. null forgets it. }
-                    key_env: { type: string, nullable: true, pattern: '^[A-Z][A-Z0-9_]{1,63}$', description: The NAME of the variable, never the key. }
+                    key_env: { type: string, nullable: true, pattern: '^[A-Z][A-Z0-9_]{1,63}$', description: "The NAME of the variable, never the key." }
                 openrouter:
                   type: object
                   properties:
@@ -27340,7 +27340,7 @@ paths:
               type: object
               properties:
                 note: { type: string, maxLength: 2000 }
-                ended_at: { type: string, description: When the relationship ended (ISO date or time). Absent or unreadable, now. }
+                ended_at: { type: string, description: "When the relationship ended (ISO date or time). Absent or unreadable, now." }
       responses:
         '200':
           description: The ended version.
@@ -27883,7 +27883,7 @@ paths:
                 what: { type: string, maxLength: 2048, description: What to build. }
                 forWhom: { type: string, maxLength: 2048, description: Who it is for. }
                 use: { type: string, maxLength: 2048, description: What it is used for. }
-                readyWhen: { type: string, maxLength: 2048, description: When it is ready, as a sentence the person can check. }
+                readyWhen: { type: string, maxLength: 2048, description: "When it is ready, as a sentence the person can check." }
                 spec:
                   type: object
                   description: The same four fields as one object, the shape GET's `send` shows.
@@ -28020,7 +28020,7 @@ paths:
                 code: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$', description: 'Stable, e.g. gift.first-build.' }
                 title: { type: string, maxLength: 160 }
                 body: { type: string, maxLength: 1000 }
-                owner: { type: string, maxLength: 200, description: The account to tell, as the trail entry that earned the notice names it. }
+                owner: { type: string, maxLength: 200, description: "The account to tell, as the trail entry that earned the notice names it." }
                 link: { type: string, description: A path on this node starting with /v1/. }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
@@ -28030,7 +28030,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '502': { description: NOTIFICATION_NOT_STORED, nobody was told and the code is free to send again. }
+        '502': { description: "NOTIFICATION_NOT_STORED, nobody was told and the code is free to send again." }
 
   /v1/goals:
     get:
@@ -28104,7 +28104,7 @@ paths:
                     minutes: { type: integer, minimum: 1, maximum: 100000 }
                     per: { type: string, enum: [result, week, month] }
                     note: { type: string }
-                    measure: { type: string, description: The number the goal should move, in the person's words. }
+                    measure: { type: string, description: "The number the goal should move, in the person's words." }
                 parent_goal_id: { type: string }
                 reason: { type: string }
                 propose: { type: boolean, description: 'The goal waits as a proposal for the owner''s yes.' }
@@ -28728,7 +28728,7 @@ paths:
                 ext: { type: string, description: Legacy path — raw ext-action; required with action + contract_ref when offering_id is omitted. }
                 action: { type: string }
                 contract_ref: { type: string }
-                cap_units: { type: integer, description: Cap in the contract's unit (morsels of pacing, or money micro-units). Omit for uncapped. }
+                cap_units: { type: integer, description: "Cap in the contract's unit (morsels of pacing, or money micro-units). Omit for uncapped." }
                 app_id: { type: string, description: Consuming app id ("owner/filename") for the per-app cost surface. }
                 escrow_party: { type: string, enum: [consumer, provider] }
                 plan_id: { type: string, description: "Optional provider pricing plan (bundle / subscription); omit for per-call at the base price." }
@@ -28969,7 +28969,7 @@ paths:
                 consumer: { type: string }
                 offering_id: { type: string, description: Withdraw one grant; requires consumer. }
                 app_id: { type: string, description: Withdraw every grant this app's approvals issued. }
-                role: { type: string, description: With app_id, narrow to one role. }
+                role: { type: string, description: "With app_id, narrow to one role." }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -29095,7 +29095,7 @@ paths:
       parameters:
         - { name: status, in: query, description: Only pending (owed) or settled (paid) entries., schema: { type: string, enum: [pending, settled] } }
         - { name: currency, in: query, description: Narrow to one currency (e.g. EUR)., schema: { type: string } }
-        - { name: limit, in: query, description: Max payable records to read (default 200, max 1000)., schema: { type: integer, minimum: 1, maximum: 1000 } }
+        - { name: limit, in: query, description: "Max payable records to read (default 200, max 1000).", schema: { type: integer, minimum: 1, maximum: 1000 } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/AimeatError' }
@@ -32513,7 +32513,7 @@ paths:
                 locale: { type: string, enum: [en, fi, es], description: The language of the mail. }
       responses:
         '201': { description: '`{ party, party_created, share, connection, key_note, key_shown, package_title, say }`, with `link` (the answer of POST /v1/parties/{name}/invite) when `email` was given, or for a recipient on another node the answer above' }
-        '400': { description: INVALID_INPUT, INVALID_RECIPIENT or SHARE_TOO_LONG }
+        '400': { description: "INVALID_INPUT, INVALID_RECIPIENT or SHARE_TOO_LONG" }
         '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
         '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
         '409': { description: PARTY_STOPPED or PACKAGE_WITHDRAWN }
@@ -32555,7 +32555,7 @@ paths:
         content: { application/json: { schema: { type: object } } }
       responses:
         '200': { description: A Catalog }
-        '400': { description: CatalogError (INVALID_MESSAGE, UNSUPPORTED_FILTER) }
+        '400': { description: "CatalogError (INVALID_MESSAGE, UNSUPPORTED_FILTER)" }
         '401': { description: CatalogError UNAUTHORIZED }
         '404': { description: The dataspace is off on this node }
   /dsp/2025-1/catalog/datasets/{id}:
@@ -32634,7 +32634,7 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
       responses:
         '200': { description: A ContractNegotiation }
-        '400': { description: ContractNegotiationError INVALID_MESSAGE, INVALID_EVENT or INVALID_STATE }
+        '400': { description: "ContractNegotiationError INVALID_MESSAGE, INVALID_EVENT or INVALID_STATE" }
         '401': { description: ContractNegotiationError UNAUTHORIZED }
         '404': { description: ContractNegotiationError NOT_FOUND }
   /dsp/2025-1/negotiations/{pid}/agreement/verification:
@@ -33075,7 +33075,7 @@ paths:
       responses:
         '200': { description: The share as the recipient reads it }
         '403': { description: PARTY_STOPPED }
-        '404': { description: INVITE_NOT_FOUND (a code no party holds, or another owner's name on it) }
+        '404': { description: "INVITE_NOT_FOUND (a code no party holds, or another owner's name on it)" }
         '410': { description: 'INVITE_USED, INVITE_EXPIRED or SHARE_ENDED (revoked, expired or declined)' }
   /v1/parties/invites/redeem:
     post:
@@ -33104,7 +33104,7 @@ paths:
                 code: { type: string }
                 accept_terms: { type: boolean }
       responses:
-        '200': { description: The share, the key, the connection file and a party token }
+        '200': { description: "The share, the key, the connection file and a party token" }
         '400': { description: TERMS_NOT_ACCEPTED }
         '403': { description: PARTY_STOPPED }
         '404': { description: INVITE_NOT_FOUND }
@@ -36814,7 +36814,7 @@ paths:
                 seller: { type: string, description: Seller owner name on this node }
                 amount: { type: integer, minimum: 1, description: 6-decimal micro-units }
                 currency: { type: string, example: EUR }
-                purpose: { type: string, example: bid, description: Caller-defined ('bid', 'deposit', …) }
+                purpose: { type: string, example: bid, description: "Caller-defined ('bid', 'deposit', …)" }
                 reference: { type: string, description: Caller's correlation reference (e.g. a listing id) }
                 payment:
                   type: object
@@ -37584,7 +37584,7 @@ paths:
                 currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201': { description: ACP checkout session (status ready_for_payment) }
-        '422': { description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money) }
+        '422': { description: "MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money)" }
 
   /acp/v1/checkout_sessions/{id}:
     get:
@@ -40501,7 +40501,7 @@ paths:
                           type: object
                           properties:
                             kind: { type: string, enum: [owners, agents, actions, boards, memories, transactions] }
-                            key: { type: string, description: The row's key (account name, GAII, provider/id, board id, gaii/memory key) }
+                            key: { type: string, description: "The row's key (account name, GAII, provider/id, board id, gaii/memory key)" }
                             error: { type: string }
         '400':
           description: INVALID_INPUT. owners, agents, actions or boards is not a list, or agent_data is not an object.
@@ -40684,7 +40684,7 @@ paths:
                             type: array
                             description: Always empty. Kept for the clients that read it; a reference that no published action answers to is refused with 400.
                             items: { type: string }
-                          note: { type: string, description: What this binding now means, in the operator's terms }
+                          note: { type: string, description: "What this binding now means, in the operator's terms" }
                           when_missing: { type: string, enum: [pass, refuse], description: Present when the request set it }
                           when_missing_note: { type: string, description: What the setting now means }
                           updated: { type: boolean }
@@ -41291,7 +41291,7 @@ paths:
         - { in: query, name: limit, required: false, schema: { type: integer, default: 50, maximum: 200 } }
         - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
         - { in: query, name: free_only, required: false, schema: { type: boolean } }
-        - { in: query, name: own, required: false, schema: { type: boolean }, description: Only the caller's own apps. Answers 401 without a session, since nobody anonymous has an own. }
+        - { in: query, name: own, required: false, schema: { type: boolean }, description: "Only the caller's own apps. Answers 401 without a session, since nobody anonymous has an own." }
         - { in: query, name: building, required: false, schema: { type: boolean }, description: "Only the apps somebody ELSE asked this caller to help build. A different question from `own`, and deliberately opt-in: an agent iterating its own apps must never quietly start editing another person's. Each row has `building_for` and `dev_level_name`. 401 without a session." }
         - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
       responses:
@@ -41480,7 +41480,7 @@ paths:
                                 type: array
                                 description: The node's serve marks this upload contained and the publish removed before storing. Absent when there were none.
                                 items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                              served_marks_note: { type: string, description: The same, in one sentence for whoever published. }
+                              served_marks_note: { type: string, description: "The same, in one sentence for whoever published." }
                               next_steps:
                                 type: object
                                 description: >-
@@ -41662,7 +41662,7 @@ paths:
                           note: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { description: The token could not be decoded (tampered, foreign node, or no key configured) }
+        '422': { description: "The token could not be decoded (tampered, foreign node, or no key configured)" }
 
   /v1/admin/apps/{owner}/{filename}/moderate:
     post:
@@ -41687,7 +41687,7 @@ paths:
               type: object
               required: [hidden]
               properties:
-                hidden: { type: boolean, description: True to hide, false to restore }
+                hidden: { type: boolean, description: "True to hide, false to restore" }
                 reason: { type: string, description: Optional reason shown to the owner (max 500 chars) }
       responses:
         '200':
@@ -41763,7 +41763,7 @@ paths:
                             type: object
                             properties:
                               url: { type: string }
-                              content_signal: { type: string, description: The directive as served, not the raw config value }
+                              content_signal: { type: string, description: "The directive as served, not the raw config value" }
                               ai_training: { type: string, enum: [allow, deny] }
                               training_crawlers_blocked: { type: boolean }
                           sitemap:
@@ -41960,7 +41960,7 @@ paths:
               type: object
               required: [blocked]
               properties:
-                blocked: { type: boolean, description: True to block search visibility, false to lift the block }
+                blocked: { type: boolean, description: "True to block search visibility, false to lift the block" }
                 reason: { type: string, description: Optional reason shown to the owner (max 500 chars) }
       responses:
         '200':
@@ -42014,7 +42014,7 @@ paths:
               type: object
               required: [approved]
               properties:
-                approved: { type: boolean, description: True to approve, false to withdraw an approval }
+                approved: { type: boolean, description: "True to approve, false to withdraw an approval" }
       responses:
         '200':
           description: Approval updated
@@ -42176,7 +42176,7 @@ paths:
                   properties:
                     obfuscate: { type: boolean, description: Mangle the app's inline scripts }
                     domainLock: { type: boolean, description: Only run on this node's app origin }
-                    watermark: { type: boolean, description: Embed an invisible, operator-decodable per-serve fingerprint }
+                    watermark: { type: boolean, description: "Embed an invisible, operator-decodable per-serve fingerprint" }
                     noRawDownload: { type: boolean, description: Block the raw source download (runnable only) }
                 cortex:
                   type: object
@@ -42407,7 +42407,7 @@ paths:
                           opens_under: { type: string, nullable: true }
                           declared_forms: { type: array, items: { $ref: '#/components/schemas/InternetOpeningForm' } }
                           opening: { allOf: [{ $ref: '#/components/schemas/InternetOpening' }], nullable: true }
-        '404': { description: Unknown app, or not the caller's }
+        '404': { description: "Unknown app, or not the caller's" }
     post:
       operationId: openAppToInternet
       summary: Open the caller's own app to the internet, ask an operator, or extend it
@@ -42440,10 +42440,10 @@ paths:
                 days: { type: integer, minimum: 1 }
       responses:
         '200': { description: Opened or extended }
-        '202': { description: Waits for an operator, or for the owner }
-        '400': { description: No reason, or days out of range }
-        '403': { description: Opening is off, the app was taken down, or it is another account's }
-        '409': { description: The app does not qualify, or the node needs no opening }
+        '202': { description: "Waits for an operator, or for the owner" }
+        '400': { description: "No reason, or days out of range" }
+        '403': { description: "Opening is off, the app was taken down, or it is another account's" }
+        '409': { description: "The app does not qualify, or the node needs no opening" }
     delete:
       operationId: closeAppToInternet
       summary: Close an app to the internet, or withdraw the waiting request
@@ -42530,7 +42530,7 @@ paths:
         '200': { description: Connected }
         '202': { description: Saved; waits for an operator's approval }
         '400': { description: Missing or not valid input }
-        '403': { description: Not allowed on this node, or not in person and no secrets:manage }
+        '403': { description: "Not allowed on this node, or not in person and no secrets:manage" }
         '409': { description: Files are in the current storage }
         '422': { description: The storage did not pass the test }
         '503': { description: The node has no encryption key }
@@ -42576,7 +42576,7 @@ paths:
                 limit: { type: integer, minimum: 1, maximum: 200 }
       responses:
         '200': { description: 'to, moved, skipped, failed, remaining' }
-        '400': { description: No target, or a malformed one }
+        '400': { description: "No target, or a malformed one" }
         '403': { description: A node store not open to everyone }
         '404': { description: No such store }
         '409': { description: The store is not taking files }
@@ -42639,7 +42639,7 @@ paths:
         '200': { description: Changed }
         '201': { description: Added }
         '400': { description: Missing or not valid input }
-        '409': { description: Files are in it, or the same folder is another store }
+        '409': { description: "Files are in it, or the same folder is another store" }
         '422': { description: The store did not pass the test }
         '503': { description: The node has no encryption key }
     delete:
@@ -42683,7 +42683,7 @@ paths:
       responses:
         '200': { description: 'where, ok, the steps and browser_access' }
         '404': { description: No such named store }
-        '409': { description: No store, its settings are incomplete, or its key does not open }
+        '409': { description: "No store, its settings are incomplete, or its key does not open" }
   /v1/admin/file-store/move:
     post:
       operationId: moveFilesOutOfDatabase
@@ -42739,7 +42739,7 @@ paths:
                 note: { type: string }
       responses:
         '200': { description: Decided }
-        '400': { description: No decision, or a decline or revoke without a note }
+        '400': { description: "No decision, or a decline or revoke without a note" }
   /v1/admin/internet-openings:
     get:
       operationId: listInternetOpenings
@@ -42813,8 +42813,8 @@ paths:
                 which: { type: string, enum: [request, forms] }
       responses:
         '200': { description: Decided }
-        '400': { description: No decision, or a decline without a note }
-        '409': { description: Nothing waits, or the app no longer qualifies }
+        '400': { description: "No decision, or a decline without a note" }
+        '409': { description: "Nothing waits, or the app no longer qualifies" }
   /v1/admin/internet-openings/{owner}/{filename}/close:
     post:
       operationId: operatorCloseInternetOpening
@@ -42908,13 +42908,13 @@ paths:
             schema:
               type: object
               properties:
-                code: { type: string, description: The app's access code, when it has one. }
+                code: { type: string, description: "The app's access code, when it has one." }
       responses:
         '200':
           description: '{ url, expires_in } — open `url` in the browser.'
         '401': { description: No account. }
         '403': { description: ACCESS_DENIED or ACCESS_CODE_REQUIRED. }
-        '404': { description: No such app, or an operator hid it. }
+        '404': { description: "No such app, or an operator hid it." }
         '409': { description: PACED_APP. }
   /v1/apps/{owner}/{filename}/access-request:
     get:
@@ -42943,7 +42943,7 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/AccessRequestState' }
         '401': { description: No account. }
-        '404': { description: No such app, or an operator hid it. }
+        '404': { description: "No such app, or an operator hid it." }
     post:
       operationId: requestAppAccess
       summary: Ask the organism's owners for access to an app
@@ -42983,8 +42983,8 @@ paths:
           description: '{ status: "pending", asked_at } — the request waits for a decision.'
         '400': { description: VALIDATION_ERROR. }
         '401': { description: No account. }
-        '403': { description: ACCESS_DENIED, REQUESTS_OFF or BANNED. }
-        '404': { description: No such app, or an operator hid it. }
+        '403': { description: "ACCESS_DENIED, REQUESTS_OFF or BANNED." }
+        '404': { description: "No such app, or an operator hid it." }
         '409': { description: 'ALREADY_OPEN, NOT_REQUESTABLE, ALREADY_PENDING, ASKED_RECENTLY, ALREADY_INVITED, CAPACITY_FULL or ALREADY_MEMBER.' }
   /v1/apps/{owner}/{filename}:
     get:
@@ -43107,7 +43107,7 @@ paths:
             URL whose owner or filename differs it answers 403 TOKEN_INVALID.
       responses:
         '200': { description: "App HTML (inline or attachment; the draft when a valid preview token is supplied), or text/markdown when the request prefers markdown (Agent Face)" }
-        '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
+        '301': { description: "Redirect to the isolated app origin (H-2, when enabled)" }
         '302':
           description: >
             Redirect to the isolated app origin for a GATED app, with a short-lived `access`
@@ -43176,7 +43176,7 @@ paths:
         - { name: filename, in: path, required: true, schema: { type: string } }
         - { name: code, in: query, required: false, schema: { type: string }, description: The app's access code. }
         - { name: access, in: query, required: false, schema: { type: string }, description: The unlock token the app origin was served with. }
-        - { name: X-Access-Code, in: header, required: false, schema: { type: string }, description: The app's access code, as a header. }
+        - { name: X-Access-Code, in: header, required: false, schema: { type: string }, description: "The app's access code, as a header." }
       responses:
         '200':
           description: '`data` is `{ app, schema, values, missing: [{ field, description? }], updated_at }`.'
@@ -43287,7 +43287,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '422': { description: The worded refusal naming the block, the field and the nearest real name }
+        '422': { description: "The worded refusal naming the block, the field and the nearest real name" }
 
   /v1/apps/{owner}/{filename}/ui/versions:
     get:
@@ -43383,9 +43383,9 @@ paths:
                                 summary: { type: string }
                                 module: { type: string, nullable: true }
                                 sheet: { type: string }
-                                shape: { type: string, description: The call, as a person would write it }
+                                shape: { type: string, description: "The call, as a person would write it" }
                                 pages: { type: array, items: { type: string } }
-                                use: { type: array, items: { type: string }, description: What a person does with the part, in fixed words. }
+                                use: { type: array, items: { type: string }, description: "What a person does with the part, in fixed words." }
                           total: { type: integer }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -43436,7 +43436,7 @@ paths:
                             type: array
                             description: What a person does with the part, in fixed words.
                             items: { type: string, enum: [view, edit, list, pick, compare, status, navigate, converse, act, copy, explain, count, search, notify, wait, layout, open, confirm] }
-                          useFor: { type: array, items: { type: string }, description: When to reach for the part, in a sentence. }
+                          useFor: { type: array, items: { type: string }, description: "When to reach for the part, in a sentence." }
                           variants:
                             type: array
                             items:
@@ -43492,7 +43492,7 @@ paths:
       parameters:
         - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect, component, avatar, ornament, kit] }, description: "`kit` is a style kit, the whole look of a new app. A kit whose reach is narrower than the node (`own`, `organism`) is listed only to a signed-in reader inside its reach." }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
-        - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
+        - { name: q, in: query, schema: { type: string }, description: "Matched against id, title, summary and tags" }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: view, in: query, schema: { type: string, enum: [map, reasons] }, description: "`map` answers the whole published list as one page of text, every part on a line under its kind, and ignores the other filters. It is what the search tools answer when they are given nothing. `reasons` answers what builders wrote down about the Book, as what it should become next: the things made by hand because the Book had nothing for them, and the parts most often looked at and left, each with the reasons given." }
       responses:
@@ -43606,8 +43606,8 @@ paths:
         '201': { description: "First proposal of this id: { id, status, version, replaced_version: null }" }
         '200': { description: "Update of your own part: { id, status, version, replaced_version }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { description: The id is another proposer's address, or the part is retired }
-        '422': { description: The bench refusal, in the validator's words }
+        '409': { description: "The id is another proposer's address, or the part is retired" }
+        '422': { description: "The bench refusal, in the validator's words" }
 
   /v1/designbook/kits/in-force:
     get:
@@ -43670,16 +43670,16 @@ paths:
               type: object
               required: [kit]
               properties:
-                kit: { type: string, nullable: true, description: The kit id, or null to clear the default }
+                kit: { type: string, nullable: true, description: "The kit id, or null to clear the default" }
                 organism: { type: string, description: The organism whose default this is }
                 node: { type: boolean, description: true for the node's default (the operator only) }
       responses:
         '200': { description: "{ subject: organism|own|node, organism?, kit }" }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: NOT_ALLOWED — not an owner or admin of the organism, or not the node's operator }
+        '403': { description: "NOT_ALLOWED — not an owner or admin of the organism, or not the node's operator" }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: NOT_PUBLISHED, NOT_FOR_THIS_ORGANISM or NOT_FOR_THE_NODE }
+        '409': { description: "NOT_PUBLISHED, NOT_FOR_THIS_ORGANISM or NOT_FOR_THE_NODE" }
         '422': { description: NOT_A_KIT }
 
   /v1/designbook/keep:
@@ -43851,7 +43851,7 @@ paths:
       responses:
         '200': { description: "{ id, filename, version, replaced_version, kind, snippet? }; `snippet` { html, css, use, prefix } for a component" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not published and not yours, or the app belongs to another owner }
+        '403': { description: "Not published and not yours, or the app belongs to another owner" }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: 'GENRE_IS_FORKED — a genre is forked from its template, never adopted; NO_LAYOUT — the app has no stored arrangement to season' }
         '422': { description: "The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words; or a component no longer passes the bench, with the bench's reason" }
@@ -44061,7 +44061,7 @@ paths:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }, description: People on one page. }
-        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 }, description: People to skip, for the next page. }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 }, description: "People to skip, for the next page." }
       responses:
         '200': { description: '`{ registration, parties, total, limit: { max, used, left }, offset, page_size, personal_data }`' }
         '403': { description: 'FORBIDDEN or SCOPE_DENIED' }
@@ -45545,13 +45545,13 @@ paths:
                           updated_at: { type: string }
                           has_live_version: { type: boolean }
                           live_version_number: { type: integer }
-                          version: { type: string, description: The display version publish-draft will publish with, the one stated in this request or else the live app's. }
+                          version: { type: string, description: "The display version publish-draft will publish with, the one stated in this request or else the live app's." }
                           note: { type: string }
                           served_marks_removed:
                             type: array
                             description: The node's serve marks this upload contained and the save removed before writing the draft slot. Absent when there were none.
                             items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                          served_marks_note: { type: string, description: The same, in one sentence for whoever saved. }
+                          served_marks_note: { type: string, description: "The same, in one sentence for whoever saved." }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '413': { description: Draft exceeds the app size limit }
@@ -45713,7 +45713,7 @@ paths:
                               smaller than the bytes sent, so pass the returned `size` as the next
                               `expected_size_bytes`.
                             items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                          served_marks_note: { type: string, description: The same, in one sentence for whoever wrote. }
+                          served_marks_note: { type: string, description: "The same, in one sentence for whoever wrote." }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
@@ -45775,7 +45775,7 @@ paths:
                             type: array
                             description: The node's serve marks the draft contained after the replacement, removed before the slot was stored. Absent when there were none.
                             items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                          served_marks_note: { type: string, description: The same, in one sentence for whoever edited. }
+                          served_marks_note: { type: string, description: "The same, in one sentence for whoever edited." }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
@@ -45894,7 +45894,7 @@ paths:
                             type: array
                             description: The node's serve marks the published version contained in its stored bytes, removed before the slot was written. Absent when there were none.
                             items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                          served_marks_note: { type: string, description: The same, in one sentence for whoever seeded. }
+                          served_marks_note: { type: string, description: "The same, in one sentence for whoever seeded." }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
           description: NOT_FOUND - no published app, or no such version, to copy from
@@ -45978,7 +45978,7 @@ paths:
                         type: object
                         properties:
                           frame_url: { type: string, description: Use as an iframe src }
-                          app_origin_url: { type: string, description: The app's own origin, without the grant }
+                          app_origin_url: { type: string, description: "The app's own origin, without the grant" }
                           granted_to: { type: string, description: The one origin this grant names }
                           expires_in_seconds: { type: integer }
                           note: { type: string }
@@ -46072,7 +46072,7 @@ paths:
                             type: array
                             description: The node's serve marks this upload contained and the publish removed before storing. Absent when there were none.
                             items: { $ref: '#/components/schemas/ServedMarkRemoval' }
-                          served_marks_note: { type: string, description: The same, in one sentence for whoever published. }
+                          served_marks_note: { type: string, description: "The same, in one sentence for whoever published." }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to publish }
         '403': { description: The scoped principal lacks app:write; the draft and live app are unchanged }
@@ -46343,9 +46343,9 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403': { description: CROSS_OWNER_FORBIDDEN (foreign target owner), missing task:write app-grant scope, or ACCESS_DENIED when starting or updating the caller's existing agent takes a permission the caller lacks }
-        '404': { description: App not found, agent not declared in manifest.cortex.agents, or RUNNER_NOT_FOUND (the named runner_agent does not exist) }
-        '409': { description: AGENT_OFFLINE and the other refusals of a publish, when the app's newer definition could not be published to the caller's agent }
+        '403': { description: "CROSS_OWNER_FORBIDDEN (foreign target owner), missing task:write app-grant scope, or ACCESS_DENIED when starting or updating the caller's existing agent takes a permission the caller lacks" }
+        '404': { description: "App not found, agent not declared in manifest.cortex.agents, or RUNNER_NOT_FOUND (the named runner_agent does not exist)" }
+        '409': { description: "AGENT_OFFLINE and the other refusals of a publish, when the app's newer definition could not be published to the caller's agent" }
 
   /v1/apps/{owner}/{filename}/agents/{agentName}/undeploy:
     post:
@@ -46393,8 +46393,8 @@ paths:
           description: Undeploy task created on the owner's own fleet
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403': { description: CROSS_OWNER_FORBIDDEN (foreign target owner), or ACCESS_DENIED when stopping the agent takes agent:write and the caller lacks it }
-        '404': { description: App not found, agent not declared, NOT_DEPLOYED (the caller has no agent made from it and no runner), or RUNNER_NOT_FOUND (the named runner_agent does not exist) }
+        '403': { description: "CROSS_OWNER_FORBIDDEN (foreign target owner), or ACCESS_DENIED when stopping the agent takes agent:write and the caller lacks it" }
+        '404': { description: "App not found, agent not declared, NOT_DEPLOYED (the caller has no agent made from it and no runner), or RUNNER_NOT_FOUND (the named runner_agent does not exist)" }
 
   /v1/apps/{owner}/{filename}/agents/{agentName}/instances:
     get:
@@ -48969,7 +48969,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200': { description: The list, and whether this node offers passkeys at all }
+        '200': { description: "The list, and whether this node offers passkeys at all" }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/ghii/passkeys/{id}:
@@ -49046,7 +49046,7 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200': { description: The names and times, never a value }
+        '200': { description: "The names and times, never a value" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -49119,11 +49119,11 @@ paths:
                     (`api.example.com`, `api.example.com:8443`): no scheme, no path. Left out, the
                     first use binds the host.
       responses:
-        '200': { description: Stored. Answers the name, the two times, the hosts and the binding, never the value }
-        '400': { description: INVALID_SECRET_NAME, INVALID_SECRET_VALUE, SECRET_TOO_LARGE or INVALID_SECRET_HOST }
+        '200': { description: "Stored. Answers the name, the two times, the hosts and the binding, never the value" }
+        '400': { description: "INVALID_SECRET_NAME, INVALID_SECRET_VALUE, SECRET_TOO_LARGE or INVALID_SECRET_HOST" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '503': { description: SECRET_STORE_UNAVAILABLE — this node has no encryption key, and nothing was written }
+        '503': { description: "SECRET_STORE_UNAVAILABLE — this node has no encryption key, and nothing was written" }
     delete:
       operationId: secretDelete
       summary: Remove one secret
@@ -49178,8 +49178,8 @@ paths:
               properties:
                 host: { type: string, nullable: true, description: '`host` or `host:port`, no scheme, no path. Null removes the address.' }
       responses:
-        '200': { description: The secret's summary, never the value }
-        '400': { description: INVALID_INPUT (no host field), INVALID_SECRET_NAME or INVALID_SECRET_HOST }
+        '200': { description: "The secret's summary, never the value" }
+        '400': { description: "INVALID_INPUT (no host field), INVALID_SECRET_NAME or INVALID_SECRET_HOST" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: SECRET_NOT_FOUND }
@@ -49740,7 +49740,7 @@ paths:
         '200': { description: The whole set after the change, content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: SCOPE_DENIED, PERSON_REQUIRED or HELP_DISABLED }
+        '403': { description: "SCOPE_DENIED, PERSON_REQUIRED or HELP_DISABLED" }
         '409': { description: AI_AUTO_OFF }
 
   /v1/help/find:
@@ -49803,7 +49803,7 @@ paths:
         '201': { description: 'question, sent_to, nobody_found', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
         '400': { description: INVALID_INPUT or ATTACHMENT_NOT_FOUND }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: SCOPE_DENIED, ASKING_OFF, AI_MAY_NOT_ASK or HELP_DISABLED }
+        '403': { description: "SCOPE_DENIED, ASKING_OFF, AI_MAY_NOT_ASK or HELP_DISABLED" }
         '404': { description: NOT_FOUND (a named member) }
         '409': { description: NOT_A_HELPER or BOARD_OFF }
 
@@ -49838,7 +49838,7 @@ paths:
       parameters:
         - { name: conversationId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The view, with role helper or asker, content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '200': { description: "The view, with role helper or asker", content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: NOT_FOUND }
 
@@ -49870,9 +49870,9 @@ paths:
         '200': { description: 'outcome, question_id, conversation_id', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: SCOPE_DENIED, AI_OFF, PERSON_REQUIRED or NOT_A_HELPER }
+        '403': { description: "SCOPE_DENIED, AI_OFF, PERSON_REQUIRED or NOT_A_HELPER" }
         '404': { description: NOT_FOUND }
-        '409': { description: ALREADY_DONE, CLOSED, NO_DRAFT, TAKEN or NOT_A_HELPER }
+        '409': { description: "ALREADY_DONE, CLOSED, NO_DRAFT, TAKEN or NOT_A_HELPER" }
 
   /v1/help/questions/{id}/close:
     post:
@@ -49905,7 +49905,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: SCOPE_DENIED or HELP_DISABLED }
         '404': { description: NOT_FOUND }
-        '409': { description: CLOSED, CHANGED or NOT_ANSWERED }
+        '409': { description: "CLOSED, CHANGED or NOT_ANSWERED" }
 
   /v1/admin/help/reports:
     get:
@@ -50026,7 +50026,7 @@ paths:
                 response: { type: object, description: The AuthenticationResponseJSON from the browser }
                 want_owner_key: { type: boolean, description: This device holds no signing key and wants a fresh one }
       responses:
-        '200': { description: Signed in, with the session token }
+        '200': { description: "Signed in, with the session token" }
         '400': { description: The ceremony expired }
         '401': { description: 'The device is unknown here, or its answer did not check out, or (PASSKEY_USER_NOT_VERIFIED) the account has two-step sign-in armed and the device did not check the person' }
         '403': { description: The account has been deactivated }
@@ -51407,7 +51407,7 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: 'Removed; the person signs in with their password alone' }
-        '400': { description: Your own account, or the account does not use two-step sign-in }
+        '400': { description: "Your own account, or the account does not use two-step sign-in" }
         '403': { description: Operator role required }
         '404': { description: Owner not found }
 
@@ -52948,8 +52948,8 @@ paths:
                           updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme / schemas / apps / rules" }
                           creator: { type: string }
                           name: { type: string }
-                          member_changes: { type: string, enum: [direct, suggest], description: The rule now in force, when this call set it }
-                          manifest_version: { type: integer, description: The stored manifest's version after this call, the one the next expected_version names. }
+                          member_changes: { type: string, enum: [direct, suggest], description: "The rule now in force, when this call set it" }
+                          manifest_version: { type: integer, description: "The stored manifest's version after this call, the one the next expected_version names." }
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
@@ -53015,11 +53015,11 @@ paths:
       responses:
         '200': { description: "Written at once (`status: applied`, with `added` and `skipped`), or nothing to add (`status: unchanged`)." }
         '202': { description: "Filed as a suggestion (`status: pending_approval`, with `suggestion`); `duplicate: true` when the same one was already waiting." }
-        '400': { description: No `ws`, or a space without a valid name and namespace, or a schema for a space this call does not add }
+        '400': { description: "No `ws`, or a space without a valid name and namespace, or a schema for a space this call does not add" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not an active member, or a member without the contributor role }
+        '403': { description: "Not an active member, or a member without the contributor role" }
         '404': { description: No such organism or workspace }
-        '409': { description: The workspace is archived, or it has no structure yet }
+        '409': { description: "The workspace is archived, or it has no structure yet" }
         '429': { description: The member already has 20 space suggestions waiting in this workspace }
 
   /v1/organisms/{id}/workspace/spaces/{space}/extensions:
@@ -53097,7 +53097,7 @@ paths:
         '400': { description: "No `ws` (WS_REQUIRED); or INVALID_INPUT: `add` is not a list of 1 to 5 entries, an entry is not `installer/name`, an entry names another account's extension or one that is not installed (the message names the entry), or the space points at the task system" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: "SCOPE_DENIED without `organism:write`; ACCESS_DENIED for an agent without `organism:direct`, an ecosystem app, a session from another node, an account that is not an active member, or a member who is neither the workspace's creator nor an organism admin" }
-        '404': { description: No such organism, workspace or space }
+        '404': { description: "No such organism, workspace or space" }
         '409': { description: "The workspace is archived (ARCHIVED), it has no structure yet (NO_STRUCTURE), or the space's `extensions` value is not a list (INVALID_STATE)" }
 
   /v1/organisms/{id}/workspace/sections/{space}:
@@ -53119,7 +53119,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
-        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by name or namespace }
+        - { name: space, in: path, required: true, schema: { type: string }, description: "The document space, by name or namespace" }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
       requestBody:
         required: true
@@ -53143,9 +53143,9 @@ paths:
       responses:
         '200': { description: "Written at once (`status: applied`, with the `sections` as they stand), or no change (`status: unchanged`)." }
         '202': { description: "Filed as a suggestion (`status: pending_approval`, with `suggestion`); `merged: true` when it joined one already waiting." }
-        '400': { description: No `ws`, or the list is not a valid section index }
+        '400': { description: "No `ws`, or the list is not a valid section index" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not an active member, or a member without the contributor role }
+        '403': { description: "Not an active member, or a member without the contributor role" }
         '404': { description: No such organism or workspace }
         '409': { description: The workspace is archived }
         '422': { description: The space is not a document space of this workspace }
@@ -53202,7 +53202,7 @@ paths:
         '200': { description: '{ suggestion, added?, skipped?, sections? }' }
         '400': { description: No valid `decision` }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not the workspace's creator or an organism admin, or the member who made the suggestion }
+        '403': { description: "Not the workspace's creator or an organism admin, or the member who made the suggestion" }
         '404': { description: No such suggestion in this organism }
         '409': { description: 'Already decided, expired, or the change no longer applies (the member lost the contributor role, the suggestion no longer describes a valid change)' }
 
@@ -53433,7 +53433,7 @@ paths:
                 space: { type: string, description: The space name or namespace from the manifest. }
                 value: { type: object, description: The content of a single write. }
                 id: { type: string, description: The instance id; a document without one gets a generated id. }
-                section: { type: string, description: Document spaces only, the section to file it under. }
+                section: { type: string, description: "Document spaces only, the section to file it under." }
                 items:
                   type: array
                   description: A batch of { space?, value, id?, section? }; all or nothing.
@@ -53797,8 +53797,8 @@ paths:
                 redirect_url: { type: string }
       responses:
         '200': { description: Form defined; returns form_id + submit_url }
-        '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
-        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
+        '400': { description: "Invalid input (missing fields, meta.* namespace, bad slug)" }
+        '403': { description: "Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED)" }
         '404': { description: Organism or workspace not found }
         '422':
           description: >
@@ -53821,7 +53821,7 @@ paths:
         - { name: ws, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: The owner's forms in the workspace }
-        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
+        '403': { description: "Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED)" }
     delete:
       operationId: deleteIntakeForm
       summary: Delete an intake form — its public link stops working (owner)
@@ -53833,7 +53833,7 @@ paths:
         - { name: form_id, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: 'Deleted (or already absent). The conversations of a conversation form stay until their own date (`ttl_days` after the last visitor message), when the node deletes them.' }
-        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
+        '403': { description: "Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED)" }
   /v1/intake/{org}/{ws}/{formId}:
     get:
       operationId: getIntakeFormDescriptor
@@ -54194,7 +54194,7 @@ paths:
               required: [ws, grantee, role]
               properties:
                 ws: { type: string, description: Workspace id }
-                grantee: { type: string, description: Owner name, GHII, or GAII to grant (applies to the owner) }
+                grantee: { type: string, description: "Owner name, GHII, or GAII to grant (applies to the owner)" }
                 role: { type: string, enum: [viewer, contributor], description: viewer = read; contributor = read+write }
       responses:
         '200': { description: 'Granted: { ws, grantee, role, organism_member, invitation, invitation_refusal? }' }
@@ -54222,7 +54222,7 @@ paths:
               required: [ws, grantee]
               properties:
                 ws: { type: string, description: Workspace id }
-                grantee: { type: string, description: Owner name, GHII, or GAII to revoke (resolved to the owner) }
+                grantee: { type: string, description: "Owner name, GHII, or GAII to revoke (resolved to the owner)" }
       responses:
         '200': { description: 'Revoked: { ws, grantee, revoked }' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -54515,7 +54515,7 @@ paths:
               type: object
               required: [zip_base64]
               properties:
-                zip_base64: { type: string, description: The workspace export ZIP, base64-encoded }
+                zip_base64: { type: string, description: "The workspace export ZIP, base64-encoded" }
       responses:
         '201':
           description: >-
@@ -54905,7 +54905,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
-        - { name: space, in: path, required: true, schema: { type: string }, description: The row space, by objectType name or namespace }
+        - { name: space, in: path, required: true, schema: { type: string }, description: "The row space, by objectType name or namespace" }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
       requestBody:
         required: true
@@ -54929,11 +54929,11 @@ paths:
                       occurred_at: { type: string }
       responses:
         '200': { description: '{ written, row_ids, pruned, revisions_kept } — pruned is what the retention sweep removed; revisions_kept names the rows whose earlier content, last written by another writer family, the node kept as a revision (GET .../{rowId}/revisions)' }
-        '400': { description: No rows, a batch over 500, a malformed row, or a space that is not a row space }
+        '400': { description: "No rows, a batch over 500, a malformed row, or a space that is not a row space" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: "Not a member, no consent, or the space's writeRole refuses this caller's person: `owner` is the workspace's creator or an organism admin, `admin` an organism admin" }
         '404': { description: No such workspace or space }
-        '413': { description: A row over quota.ws_rows_max_row_kb, or the workspace/organism quota reached }
+        '413': { description: "A row over quota.ws_rows_max_row_kb, or the workspace/organism quota reached" }
         '422':
           description: SCHEMA_VALIDATION_FAILED — one or more rows do not match the space's JSON Schema, and none was written
           content:
@@ -54995,9 +54995,9 @@ paths:
         - { name: order, in: query, required: false, schema: { type: string, enum: [asc, desc], default: desc } }
       responses:
         '200': { description: '{ space, namespace, rows, cursor, indexed }' }
-        '400': { description: A filter on a field the space does not index, or an unreadable timestamp }
+        '400': { description: "A filter on a field the space does not index, or an unreadable timestamp" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, or no consent for this workspace }
+        '403': { description: "Not a member, or no consent for this workspace" }
         '404': { description: No such workspace or space }
     delete:
       operationId: deleteWorkspaceRowsBefore
@@ -55023,7 +55023,7 @@ paths:
         '200': { description: '{ removed }' }
         '400': { description: Missing or unreadable `before` }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, or the space's writeRole refuses this caller }
+        '403': { description: "Not a member, or the space's writeRole refuses this caller" }
         '404': { description: No such workspace or space }
 
   /v1/organisms/{id}/workspace/rows/{space}/stats:
@@ -55043,7 +55043,7 @@ paths:
       responses:
         '200': { description: '{ stats: { namespace, rows, bytes, oldest, newest, lastWriteAt } }' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, or no consent for this workspace }
+        '403': { description: "Not a member, or no consent for this workspace" }
         '404': { description: No such workspace or space }
 
   /v1/organisms/{id}/workspace/rows/{space}/{rowId}:
@@ -55060,8 +55060,8 @@ paths:
       responses:
         '200': { description: '{ row }' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, or no consent for this workspace }
-        '404': { description: No such workspace, space or row }
+        '403': { description: "Not a member, or no consent for this workspace" }
+        '404': { description: "No such workspace, space or row" }
     delete:
       operationId: deleteWorkspaceRow
       summary: Remove one row
@@ -55078,8 +55078,8 @@ paths:
       responses:
         '200': { description: '{ deleted: true }' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, or the space's writeRole refuses this caller }
-        '404': { description: No such workspace, space or row }
+        '403': { description: "Not a member, or the space's writeRole refuses this caller" }
+        '404': { description: "No such workspace, space or row" }
 
   /v1/organisms/{id}/workspace/rows/{space}/{rowId}/revisions:
     get:
@@ -55105,7 +55105,7 @@ paths:
       responses:
         '200': { description: '{ space, row_id, revisions: [{ revisionId, rowId, occurredAt, createdAt, updatedAt, createdBy, updatedBy, body, bytes, replacedAt, replacedBy }] }' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing }
+        '403': { description: "Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing" }
         '404': { description: No such workspace or space }
 
   /v1/organisms/{id}/workspace/rows/{space}/{rowId}/revisions/{revisionId}/restore:
@@ -55123,13 +55123,13 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
         - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
         - { name: rowId, in: path, required: true, schema: { type: string }, description: The caller-visible row id }
-        - { name: revisionId, in: path, required: true, schema: { type: string }, description: The kept revision, from the revisions list }
+        - { name: revisionId, in: path, required: true, schema: { type: string }, description: "The kept revision, from the revisions list" }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
       responses:
         '200': { description: '{ row_id, restored, revision_kept } — revision_kept says the replaced content was kept' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing }
-        '404': { description: No such workspace, space or revision of this row }
+        '403': { description: "Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing" }
+        '404': { description: "No such workspace, space or revision of this row" }
         '413': { description: The workspace or organism row quota is reached }
         '422': { description: 'SCHEMA_VALIDATION_FAILED — the revision does not match the space''s JSON Schema in force now; error.details.rows names the field paths' }
 
@@ -55167,7 +55167,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
-        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by objectType name or namespace }
+        - { name: space, in: path, required: true, schema: { type: string }, description: "The document space, by objectType name or namespace" }
         - { name: docId, in: path, required: true, schema: { type: string }, description: The document instance id }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
       requestBody:
@@ -55182,11 +55182,11 @@ paths:
                 section: { type: string, description: "Add at the end of this section instead of the document's end; the heading's exact text" }
       responses:
         '200': { description: '{ key, id, space, namespace, version, bytes, seeded_from_published, section?, attempts }' }
-        '400': { description: No `markdown`, no `ws`, or the space holds records rather than documents }
+        '400': { description: "No `markdown`, no `ws`, or the space holds records rather than documents" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, no consent, or not approved to write this workspace }
-        '404': { description: No such workspace or document, or no heading matching `section` }
-        '409': { description: The document is archived, or it kept changing under six retries }
+        '403': { description: "Not a member, no consent, or not approved to write this workspace" }
+        '404': { description: "No such workspace or document, or no heading matching `section`" }
+        '409': { description: "The document is archived, or it kept changing under six retries" }
         '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
         '422':
           description: >
@@ -55252,7 +55252,7 @@ paths:
         '200': { description: '{ recorded: true, day }' }
         '400': { description: No `ws` }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { description: The caller cannot read the workspace, or no such space or page }
+        '404': { description: "The caller cannot read the workspace, or no such space or page" }
 
   /v1/organisms/{id}/workspace/documents/{space}/{docId}/section:
     post:
@@ -55279,7 +55279,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
-        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by objectType name or namespace }
+        - { name: space, in: path, required: true, schema: { type: string }, description: "The document space, by objectType name or namespace" }
         - { name: docId, in: path, required: true, schema: { type: string }, description: The document instance id }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
       requestBody:
@@ -55294,11 +55294,11 @@ paths:
                 markdown: { type: string, description: 'The whole replacement section, starting with its heading line' }
       responses:
         '200': { description: '{ key, id, space, namespace, version, bytes, seeded_from_published, section, attempts }' }
-        '400': { description: No `section` or `markdown`, a replacement not starting with a heading, or a records space }
+        '400': { description: "No `section` or `markdown`, a replacement not starting with a heading, or a records space" }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Not a member, no consent, or not approved to write this workspace }
-        '404': { description: No such workspace or document, or no heading matching `section` }
-        '409': { description: The document is archived, an ambiguous heading, or six lost retries }
+        '403': { description: "Not a member, no consent, or not approved to write this workspace" }
+        '404': { description: "No such workspace or document, or no heading matching `section`" }
+        '409': { description: "The document is archived, an ambiguous heading, or six lost retries" }
         '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
         '422':
           description: >
@@ -55372,7 +55372,7 @@ paths:
               type: object
               required: [zip_base64]
               properties:
-                zip_base64: { type: string, description: The organism export ZIP, base64-encoded }
+                zip_base64: { type: string, description: "The organism export ZIP, base64-encoded" }
                 preview: { type: boolean, default: false }
                 people: { type: string, enum: [none, invite], default: none }
                 team: { type: boolean, default: true }
@@ -55657,7 +55657,7 @@ paths:
                       description: The emails the node sends to the owner's own address that are theirs to switch off; a code, a login link and a password reset always go.
                       properties:
                         workflowEnd: { type: boolean, description: The email when a workflow run ends (default true). }
-                        nudge: { type: boolean, description: The reminder after two quiet weeks. Absent means undecided here, and the old settings.email_notifications switch answers. }
+                        nudge: { type: boolean, description: "The reminder after two quiet weeks. Absent means undecided here, and the old settings.email_notifications switch answers." }
                         agentAsks: { type: boolean, description: "The email when one of the owner's agents asks to be allowed something it was refused, with the address that allows it, or with its page when the permission is not given with one press (default true)." }
       responses:
         '200': { description: "{ settings }" }
@@ -62919,12 +62919,12 @@ paths:
               type: object
               required: [email, username, code]
               properties:
-                email: { type: string, format: email, description: Recipient email — the code + explanation are sent here, and kept on the account unverified }
+                email: { type: string, format: email, description: "Recipient email — the code + explanation are sent here, and kept on the account unverified" }
                 username: { type: string, description: Desired account username (must be free); the client owns the naming scheme }
                 code: { type: string, minLength: 8, description: The access code — also the account password (delivered once by email; never stored in plaintext) }
                 display_name: { type: string, description: Optional display name for the provisioned account }
                 locale: { type: string, enum: [en, fi], description: Language of the invitation email }
-                message: { type: string, description: Caller-composed, already-localized explanation shown in the email }
+                message: { type: string, description: "Caller-composed, already-localized explanation shown in the email" }
                 landing_url: { type: string, description: Where the recipient enters the code (defaults to the node base URL) }
                 org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member).' }
                 workspaces:
@@ -65658,7 +65658,7 @@ paths:
                                         field: { type: string }
                                         title: { type: string }
                                         description: { type: string }
-                                        default: { type: string, description: The field's default, as text; empty when it has none. }
+                                        default: { type: string, description: "The field's default, as text; empty when it has none." }
                                         required: { type: boolean }
                                         secret: { type: boolean }
                                   expects: { type: object }
@@ -72748,7 +72748,7 @@ paths:
               type: object
               required: [contact_id, app_origin]
               properties:
-                contact_id: { type: string, description: The contact the owner chose, from GET /v1/contacts. }
+                contact_id: { type: string, description: "The contact the owner chose, from GET /v1/contacts." }
                 app_origin: { type: string, description: The origin of the app that opened the picker. }
       responses:
         '201':
@@ -73024,7 +73024,7 @@ paths:
               required: [email]
               properties:
                 email: { type: string, format: email }
-                message: { type: string, maxLength: 1000, description: A short message from the owner, sent in the email. }
+                message: { type: string, maxLength: 1000, description: "A short message from the owner, sent in the email." }
       responses:
         '201':
           description: Invited
@@ -73140,7 +73140,7 @@ paths:
                 message_id: { type: string }
                 reaction: { type: string, minLength: 1, maxLength: 32 }
                 reactor: { type: string, description: The person (GHII) or agent (GAII) of the sending node who gave it. }
-                by_agent: { type: string, nullable: true, description: The agent that gave it in the reactor's name, when one did. }
+                by_agent: { type: string, nullable: true, description: "The agent that gave it in the reactor's name, when one did." }
                 op: { type: string, enum: [add, remove] }
                 timestamp: { type: string, format: date-time }
                 signature: { type: string }
@@ -74116,7 +74116,7 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/AgentCrewLlmEffective'
-        '403': { description: Not this account's agent, or memory:read missing }
+        '403': { description: "Not this account's agent, or memory:read missing" }
         '404': { description: No agent of this account by that name }
     put:
       operationId: setAgentCrewLlm
@@ -74188,7 +74188,7 @@ paths:
                           key: { type: string }
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
-        '400': { description: Not a choice this runtime could resolve, it contained a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE) }
+        '400': { description: "Not a choice this runtime could resolve, it contained a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE)" }
         '403': { description: Not this account's agent }
         '404': { description: No agent of this account by that name }
 
@@ -74239,7 +74239,7 @@ paths:
                           key: { type: string }
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
-        '400': { description: Not a choice this runtime could resolve, or it contained a credential }
+        '400': { description: "Not a choice this runtime could resolve, or it contained a credential" }
 
   /v1/agents/{name}/crew/seed:
     post:
@@ -75172,7 +75172,7 @@ paths:
                   type: string
                   pattern: '^[a-z0-9][a-z0-9_-]{1,40}$'
                   description: Names the definition, `<prefix>.config`.
-                  example: postinjalostamo
+                  example: mail
                 message_ids:
                   type: array
                   maxItems: 50
@@ -75299,7 +75299,7 @@ paths:
       parameters:
         - { name: kind, in: query, schema: { type: string, enum: [file, memory, pdf, image, video, text, other] }, description: 'With key: file or memory. Without key: filter the page by item kind.' }
         - { name: key, in: query, schema: { type: string } }
-        - { name: owner, in: query, schema: { type: string }, description: The identity the item is stored under, when it is one of your agents. }
+        - { name: owner, in: query, schema: { type: string }, description: "The identity the item is stored under, when it is one of your agents." }
         - { name: with_profile, in: query, schema: { type: boolean }, description: 'With key: also answer the profile''s sections (null when the item has no profile).' }
         - { name: class, in: query, schema: { type: string }, description: Only items of this content class. }
         - { name: stale, in: query, schema: { type: boolean } }
@@ -75622,7 +75622,7 @@ paths:
         - BearerAuth: []
       parameters:
         - { name: organism_id, in: query, schema: { type: string }, description: The organism whose fingerprint setting to read. }
-        - { name: ws, in: query, schema: { type: string }, description: With organism_id, the workspace. }
+        - { name: ws, in: query, schema: { type: string }, description: "With organism_id, the workspace." }
       responses:
         '200':
           description: The settings.
@@ -75651,7 +75651,7 @@ paths:
         - BearerAuth: []
       parameters:
         - { name: organism_id, in: query, schema: { type: string }, description: The organism whose fingerprint setting to change. }
-        - { name: ws, in: query, schema: { type: string }, description: With organism_id, the workspace. }
+        - { name: ws, in: query, schema: { type: string }, description: "With organism_id, the workspace." }
       requestBody:
         required: true
         content:
@@ -79065,7 +79065,7 @@ paths:
                             ip: { type: string }
                             host: { type: string }
                             ua: { type: string }
-                            credential: { type: string, description: Credential kind presented (none, bearer-jwt, pat, cookie, ...) }
+                            credential: { type: string, description: "Credential kind presented (none, bearer-jwt, pat, cookie, ...)" }
                             credential_digest: { type: string, description: 12-hex fingerprint of the credential; never the credential itself }
         '401':
           description: Not authenticated
@@ -79180,7 +79180,7 @@ paths:
                               properties:
                                 instrument: { type: string }
                                 currency: { type: string }
-                                charged: { type: number, description: Charged in total, captures included }
+                                charged: { type: number, description: "Charged in total, captures included" }
                                 held: { type: number, description: Authorized and not yet captured or released }
                                 refunded: { type: number }
                           sellers:
@@ -80724,7 +80724,7 @@ paths:
                               open_incidents: { type: object }
                               counters_since: { type: string, nullable: true }
                               uptime_seconds: { type: integer, nullable: true }
-                              log: { type: object, description: Whether the refusal log is on, its file, its size and its older generation's }
+                              log: { type: object, description: "Whether the refusal log is on, its file, its size and its older generation's" }
                               test_money_handler:
                                 type: object
                                 description: >-
@@ -83623,7 +83623,7 @@ paths:
                                 rel: { type: string }
                                 title: { type: string }
                                 href: { type: string }
-                          kinds: { type: object, additionalProperties: true, description: Every kind with its path, link relation, title and the reason it exists }
+                          kinds: { type: object, additionalProperties: true, description: "Every kind with its path, link relation, title and the reason it exists" }
                           documents: { type: object, additionalProperties: true, description: Owner only — the pages with their content }
         '404':
           $ref: '#/components/responses/NotFound'
@@ -83692,7 +83692,7 @@ paths:
       parameters:
         - { in: path, name: owner, required: true, schema: { type: string } }
         - { in: path, name: filename, required: true, schema: { type: string } }
-        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500 }, description: The newest N entries, newest first }
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500 }, description: "The newest N entries, newest first" }
         - { in: query, name: playtest, required: false, schema: { type: boolean }, description: Also open the app in a headless browser and report what it did }
         - { in: query, name: archive, required: false, schema: { type: string, pattern: '^\d{4}$' }, description: Read this year's archived entries instead of the active log }
       responses:
@@ -85178,7 +85178,7 @@ paths:
               type: object
               required: [username, password]
               properties:
-                username: { type: string, description: Bare owner name, full GHII (remote node = federated login), or the account's verified email address }
+                username: { type: string, description: "Bare owner name, full GHII (remote node = federated login), or the account's verified email address" }
                 password: { type: string }
                 totp_code: { type: string }
                 backup_code: { type: string }
@@ -85276,7 +85276,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          secret: { type: string, description: The Base32 key, for typing into the app }
+                          secret: { type: string, description: "The Base32 key, for typing into the app" }
                           otpauth_url: { type: string, description: 'The otpauth:// address the QR code contains' }
                           qr_data_url: { type: string, description: The QR code as a PNG data URL }
                           expires_at: { type: string, format: date-time, description: When the setup token ends }
@@ -86173,7 +86173,7 @@ paths:
                           audit:
                             type: object
                             properties:
-                              entries: { type: array, items: { type: object }, description: The newest rows, at most entry_limit }
+                              entries: { type: array, items: { type: object }, description: "The newest rows, at most entry_limit" }
                               total: { type: integer, description: Every row in the window }
                               period_days: { type: integer }
                               entry_limit: { type: integer }
@@ -86196,9 +86196,9 @@ paths:
                                     count: { type: integer }
                                     first: { type: string, format: date-time }
                                     last: { type: string, format: date-time }
-                                    keys: { type: array, items: { type: string }, description: Distinct keys, newest first, at most 20 }
+                                    keys: { type: array, items: { type: string }, description: "Distinct keys, newest first, at most 20" }
                                     key_count: { type: integer }
-                              group_total: { type: integer, description: Every group in the window, whatever group_limit returned }
+                              group_total: { type: integer, description: "Every group in the window, whatever group_limit returned" }
                               denied_total: { type: integer, description: Refused rows in the window }
                               denied_groups: { type: integer, description: Groups of refused rows }
                               manifest_denied: { type: integer, description: Refused rows that asked for a workspace manifest }
@@ -88140,10 +88140,10 @@ paths:
                                   type: object
                                   properties:
                                     toll: { type: integer, description: The pacing amount held for the provider and paid on delivery. }
-                                    base_price: { type: integer, deprecated: true, description: Deprecated mirror of toll, until 4.0.0. }
+                                    base_price: { type: integer, deprecated: true, description: "Deprecated mirror of toll, until 4.0.0." }
                                     deprecated: { $ref: '#/components/schemas/MorselPriceDeprecation' }
-                                    network_fee: { type: integer, description: Split between the nodes and the registry, part of it burned. }
-                                    total: { type: integer, description: toll plus network_fee, all the morsels the job holds. }
+                                    network_fee: { type: integer, description: "Split between the nodes and the registry, part of it burned." }
+                                    total: { type: integer, description: "toll plus network_fee, all the morsels the job holds." }
                                     in_escrow:
                                       type: integer
                                       description: >-
@@ -89684,7 +89684,7 @@ paths:
                                 title: { type: string }
                                 level: { type: string, enum: [public, link, signed-in, organism, named], description: 'named is one outside party the owner chose by name (a named share, a party holding a key).' }
                                 organism_id: { type: string, description: Present when level is organism. }
-                                url: { type: string, description: The address it is read at, when a stranger can open one. }
+                                url: { type: string, description: "The address it is read at, when a stranger can open one." }
                                 how_to_close: { type: string, description: 'The English sentence, for an AI. A page says the same from `close`.' }
                                 close:
                                   type: object
@@ -91077,7 +91077,7 @@ paths:
                         type: object
                         properties:
                           posted: { type: boolean }
-                          count: { type: integer, description: Messages now held on the board, at most 20. }
+                          count: { type: integer, description: "Messages now held on the board, at most 20." }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -91147,7 +91147,7 @@ paths:
                             you: { type: string }
                             agent_uses: { type: string }
                             app_shows: { type: string }
-                      problems: { type: array, items: { type: string }, description: Entries left out, and why. }
+                      problems: { type: array, items: { type: string }, description: "Entries left out, and why." }
   /v1/prompts/intent-pool:
     get:
       operationId: getIntentPoolPrompt
@@ -91835,7 +91835,7 @@ paths:
                                     node: { type: string }
                                     fetchedAt: { type: string, format: date-time, nullable: true, description: The last successful fetch. }
                                     lastAttemptAt: { type: string, format: date-time, nullable: true }
-                                    error: { type: string, nullable: true, description: The last attempt's error, or null when it succeeded. }
+                                    error: { type: string, nullable: true, description: "The last attempt's error, or null when it succeeded." }
                                     templates: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -91878,7 +91878,7 @@ paths:
                               properties:
                                 name: { type: string }
                                 gaii: { type: string }
-                                display_name: { type: string, nullable: true, description: The name the agent is shown by, when one was given. }
+                                display_name: { type: string, nullable: true, description: "The name the agent is shown by, when one was given." }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -92905,7 +92905,7 @@ paths:
       tags: [Auth]
       parameters:
         - { in: query, name: client_id, required: true, schema: { type: string } }
-        - { in: query, name: redirect_uri, required: false, schema: { type: string }, description: The redirect the request names; the client's first registered one when absent, as the authorize step does. }
+        - { in: query, name: redirect_uri, required: false, schema: { type: string }, description: "The redirect the request names; the client's first registered one when absent, as the authorize step does." }
       responses:
         '200':
           description: The checked facts.

@@ -19,10 +19,13 @@
  *   - parse with the `yaml` package (genuine syntax errors)
  *   - resolve every internal `$ref` (the break that stopped codegen)
  *   - flag unquoted flow-mapping scalars containing `?` (accepted here, rejected by YAML 1.1 parsers)
+ *   - flag a key with no value inside { } (a comma cut an unquoted description)
  *   - info.version equals the node's version in aimeat/package.json
  * @usage  pnpm check:openapi   (exits non-zero on a parse error, a dangling $ref, a portability trap,
- *   or an info.version that is not the node's)
+ *   a cut description, or an info.version that is not the node's)
  * @version-history
+ *   v1.2.0 — 2026-11-23 — Refuses a key with no value inside a flow mapping: an unquoted description
+ *     with a comma, read as half a sentence and a stray key (333 in 274 descriptions until this date).
  *   v1.1.0 — 2026-10-12 — info.version follows the node's version (Core 2026-11 ruling Q2); it had
  *     stood at 1.2.0 while the node moved to 3.26.1.
  *   v1.0.0 — 2026-07-26 — Initial guard, after both failure modes were found live on main.
@@ -118,6 +121,24 @@ visit(cst, {
     },
 });
 
+// ── 3b. A cut sentence: a key with no value inside { } ───────────────────────
+// `{ type: string, description: The host, never the whole address }` parses: the comma ends the
+// description at "The host", and "never the whole address" becomes a key with no value. The API
+// reference and every client read half a sentence. No key in a schema or a parameter is written
+// without a value, so any such key is the rest of a sentence. 333 of them, in 274 descriptions, were
+// in the file until 2026-11-23, when every one was quoted.
+const cutSentences: { line: number; key: string }[] = [];
+visit(cst, {
+    Pair(_key, pair, path) {
+        const parent = path[path.length - 1];
+        if (!isCollection(parent) || (parent as { flow?: boolean }).flow !== true) return;
+        const v = pair.value as { value?: unknown } | null;
+        if (v !== null && !(v && typeof v === 'object' && 'value' in v && v.value === null)) return;
+        const k = pair.key as { value?: unknown; range?: [number, number, number] } | null;
+        cutSentences.push({ line: k?.range ? lineOf(k.range[0]) : 0, key: String(k?.value ?? '') });
+    },
+});
+
 // ── Report ──────────────────────────────────────────────────────────────────
 let failed = false;
 
@@ -132,6 +153,13 @@ if (portability.length) {
     console.error(`✗ ${portability.length} unquoted flow scalar(s) containing "?" — this file parses here but`);
     console.error('  fails in PyYAML-based OpenAPI tooling. Quote the value:');
     for (const p of portability) console.error(`  openapi.yaml:${p.line}  ${p.text.slice(0, 110)}`);
+}
+
+if (cutSentences.length) {
+    failed = true;
+    console.error(`✗ ${cutSentences.length} key(s) with no value inside { }: a comma cut an unquoted description, and`);
+    console.error('  the words after it became a key. Put the whole description in double quotes:');
+    for (const c of cutSentences) console.error(`  openapi.yaml:${c.line}  "${c.key.slice(0, 100)}"`);
 }
 
 // ── 4. Does info.version follow the node? ───────────────────────────────────
