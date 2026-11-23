@@ -19396,6 +19396,7 @@ paths:
 
   /v1/settings/proactive:
     get:
+      x-aimeat-scope: { word: 'memory:read' }
       operationId: getSettingsProactive
       summary: Whether this account's AIs offer what else is possible here
       description: >-
@@ -19409,10 +19410,16 @@ paths:
         for: the two differ only on a node whose operator switched the feature off for everybody,
         which `available_here` reports.
 
-        This route is for the person and answers only to their session. Their AI changes the
-        setting through memory: the setting is an ordinary owner memory key (`settings.proactive`), so an AI asked to
-        stop suggesting things writes it there and then rather than sending somebody to a settings
-        page. `set_by` says which of the two acted, and is null when the record does not say.
+        The account holder reads this in their own session. An agent or an app of the same account
+        reads it too when it holds `memory:read`, the scope that already lets it read the setting's
+        own memory key (`settings.proactive`). What this answer adds to that key is `available_here`:
+        an agent that notifies or asks the person learns here that the operator switched the feature
+        off, which no memory key holds. A session from another node and an ecosystem app are refused.
+
+        Only the account holder changes the setting through this route. Their AI changes it through
+        memory: the setting is an ordinary owner memory key, so an AI asked to stop suggesting things
+        writes it there and then rather than sending somebody to a settings page. `set_by` says which
+        of the two acted, and is null when the record does not say.
       tags:
         - Portal
       security:
@@ -19421,7 +19428,9 @@ paths:
         '200':
           description: The setting, whether it is still the default, and who last changed it
         '403':
-          description: Not the account holder's own session
+          description: >-
+            The caller does not hold `memory:read` (the answer names the scope), or it is a session
+            from another node or an ecosystem app
     put:
       operationId: putSettingsProactive
       summary: Turn those ideas on or off

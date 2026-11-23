@@ -20,10 +20,17 @@
  *   v1.1.0 — 2026-10-12 — Test 10 calls the person-only route with the agent's own REST token (POST
  *     /v1/auth/token). It sent the MCP OAuth token, which node 4.0.0 refuses on every REST route with
  *     401 INVALID_TOKEN, so the 403 for an agent session the test names was never reached there.
+ *   v1.2.0 — 2026-11-23 — GET /v1/settings/proactive answers the owner's own agents and apps that
+ *     hold memory:read, so an agent can learn that the operator turned the feature off. Tests 8a to
+ *     8f and the agent's read in test 12 are new. Test 8a holds the route to the memory read of the
+ *     setting's own key, caller by caller. Test 8f is the chat path: the route as a capability an
+ *     agent looks up and runs with aimeat_invoke, over REST and over MCP. Test 10 asserted 403 for an agent's GET ("an agent cannot
+ *     use the person-only route"); that is no longer the designed behaviour, so it now asserts that
+ *     an agent's PUT is refused and changes nothing.
  */
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -66,7 +73,7 @@ async function jsonAt(base: string, path: string, opts: RequestInit = {}) {
     const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
-    return { status: res.status, body };
+    return { status: res.status, body, headers: res.headers };
 }
 const json = (path: string, opts: RequestInit = {}) => jsonAt(BASE, path, opts);
 
@@ -199,6 +206,76 @@ async function provision(base: string, stamp: number, tag: string) {
     return { ownerName, ownerToken, agentGaii, mcpToken: tok.body.access_token as string, agentToken: restTok.body.data.token as string };
 }
 
+/**
+ * One more agent of an existing owner, holding exactly `scopes`, with its own REST token. The owner
+ * sets the list as a person does on the agents page (PATCH /v1/agents/:name/scopes), and the token is
+ * made after that so it is the agent's current one.
+ */
+async function agentWithScopes(base: string, owner: { ownerName: string; ownerToken: string }, name: string, scopes: string[]): Promise<string> {
+    const agent = await jsonAt(base, '/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${owner.ownerToken}` },
+        body: JSON.stringify({ name, owner: owner.ownerName, capabilities: ['memory'], model: 'gpt-4o' }),
+    });
+    assert(agent.status === 201, `agent ${name} ${agent.status}: ${JSON.stringify(agent.body?.error)}`);
+    const set = await jsonAt(base, `/v1/agents/${encodeURIComponent(name)}/scopes`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${owner.ownerToken}` }, body: JSON.stringify({ scopes }),
+    });
+    assert(set.status === 200, `scopes of ${name} ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    const gaii = agent.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await jsonAt(base, '/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(agent.body.data.private_key, gaii + ts) }),
+    });
+    assert(tok.status === 200, `token of ${name} ${tok.status}: ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.token as string;
+}
+
+/**
+ * What one caller gets for the setting's own memory key through the memory read with owner_scope:
+ * the status, and whether the record came back. The route's read rule is held to this one.
+ */
+async function memoryReadOfSetting(base: string, token: string): Promise<{ status: number; seen: boolean; code: string | null }> {
+    const r = await jsonAt(base, '/v1/memory/settings.proactive?owner_scope=true&soft=1', auth(token));
+    return { status: r.status, seen: r.status === 200 && r.body?.data?.exists === true, code: r.body?.error?.code ?? null };
+}
+
+/** Where an app grant's code is sent in this suite. Nothing listens there: the code is read from the consent's answer. */
+const APP_REDIRECT = 'http://localhost:9913/proactive-callback';
+
+/**
+ * Publish a one-page app as `owner` on `base` and sign it in through the app-grant flow a browser
+ * uses (authorize, the owner's consent, the code exchange with PKCE). Answers the app's own token.
+ * A local copy of the purpose suites' shared app-grant helper: that helper reads the runner's node
+ * address, and this suite starts every node it talks to (test/run-e2e-plan.ts lists it as needing no
+ * runner node), as e2e-ai-jobs.ts and e2e-ai-input-reach.ts do. `base` has no default on purpose.
+ */
+async function appGrantToken(base: string, owner: { ownerName: string; ownerToken: string }, filename: string, scope: string): Promise<string> {
+    const html = '<!DOCTYPE html><html><body>proactive e2e</body></html>';
+    const pub = await jsonAt(base, '/v1/apps', auth(owner.ownerToken, {
+        method: 'POST',
+        body: JSON.stringify({ filename, content: Buffer.from(html).toString('base64'), name: `Proactive ${filename}`, description: 'proactive e2e', category: 'utility' }),
+    }));
+    assert(pub.status === 201, `publish ${filename} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({ app: `${owner.ownerName}/${filename}`, response_type: 'code', scope,
+        redirect_uri: APP_REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' });
+    const res = await fetch(`${base}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+    assert(!!m, `consent redirect expected for ${filename}, got ${res.status}`);
+    const con = await jsonAt(base, '/v1/app-grants/authorize-consent', auth(owner.ownerToken, {
+        method: 'POST', body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+    }));
+    assert(con.status === 200, `consent ${filename}: ${con.status} ${JSON.stringify(con.body?.error)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await jsonAt(base, '/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: APP_REDIRECT }),
+    });
+    assert(tok.body?.ok === true, `app token ${filename}: ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.access_token as string;
+}
+
 /** The instructions string a brand-new connection is served. */
 async function freshInstructions(base: string, token: string, path = '/v1/mcp'): Promise<string> {
     const rpc = mcpClient(base, path, () => token);
@@ -311,6 +388,116 @@ async function main() {
             assert(!text.includes(GUIDANCE_MARK), 'and the next connection is quiet');
         });
 
+        console.log('\nPhase 3b: who reads the setting');
+
+        // The callers of the first owner, by what each holds. The setting is OFF and set by an AI at
+        // this point (test 8), so an answer that is only the default cannot pass for the real one.
+        const readers: Record<string, string> = {};
+        /**
+         * Who the memory read shows the setting's own key to, and so who the route answers. An agent
+         * needs memory:read and nothing more: the key's visibility is `owner`, which a same-owner
+         * reader sees without memory:read-as-owner, and that word alone is not enough.
+         */
+        const SERVED: Record<string, boolean> = {
+            owner: true, wildcard: true, memoryRead: true, readAsOwner: true, appRead: true,
+            asOwnerOnly: false, noMemory: false, appNoMemory: false,
+        };
+
+        await test('8a. the route answers exactly the callers the memory read shows the key to', async () => {
+            readers.owner = me.ownerToken;
+            readers.wildcard = me.agentToken;
+            readers.memoryRead = await agentWithScopes(BASE, me, 'proactread', ['memory:read']);
+            readers.readAsOwner = await agentWithScopes(BASE, me, 'proactasowner', ['memory:read', 'memory:read-as-owner']);
+            readers.asOwnerOnly = await agentWithScopes(BASE, me, 'proactonlyas', ['memory:read-as-owner']);
+            readers.noMemory = await agentWithScopes(BASE, me, 'proactnomem', ['messages:send']);
+            readers.appRead = await appGrantToken(BASE, me, 'proactread.html', 'memory:read');
+            readers.appNoMemory = await appGrantToken(BASE, me, 'proactnomem.html', 'ai:use');
+
+            const wrong: string[] = [];
+            for (const [who, token] of Object.entries(readers)) {
+                const mem = await memoryReadOfSetting(BASE, token);
+                const route = await json('/v1/settings/proactive', auth(token));
+                // The control: the memory read is what this suite says it is. It holds on any route code.
+                if (mem.seen !== SERVED[who]) wrong.push(`${who}: the memory read shows the key ${mem.seen} (status ${mem.status}), expected ${SERVED[who]}`);
+                // The route follows it: 200 for a caller the memory read serves, 403 for one it does not.
+                const want = SERVED[who] ? 200 : 403;
+                if (route.status !== want) wrong.push(`${who}: the route answered ${route.status}, expected ${want}`);
+            }
+            assert(wrong.length === 0, `the route and the memory read disagree:\n      ${wrong.join('\n      ')}`);
+        });
+
+        await test('8b. the owner\'s agent gets the owner\'s own answer', async () => {
+            const mine = await json('/v1/settings/proactive', auth(me.ownerToken));
+            const agents = await json('/v1/settings/proactive', auth(readers.memoryRead!));
+            assert(agents.status === 200, `status ${agents.status}: ${JSON.stringify(agents.body?.error)}`);
+            for (const field of ['enabled', 'defaulted', 'owner_choice', 'available_here', 'set_by', 'set_at']) {
+                assert(agents.body.data[field] === mine.body.data[field],
+                    `${field}: the agent reads ${JSON.stringify(agents.body.data[field])}, the owner ${JSON.stringify(mine.body.data[field])}`);
+            }
+            assert(agents.body.data.enabled === false && agents.body.data.set_by === 'ai',
+                `the agent reads the real setting, not the default: ${JSON.stringify(agents.body.data)}`);
+        });
+
+        await test('8c. a caller without memory:read is refused, and the refusal names the word', async () => {
+            for (const who of ['noMemory', 'asOwnerOnly']) {
+                const r = await json('/v1/settings/proactive', auth(readers[who]!));
+                assert(r.status === 403, `${who}: expected 403, got ${r.status}`);
+                assert(r.body?.error?.code === 'SCOPE_DENIED', `${who}: the code is ${r.body?.error?.code}`);
+                const challenge = r.headers.get('www-authenticate') ?? '';
+                assert(challenge.includes('insufficient_scope') && challenge.includes('memory:read'),
+                    `${who}: the challenge names the missing word for a client: ${challenge}`);
+            }
+        });
+
+        await test('8d. another owner\'s agent reads its own owner\'s setting, never this one', async () => {
+            const theirs = await agentWithScopes(BASE, other, 'proactread', ['memory:read']);
+            const r = await json('/v1/settings/proactive', auth(theirs));
+            assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            assert(r.body.data.defaulted === true && r.body.data.enabled === true,
+                `the second owner never chose, and the first owner's off is not theirs: ${JSON.stringify(r.body.data)}`);
+        });
+
+        await test('8e. a request without a session is asked to sign in', async () => {
+            const r = await json('/v1/settings/proactive');
+            assert(r.status === 401, `expected 401, got ${r.status}`);
+        });
+
+        await test('8f. an agent in a chat reads it too: the route is a capability aimeat_invoke runs', async () => {
+            const CAP = 'route:GET /v1/settings/proactive';
+            const run = (token: string) => json('/v1/invoke', auth(token, { method: 'POST', body: JSON.stringify({ capability: CAP, input: {} }) }));
+
+            // What an agent that looks the capability up is told: the route, and the word it asks.
+            const listed = await json(`/v1/capabilities/node/${encodeURIComponent(CAP)}`);
+            assert(listed.status === 200, `the capability is listed: ${listed.status} ${JSON.stringify(listed.body?.error)}`);
+            const cap = listed.body.data.capability;
+            assert(cap.kind === 'route' && cap.method === 'GET' && cap.path === '/v1/settings/proactive', `the route: ${JSON.stringify(cap).slice(0, 200)}`);
+            assert(cap.permission?.word === 'memory:read', `it names the word an agent needs: ${JSON.stringify(cap).slice(0, 400)}`);
+
+            // Run through invoke, the route answers as it does directly: the same data for the agent it
+            // serves, the same refusal for the one it does not.
+            const direct = await json('/v1/settings/proactive', auth(readers.memoryRead!));
+            const via = await run(readers.memoryRead!);
+            assert(via.status === 200, `invoke admits the agent: ${via.status} ${JSON.stringify(via.body?.error)}`);
+            const got = via.body.data?.result;
+            assert(got?.enabled === direct.body.data.enabled && got?.available_here === direct.body.data.available_here && got?.set_by === 'ai',
+                `the same answer as the route: ${JSON.stringify(via.body.data).slice(0, 300)}`);
+            const refusedDirect = await json('/v1/settings/proactive', auth(readers.noMemory!));
+            const refusedVia = await run(readers.noMemory!);
+            assert(refusedVia.status === refusedDirect.status && refusedVia.body?.error?.code === refusedDirect.body?.error?.code,
+                `the same refusal as the route: invoke ${refusedVia.status} ${refusedVia.body?.error?.code}, route ${refusedDirect.status} ${refusedDirect.body?.error?.code}`);
+            assert(String(refusedVia.body?.error?.message).includes('memory:read'),
+                `the refusal through invoke is the route's own, naming its word: ${JSON.stringify(refusedVia.body?.error)}`);
+
+            // And over MCP, where a chat's AI is.
+            const rpc = mcpClient(BASE, '/v1/mcp', () => me.mcpToken);
+            await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'x', version: '1' } });
+            const { body } = await rpc('tools/call', { name: 'aimeat_invoke', arguments: { capability: CAP, input: {} } }, 13);
+            assert(body.result?.isError !== true, `aimeat_invoke failed: ${toolText(body).slice(0, 300)}`);
+            const out = JSON.parse(toolText(body));
+            assert(out.capability === CAP && out.result?.enabled === false && typeof out.result?.available_here === 'boolean',
+                `the chat's AI reads the mode: ${toolText(body).slice(0, 300)}`);
+        });
+
         console.log('\nPhase 4: refusals');
 
         await test('9. another owner cannot read this setting', async () => {
@@ -321,9 +508,17 @@ async function main() {
                 'the second owner sees their own untouched default, not the first owner\'s off');
         });
 
-        await test('10. an agent cannot use the person-only route', async () => {
-            const r = await json('/v1/settings/proactive', auth(me.agentToken));
-            assert(r.status === 403, `an agent session must be refused here, got ${r.status}`);
+        await test('10. an agent cannot change the setting through the route, whatever it holds', async () => {
+            // The write is the account holder's own step: it records `by: 'person'` without asking. An
+            // agent that holds every word still changes the setting only through the memory key, where
+            // it says who acted (test 8).
+            const r = await json('/v1/settings/proactive', auth(me.agentToken, {
+                method: 'PUT', body: JSON.stringify({ enabled: true }),
+            }));
+            assert(r.status === 403, `an agent's write must be refused here, got ${r.status}`);
+            const after = await json('/v1/settings/proactive', auth(me.ownerToken));
+            assert(after.body.data.enabled === false && after.body.data.set_by === 'ai',
+                `the refused write changed the setting: ${JSON.stringify(after.body.data)}`);
         });
 
         await test('11. a setting that is neither on nor off is refused', async () => {
@@ -343,6 +538,15 @@ async function main() {
             assert(r.body.data.enabled === false, 'nothing is on here');
             assert(r.body.data.owner_choice === true, 'though the account itself never asked for that');
             assert(r.body.data.available_here === false, 'and the surface can say why');
+
+            // An agent acting for the owner learns it too. No memory key holds the operator's switch,
+            // so without this read an agent that interrupts people cannot know it is off here.
+            const offAgent = await agentWithScopes(OFF_BASE, them, 'proactoffread', ['memory:read']);
+            const seen = await jsonAt(OFF_BASE, '/v1/settings/proactive', auth(offAgent));
+            assert(seen.status === 200, `the owner's agent reads the mode on this node: ${seen.status} ${JSON.stringify(seen.body?.error)}`);
+            assert(seen.body.data.available_here === false && seen.body.data.enabled === false,
+                `the agent sees that the operator turned it off: ${JSON.stringify(seen.body.data)}`);
+            assert(seen.body.data.owner_choice === true, 'and that the account itself did not');
 
             // Even an owner who explicitly turns it ON gets nothing: the operator's answer is final.
             const on = await jsonAt(OFF_BASE, '/v1/settings/proactive', auth(them.ownerToken, {

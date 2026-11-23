@@ -18,6 +18,11 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.9.0 — 2026-11-23 — GET /v1/settings/proactive refuses the visitor by the route's own check. The
+ *     route answers the account's own agents and apps that hold memory:read from this date, and this
+ *     visitor holds that word, so without services/proactive-mode.ts servesProactiveRead it would get
+ *     200 and the default of an account that is not on this node. The visitor got 403 before the
+ *     change too, from the person-only gate; the new case pins which check refuses now.
  *   v1.8.0 — 2026-10-24 — A memory record for 'members' refuses the visitor and admits a local account;
  *     a public record and a consent by name still admit the visitor (secaudit2026oct22,
  *     members-tier-admits-federated-visitor).
@@ -373,6 +378,21 @@ async function run() {
         assert(ownRekey.status === 200, `positive control: the namesake cannot rekey her own agent: ${ownRekey.status} ${JSON.stringify(ownRekey.body?.error)}`);
         const ownHome = await json('/v1/home/state', as(alice.token));
         assert(ownHome.status === 200, `positive control: the namesake's own home step: ${ownHome.status}`);
+    });
+
+    // GET /v1/settings/proactive answers the account's own agents and apps since 2026-11-23, so it is
+    // no longer behind the account holder's own session. A visitor is still refused, by what it is:
+    // its account is on another node, and the route would otherwise look up a local account that does
+    // not exist and answer the default (services/proactive-mode.ts servesProactiveRead).
+    await test('The proactive setting answers no visitor, and still answers the local account', async () => {
+        const visitor = await json('/v1/settings/proactive', as(fedToken));
+        assert(visitor.status === 403, `the proactive setting admitted the visitor: ${visitor.status} ${JSON.stringify(visitor.body?.data ?? visitor.body?.error).slice(0, 200)}`);
+        // This visitor holds memory:read, so the scope check lets it through and the refusal is the
+        // route's own: without it the answer would be 200 and the default of an account that is not here.
+        assert(visitor.body?.error?.code === 'ACCESS_DENIED' && String(visitor.body?.error?.message).includes('another node'),
+            `the refusal is the route's own, naming what the caller is: ${JSON.stringify(visitor.body?.error)}`);
+        const own = await json('/v1/settings/proactive', as(alice.token));
+        assert(own.status === 200, `positive control: the namesake's own setting: ${own.status} ${JSON.stringify(own.body?.error)}`);
     });
 
     // EVERY GET DOOR THE CONTRACT NAMES, NOT A HAND-PICKED LIST. Each September sweep named the doors

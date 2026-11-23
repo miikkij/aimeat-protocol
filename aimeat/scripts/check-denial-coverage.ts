@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-23 -- ROUTE_CEILING 395: PUT /v1/settings/proactive is refused to an agent of the owner
+ *     by test/e2e-proactive-mode.ts.
  *   2026-11-19 -- ROUTE_CEILING 396: DELETE /v1/ecosystem-apps/{app}, GET /v1/messages/broadcast/{id}
  *     and POST /v1/living/author are refused by the feature audit's suites, and GET
  *     /v1/organisms/{id}/workspace/share to an agent without memory:read by test/e2e-calendar-feed.ts.
@@ -146,7 +148,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 396;
+export const ROUTE_CEILING = 395;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

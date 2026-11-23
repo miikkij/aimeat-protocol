@@ -21,16 +21,20 @@
  *   stamps 'person'. An AI flipping it for them writes the key directly and is told to include
  *   `"by":"ai"` — the surface shows who acted. When the field is absent it stays null and the
  *   surface says nothing, because inventing an answer to "who did this" is worse than not having it.
- * @structure PROACTIVE_KEY · ProactiveMode · readProactiveMode · writeProactiveMode ·
- *   proactiveGuidance
+ * @structure PROACTIVE_KEY · ProactiveMode · servesProactiveRead · readProactiveMode ·
+ *   writeProactiveMode · proactiveGuidance
  * @usage
  *   import { readProactiveMode, proactiveGuidance } from '../services/proactive-mode.js';
  *   const guidance = await proactiveGuidance(storage, config, owner);
  * @version-history
+ *   v1.1.0 — 2026-11-23 — servesProactiveRead: the kinds of caller GET /v1/settings/proactive
+ *     answers once the route serves the owner's own agents and apps (a session from another node
+ *     and an ecosystem app are never served).
  *   v1.0.0 — 2026-08-22 — Initial: the mode, its key, and the guidance an equipped agent reads.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { CallerContext } from './caller-context.js';
 import { logger } from '../utils/logger.js';
 import { PROACTIVE_GUIDANCE_ID, PROACTIVE_GUIDANCE_TEXT } from './prompt-defaults/proactive.js';
 
@@ -55,6 +59,18 @@ export interface ProactiveMode {
 
 function ghiiOf(config: AimeatConfig, owner: string): string {
     return `${owner}@${config.nodeId}`;
+}
+
+/**
+ * Whether this kind of caller is served the account's proactive mode at all. The route asks for
+ * memory:read first, as the memory read of PROACTIVE_KEY does, and a scope cannot decide the rest.
+ * A session from another node is named by its home account, so the account it would read does not
+ * exist on this node. An ecosystem app is limited to its own namespace and the data areas the owner
+ * granted, and the memory read gives it none of the owner's own records (routes/memory/key.ts, the
+ * owner-scope read). Both are refused whatever scopes they hold.
+ */
+export function servesProactiveRead(caller: Pick<CallerContext, 'visitor' | 'kind'>): boolean {
+    return !caller.visitor && caller.kind !== 'ecosystem';
 }
 
 function setByOf(value: unknown): ProactiveSetBy {
