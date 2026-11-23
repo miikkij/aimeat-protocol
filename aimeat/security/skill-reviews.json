@@ -90,14 +90,14 @@
       "digest": "sha256:e0fed4d4d196dabda52701b4"
     },
     "node:aimeat-find-my-app": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/mcp/apps.ts",
         "aimeat/src/tool-catalog/definitions/apps-publish.ts",
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:695674ea4b4031f46d48d87c"
+      "digest": "sha256:302b9240fcd2438f731a95b4"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-15",
@@ -1046,7 +1046,7 @@
       "aimeat/src/mcp/apps.ts": "7b59c97a7c009bfc",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "b5f0f65b06e21760",
       "aimeat/src/services/usage/usage-read.ts": "7e2062c63eacffc3",
-      "aimeat/public/views/appcat.js": "ba193645415a5469"
+      "aimeat/public/views/appcat.js": "07854e20e3e0385c"
     },
     "node:aimeat-ask-someone-who-knows": {
       "aimeat/src/services/help/questions.ts": "48bd731a5654dfa6",
