@@ -1077,6 +1077,7 @@
       "/views/invite-accept.js": "/views/invite-accept.js",
       "/views/landing.js": "/views/landing.js",
       "/views/members.js": "/views/members.js",
+      "/views/file-open.js": "/views/file-open.js",
       "/views/oauth-round.js": "/views/oauth-round.js",
       "/views/portal-classic.js": "/views/portal-classic.js",
       "/views/portal-dev.js": "/views/portal-dev.js",
@@ -1286,6 +1287,9 @@
       // An AI label's "how this was made" record, read with the session on a signed-in-only node
       // (middleware/content-access-gate.ts). In data/spa-page-paths.ts too, or F5 is a 404.
       '/v1/provenance-open': () => import('/views/provenance-open.js'),
+      // A file link a new tab opened with no session: the file read with the session
+      // (middleware/file-open-redirect.ts). In data/spa-page-paths.ts too, or F5 is a 404.
+      '/v1/file-open': () => import('/views/file-open.js'),
       '/v1/aimeat-os':  () => import('/views/aimeat-os.js'),
       '/v1/classic':     () => import('/views/portal-classic.js'),
       '/v1/portfolio':   () => import('/views/portfolio.js'),

@@ -63482,7 +63482,9 @@ paths:
               description: '`<record_url>; rel="ai-provenance"`, when the file has a record.'
               schema: { type: string }
         '302':
-          description: A data package version's stored `odps.yaml` redirects to GET /v1/datapackages/{owner}/{name}/odps?version=…, the sheet projected from the version's audience.
+          description: |
+            A data package version's stored `odps.yaml` redirects to GET /v1/datapackages/{owner}/{name}/odps?version=…, the sheet projected from the version's audience.
+            A browser page navigation (Accept prefers text/html over JSON, no `mode`) with no credential, which would get 404 here (or 401 SIGN_IN_REQUIRED on a node set to signed-in content access), redirects to `/v1/file-open?path=<this address>`, the page that reads the file with the session; a new tab carries no session because the web app keeps it in local storage. An image, media or script request and an API caller keep the 404 or 401.
         '304':
           description: Not modified. The If-None-Match or If-Modified-Since validator still matches.
         '403':

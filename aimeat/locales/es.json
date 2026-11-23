@@ -7366,6 +7366,15 @@
     "failed": "No se pudo leer el registro. Inténtalo de nuevo dentro de un momento.",
     "errorTitle": "El registro no se abre"
   },
+  "fileOpen": {
+    "title": "Abrir un archivo",
+    "loading": "Abriendo el archivo…",
+    "missing": "La dirección no indica ningún archivo.",
+    "failed": "No se pudo leer el archivo. Inténtalo de nuevo dentro de un momento.",
+    "notFound": "El archivo no está aquí o no se ha compartido contigo. Pide a quien te envió el enlace que lo comparta contigo.",
+    "signIn": "Este archivo se abre solo para personas con sesión iniciada. Inicia sesión y el archivo se abrirá.",
+    "errorTitle": "El archivo no se abre"
+  },
   "appOpen": {
     "opening": "Abriendo la aplicación…",
     "loginTitle": "Inicia sesión para abrir esta aplicación",

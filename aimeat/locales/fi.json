@@ -8595,6 +8595,15 @@
     "failed": "Tietuetta ei voitu lukea. Yritä hetken päästä uudelleen.",
     "errorTitle": "Tietue ei aukea"
   },
+  "fileOpen": {
+    "title": "Tiedoston avaus",
+    "loading": "Avataan tiedostoa…",
+    "missing": "Osoitteessa ei ole tiedostoa.",
+    "failed": "Tiedostoa ei voitu lukea. Yritä hetken päästä uudelleen.",
+    "notFound": "Tiedostoa ei löydy, tai sitä ei ole jaettu sinulle. Pyydä linkin lähettäjää jakamaan se sinulle.",
+    "signIn": "Tiedosto aukeaa vain kirjautuneille. Kirjaudu sisään, niin tiedosto aukeaa.",
+    "errorTitle": "Tiedosto ei aukea"
+  },
   "appOpen": {
     "opening": "Avataan sovellusta…",
     "loginTitle": "Kirjaudu sisään avataksesi sovelluksen",

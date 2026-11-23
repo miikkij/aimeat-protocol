@@ -15,6 +15,8 @@
  *   Self-spawns its own node (the shared runner keeps the node open).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-browser
  * @version-history
+ *   v1.2.0 — 2026-11-23 — A file link: a browser goes to /v1/file-open, which reads the file with the
+ *     session; an image, a fetch, an API caller and the handle keep the 401, another account gets no handle.
  *   v1.1.0 — 2026-11-05 — An AI label's record link: a browser goes to /v1/provenance-open, which reads
  *     the record with the session; an API caller and a stranger keep the 401, another account the 404.
  *   v1.0.0 — 2026-10-19 — Initial.
@@ -229,6 +231,44 @@ async function main() {
             const read = await fetch(`${BASE}/v1/provenance/${recordId}`, { headers: { Accept: 'text/html', Authorization: `Bearer ${other}` } });
             const body = await read.text();
             assert(read.status === 404 && !body.includes('browser audit text') && !body.includes(owner), `another account read a private record: ${read.status}`);
+        });
+
+        const fileContent = `browser audit file ${Date.now()}`;
+        const fileAddress = `/v1/pub/${encodeURIComponent(`${owner}@${NODE_ID}`)}/${encodeURIComponent('audit/private-note.txt')}`;
+        await test('a file link opens for a signed-in person: the browser goes to the file page, which reads the file with the session', async () => {
+            // A link to a stored file (an AI's answer, a message) opens in a new tab, which carries no
+            // session, so the gate answered every signed-in person 401 (seen on an organisation node 2026-11-23).
+            const up = await fetch(`${BASE}/v1/storage`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ key: 'audit/private-note.txt', data: b64(fileContent), mime_type: 'text/plain', visibility: 'owner' }) });
+            assert(up.status === 201, `upload ${up.status}`);
+            const tab = await fetch(`${BASE}${fileAddress}`, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
+            const tabBody = await tab.text();
+            assert(tab.status === 302 && tab.headers.get('location') === `/v1/file-open?path=${encodeURIComponent(fileAddress)}`, `the tab: ${tab.status} ${tab.headers.get('location')} ${tabBody.slice(0, 120)}`);
+            assert(tab.headers.get('cache-control') === 'no-store', 'cacheable redirect');
+            const page = await browser(`/v1/file-open?path=${encodeURIComponent(fileAddress)}`);
+            assert(page.status === 200 && page.ct.includes('text/html'), `the file page: ${page.status} ${page.ct}`);
+            assert(!page.body.includes(fileContent), 'the shell carried the file');
+            const view = await browser('/views/file-open.js', '*/*');
+            assert(view.status === 200, `/views/file-open.js: ${view.status}`);
+            // What the page asks: the same address with the session for the handle, then the presigned
+            // address, which the gate leaves open because the token is its credential.
+            const handle = await fetch(`${BASE}${fileAddress}?mode=handle`, { headers: { Authorization: `Bearer ${token}` } });
+            const hj = await handle.json() as any;
+            assert(handle.status === 200 && typeof hj?.data?.download_url === 'string', `the handle with the session: ${handle.status}`);
+            const bytes = await browser(new URL(hj.data.download_url).pathname, PAGE_ACCEPT);
+            assert(bytes.status === 200 && bytes.body === fileContent, `the presigned address: ${bytes.status}`);
+        });
+
+        await test('FAILURE: the file stays closed to an image, a fetch and an API caller without a session, and another account reads nothing through the page', async () => {
+            for (const accept of ['image/avif,image/webp,image/png,*/*;q=0.8', '*/*', 'application/json']) {
+                const r = await browser(fileAddress, accept);
+                assert(refusedByGate(r), `Accept ${accept}: ${r.status}`);
+            }
+            assert(refusedByGate(await browser(`${fileAddress}?mode=handle`)), 'the handle took the redirect');
+            const other = (await registerOwner(BASE, `brwfile${Date.now() % 100000}`)).token;
+            const read = await fetch(`${BASE}${fileAddress}?mode=handle`, { headers: { Authorization: `Bearer ${other}` } });
+            const body = await read.text();
+            assert((read.status === 403 || read.status === 404) && !body.includes('download_url'), `another account got a handle: ${read.status}`);
         });
 
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

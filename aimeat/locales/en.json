@@ -7828,6 +7828,15 @@
     "failed": "The record could not be read. Try again in a moment.",
     "errorTitle": "The record does not open"
   },
+  "fileOpen": {
+    "title": "Open a file",
+    "loading": "Opening the file…",
+    "missing": "The address names no file.",
+    "failed": "The file could not be read. Try again in a moment.",
+    "notFound": "The file is not here, or it is not shared with you. Ask the person who sent the link to share it with you.",
+    "signIn": "This file opens for signed-in people. Sign in, and the file opens.",
+    "errorTitle": "The file does not open"
+  },
   "appOpen": {
     "opening": "Opening the app…",
     "loginTitle": "Sign in to open this app",

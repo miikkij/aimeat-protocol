@@ -16,6 +16,8 @@
  * @structure SPA_PAGE_PATHS
  * @usage import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
  * @version-history
+ *   v1.4.0 — 2026-11-23 — /v1/file-open, the page a file link opened in a new tab reaches when the tab
+ *     cannot read the file.
  *   v1.3.1 — 2026-11-22 — Comment only: the old /app-catalog.html beside /v1/appcat is removed.
  *   v1.3.0 — 2026-11-14 — /v1/secret-pickup and /v1/secret-deposit, the pages a secret share's link and
  *     a secret request's link open (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
@@ -85,6 +87,7 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/secret-pickup', // A secret share's pickup page: signed in, with a code, or opened on this device (SPA, ?share=; services/secret-shares/)
   '/v1/secret-deposit', // A secret request's deposit page, with the link's token after # or signed in (SPA, ?share=#t=; services/secret-shares/)
   '/v1/provenance-open', // An AI label's "how this was made" record, read with the session on a signed-in-only node (SPA, ?id=; middleware/content-access-gate.ts)
+  '/v1/file-open', // A file link a new tab opened with no session: the file read with the session (SPA, ?path=; middleware/file-open-redirect.ts)
   // The public dataset page /v1/dataset/{owner}/{name} is parameterized, so routes/portal.ts serves it
   // with its own head and the content access gate names it with a pattern of its own.
 ];

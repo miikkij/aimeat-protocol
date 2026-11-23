@@ -11,6 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-23 -- GET /v1/pub sends a browser navigation with no credential to /v1/file-open where it
+ *     answered 404, so a file link opened in a new tab reaches a signed-in person on an open node too
+ *     (middleware/file-open-redirect.ts).
  *   2026-11-21 -- GET /v1/pub answers a file held for its content risk marks as absent to another person's
  *     AI; GET /v1/storage/{key}?mode=inline carries content_risk (services/content/risk-read.ts).
  *   2026-11-08 -- GET and HEAD /v1/storage/{key} ask the labels a data package version keeps, as GET /v1/pub
@@ -188,6 +191,7 @@ import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { fileOpenRedirect } from '../middleware/file-open-redirect.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
@@ -490,11 +494,19 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Metadata first, and the bytes only after the access decision below. The authorization
         // inputs — visibility, groupId, workspaceRef — all live in the metadata, so a request that
         // ends in 403 or 404 no longer reads a 25 MB file on its way there.
-        const file = await storage.getStorageFileMeta(gaii, key);
-        if (!file) {
+        // A browser's new tab carries no session (middleware/file-open-redirect.ts). Where this route
+        // answers a caller with no credential 404, a page navigation goes to the open page instead,
+        // which reads the file with the session. Every such answer redirects alike, a missing file
+        // included, so the redirect tells a stranger no more than the 404 did; an <img>, a fetch and an
+        // API caller keep the 404.
+        const anonymousCaller = !req.auth?.sub || isAnonymousPrincipal(req.auth);
+        const openPage = anonymousCaller ? fileOpenRedirect(req) : null;
+        const absent = (): void => {
+            if (openPage) { res.setHeader('Cache-Control', 'no-store'); res.redirect(302, openPage); return; }
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-            return;
-        }
+        };
+        const file = await storage.getStorageFileMeta(gaii, key);
+        if (!file) { absent(); return; }
         // The classification reader (TARGET-082) runs once the access decision below has admitted the
         // caller, so an outsider writes no refusal row into the owner's classification audit log
         // (TARGET-082 review). A file the admitted caller may not see answers as absent.
@@ -539,7 +551,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         if (party !== 'none') { if (!(await party.charge())) return; party.served(); }
         if (pkg.kind === 'withdrawn') { res.status(410).json(error(config.nodeId, 'GONE', withdrawnMessage(key.split('/')[1], pkg.withdrawnAt))); return; }
         if (pkg.kind === 'open' && file.visibility !== 'public') {
-            if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
+            if (await hiddenFromCaller()) { absent(); return; }
             const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii;
             const prov = await markProvenance(res, file, !!req.auth?.sub && viewer === gaii);
             if (handleMode) { await sendHandle(viewer, prov); return; }
@@ -560,10 +572,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 visibility: 'public',
                 action: 'read',
             });
-            if (await hiddenFromCaller()) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-                return;
-            }
+            if (await hiddenFromCaller()) { absent(); return; }
             const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : 'anonymous';
             const prov = await markProvenance(res, file, viewer === gaii);
             // A caller with no credential gets the handle the owner's GAII would: it lives the owner's
@@ -612,7 +621,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // (routes/organisms/share-file-pass.ts). The file keeps its visibility.
         const sharedOn = req.query.share !== undefined ? await sharedPageAdmitsFile(organismHelpers(), { storage, config }, req, file, gaii, key) : null;
         if (sharedOn) {
-            if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
+            if (await hiddenFromCaller()) { absent(); return; }
             await markProvenance(res, file, false, sharedOn);
             res.setHeader('Cache-Control', 'private, max-age=300');
             if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
@@ -629,27 +638,21 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
         // Consent layer off → preserve the legacy existence-hiding behavior. An 'organism:<id>' file is
         // decided by membership, not consent, so it goes on to the guard either way.
-        if (!config.consentEnabled && !viaMailbox && !isOrganismVisibilityWord(file.visibility)) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-            return;
-        }
+        if (!config.consentEnabled && !viaMailbox && !isOrganismVisibilityWord(file.visibility)) { absent(); return; }
 
         // Same access decision + audit as memory, threading file.groupId (visibility:'group'),
         // file.workspaceRef + the accessor's sub/owner (visibility:'workspace' → canReadWorkspace).
         // An anonymous caller holding a matching grant can still be allowed (parity with the prior
         // behavior). The <img>-loadable path for a NON-public file is: the reader's app blob-fetches
         // /v1/pub with the reader's Bearer, and this decision gates it.
-        const isAnonymous = !req.auth?.sub || isAnonymousPrincipal(req.auth);
+        const isAnonymous = anonymousCaller;
         // Resolve to the GHII/GAII — an OWNER session carries a BARE `sub`, but consent grants and the
         // workspace manifest gate are keyed under the resolved identity (owner@node). Passing the bare
         // name would miss the grant. This mirrors what the workspace route (canReadWorkspace) resolves.
         const accessorGaii = isAnonymous ? 'anonymous' : resolveIdentity(req.auth!, config.nodeId);
         // 'members' = any authenticated node user; authorizeRead trusts the caller to reject the shared
         // anonymous identity, so gate it here — a token-less <img> must not read a members-only file.
-        if (file.visibility === 'members' && isAnonymous) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-            return;
-        }
+        if (file.visibility === 'members' && isAnonymous) { absent(); return; }
         // A signed-in caller that is not the account holder in person reads a file that is not
         // public only with storage:read, the word GET /v1/storage/{key} asks. An app grant resolves
         // to its owner's GHII, so authorizeRead answers `owner` for it, and an app granted one
@@ -675,10 +678,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         if (!result.allowed) {
             // Authenticated-but-denied → 403 (matches GET /v1/memory/:gaii/:key). Anonymous or
             // unauthenticated callers keep the 404 existence-hiding convention for file URLs.
-            if (isAnonymous) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-                return;
-            }
+            if (isAnonymous) { absent(); return; }
             if (result.reason === 'not_organism_member') {
                 res.status(403).json(error(config.nodeId, 'NOT_ORGANISM_MEMBER',
                     'This file is visible to the active members of one organism, and you are not one of them. Ask its owner to share it with you another way.'));
@@ -687,10 +687,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${result.reason}. You can change what you share in Profile → Consent.`));
             return;
         }
-        if (await hiddenFromCaller()) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-            return;
-        }
+        if (await hiddenFromCaller()) { absent(); return; }
 
         const consentedProv = await markProvenance(res, file, accessorGaii === gaii);
         if (handleMode) { await sendHandle(accessorGaii, consentedProv); return; }

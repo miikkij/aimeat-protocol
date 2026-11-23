@@ -45,6 +45,9 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.11 — 2026-11-23 — A browser navigation to GET /v1/pub/:owner/{*key} goes to /v1/file-open, the SPA
+ *     page that reads the file with the session (middleware/file-open-redirect.ts): a file link opened
+ *     in a new tab answered a signed-in person 401 (seen on an organisation node).
  *   v1.4.10 — 2026-11-22 — /app-catalog.html leaves the open shell files: the old page and its route
  *     are removed (the app catalogue is /v1/appcat, a SPA page address).
  *   v1.4.9 — 2026-11-14 — A secret share's card and deposit card (GET) and its pickup with a code and
@@ -98,6 +101,7 @@ import { mirroredPages } from '../data/public-pages.js';
 import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
 import { localAccountName } from '../utils/gaii.js';
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
+import { fileOpenRedirect } from './file-open-redirect.js';
 import type { Storage } from '../storage/interface.js';
 import {
   anyOpenings, isAppOpenToInternet, isOpenedIntakeRoute, isTargetOpenToInternet,
@@ -342,7 +346,8 @@ export function contentAccessGate(
     // The apex read of an app opened to the internet: the route serves it as on an open node
     // (routes/apps/read.ts asks appAudience, which answers anyone for it).
     if (openedAppRead(req.method, req.path)) return next();
-    const openPage = appOpenRedirect(req.method, req.path, req.headers.accept) ?? provenanceOpenRedirect(req);
+    const openPage = appOpenRedirect(req.method, req.path, req.headers.accept) ?? provenanceOpenRedirect(req)
+      ?? fileOpenRedirect(req);
     if (openPage) {
       res.setHeader('Cache-Control', 'no-store');
       res.redirect(302, openPage);

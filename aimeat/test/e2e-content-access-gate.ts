@@ -20,6 +20,7 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-11-23 — The shell test opens /v1/file-open, where a file link goes when its tab has no session.
  *   2026-11-22 — GET /app-catalog.html leaves the open routes with the old page.
  *   2026-11-06 — GET /index.html joins the open routes: a constant 301 to the front page (TARGET-091).
  *   2026-11-05 — The shell test opens /v1/provenance-open, where an AI label's record link goes.
@@ -279,7 +280,9 @@ async function main() {
                 // The links an AI hands a person, which a new tab opens with no session.
                 `/v1/appcat/structure?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/secret-allow?secret=x', '/v1/eco-capability-allow?app=x',
                 // Where an AI label's record link goes (middleware/content-access-gate.ts provenanceOpenRedirect).
-                '/v1/provenance-open?id=x']) {
+                '/v1/provenance-open?id=x',
+                // Where a file link goes when its tab carries no session (middleware/file-open-redirect.ts).
+                '/v1/file-open?path=x']) {
                 const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'text/html' } });
                 const body = await res.text();
                 assert(res.status === 200, `${path}: ${res.status}`);
