@@ -28,8 +28,9 @@
  *   machine. The waiting pnpm ready that gets the lock drives a BATCH (scripts/lib/ready-batch.ts): the
  *   commits of every session waiting at that moment, rebased in the order they asked onto main as it
  *   is then, tested together in a worktree of the batch's own (scripts/lib/ready-train.ts), and pushed
- *   as one. Every pnpm ready in the batch then reads its own verdict and ends: on main, or refused
- *   with the reason. A session that asks while a batch runs is in the next one.
+ *   as one. Every pnpm ready in the batch reads its own verdict and ends: on main, or refused with
+ *   the reason, which it hears the moment the batch knows it and not when the batch ends. A session
+ *   that asks while a batch runs is in the next one.
  *     Before 2026-11-23 nothing held runs apart: several sessions ran their sweeps side by side, every
  *   node start passed its 60 s limit, each run went red for timing and started again, and a change of
  *   words took a working day to reach main. One run at a time ended that and left N waiting sessions
@@ -154,20 +155,25 @@ async function driveBatch(queue: ReadyQueue, mine: QueueEntry, commonDir: string
     if (pgNote) say(pgNote);
 
     const cfg: TrainConfig = { commonDir, stateDir, sessionAimeat: process.cwd(), lanes, pgLanes, noMerge: mine.flags.noMerge, logFile, say };
-    let verdicts: Map<string, Verdict>;
+    // Each session is answered the moment its verdict is known (BatchDeps.settle), so a refused one
+    // does not wait for the others to be tested again.
+    const answered = new Set<string>();
+    const settle = (entry: QueueEntry, verdict: Verdict): void => {
+        if (answered.has(entry.id)) return;
+        answered.add(entry.id);
+        queue.settle(entry, verdict);
+    };
     const started = Date.now();
     try {
         await ensureTrain(cfg);
-        verdicts = await runBatch(trainDeps(cfg), entries, batch);
+        await runBatch({ ...trainDeps(cfg), settle }, entries, batch);
     } catch (e) {
-        // A fault of the run itself (the worktree, an install, git): nobody's commits were judged.
+        // A fault of the run itself (the worktree, an install, git): the sessions not answered yet were not judged.
         const reason = `the batch stopped on a fault of its own, not on anybody's commits: ${(e as Error).message.split('\n')[0]} Run pnpm ready again.`;
         say(reason);
-        verdicts = new Map(entries.map(entry => [entry.id, { status: 'refused', reason, batch, log: logFile } satisfies Verdict]));
+        for (const entry of entries) settle(entry, { status: 'refused', reason, batch, log: logFile });
     }
-    for (const entry of entries) {
-        queue.settle(entry, verdicts.get(entry.id) ?? { status: 'refused', reason: 'the batch gave no verdict for this entry; run pnpm ready again.', batch, log: logFile });
-    }
+    for (const entry of entries) settle(entry, { status: 'refused', reason: 'the batch gave no verdict for this entry; run pnpm ready again.', batch, log: logFile });
     say(`${batch}: ended after ${Math.max(1, Math.round((Date.now() - started) / 60_000))} min.`);
 }
 

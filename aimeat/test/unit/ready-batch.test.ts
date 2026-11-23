@@ -179,6 +179,21 @@ describe('runBatch', { timeout: 120_000 }, () => {
         expect(verdicts.get(alice.id)).toMatchObject({ with: ['cc-carol-c'] });
     });
 
+    it('tells a refused session its verdict before the rest of the batch is tested again', async () => {
+        const l = lab();
+        const alice = l.session('cc-alice-a', { 'alice.txt': 'a\n' });
+        const bob = l.session('cc-bob-b', { 'bob.txt': 'b\n', 'breaks-unit.txt': 'x\n' });
+        const told: string[] = [];
+        const deps = l.deps({ unit: has => has('breaks-unit.txt') }, {
+            settle: (entry, verdict) => { told.push(`${entry.session}:${verdict.status} after ${l.ran.unit} unit run(s)`); },
+        });
+        const verdicts = await runBatch(deps, [alice, bob], 'batch-1');
+
+        // Bob hears after the first unit run; Alice lands after the second, which is run without him.
+        expect(told).toEqual(['cc-bob-b:refused after 1 unit run(s)', 'cc-alice-a:landed after 2 unit run(s)']);
+        expect([alice, bob].map(e => statusOf(verdicts, e))).toEqual(['landed', 'refused']);
+    });
+
     it('refuses the later of two sessions when the red shows only with both', async () => {
         const l = lab();
         const alice = l.session('cc-alice-a', { 'half-one.txt': '1\n' });

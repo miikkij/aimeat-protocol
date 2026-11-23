@@ -35,6 +35,10 @@
  *   const verdicts = await runBatch(deps, queue.waiting().slice(0, MAX_BATCH), batchId);
  *   for (const e of entries) queue.settle(e, verdicts.get(e.id)!);
  * @version-history
+ *   v1.1.0 — 2026-11-23 — A verdict is handed to BatchDeps.settle when it is known, not when the batch
+ *     ends, and the driver's screen gets the first line of a reason, not the red step's output.
+ *   v1.0.1 — 2026-11-23 — The candidate is the rebase's upstream, so a session stacked on another
+ *     waiting session's commits applies.
  *   v1.0.0 — 2026-11-23 — Initial (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
  */
 import type { QueueEntry, Verdict } from './ready-queue.js';
@@ -72,6 +76,8 @@ export interface BatchDeps {
     log: (line: string) => void;
     /** The batch's log file, named in a refusal. */
     logFile: string | null;
+    /** Called with each verdict when it is known, before the batch ends: the queue answers that session then. */
+    settle?: (entry: QueueEntry, verdict: Verdict) => void;
 }
 
 const short = (sha: string): string => sha.slice(0, 9);
@@ -134,9 +140,17 @@ export function buildCandidate(deps: Pick<BatchDeps, 'git' | 'log'>, base: strin
  */
 export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: string): Promise<Map<string, Verdict>> {
     const verdicts = new Map<string, Verdict>();
+    // A verdict is told the moment it is known: a refused session starts on its fix while the rest of
+    // the batch is tested again, which with a sweep is an hour it would otherwise wait for nothing.
+    const decide = (entry: QueueEntry, verdict: Verdict): void => {
+        verdicts.set(entry.id, verdict);
+        deps.settle?.(entry, verdict);
+    };
+    const firstLine = (text: string): string => text.split('\n')[0];
     const refuse = (entry: QueueEntry, reason: string): void => {
-        verdicts.set(entry.id, { status: 'refused', reason, batch, log: deps.logFile });
-        deps.log(`refused: ${entry.session} (${short(entry.sha)}): ${reason}`);
+        decide(entry, { status: 'refused', reason, batch, log: deps.logFile });
+        // The whole reason, with the red step's last lines, is in the verdict; the driver's screen gets its first line.
+        deps.log(`refused: ${entry.session} (${short(entry.sha)}): ${firstLine(reason)}`);
     };
     let remaining = [...entries];
     const notes: string[] = [];
@@ -146,7 +160,7 @@ export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: st
         const candidate = buildCandidate(deps, base, remaining);
         for (const r of candidate.refused) refuse(r.entry, r.reason);
         for (const entry of candidate.present) {
-            verdicts.set(entry.id, { status: 'landed', main: base, batch, with: [], notes: ['its commits were on main already'] });
+            decide(entry, { status: 'landed', main: base, batch, with: [], notes: ['its commits were on main already'] });
             deps.log(`landed: ${entry.session} (${short(entry.sha)}): its commits were on main already`);
         }
         const tips = candidate.applied;
@@ -168,7 +182,7 @@ export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: st
                 break;
             }
             // Whose red it is: the first tip of the chain where the same red shows.
-            deps.log(`${stage.name} is red on the candidate (${result.detail}); looking for the session that brought it.`);
+            deps.log(`${stage.name} is red on the candidate (${firstLine(result.detail)}); looking for the session that brought it.`);
             for (const t of tips) {
                 await deps.checkout(t.tip);
                 if (await result.probe()) { blamed = t; break; }
@@ -180,7 +194,7 @@ export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: st
                 break;
             }
             // Green on every tip, the candidate's own included: the red did not repeat on the same tree.
-            const note = `[batch-flaky] ${stage.name} was red on the candidate (${result.detail}) and green when the same was run again on the same commit`;
+            const note = `[batch-flaky] ${stage.name} was red on the candidate (${firstLine(result.detail)}) and green when the same was run again on the same commit`;
             notes.push(note);
             deps.log(note);
         }
@@ -198,7 +212,7 @@ export async function runBatch(deps: BatchDeps, entries: QueueEntry[], batch: st
             break;
         }
         for (const t of tips) {
-            verdicts.set(t.entry.id, pushed.main === null
+            decide(t.entry, pushed.main === null
                 ? { status: 'green', batch, notes }
                 : { status: 'landed', main: pushed.main, batch, with: sessions.filter(s => s !== t.entry.session), notes });
         }
