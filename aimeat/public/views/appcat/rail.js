@@ -9,6 +9,9 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.7.0 — 2026-11-23 — "Something missing" carries a question mark that opens its explanation
+ *     (explain.concept.appGaps): what the rows count, that they are the person's own apps, and how a
+ *     row is fixed.
  *   v1.6.0 — 2026-11-20 — The organisation's app wall among the views, for a signed-in person (appcat/org-wall.js).
  *   v1.5.0 — 2026-10-31 — Jouni's review of v31 (K39): the fold reads "Ylläpito (kehittäjille)" with no
  *     number, and holds the state filters too.
@@ -26,8 +29,10 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { customerNode } from '/js/site.js';
 import { SideMenu, SideMenuTitle, SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuLabel, SideMenuMore } from '/components/SideMenu.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { x } from '/views/appcat/i18n.js';
 import { KUNTO_KEYS, STATES, tagCounts } from '/views/appcat/model.js';
+import { GAP_CONCEPT } from '/views/appcat/gaps.js';
 
 const html = htm.bind(h);
 const TAGS_FOLDED = 8;
@@ -76,7 +81,7 @@ export function CatRail(p) {
           ${folded ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(true)}>${x('rail.kuntoShow')}<//>` : html`
             ${STATES.map((s) => html`<${SideMenuItem} key=${s} tally active=${p.stateFilter === s}
               count=${p.states[s]} onClick=${() => p.onState(s)}>${x('state.' + s)}<//>`)}
-            ${kuntoRows.length ? html`<${SideMenuLabel}>${x('rail.kunto')}<//>` : null}
+            ${kuntoRows.length ? html`<${SideMenuLabel}>${x('rail.kunto')} <${HelpTip} term=${GAP_CONCEPT} label=${x('rail.kunto')} /><//>` : null}
             ${kuntoRows.map((k) => html`<${SideMenuItem} key=${k} tally active=${p.stateFilter === k}
               count=${p.states.kunto[k]} onClick=${() => p.onState(k)}>${x('kunto.' + k)}<//>`)}
             ${kuntoOpen ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(false)}>${x('rail.kuntoHide')}<//>` : null}`}

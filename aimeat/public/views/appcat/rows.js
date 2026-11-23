@@ -12,6 +12,8 @@
  * @structure AppRow({ sa, i, own, open, onToggle, starred }) · openApp(sa) · openDraft(sa)
  * @usage html`<${AppRow} key=${ref} sa=${sa} i=${i} own open=${ref === openRef} onToggle=${…} starred=${favs.has(ref)} />`
  * @version-history
+ *   v1.5.0 — 2026-11-23 — An own app's open row says what the app is missing, each condition with
+ *     its question mark, and offers the prompt that asks the person's AI to fix it (gaps.js GapLine).
  *   v1.4.0 — 2026-11-15 — Fork on another person's app behind an access code opens the fork dialog
  *     with the code field (needsCode), except for the operator, who forks without it (E2E audit M093).
  *   v1.3.0 — 2026-11-12 — An app that brings an agent is marked with the word (card.agent) in the
@@ -34,6 +36,7 @@ import { notice, openDetail, toggleFavourite, appRef } from '/views/appcat/store
 import { openDialog } from '/views/appcat/dialogs/host.js';
 import { openPublished, openDraftPreview, appUrl, isOperator } from '/views/appcat/dialogs/app-io.js';
 import { appName, appIcon, appDesc, shipsAgents, fmtKb, fmtDate, stateOf } from '/views/appcat/model.js';
+import { GapLine } from '/views/appcat/gaps.js';
 
 const html = htm.bind(h);
 
@@ -111,7 +114,7 @@ export function AppRow({ sa, i, own, open, onToggle, starred }) {
     <${Cell}>${state}<//>
     <${Num}>${opens}<//>
     <${Cell}>${open ? '↓' : '→'}<//>
-    ${open ? html`<${Panel}><${Actions}>${doors}<//><${Note} kind="hint">${line}<//><//>` : null}
+    ${open ? html`<${Panel}><${Actions}>${doors}<//><${Note} kind="hint">${line}<//>${own ? html`<${GapLine} sa=${sa} />` : null}<//>` : null}
   <//>`;
 }
 

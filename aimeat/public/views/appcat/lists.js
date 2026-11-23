@@ -11,6 +11,8 @@
  * @structure LibraryList(props) · RestingList(props) · CommunityList(props) · FavouritesList(props) · BuildingList(props) · CatFoot({ loaded, n })
  * @usage html`<${LibraryList} rows=${rows} total=${own.length} … />`
  * @version-history
+ *   v1.5.0 — 2026-11-23 — LibraryList takes `lead`: the explanation and the prompt action that stand
+ *     over the rows while a "Something missing" row filters the list (gaps.js).
  *   v1.4.0 — 2026-11-14 — RestingList: the own apps not used nor changed in six months, folded under
  *     Your apps; a search finds them in Your apps itself (wish-omien-sovellusten-l-yt-minen-kun-niit-on-satoja).
  *   v1.3.0 — 2026-11-01 — With no apps the foot leaves out its count sentence ("Jokainen 0
@@ -78,9 +80,10 @@ const Loading = () => html`<${EmptyState} start loading title=${x('loading.apps'
 /**
  * Your apps (F31–F43): `rows` are the filtered and ordered own apps, `total` how many the person has.
  * `closeOn`: the moments the old page drew the list anew (see useOpenRow).
- * @param {{ rows: any[], total: number, loaded: boolean, filtering: boolean, favourites: Set<string>, closeOn: any[] }} props
+ * `lead`: what stands over the rows while a "Something missing" row filters the list (gaps.js GapLead).
+ * @param {{ rows: any[], total: number, loaded: boolean, filtering: boolean, favourites: Set<string>, closeOn: any[], lead?: any }} props
  */
-export function LibraryList({ rows, total, loaded, filtering, favourites, closeOn }) {
+export function LibraryList({ rows, total, loaded, filtering, favourites, closeOn, lead }) {
   const [openRef, toggle] = useOpenRow(closeOn, rows);
   let body;
   if (!rows.length) {
@@ -96,7 +99,7 @@ export function LibraryList({ rows, total, loaded, filtering, favourites, closeO
     body = html`<${List} cols=${CUT} index>${rowsOf(rows, true, favourites, openRef, toggle)}<//>`;
   }
   // The headline shows only when the person has at least one app (F31).
-  if (total > 0) return html`<${PageSection} list spaced title=${x('sec.local')} count=${'· ' + total} foot=${x('list.foot')}>${body}<//>`;
+  if (total > 0) return html`<${PageSection} list spaced title=${x('sec.local')} count=${'· ' + total} foot=${x('list.foot')}>${lead || null}${body}<//>`;
   // With no apps at all there are no rows for the foot to explain.
   return html`<${PageSection} list plain foot=${loaded && total === 0 && !filtering ? null : x('list.foot')}>${body}<//>`;
 }

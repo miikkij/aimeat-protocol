@@ -20,6 +20,8 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.8.0 — 2026-11-23 — While a "Something missing" row filters Your apps, the list opens with
+ *     what that condition is and one action that copies a fix prompt for the apps shown (gaps.js).
  *   v1.7.0 — 2026-11-20 — ?view=org: the organisation's app wall (appcat/org-wall.js), with ?org=<organism id>.
  *   v1.6.0 — 2026-11-14 — Recently opened (recent.js) over Your apps, and the own apps not used nor
  *     changed in six months in a folded section under it (RestingList), while no search, tag or state
@@ -63,6 +65,7 @@ import { InstallCta } from '/components/InstallCta.js';
 import { installAs } from '/js/install-prompt.js';
 import { t } from '/js/i18n.js';
 import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts, resting } from '/views/appcat/model.js';
+import { GapLead } from '/views/appcat/gaps.js';
 
 const html = htm.bind(h);
 const VIEWS = ['library', 'community', 'favorites', 'building', 'org'];
@@ -240,7 +243,8 @@ export default function AppCat() {
       ${view === 'library' ? html`<${CortexBar} />` : null}
       ${view === 'library' && cat.me && !filtering && !stateFilter ? html`<${RecentList} rows=${cat.all} />` : null}
       ${view === 'library' ? html`<${StartedList} signedIn=${!!cat.me} />` : null}
-      ${view === 'library' ? html`<${LibraryList} rows=${activeRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
+      ${view === 'library' ? html`<${LibraryList} rows=${activeRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw}
+        lead=${KUNTO_KEYS.includes(stateFilter) ? html`<${GapLead} gap=${stateFilter} rows=${activeRows} />` : null} />` : null}
       ${view === 'library' ? html`<${RestingList} rows=${shownResting} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
       ${view === 'community' ? html`<${CommunityList} rows=${communityRows} order=${communityOrder} total=${cat.community.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'favorites' ? html`<${FavouritesList} rows=${favRows} order=${favOrder} total=${favRowsAll.length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
