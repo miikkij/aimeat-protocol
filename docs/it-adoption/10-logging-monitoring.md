@@ -1,6 +1,6 @@
 # 10 Logging and monitoring
 
-> Checked against AIMEAT node 4.3.1 (commit 6ad8b6759) on 2026-11-22. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 519bf074f) on 2026-11-23. Maintained with the code: see the README for how.
 
 This page is for the sysadmin and the SOC that must watch a node. It lists what the node records, where each record lives and how long it is kept, what the process log looks like and what it masks, how to get the records into a SIEM, which health and metrics endpoints exist, what to alert on, and which compliance reports the node keeps. The operator's own monitoring guide is [aimeat/docs/observability-guide.md](../../aimeat/docs/observability-guide.md); health checks are in [Production deployment](../operations/production-deployment.md#health-checks).
 

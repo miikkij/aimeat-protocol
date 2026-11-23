@@ -232,7 +232,7 @@
       "digest": "sha256:0a4d1012a0534ccdfc6295c4"
     },
     "12. Messages, contacts and email": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/routes/outbound.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts",
@@ -248,7 +248,7 @@
         "aimeat/src/services/message/broadcast.ts",
         "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:330c0d026824dfd7ad2975b4"
+      "digest": "sha256:6f94d245b6be091a4ed0251e"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-22",
@@ -400,12 +400,12 @@
       "digest": "sha256:8d964b7e88361dba3229efcb"
     },
     "22. Companion projects": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "python/aimeat-crewai/pyproject.toml",
         "python/aimeat-crewai/README.md"
       ],
-      "digest": "sha256:216b7ad007fe0d5d9c3bbc86"
+      "digest": "sha256:c98664f229c5db17661b244b"
     },
     "23. Removed, and what replaced it": {
       "reviewedOn": "2026-11-19",
@@ -461,7 +461,7 @@
       "holds": "blocks a redirect that points at an internal address"
     },
     {
-      "quote": "a socket address that carries the old `?token=` is refused whatever the setting says",
+      "quote": "a socket address that contains the old `?token=` is refused whatever the setting says",
       "holder": "aimeat/test/e2e-realtime-rooms.ts",
       "holds": "from 4.0.0 a query token is refused"
     },
@@ -815,9 +815,9 @@
       "aimeat/src/routes/connections.ts": "bed9376e4ed7948b",
       "aimeat/src/services/mailbox.ts": "31e9c3987f3dff3b",
       "aimeat/src/services/refinery/definition-ask.ts": "53b8b6449a3ffb4e",
-      "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
-      "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
-      "aimeat/src/services/refinery/runs.ts": "5f36c34ae12f0f1b",
+      "aimeat/src/services/refinery/message.ts": "06d362ede7aa00b4",
+      "aimeat/src/services/refinery/pipeline.ts": "b91d4de89456baf3",
+      "aimeat/src/services/refinery/runs.ts": "061c13b0a4b75717",
       "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
       "aimeat/src/services/refinery/scheduled-job.ts": "0edfa3c9bf212605",
       "aimeat/src/routes/unfurl.ts": "c44dfb0704c68d51",
@@ -1002,7 +1002,7 @@
     },
     "22. Companion projects": {
       "python/aimeat-crewai/pyproject.toml": "64a5d09c2d567d07",
-      "python/aimeat-crewai/README.md": "234d55b91300434b"
+      "python/aimeat-crewai/README.md": "02fbba48d9ed557e"
     },
     "23. Removed, and what replaced it": {
       "aimeat/src/services/deprecation.ts": "8ff8f23db768c19d"

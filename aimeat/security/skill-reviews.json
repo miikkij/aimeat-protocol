@@ -45,14 +45,14 @@
       "digest": "sha256:5200c4bf7e36704d9a8cd99f"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:be3cce912d96284a81ccdf1d"
+      "digest": "sha256:8a3a0aee0711948ce2a98111"
     },
     "node:aimeat-content-classes": {
       "reviewedOn": "2026-11-21",
@@ -438,7 +438,7 @@
       "digest": "sha256:3320478516ea39bda9c19a00"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -448,7 +448,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:1373af9effeb6d2c3b7b7b07"
+      "digest": "sha256:fd789c80ceb4ca0bd991aaab"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-22",
@@ -571,14 +571,14 @@
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         "aimeat/scripts/sandbox-machines.ts",
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/builder/app-prompt.ts"
       ],
-      "digest": "sha256:ce13e2cdeaf5e082e885206c",
+      "digest": "sha256:0267ba9f4b6fa6d5db308884",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -600,14 +600,14 @@
       "digest": "sha256:5154377cd3a3bf1ee1e37aca"
     },
     "project:aimeat-organism-records": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/services/exchange/odps.ts",
         "aimeat/src/static/sdk-libs/exchange/odps-completeness.js",
         "docs/known_gaps.md",
         ".claude/agents/note-writer.md"
       ],
-      "digest": "sha256:d523d09d7d85e218cd1ddaae",
+      "digest": "sha256:4b6c839260a290ae8b8b0ae3",
       "note": "Most of it is about records on the node and Lifecycle Central; the code it makes claims about is the ODPS descriptor and its completeness list (which fields a validator reports missing), the known-gaps rule, and the decision_record call it shares with agent note-writer. Its frontmatter also carries a review-by date."
     },
     "project:aimeat-pages-links": {
@@ -646,11 +646,11 @@
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:be48f4918a8883dc664cb457",
+      "digest": "sha256:c7fb03b9fbd3754f88b39a80",
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
@@ -671,29 +671,29 @@
       "note": "Its verification runs against the shared stub harness; its contract is node:aimeat-subagent-brief, which the lead pastes into the brief."
     },
     "agent:note-writer": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "docs/pitfalls.md",
         ".claude/skills/aimeat-organism-records/SKILL.md"
       ],
-      "digest": "sha256:f1ee41f83ccbb45633bcce77",
+      "digest": "sha256:c5bffc21a92f2412157eb97d",
       "note": "It writes to the node and to docs/pitfalls.md by the homes CLAUDE.md names. It restates the pitfalls header's rule for a new section, and the workspace ids and decision_record call that aimeat-organism-records also states."
     },
     "agent:ui-conformance": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:be48f4918a8883dc664cb457",
+      "digest": "sha256:c7fb03b9fbd3754f88b39a80",
       "note": "It checks pages on the session's sandbox node against the decisions the lead points it at."
     },
     "agent:ui-design-review": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         ".claude/rules/page-guidance.md"
       ],
-      "digest": "sha256:bffece6a93d91a80eb297e26",
+      "digest": "sha256:4094b519dba716201a6b67bb",
       "note": "It looks at pages on the session's sandbox node and judges them by the page-guidance rule and skill aimeat-design-language."
     }
   },
@@ -858,9 +858,9 @@
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198",
+      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
-      "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
+      "aimeat/scripts/ui-compare.ts": "5db1f174d56d40f5",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02"
     },
     "project:aimeat-imagery": {
@@ -875,8 +875,8 @@
     "project:aimeat-organism-records": {
       "aimeat/src/services/exchange/odps.ts": "d3f4b8365c760ab0",
       "aimeat/src/static/sdk-libs/exchange/odps-completeness.js": "c6242c9fcfdbc5fc",
-      "docs/known_gaps.md": "e2aeac3895e44b32",
-      ".claude/agents/note-writer.md": "14642ac19048c31a"
+      "docs/known_gaps.md": "7ff5346c65df2171",
+      ".claude/agents/note-writer.md": "65f8efe63a7a0b33"
     },
     "project:aimeat-pages-links": {
       "aimeat/src/routes/organisms/workspace-ops.ts": "5c0b9f1f380f2c3b"
@@ -916,10 +916,10 @@
       "aimeat/src/services/ai-jobs/ext-capability.ts": "5160116944d221c5"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
-      "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
+      "aimeat/src/services/refinery/pipeline.ts": "b91d4de89456baf3",
+      "aimeat/src/services/refinery/message.ts": "06d362ede7aa00b4",
       "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
-      "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
+      "aimeat/src/data/refinery-classes.ts": "e51feef783760168"
     },
     "node:aimeat-guided-journey": {
       "aimeat/src/services/journey-state.ts": "c50367fb9a2a399b",
@@ -984,7 +984,7 @@
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/connect-tunnel/push.ts": "b828b403c0ce83a5",
       "aimeat/src/services/workspace-rows/row-service.ts": "d11d68697a4264cd",
-      "aimeat/src/services/refinery/pipeline.ts": "717c2d366eba5792",
+      "aimeat/src/services/refinery/pipeline.ts": "b91d4de89456baf3",
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61"
     },
     "node:aimeat-html-page": {
@@ -1060,7 +1060,7 @@
       "aimeat/test/run-e2e-ci.ts": "9bcb11bb660abce6"
     },
     "agent:browser-verifier": {
-      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198"
+      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "06be512fde3bde50",
@@ -1070,15 +1070,15 @@
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
     },
     "agent:note-writer": {
-      "docs/pitfalls.md": "388b0159f0162961",
+      "docs/pitfalls.md": "2c304ca1c628b66e",
       ".claude/skills/aimeat-organism-records/SKILL.md": "13283f127034ab15"
     },
     "agent:ui-conformance": {
-      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198"
+      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21"
     },
     "agent:ui-design-review": {
-      "aimeat/scripts/sandbox.ts": "c10876b1bf2ae198",
-      ".claude/rules/page-guidance.md": "2d641d98bbc4a1e5"
+      "aimeat/scripts/sandbox.ts": "89a20b63d8d6de21",
+      ".claude/rules/page-guidance.md": "72c61fac8b14df0c"
     },
     "node:aimeat-goal-recipes": {
       "aimeat/src/tool-catalog/definitions/goals.ts": "15966fd2c695c2ed",
