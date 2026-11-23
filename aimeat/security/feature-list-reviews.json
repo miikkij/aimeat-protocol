@@ -89,7 +89,7 @@
       "digest": "sha256:3881a3a9d7ca543d17d470eb"
     },
     "5. Memory, files and search": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-23",
       "watches": [
         "aimeat/src/routes/memory.ts",
         "aimeat/src/routes/memory/history.ts",
@@ -103,7 +103,7 @@
         "aimeat/src/routes/content.ts",
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:15bc76fc51d8c31a9c71e0fd"
+      "digest": "sha256:4610951cc82a67fd257b52dc"
     },
     "6. Organisms, workspaces and knowledge": {
       "reviewedOn": "2026-11-22",
@@ -628,7 +628,7 @@
       "aimeat/src/routes/memory.ts": "7f04e5dd4346b09f",
       "aimeat/src/routes/memory/history.ts": "2f1601e58a86e606",
       "aimeat/src/routes/memory-hands.ts": "f1a6339a62d0a7d3",
-      "aimeat/src/routes/storage-files.ts": "f27b9394ed2b4f87",
+      "aimeat/src/routes/storage-files.ts": "1537a9981a819a71",
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "68d428753b656d0e",
       "aimeat/src/services/memory-bin-sweep.ts": "d6e51fe4277e7639",
       "aimeat/src/services/schema-lock-rule.ts": "cdd24287062eb450",

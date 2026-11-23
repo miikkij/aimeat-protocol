@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-23 -- e2e-file-open-link.ts joins the list (not the guard tier): a file link opened in a new
+ *     tab with no session goes to /v1/file-open.
  *   2026-11-21 -- e2e-workspace-write-role.ts joins the list (not the guard tier): a record space's
  *     writeRole holds on every write path, on memory and row spaces alike (ruling 2026-11-21).
  *   2026-11-21 -- e2e-workspace-read-ambiguous.ts joins the list (not the guard tier): an id two spaces
@@ -1898,6 +1900,8 @@ const ALL_SUITES = [
     'test/e2e-presigned-meta.ts',
     'test/e2e-memory-file-presigned.ts',
     'test/e2e-storage-visibility.ts',
+    // A file link opened in a new tab (no session) goes to /v1/file-open (middleware/file-open-redirect.ts).
+    'test/e2e-file-open-link.ts',
     // Visibility 'organism:<id>' on memory records and stored files: members read, others refused.
     'test/e2e-audience-memory-files.ts',
     'test/e2e-subdomains.ts',

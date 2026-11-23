@@ -6,9 +6,6 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
- *   2026-11-23 — Tests 40l-40m: a page navigation with no credential to a file that is not public goes to
- *     /v1/file-open, a missing file alike; an image, a fetch, an API call and the handle keep the 404,
- *     and a request with a credential and a public file are served as before.
  *   2026-11-15 — Audit L118: test 54b takes storage:write back mid-upload and the next chunk is refused.
  *   2026-11-04 — Tests 40e-40k: a group file with no group id is refused on every upload route and on
  *     both visibility routes, and a file that has a group goes private and back with it. 40e-40j are
@@ -1116,50 +1113,6 @@ await test('40d. The owner\'s own agent gets the members file → 200', async ()
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
     assert(res.status === 200, `the uploader was refused their own members file, got ${res.status}`);
-});
-
-// ── A file link opened in a new tab ──
-//
-// The web app keeps the session in localStorage, so a link to a file that is not public, opened in a
-// new tab, carried no credential and answered a signed-in person 404 (seen on an organisation node
-// 2026-11-23). A page navigation with no credential now goes to /v1/file-open, which reads the file
-// with the session (middleware/file-open-redirect.ts); 40l was red before the change (404).
-const PAGE_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
-const membersFileAddress = `/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(membersFileKey)}`;
-
-await test('40l. A new tab on the members file goes to the file page, which reads it with the session', async () => {
-    const tab = await rawFetch(membersFileAddress, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
-    assert(tab.status === 302, `the new tab got ${tab.status}, not the file page`);
-    assert(tab.headers.get('location') === `/v1/file-open?path=${encodeURIComponent(membersFileAddress)}`, `location: ${tab.headers.get('location')}`);
-    assert(tab.headers.get('cache-control') === 'no-store', `cacheable redirect: ${tab.headers.get('cache-control')}`);
-    const page = await rawFetch(`/v1/file-open?path=${encodeURIComponent(membersFileAddress)}`, { headers: { Accept: PAGE_ACCEPT } });
-    const pageBody = await page.text();
-    assert(page.status === 200 && (page.headers.get('content-type') ?? '').includes('text/html'), `the file page: ${page.status}`);
-    assert(!pageBody.includes(testContent), 'the shell carried the file');
-    // What the page asks: the same address with the session, for the handle, then the presigned address.
-    const { status, body } = await json(`${membersFileAddress}?mode=handle`, { headers: { Authorization: `Bearer ${agentCToken}` } });
-    assert(status === 200 && typeof body.data?.download_url === 'string', `the handle with the session: ${status}`);
-    const bytes = await rawFetch(new URL(body.data.download_url).pathname, { headers: { Accept: PAGE_ACCEPT } });
-    assert(bytes.status === 200 && await bytes.text() === testContent, `the presigned address: ${bytes.status}`);
-});
-
-await test('40m. FAILURE: an image, a fetch and an API call keep the 404, a missing file redirects alike, a signed-in tab and a public file are served', async () => {
-    for (const accept of ['image/avif,image/webp,image/png,*/*;q=0.8', '*/*', 'application/json']) {
-        const r = await rawFetch(membersFileAddress, { redirect: 'manual', headers: { Accept: accept } });
-        assert(r.status === 404, `Accept ${accept}: ${r.status}`);
-    }
-    const handle = await rawFetch(`${membersFileAddress}?mode=handle`, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
-    assert(handle.status === 404, `the handle without a session: ${handle.status}`);
-    // A stranger learns nothing more than from the 404: a file that does not exist redirects the same way.
-    const missing = `/v1/pub/${encodeURIComponent(agentAGaii)}/no-such-file-${Date.now()}`;
-    const gone = await rawFetch(missing, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
-    assert(gone.status === 302 && gone.headers.get('location') === `/v1/file-open?path=${encodeURIComponent(missing)}`, `a missing file: ${gone.status}`);
-    const signedIn = await rawFetch(membersFileAddress, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT, Authorization: `Bearer ${agentCToken}` } });
-    assert(signedIn.status === 200, `a request with a credential was redirected: ${signedIn.status}`);
-    const pub = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(publicKey)}`, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
-    assert(pub.status === 200 && await pub.text() === testContent, `a public file in a new tab: ${pub.status}`);
-    // Another account's read through the page is the route's decision; e2e-content-access-browser asks
-    // it. Not asked here: a denied read is audited, and test 41 asserts no entry for this suite's files.
 });
 
 await test('41. Presigned download (allowed read) is NOT audited', async () => {
