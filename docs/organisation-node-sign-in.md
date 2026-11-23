@@ -137,7 +137,7 @@ username, and the address is confirmed here like any other. Casdoor has the same
 - **Other sign-in providers.** The tenant allowlist gates Entra only. If Google or Casdoor is also
   enabled, that is a second sign-in method with its own answer to "who may sign in", and under mode
   `oauth` it creates accounts too. Turn them off on an organisation node.
-- **Guest accounts in your own directory.** A guest invited into your tenant carries YOUR `tid`, so
+- **Guest accounts in your own directory.** A guest invited into your tenant has YOUR `tid`, so
   they pass the gate. Anyone your Entra admins invite as a guest can sign in here. That is often
   what you want, and it should be a decision rather than a surprise.
 - **Invitations.** Under `oauth` and `invite`, any member of the node can mint an invitation and the
@@ -160,12 +160,12 @@ the node serve nothing to anyone who is not signed in to one of its own accounts
 
 - Every route outside a short list answers 401 `SIGN_IN_REQUIRED`. The list is what signing in,
   registering, invitations, MCP and OAuth, device authorization and the app-grant steps need, plus
-  routes that carry a credential of their own (download tokens, unsubscribe links, signed
+  routes that use a credential of their own (download tokens, unsubscribe links, signed
   federation messages) and the node's own description for machines. It is `OPEN_ROUTES` in
   `aimeat/src/middleware/content-access-gate.ts`, each entry with its reason, and
   `test/e2e-content-access-gate.ts` calls every route the code declares to prove the rest refuse.
-- The pages still load (a browser keeps its session in its own storage, so a page load carries no
-  credential), but they carry no content: the shell drops the node's apps, members and portfolios,
+- The pages still load (a browser keeps its session in its own storage, so a page load sends no
+  credential), but they show no content: the shell drops the node's apps, members and portfolios,
   and the API calls behind the page are refused until the person signs in.
 - Apps open only after a sign-in. A browser that opens an app without a session is sent to
   `/v1/app-open`, signs in there, and comes back to the app. An owner can narrow an app further to
@@ -179,7 +179,7 @@ the node serve nothing to anyone who is not signed in to one of its own accounts
 - A visitor signed in on another node is not an account here and gets the same 401.
 - Something made public from now on is saved for the signed-in accounts instead. A memory record,
   a stored file, a user skill, a package, a knowledge package or one of its entries and a data
-  package are saved at `members`, and a workspace link at `account`. The answer carries one
+  package are saved at `members`, and a workspace link at `account`. The answer contains one
   warning, `PUBLIC_IS_SIGNED_IN_HERE`, in `warnings` (on MCP in the result text, not as an error).
   This also applies to a starting level of public (`AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY`,
   `AIMEAT_DEFAULT_SHARE_ACCESS`, `AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY`). No publish request is
@@ -265,7 +265,7 @@ sensitive a piece of content is. On a company node it also limits who may see th
    a password, an IBAN or an e-mail address. You change the classifications and the rules on the
    admin Security page, with `GET` and `PUT /v1/classification/policy` and `level: "node"`, or with
    `aimeat_classification` (`policy_get`, `policy_set`).
-3. *Classify the containers.* An organism, a workspace, a board and an app can carry a
+3. *Classify the containers.* An organism, a workspace, a board and an app can have a
    classification, and everything inside it is classified at least that high. The organism's creator
    or an admin sets it on an organism or a workspace, and the owner sets it on a board or an app:
    `PUT /v1/classification/label` with `kind` `organism`, `workspace`, `board` or `app` (and
@@ -321,7 +321,7 @@ as an **SSO connection** — a record an operator manages at runtime, in the adm
 Organisation sign-in tab, over `/v1/admin/sso/connections`, or through the `aimeat_admin_sso_*`
 tools from a chat.
 
-One connection carries one organisation: its email domains, an optional organism its people join
+One connection is for one organisation: its email domains, an optional organism its people join
 on arrival, the SAML half (read from the IdP's metadata, by URL or pasted XML) and the SCIM half
 (a provisioning token shown once, hash stored). A node for one company creates one connection;
 a shared node creates one per customer, and marks them `hidden` so the public sign-in modal does
@@ -329,7 +329,7 @@ not publish the customer list.
 
 The setup itself is a five-step playbook in the admin tab, and every step shows what the node has
 actually SEEN — metadata read, a real sign-in through, the directory calling the SCIM endpoint —
-rather than what was configured. The tab also carries Entra and Okta walkthroughs and a copyable
+rather than what was configured. The tab also has Entra and Okta walkthroughs and a copyable
 brief for the operator's own AI. Two runtime switches govern the endpoints:
 
 - `sso.enabled` (`AIMEAT_SSO_ENABLED`, default false) — the public endpoints (SAML login, ACS, SCIM,
@@ -383,7 +383,7 @@ integration, same two values, metadata address from the Sign On tab.
 
 One implementation detail worth recording, because it looks like it should be a problem. A
 multi-tenant Entra app discovers its metadata at the `organizations` authority, whose discovery
-document carries the literal issuer `https://login.microsoftonline.com/{tenantid}/v2.0`. The token's
+document contains the literal issuer `https://login.microsoftonline.com/{tenantid}/v2.0`. The token's
 own `iss` names the real tenant, so a strict OIDC client would reject every sign-in. openid-client
 v6 recognises the Entra origin and substitutes the token's `tid` when it validates `iss`, which is
 why the generic OIDC client here needs no Entra special case.

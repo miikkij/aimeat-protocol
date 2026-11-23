@@ -75,7 +75,7 @@ A stream sets `geo`, the precision it keeps a place at: `off` (the default), `co
 headers the reverse proxy sets, and the node keeps no address. Each day gets `countries` (an ISO
 3166 two-letter code, or `ZZ` when the place could not be told) and, at `region` or `city`,
 `places`, whose keys (`country|region|city`) point into the month's `places` map. A city place
-carries `lat` and `lon` rounded to one decimal. A month keeps at most 300 places; a new place after
+has `lat` and `lon` rounded to one decimal. A month keeps at most 300 places; a new place after
 that is not counted as a place, and `placesTruncated` turns true.
 
 The report (`GET /v1/signals/streams/{streamId}/report`) takes a month window (`from`, `to`) or a
@@ -94,7 +94,7 @@ hold budget forever.
 
 ## Who opened it, without the node learning who
 
-A hit may carry a `subject`: an opaque token the SENDER minted and only the sender can map back to a
+A hit may include a `subject`: an opaque token the SENDER minted and only the sender can map back to a
 person. The node counts per token and stores no address, no name and no IP. So "who opened this" is
 answerable by the person who sent it, and by nobody else, and the answer never becomes data this
 node holds about a stranger. A stream can turn the per-subject roll-up off (`perSubject: false`) and
@@ -102,7 +102,7 @@ keep the totals.
 
 ## What each number is worth
 
-Carried in the report payload itself (`reading`), not left to whoever renders it, because a number
+Given in the report payload itself (`reading`), not left to whoever renders it, because a number
 that is passed on without its meaning gets repeated to a customer as something it is not.
 
 - **A click is an act.** Somebody chose the link. Known mail scanners are counted as machines.

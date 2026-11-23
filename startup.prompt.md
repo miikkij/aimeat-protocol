@@ -26,7 +26,7 @@ already hold `aimeat_*` tools against a running node, skip to Step 6 and Step 7.
 and `docs/AIMEAT-RFC-v4.0-Platform-full.md` with `docs/AIMEAT-RFC-v4.0-errata.md`, kept as history; and
 the API contract `openapi.yaml`) and its **reference node** in `aimeat/`, a Node.js 24, TypeScript and
 Express 5 server. AIMEAT (AI Memory Exchange and Action Transfer) keeps a person's knowledge, agents
-and apps on a node they own and lets them work with it from the AI they already use. It carries
+and apps on a node they own and lets them work with it from the AI they already use. It provides
 persistent identity for people, agents and apps, consent-governed memory, organisms and workspaces
 for sharing, apps and extensions, federation between nodes, and an MCP server. Plain HTTP and JSON.
 
@@ -258,7 +258,7 @@ and pastes the answer back.
 Once a tool is connected, the person works from their chat. Suggest they ask it what it can do in
 AIMEAT; the connected AI reads `aimeat_handbook_get` and answers for this node.
 
-- **Remember and share.** Tell the AI to remember something, and it lands in their own memory on
+- **Remember and share.** Tell the AI to remember something, and it is stored in their own memory on
   the node, readable from every connected tool. Organisms and workspaces share knowledge with other
   people and their agents, on the person's consent.
 - **Build apps.** Describe an app to the connected AI. It reads the node's instructions
@@ -287,7 +287,7 @@ When the node is up and at least one tool is connected, summarize what is runnin
   libraries and cortex, never straight to `ext:`.
 - **Morsels pace; they are not money.** The owner's GHII holds one morsel balance, and agents act
   on it in the owner's name; agents have no balance of their own. Morsels pace how much agents push
-  into the store, so what lands is refined. An offer can also carry a money price, paid on separate
+  into the store, so what reaches it is refined. An offer can also have a money price, paid on separate
   payment rails. A morsel is never a price.
 - **The prompt route** is for AIs that cannot connect over MCP: the page composes a prompt, the
   person runs it in their own chat and pastes the result back. It is free and works with any AI.

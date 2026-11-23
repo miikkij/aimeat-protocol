@@ -126,6 +126,6 @@ Ask to add these once their request bodies are curated against the spec.
 ## Constraints (read these)
 
 - **10-second ceiling.** AIMEAT aborts the webhook at 10s, so only fast Dify workflows fit the synchronous capability path. `DIFY_TIMEOUT_MS` keeps the shim under that. Long workflows belong on the async work/escrow queue, not a capability.
-- **No auth from AIMEAT.** The webhook carries only `X-AIMEAT-Node` + `X-AIMEAT-Timestamp` (no bearer). Protect the shim by **network isolation**; the node-id/timestamp checks are advisory; the `?key=` secret is only safe for **non-public** capabilities (a public capability's record exposes its `webhookUrl`).
+- **No auth from AIMEAT.** The webhook sends only `X-AIMEAT-Node` + `X-AIMEAT-Timestamp` (no bearer). Protect the shim by **network isolation**; the node-id/timestamp checks are advisory; the `?key=` secret is only safe for **non-public** capabilities (a public capability's record exposes its `webhookUrl`).
 - **SSRF.** Loopback/private shim hosts require `AIMEAT_DEV_MODE=true` on the node. Production shim must be on a node-reachable host.
 - **Production node config.** Use a real domain allowlist (`AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST=bridge.yourhost`) instead of `open`.

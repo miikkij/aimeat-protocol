@@ -23,7 +23,7 @@ JetBrains Mono vendored 2026-07-25 for the AIMEAT theme system, Archivo and Arch
 2026-08-29 as the house faces, and on the same day Fjalla One (the headline face,
 `--font-headline` in theme.css), DM Sans (the body fallback and the older static pages) and
 VT323 (the OS front page): the last three had still been fetched from fonts.googleapis.com by
-sixteen HTML files. Every `@font-face` lives in `/lib/aimeat-fonts.css`, which
+sixteen HTML files. Every `@font-face` is in `/lib/aimeat-fonts.css`, which
 `/lib/aimeat-theme.css` imports and the standalone pages link, so nothing on the node reaches
 an external CDN and the CSP no longer allows one. All subsets are latin + latin-ext, so
 Finnish ä/ö render.

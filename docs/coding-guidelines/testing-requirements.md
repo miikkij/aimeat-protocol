@@ -22,7 +22,7 @@ The rule itself is in [CLAUDE.md](../../CLAUDE.md), section "Gates": E2E on both
 
 ### Rule 1b: The guard tier is the part CI runs on every push
 
-Both E2E steps in `.github/workflows/ci.yml` carried `continue-on-error: true` from the day they were added, so until 2026-08-15 a red suite had never stopped a merge. The full sweep still cannot be that gate: two hours, and the cleanup race in `docs/pitfalls.md` §18 makes it occasionally wrong about suites nobody touched.
+Both E2E steps in `.github/workflows/ci.yml` had `continue-on-error: true` from the day they were added, so until 2026-08-15 a red suite had never stopped a merge. The full sweep still cannot be that gate: two hours, and the cleanup race in `docs/pitfalls.md` §18 makes it occasionally wrong about suites nobody touched.
 
 So a named tier runs on every push instead. CI runs after the push has landed on main and stops nothing by itself; its state is printed by the session-start hook and `pnpm gate`, and the pre-push hook asks a session for a named reason before it pushes on top of a red run (`Red-CI: <reason>` trailer). `GUARD_SUITES` in `test/run-e2e-ci.ts`, run with `--guards`:
 

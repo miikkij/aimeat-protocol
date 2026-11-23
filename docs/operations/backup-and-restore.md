@@ -11,7 +11,7 @@ them, at the same time, and keep them together.
 
 | Part | Where | Why it matters |
 |---|---|---|
-| **The database** | SQLite: the file `AIMEAT_SQLITE_PATH` names (and its `-wal` and `-shm` files beside it). PostgreSQL: the database `DATABASE_URL` names | every account, record, workspace, app and setting. With `AIMEAT_FILE_STORE=database` (the default) **stored files are inside the database** (the `StorageFile` table), so the database backup carries them |
+| **The database** | SQLite: the file `AIMEAT_SQLITE_PATH` names (and its `-wal` and `-shm` files beside it). PostgreSQL: the database `DATABASE_URL` names | every account, record, workspace, app and setting. With `AIMEAT_FILE_STORE=database` (the default) **stored files are inside the database** (the `StorageFile` table), so the database backup contains them |
 | **The file store**, when it is not the database | the bucket (`AIMEAT_FILE_STORE=s3`) or container (`azure`) and its folder (`AIMEAT_FILE_STORE_PREFIX`), and the storage a person connects of their own (`AIMEAT_OWNER_FILE_STORES`) | the bytes of the stored files. The database backup holds only their rows. Turn on object versioning in the bucket: the node's daily sweep removes objects in its folder that no file of the node names, so after a restore of an older database, objects written after that backup are no longer named and can be removed |
 | **The secrets** | `.env`, or wherever the process manager sets the variables | `AIMEAT_ENCRYPTION_KEY` (or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is not set) encrypts every stored secret: AI keys, vault entries, two-step sign-in secrets, attached MCP server tokens. On a node that has a second data key (a [key rotation](key-rotation.md) started or finished), also `AIMEAT_ENCRYPTION_KEY_1` and `AIMEAT_ENCRYPTION_KEY_CURRENT`: a restore without them opens no secret sealed under key 1. `AIMEAT_KEY_PASSPHRASE` protects the node's key |
 | **The node's key** | `~/.aimeat/nodes/<node id>/node-key.json`, or the file `AIMEAT_NODE_KEY_PATH` names | the node's identity: the key every token and federation message is signed with. The database holds a sealed copy too, which opens only with the same secrets |
@@ -28,8 +28,8 @@ file on a volume (`AIMEAT_NODE_KEY_PATH`), and back that volume up with the data
 ## What is not a backup
 
 - **`GET /v1/admin/backup`** (and the backup on the admin Maintenance tab) writes a JSON export of accounts,
-  agents, actions, boards and each agent's memory and transactions. It carries no credential, and it
-  does **not** carry the records people keep under their own accounts, organisms, workspaces, apps or
+  agents, actions, boards and each agent's memory and transactions. It contains no credential, and it
+  does **not** contain the records people keep under their own accounts, organisms, workspaces, apps or
   files. Use it to move account and agent rows, never as the node's backup. `POST /v1/admin/restore`
   reads the same shape. Its answer counts, per kind, the rows it imported, the rows it skipped
   because they already exist (`skipped_duplicates`) and the rows that failed for any other reason

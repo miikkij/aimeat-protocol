@@ -10,9 +10,9 @@ are outside this public inventory and were preserved.
 - Keep current guides and specs, with the corrections recorded in this change.
 - Preserve runtime assets in their loader paths. There is one CSM template set, `aimeat/docs/csm-examples`; the unloaded root copy was removed on 2026-10-11.
 - Treat external integrations and provider reports as dated references.
-- Plans, design specs and build notes live on the node, in the AIMEAT development organism. The
+- Plans, design specs and build notes are on the node, in the AIMEAT development organism. The
   `archive/` folder of 45 plans and test outlines was removed on 2026-10-11 (ruling D6); git history
-  keeps every file. A file kept here as history carries a history notice at its top.
+  keeps every file. A file kept here as history has a history notice at its top.
 - Guidance written for an AI is a built-in skill every node serves (`aimeat_skill_get`), not a file
   here. A repository file that moved keeps a short pointer only where outside links may reach it.
 - Use [maintenance.md](maintenance.md) for status meanings, review triggers and check limits.
@@ -27,7 +27,7 @@ read the file against its source; when the source changes after that day, `pnpm 
 so the source is the narrowest file that decides what the doc says. **"held by &lt;check&gt;"** names a
 test, a check script or a ledger that already fails when the file goes wrong: the it-adoption pages
 are held by `pnpm check:it-adoption` and its ledger, and the runtime assets by their loader tests.
-A held row carries no date and is never compared, because its holder's own file changes for reasons
+A held row has no date and is never compared, because its holder's own file changes for reasons
 that leave the doc true; the holder must name the file (its path, its name, or for a non-Markdown
 file a folder it loads whole). A historical file needs neither.
 
@@ -37,7 +37,7 @@ file a folder it loads whole). A historical file needs neither.
 |---|---|---|---|
 | [aimeat/docs/AIMEAT_Help_Prompt.md](../aimeat/docs/AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree; held by check:prompt-refs (every route and tool it names exists) and check:docs (the copies agree) | `aimeat/scripts/check-prompt-refs.ts` |
 | [aimeat/docs/AIMEAT_Help_Prompt_Person.md](../aimeat/docs/AIMEAT_Help_Prompt_Person.md) | runtime | Served person help prompt; root and packaged copies must agree; held by check:prompt-refs and check:docs (the copies agree) | `aimeat/scripts/check-prompt-refs.ts` |
-| [aimeat/docs/README.md](../aimeat/docs/README.md) | entry | What the package's docs/ folder carries and why AI guidance is a built-in skill instead; checked 2026-11-14 | `aimeat/scripts/copy-dist-assets.mjs` |
+| [aimeat/docs/README.md](../aimeat/docs/README.md) | entry | What the package's docs/ folder contains and why AI guidance is a built-in skill instead; checked 2026-11-14 | `aimeat/scripts/copy-dist-assets.mjs` |
 | [aimeat/docs/configuration-guide.md](../aimeat/docs/configuration-guide.md) | entry | Navigation to the maintained guide or current contract; checked 2026-11-15 | `aimeat/src/index.ts` |
 | [aimeat/docs/csm-bundles/README.md](../aimeat/docs/csm-bundles/README.md) | runtime | Project bundle asset or loader guidance; preserve paths and inspect compiled constraints; checked 2026-11-15 (loadBundle parses and validates every file of the project bundle) | `aimeat/src/services/template-bundles.ts` |
 | [aimeat/docs/csm-bundles/project/decision.csm.yaml](../aimeat/docs/csm-bundles/project/decision.csm.yaml) | runtime | Project bundle asset or loader guidance; preserve paths and inspect compiled constraints; checked 2026-11-15 (loadBundle parses and validates every file of the project bundle) | `aimeat/src/services/template-bundles.ts` |
@@ -65,7 +65,7 @@ file a folder it loads whole). A historical file needs neither.
 | [docs/AIMEAT-RFC-v4.0-errata.md](AIMEAT-RFC-v4.0-errata.md) | historical | Known errata in RFC v4.0 up to node 4.0.0, checked against node 3.26.1 on 2026-10-11; superseded with the two v4.0 documents and not maintained; "What comes next" links Core 2026-11, its evidence and the Platform reference | `openapi.yaml` |
 | [docs/AIMEAT_Help_Prompt.md](AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree; held by check:prompt-refs (every route and tool it names exists) and check:docs (the copies agree) | `aimeat/scripts/check-prompt-refs.ts` |
 | [docs/AIMEAT_Help_Prompt_Person.md](AIMEAT_Help_Prompt_Person.md) | runtime | Help prompt a person pastes into a consumer AI, served at /v1/help/prompt/person; root and packaged copies must agree; held by check:prompt-refs and check:docs (the copies agree) | `aimeat/scripts/check-prompt-refs.ts` |
-| [docs/README.md](README.md) | entry | Navigation to the maintained guide or current contract; plans and build notes live on the node; checked 2026-11-15 | `docs/catalog.md` |
+| [docs/README.md](README.md) | entry | Navigation to the maintained guide or current contract; plans and build notes are on the node; checked 2026-11-15 | `docs/catalog.md` |
 | [docs/a-endpoints.md](a-endpoints.md) | entry | Navigation to the maintained guide or current contract; checked 2026-11-15 | `aimeat/src/routes/auth.ts` |
 | [docs/agent-workspace-contracts.md](agent-workspace-contracts.md) | entry | Pointer: the guide is the built-in skill aimeat-workspace-contracts; kept because the RFC, the changelog and the crewai package cite this path; checked 2026-11-14 | `aimeat/src/data/builtin-skills.workspace-contracts.ts` |
 | [docs/ai-transparency.md](ai-transparency.md) | maintained | Implementation disclosure; private research links removed, legal analysis not revalidated; checked 2026-11-15 | `aimeat/src/routes/ai-transparency.ts` |
@@ -82,7 +82,7 @@ file a folder it loads whole). A historical file needs neither.
 | [docs/building-an-aimeat-compatible-ecosystem-app.md](building-an-aimeat-compatible-ecosystem-app.md) | maintained | Ecosystem app (GEAI) contract: joining, renewal, manifest with automation hints and setup guide, events, and the owner's automation (data, schedules, recipe, advisories); took in the automation how-to on 2026-10-12; checked 2026-11-15 | `aimeat/src/routes/ecosystem-apps.ts` |
 | [docs/c-platform-notes.md](c-platform-notes.md) | maintained | What each kind of AI client can do with a node: the CLI, the desktop app, per-tool setup at GET /v1/ai-tools; checked 2026-11-15 | `aimeat/src/services/ai/tool-setup.ts` |
 | [docs/catalog.md](catalog.md) | maintained | Complete tracked-file inventory for both documentation trees; checked 2026-11-15 | `aimeat/scripts/check-docs.mjs` |
-| [docs/coding-guidelines/README.md](coding-guidelines/README.md) | entry | Index of the development guides and the verification commands; plans live on the node; checked 2026-11-14 | `aimeat/scripts/gate.ts` |
+| [docs/coding-guidelines/README.md](coding-guidelines/README.md) | entry | Index of the development guides and the verification commands; plans are on the node; checked 2026-11-14 | `aimeat/scripts/gate.ts` |
 | [docs/coding-guidelines/agent-tags.md](coding-guidelines/agent-tags.md) | maintained | Agent tags, the five modes and run mode, and who may set them; checked 2026-11-15 | `aimeat/src/models/agent-onboarding-schemas.ts` |
 | [docs/coding-guidelines/architecture.md](coding-guidelines/architecture.md) | maintained | Subsystem map: where routes, services, storage and the SPA live, and how routes are mounted; checked 2026-11-15 | `aimeat/src/server-bootstrap/routes-loader.ts` |
 | [docs/coding-guidelines/code-style.md](coding-guidelines/code-style.md) | maintained | TypeScript and route conventions: envelope, router factory, caller object, imports; checked 2026-11-14 | `aimeat/src/middleware/envelope.ts` |

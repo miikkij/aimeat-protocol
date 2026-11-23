@@ -138,7 +138,7 @@
         "leaflet@1/**"
       ],
       "modified": false,
-      "note": "Map TILES are fetched at runtime from OpenStreetMap and carry their own attribution requirement, which the Atelier map component renders on the map itself.",
+      "note": "Map TILES are fetched at runtime from OpenStreetMap and have their own attribution requirement, which the Atelier map component renders on the map itself.",
       "purl": "pkg:npm/leaflet@1.9.4"
     },
     {
@@ -216,7 +216,7 @@
         "lenis@1.css"
       ],
       "modified": false,
-      "note": "Both files are needed: the stylesheet carries the html.lenis rules without which the hijacked scroll container never gets its height.",
+      "note": "Both files are needed: the stylesheet contains the html.lenis rules without which the hijacked scroll container never gets its height.",
       "purl": "pkg:npm/lenis@1.3.27"
     },
     {
@@ -408,7 +408,7 @@
         "swagger-ui-dist@5.34.1/**"
       ],
       "modified": false,
-      "note": "The /v1/docs page loads these two files. The bundle carries third-party code (DOMPurify 3.4.17, React, Immutable and others, MIT, BSD-3-Clause and Apache-2.0 OR MPL-2.0); the notices the package ships for it are reproduced in the noticeFile.",
+      "note": "The /v1/docs page loads these two files. The bundle includes third-party code (DOMPurify 3.4.17, React, Immutable and others, MIT, BSD-3-Clause and Apache-2.0 OR MPL-2.0); the notices the package ships for it are reproduced in the noticeFile.",
       "purl": "pkg:npm/swagger-ui-dist@5.34.1"
     },
     {
@@ -424,7 +424,7 @@
         "dompurify@3.4.17/**"
       ],
       "modified": false,
-      "note": "Used under Apache-2.0. The licence file carries both texts the package ships.",
+      "note": "Used under Apache-2.0. The licence file contains both texts the package ships.",
       "purl": "pkg:npm/dompurify@3.4.17"
     },
     {
@@ -477,7 +477,7 @@
         "aimeat-atlas@1.json"
       ],
       "modified": true,
-      "note": "The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.",
+      "note": "The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to include a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.",
       "purl": "pkg:npm/world-atlas@2.0.2"
     },
     {
@@ -511,7 +511,7 @@
       ],
       "modified": false,
       "purl": "pkg:npm/preact@10.29.8",
-      "note": "Both files come from the SAME upstream dist. That is the whole requirement, and getting it wrong killed the app once: on 2026-08-31 preact was taken from one esm.sh build variant and hooks from another, the two ended up with different options objects, and the SPA died with AIMEAT failed to start. hooks/dist/hooks.mjs imports the bare specifier preact, which the importmap resolves to the same module the page uses; a build that imports ./preact.mjs relatively does NOT work here, because the importmap stamps a ?v= cache-busting query and the relative path does not carry it."
+      "note": "Both files come from the SAME upstream dist. That is the whole requirement, and getting it wrong killed the app once: on 2026-08-31 preact was taken from one esm.sh build variant and hooks from another, the two ended up with different options objects, and the SPA died with AIMEAT failed to start. hooks/dist/hooks.mjs imports the bare specifier preact, which the importmap resolves to the same module the page uses; a build that imports ./preact.mjs relatively does NOT work here, because the importmap stamps a ?v= cache-busting query and the relative path does not get it."
     },
     {
       "id": "htm",
@@ -573,7 +573,7 @@
       ],
       "modified": true,
       "purl": "pkg:npm/katex@0.19.1",
-      "note": "The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file."
+      "note": "The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are included: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and has no separate font licence file."
     },
     {
       "id": "aimeat",

@@ -78,7 +78,7 @@ ends after 90 days unless its share names another end date.
 
 Use the MCP tool `aimeat_workspace_share` (all three agent surfaces since 2026-10-16): `organism_id`,
 `ws`, `space` and `id` for one page (`space` alone for a whole space, neither for the workspace),
-`shared: true`, and `access`. Its answer carries `viewer_url`, the link to give. `until` takes an
+`shared: true`, and `access`. Its answer includes `viewer_url`, the link to give. `until` takes an
 ISO date for the end of the share, or `"none"` to remove the end. Only the workspace creator, an
 organism admin or their own agent may change sharing, and only published pages are shown. When the
 node asks the owner before making something public and the agent lacks `publish:public`, opening

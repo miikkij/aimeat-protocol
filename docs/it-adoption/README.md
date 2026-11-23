@@ -8,7 +8,7 @@ The package answers three questions:
 
 1. **Is it safe by default?** Partly, and the pages say which defaults an organisation node must change: [07 Security](07-security.md) lists the secure defaults, [16 Known limitations](16-known-limitations.md) the open ones, and [09 Hardening guide](09-hardening-guide.md) what to set.
 2. **Who is responsible for what?** [03 Shared responsibility](03-shared-responsibility.md): the software, the operator (IT), the admins of each shared group and the users.
-3. **Can every claim be checked?** Each one carries its source, and `pnpm check:it-adoption` refuses a page whose sources changed since it was read (below).
+3. **Can every claim be checked?** Each one names its source, and `pnpm check:it-adoption` refuses a page whose sources changed since it was read (below).
 
 ## Reading order for IT and security
 

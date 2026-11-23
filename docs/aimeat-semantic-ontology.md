@@ -15,7 +15,7 @@ AIMEAT provides optional JSON-LD-compatible semantic annotations on records and 
 
 - **Federation interoperability:** nodes can understand each other's data types without prior coordination
 - **Linked Data discovery:** external systems can consume AIMEAT data using standard ontology URIs
-- **Schema enrichment:** memory schemas carry semantic context that describes what the data represents, not just its shape
+- **Schema enrichment:** memory schemas include semantic context that describes what the data represents, not just its shape
 
 All semantic annotations are **optional**. A record or schema without semantic metadata remains fully functional. Annotations follow JSON-LD conventions (`@context`, `@type`) so that any JSON-LD processor can expand them into full IRIs.
 
@@ -80,7 +80,7 @@ The `properties` field allows per-field semantic mappings within a schema, enabl
 ### 2.4 The one rule: every prefix must resolve
 
 `SemanticAnnotationSchema` refuses a prefixed name whose prefix is neither declared in the
-annotation's own `@context` nor carried by the node's default context (§3.0). This applies to
+annotation's own `@context` nor declared by the node's default context (§3.0). This applies to
 `@type`, to property keys, and to both inside nested nodes: a `schema:address` holding a
 `weird:PostalAddress` is refused as readily as a bad type at the top.
 
@@ -125,7 +125,7 @@ has no fields to map, and the check stands down rather than refusing everything.
 Eight prefixes resolve without being declared. They are the vocabularies this node already speaks
 somewhere, and `GET /v1/ns` serves the list:
 
-| Prefix | Namespace | What it carries here |
+| Prefix | Namespace | What it names here |
 |---|---|---|
 | `aimeat` | `https://aimeat.io/ns/` | this protocol's own classes and relations |
 | `schema` | `https://schema.org/` | people, places, offers, creative works, actions |
@@ -201,7 +201,7 @@ AIMEAT does not restrict which ontologies can be used. The `@context` field acce
 
 ## 4. CSM Semantic Integration
 
-Community Service Manifests (CSMs) carry an optional `semantic` block in their `service` definition (`CsmDefinition` in `aimeat/src/services/csm-parser.ts`):
+Community Service Manifests (CSMs) have an optional `semantic` block in their `service` definition (`CsmDefinition` in `aimeat/src/services/csm-parser.ts`):
 
 ```typescript
 export interface CsmDefinition {
@@ -247,11 +247,11 @@ service:
       "@type": "skos:ConceptScheme"
 ```
 
-The CSM semantic annotation describes the **service itself** (e.g., "this service is a DataCatalog about a ConceptScheme"), while the records within the service carry their own `SemanticAnnotation` describing individual entries.
+The CSM semantic annotation describes the **service itself** (e.g., "this service is a DataCatalog about a ConceptScheme"), while the records within the service have their own `SemanticAnnotation` describing individual entries.
 
 ## 5. Record-to-Ontology Mapping Table
 
-All AIMEAT records that carry a `semantic?` field, mapped to their typical ontology types:
+All AIMEAT records that have a `semantic?` field, mapped to their typical ontology types:
 
 | Record Type | Interface Location | `semantic` Field Type | Default `@type` | Ontology Properties |
 |---|---|---|---|---|

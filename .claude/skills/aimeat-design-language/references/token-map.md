@@ -19,6 +19,6 @@ The standalone pages (`public/connect*.html`, `public/front-*.html`, `public/wii
 `public/aimeat-developers.html`, the app catalog's template) link the same sheet and name their
 faces in their own inline CSS, so a change of face reaches them only by hand.
 
-Code that runs **outside** the node cannot read a token: the portfolio prompt a person carries to
-their own AI, the auth library's fallbacks, an app built elsewhere. Those carry the literal values
+Code that runs **outside** the node cannot read a token: the portfolio prompt a person copies into
+their own AI, the auth library's fallbacks, an app built elsewhere. Those use the literal values
 from the colour table in `SKILL.md` and are the second half of the checklist when a value changes.

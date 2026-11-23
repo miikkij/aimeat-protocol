@@ -8,9 +8,9 @@ the same request the node sends to TypeSafe's Jev, so the node uses them as **de
 |---|---|---|---|---|
 | Laya 0.3.11 (multilingual checkpoint) | Apache 2.0 | 8801 | yes | the fastest on a CPU |
 | von 1.1.1 | Apache 2.0 | 8802 | no | 1.1.1 is the von-sdk version; the model id in a request is `von-1.1.0` |
-| jeff 0.1.0 (GLiFormer) | MIT | 8803 | yes | carries 60 options |
+| jeff 0.1.0 (GLiFormer) | MIT | 8803 | yes | has 60 options |
 
-Each model answers only a call that carries its own key, a random one you make once (below). The
+Each model answers only a call that includes its own key, a random one you make once (below). The
 node sends the same keys.
 
 The ports are the ones the node's built-in providers `laya`, `von` and `jeff` expect.
@@ -22,7 +22,7 @@ Two ways to run them:
 
 ## Docker
 
-Needs Docker with Compose. For the GPU: an NVIDIA card with driver 580 or newer (the images carry
+Needs Docker with Compose. For the GPU: an NVIDIA card with driver 580 or newer (the images contain
 torch built for CUDA 13.0) and the NVIDIA container runtime.
 
 ```bash
@@ -95,7 +95,7 @@ takes about 1.7 s on the same 4 cores.
 
 The CUDA figures were measured with torch 2.11 built for CUDA 12.8. The CUDA images moved to torch
 2.14 built for CUDA 13.0 on 2026-09-27, because the CUDA 12.8 builds stop at 2.11 and that version
-carries a torch advisory and holds setuptools below its fix. Measure the CUDA column again on the
+has a torch advisory and holds setuptools below its fix. Measure the CUDA column again on the
 next GPU build.
 
 ## Connecting a node
@@ -130,7 +130,7 @@ loopback to every fetch the server makes. **A public node never sets it**; it us
 When the node runs in the same Compose project or Docker network, leave the ports unpublished and
 name the containers instead. The built-in providers point at 127.0.0.1, so describe the providers
 yourself in `AIMEAT_DECIDE_PROVIDERS` (auth `env`, naming the variable that holds each model's key),
-with the limits the built-ins carry (`aimeat/src/services/decide/providers.ts`):
+with the limits the built-ins have (`aimeat/src/services/decide/providers.ts`):
 
 ```bash
 AIMEAT_DECIDE_PROVIDER_EGRESS=http://laya:8000,http://jeff:8000
@@ -150,7 +150,7 @@ the list.
 ## Windows without Docker
 
 From `tools/systemone` in PowerShell. Needs Python 3.12 (`py -3.12`) and Git; with an NVIDIA card it
-installs the CUDA build of torch. It installs what the images carry: every package at the version in
+installs the CUDA build of torch. It installs what the images contain: every package at the version in
 the model's `docker/<model>/requirements-cu130.txt`, jeff's source at the images' commit, and the
 weights at the images' commits.
 

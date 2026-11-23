@@ -1,6 +1,6 @@
 ---
 name: aimeat-photos-to-dataset
-description: Turn photographs, scans and attached documents into a data package on an AIMEAT node, with every row linked back to the picture it was read from. The paved path for "here are photos of my receipts / meter readings / business cards / invoices, make something out of them". Covers the shape decision, the append trap that silently deletes yesterday's rows, and what to say to the person.
+description: Turn photographs, scans and attached documents into a data package on an AIMEAT node, with every row linked back to the picture it was read from. The recommended way for "here are photos of my receipts / meter readings / business cards / invoices, make something out of them". Covers the shape decision, the append trap that silently deletes yesterday's rows, and what to say to the person.
 license: MIT
 metadata:
   audience: agent

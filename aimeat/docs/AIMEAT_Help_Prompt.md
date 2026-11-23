@@ -73,7 +73,7 @@ their connection path until an authorized migration changes them.
 
 **Tasks & workflows**: the owner queues work for their own agents as **tasks** (`/v1/agents/{name}/tasks`, `draft → queued → active → done`; key-holding v2 agents use `/v1/agents/v2/tasks`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work at set times.
 
-**EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.2 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns as it runs.
+**EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering has a price and an ODPS v4.2 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns as it runs.
 
 **Commerce** (`/v1/commerce`, checkout at `/v1/commerce/checkout-sessions`): checkout and settlement behind a pluggable payment interface. Each seller connects their own Stripe account; invoice and x402 rails also exist. All of it is optional; a node runs fine on its own.
 

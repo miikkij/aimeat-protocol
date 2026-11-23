@@ -15,7 +15,7 @@ once inside: the home, every profile tab, the chat, the sign-in dialog, the app 
 the type, the colours, the shapes and the rules; they differ in how loud they are. A third register,
 the **classic shell** (rounded controls, cards), remains under the admin dashboard and the oldest
 views and is not extended; it reads the same type tokens. Its rules (buttons, cards, badges, the
-segmented control, the toast, the top bar) live in `aimeat/public/css/components/`, one sheet each.
+segmented control, the toast, the top bar) are in `aimeat/public/css/components/`, one sheet each.
 That folder also holds the library parts Settings & Controls is drawn from (the page kit, the
 listing, the facts, the fields, the timeline, and every part only one page draws), one sheet
 each, each with its entry in the component catalogue (`src/services/ui-library/entries-*.ts`) and
@@ -25,15 +25,15 @@ Settings & Controls page writes no class at all: it calls the components (`compo
 and a component draws only its own class names and the `poster.css` shapes below. The admin pages
 (since 2026-09-27) and appcat, the app catalogue rebuilt on the components at `/v1/appcat`, are
 drawn the same way; where the old app catalogue drew a thing in its own way, that look is a named
-option of the component reading the tokens, so a theme reaches it too.
+option of the component reading the tokens, so a theme applies to it too.
 
-Type and colour tokens live in `aimeat/public/css/theme.css`, and nothing else does:
+Type and colour tokens are in `aimeat/public/css/theme.css`, and that file holds nothing else:
 `pnpm check:theme-tokens` refuses a rule there that is not a custom property. Font sizes and
 weights are tokens too (`--text-2xs` … `--text-xl`, `--weight-regular` … `--weight-heavy`), so a
 theme can change the type scale in one place. `--text-2xs` is 11px, the smallest text a page shows
-(the Status and the time read it; Jouni, 2026-10-25): a size below it is a finding. The shared shapes live in
+(the Status and the time read it; Jouni, 2026-10-25): a size below it is a finding. The shared shapes are in
 `aimeat/public/css/poster.css`. A view composes a shape by class and owns its layout. Change the
-token or shape at its home; `references/token-map.md` and `references/shapes.md` show which surfaces follow. Existing copies are
+token or shape in the file that defines it; `references/token-map.md` and `references/shapes.md` show which surfaces follow. Existing copies are
 recorded migration debt, not examples for a new view.
 
 ## The faces
@@ -44,7 +44,7 @@ alias of one of them, so a face changes once and reaches every page, outside and
 | Token | Value | Where |
 |---|---|---|
 | `--font-headline` | **Fjalla One**, uppercase, one weight | every headline, big numeral, sticker, slab and tab (the wordmark is its own token, below) |
-| `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 (the vendored Archivo carries 400 to 700, so an 800 would be synthesised); also form controls and the classic shell |
+| `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 (the vendored Archivo has the weights 400 to 700, so an 800 would be synthesised); also form controls and the classic shell |
 | `--font-mono` | **JetBrains Mono** | identifiers, keys, crumbs, addresses, commands, small labels that name a machine thing |
 
 The aliases a view sheet reads, and what they resolve to: `--font-showroom` and `--font-poster` are
@@ -93,7 +93,7 @@ load an added face: the kit's sheet imports `aimeat-fonts.css`, which does not i
 `/v1/themes/fonts.css`.
 
 Fjalla One is condensed and ships one cut, so a headline is short: one sentence, the second half in
-coral when it carries the point. Never synthesise a bold on a single-weight face. A monospace family
+coral when it holds the main point. Never synthesise a bold on a single-weight face. A monospace family
 is `var(--font-mono)`, never `monospace` or a hand-typed stack; the view sheets were swept of both
 on 2026-08-29.
 
@@ -191,7 +191,7 @@ prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made
   menu item, a dialog title, a section label or a notice, and not inside a translation string,
   where they hide from a reviewer until the screen is up. They read as noise and cheapen the
   product (Jouni, 2026-08-29, after 142 of them were stripped from the app catalog's strings in
-  one pass). Icons are inline SVG on a 16/20/24 grid. The four glyphs that carry meaning in text
+  one pass). Icons are inline SVG on a 16/20/24 grid. The four glyphs that have a meaning in text
   are `✓ ✗ → ↩`; a fifth is a decision, not a habit. The one emoji that stays is data: the icon
   a person chose for their own app.
 - No tilt, no rotation, no gradient, no drop-shadow blur, no `rgba(255,255,255,…)`, no radius on a
@@ -219,9 +219,9 @@ under the MCP connection, not above it.)
 Change the token in `aimeat/public/css/theme.css`; a new face is first vendored into
 `aimeat/public/lib/fonts/` and declared in `aimeat/public/lib/aimeat-fonts.css`. Then the surfaces
 that read the token follow on their own. Some do not: the standalone pages name their faces in their
-own inline CSS, and code that runs outside the node carries literal values. **Before you change a
+own inline CSS, and code that runs outside the node uses literal values. **Before you change a
 token, read `references/token-map.md`**: it lists every sheet a token reaches and the surfaces that
-need a hand, and it is the checklist for the change.
+need a manual change, and it is the checklist for the change.
 
 ### The shape values: what a theme changes once
 
@@ -273,10 +273,10 @@ its variants (the class or prop for each), one example, the theme tokens its she
 pages that draw it; the shapes of `poster.css` are in it too. Read it before building a page and
 reuse the part that exists. A new component gets an entry in `aimeat/src/services/ui-library/`
 (the purpose half, written by hand), then `pnpm build:ui-library` reads the rest from the files.
-`pnpm check:ui-library` refuses a sheet with no entry, a variant class its sheet does not carry, an
+`pnpm check:ui-library` refuses a sheet with no entry, a variant class its sheet does not define, an
 "active" part no page draws and stale facts. **To see the parts**, open aimeat-design-lab in the
 admin pages (group Design): every entry drawn live by its real component with its example, every
-variant in light and dark and at a phone width. Its demos live in `public/views/design-lab/`, and
+variant in light and dark and at a phone width. Its demos are in `public/views/design-lab/`, and
 the check refuses an entry without one. This catalogue is the node's own interface only;
 Atelier's catalogue of app parts is a different thing and shares nothing with it.
 
@@ -309,7 +309,7 @@ A page that hardcodes its palette says so: `<meta name="aimeat-light" content="f
 login pill's light/dark control renders disabled there and says why rather than doing nothing.
 Absent, or `content="follows"`, means the switch works, which is what a page whose every colour is
 a token wants. The signal is the page's own declaration and not its register, because the register
-names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` carries a lightness cap,
+names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` has a lightness cap,
 because white is the action ink on paper and the theme coral at `#E8564A` measured 3.58:1 under it:
 inside the kit it deepens to `#cf3e35`; the node's own surfaces above keep the coral as it is.
 

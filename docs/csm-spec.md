@@ -30,12 +30,12 @@ The node keeps these beside the YAML; none of them is a key of the YAML itself
 ([routes](../aimeat/src/routes/csm.ts), [service](../aimeat/src/services/csm-service.ts)).
 
 - **Who may register.** The account holder, or an agent or app holding the
-  permission `csm:write` (inside the wildcard: `*` and `csm:*` carry it). An
+  permission `csm:write` (inside the wildcard: `*` and `csm:*` include it). An
   agent registers in its owner's account and changes only that account's CSMs.
 - **The name starts with the account.** CSM names are node-global. A new CSM
   whose `service.name` does not already start with `<account>.` gets it in
   front: `ruuvi-nakyma` registered by `jussil` is `jussil.ruuvi-nakyma`. The
-  answer carries the final name. CSMs registered before 2026-11-07 keep theirs.
+  answer gives the final name. CSMs registered before 2026-11-07 keep theirs.
 - **Visibility.** `public` (anyone, without signing in, so the author of a
   program reads the shape it must send), `members` (any account of this node),
   `organism:<id>` (the active members of that organism) or `private` (the
@@ -302,7 +302,7 @@ service:
 Additional keys are permitted and passed through. The parser accepts `semantic` only if it is a non-null object; otherwise it is set to `undefined`.
 
 **Every prefix must resolve.** A prefixed name (`shop:Directory`) is refused unless `shop` is
-declared in this block's own `@context` or is one the node carries by default: `aimeat`, `schema`,
+declared in this block's own `@context` or is one the node defines by default: `aimeat`, `schema`,
 `skos`, `dcterms`, `prov`, `rdfs`, `qudt`, `saref`. `GET /v1/ns` lists them, along with the classes
 `aimeat:` names. A bare type (`"@type": "LocalBusiness"`, as above) is always accepted: it resolves
 against the document's default vocabulary rather than a prefix.

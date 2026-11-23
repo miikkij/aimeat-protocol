@@ -25,7 +25,7 @@ into domain complexity** — business rules, multi-feature depth, the "kimuranti
 
 Corrected task design rules:
 1. The engine/visual element is a COMPONENT of the task, never the task itself.
-2. The task carries REAL business logic: rules with interactions (constraints, penalties,
+2. The task has REAL business logic: rules with interactions (constraints, penalties,
    capacities, reporting), persistence across sessions, and a cross-user feature.
 3. The functional checklist is ≥70% DOMAIN checks (rules behave correctly, report numbers
    consistent, persistence round-trips) — engine plumbing gets at most 2–3 checks.

@@ -186,7 +186,7 @@ a dmg, Linux a deb and an AppImage. CI builds all three on their own runners
   `src-tauri/resources/server/`, and does a **production-only** dependency install there, with the server's
   install lifecycle scripts removed, so the native SQLite binary is present.
 - [scripts/stage-licenses.mjs](scripts/stage-licenses.mjs) — copies the licence texts the installer must
-  carry (AIMEAT's licence, the server's third-party notices, the licence of the Node runtime being
+  include (AIMEAT's licence, the server's third-party notices, the licence of the Node runtime being
   shipped, and on Windows a WebView2 notice) into `src-tauri/resources/licenses/`. It also generates
   Rust dependency notices from `cargo metadata --locked`, retaining the packages' original notices
   and explicitly selecting licence alternatives. Missing upstream terms are retrieved from pinned
@@ -261,7 +261,7 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
   to 2026-09-18. There is one mechanism now, the Tauri updater, and it polls a fixed address,
   `releases/download/desktop-latest/latest.json`, which `release-desktop.yml` rewrites on every `desktop-v*`
   release (a prerelease, so it never takes the repository's "Latest" label). An app installed at 0.4.12 still
-  carries the old address compiled in and will never see an update: that one has to be replaced by hand.
+  has the old address compiled in and will never see an update: that one has to be replaced by hand.
 - **Claude Desktop is attached in its own settings, and only to an AIMEAT the internet can reach.** It takes a
   remote MCP server as a custom connector (Settings → Connectors → Add custom connector) on every plan, so it
   needs no bridge and no file on this machine, and the app gives the address to paste. But "Claude

@@ -27,7 +27,7 @@ publish directly to the node — you do **not** need the AIMEAT web UI.
 
 An **AIMEAT app** is a **single self-contained HTML file**. The node hosts it and serves it
 on its own subdomain (e.g. `https://<name>.apps.aimeat.io/`). Its head is a few lines and its
-interface is calls into the served component kit (`AIMEAT.atelier`), which carries the header,
+interface is calls into the served component kit (`AIMEAT.atelier`), which provides the header,
 the sign-in, the language switch and the loading, empty and error states. There is **no build
 step and no backend to write**: the node is the backend.
 
@@ -77,7 +77,7 @@ If the node base URL is not `aimeat.io`, use the one configured for this instanc
    - Serve the file locally and `curl` it back; confirm it is well-formed and the script tags
      resolve to real node URLs.
 4. **Publish over MCP.** Call the `aimeat_app_publish` tool with the `spec_token` the
-   specification carries. For any file bigger than ~1 KB use the **presigned upload** mode: call
+   specification contains. For any file bigger than ~1 KB use the **presigned upload** mode: call
    the tool **without** the content parameter → it returns an `upload_url` → `PUT` the raw HTML
    to that URL:
    ```bash
@@ -105,5 +105,5 @@ never by calling it directly. Most apps need **no** extension.
 - **Don't** build a separate backend, a bundler, or a multi-file app — the node is the backend.
 - **Don't** hardcode colours or bypass the kit — its `--ak-*` tokens are the look.
 
-Full API detail lives in `./references/aimeat-cheatsheet.md`, but the live spec at
+Full API detail is in `./references/aimeat-cheatsheet.md`, but the live spec at
 `/v1/prompts/build-app-atelier` always wins on any conflict.

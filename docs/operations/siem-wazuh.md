@@ -32,7 +32,7 @@ Syslog, RFC 5424. The message is one JSON object with the whole event:
 | `team` | `<109>` | `approval_id`, `organism_id`, `action` (`team:delete`, `team:send`, `team:pay`), `actor`, `status` (`pending`, `approved`, `rejected`), `decided_by`, `summary` |
 | `trail` | `<134>` (local0, info) | `account`, `actor`, `actor_kind`, `surface`, `call`, `outcome`, `reason`, `counterparty`, `duration_ms` |
 
-Over OTLP the same event is one log record: `severityText` WARN for a refusal, ERROR for an incident, INFO for the rest, the JSON as the body, and each field as an attribute `aimeat.<field>`. The resource carries `service.name=aimeat` and `aimeat.node`.
+Over OTLP the same event is one log record: `severityText` WARN for a refusal, ERROR for an incident, INFO for the rest, the JSON as the body, and each field as an attribute `aimeat.<field>`. The resource has `service.name=aimeat` and `aimeat.node`.
 
 TCP lines are newline-framed. Events that arrive while the TCP connection is being opened are dropped; the first event after a collector comes back opens it again.
 

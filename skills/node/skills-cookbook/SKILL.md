@@ -28,7 +28,7 @@ UI locations are given alongside. Keep answers concrete: run the tool, show the 
   stamp `metadata.aimeat_ref: {ref}@{version}` + `aimeat_node` for update checks.
   CLI: `aimeat skill install node:manage-my-agents` (also `--project`, `--dir`, `--node/--token`).
 - claude.ai chat: Skills tab → **⤓ .zip** (`GET /v1/skills/{name}/zip`) → upload in Settings → Skills.
-- Full recipe lives in the node skill `install-skills-locally`.
+- The full recipe is in the node skill `install-skills-locally`.
 
 ## 4 · Boost an agent
 - "Link the skill `node:set-up-content-pipeline` to my agent crew-forge" → `aimeat_skill_link`.

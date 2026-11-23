@@ -18,8 +18,8 @@ work together in a controlled, safe and reliable way.
 
 AIMEAT began at the end of February 2026 (the first commit is dated 2026-02-25) as the **AI Memory
 Exchange and Action Transfer**: a
-protocol through which an AI keeps what it learns, exchanges it, and hands actions on. That was a
-good name for what it was then. The Core protocol still carries that name and those parts
+protocol through which an AI keeps what it learns, exchanges it, and passes actions on. That was a
+good name for what it was then. The Core protocol still has that name and those parts
 ([AIMEAT-Core-2026-11.md](AIMEAT-Core-2026-11.md)), and they are still underneath everything.
 
 ## What it grew into
@@ -34,7 +34,7 @@ who reaches it, and share it in a controlled way.
 From that, a different idea formed quickly:
 
 - **Data is at the centre**, above all refined knowledge that people bring and own.
-- **The whole system can be used through AI from start to finish, and fast.** Every part carries
+- **The whole system can be used through AI from start to finish, and fast.** Every part includes
   instructions an AI understands at once. Those instructions are written for AI, not for people to
   read; material for people is written separately.
 
@@ -53,7 +53,7 @@ refine it for the other side. The other person's agent then presents it exactly 
 person needs it, so they can decide or answer quickly. This makes communication and getting
 things done far more efficient.
 
-## Less to carry
+## Less to remember
 
 A person does not need to keep everything in their head. Their AI keeps track of the details, so
 they remember less, see the whole picture, and still take part in every decision.
@@ -105,8 +105,8 @@ heidän tekoälynsä voivat tehdä yhdessä töitä hallitusti, turvallisesti ja
 
 AIMEAT sai alkunsa helmikuun lopussa 2026 (ensimmäinen commit on päivätty 25.2.2026) nimellä **AI Memory Exchange and Action Transfer**. Se oli
 protokolla, jonka avulla tekoäly säilyttää oppimansa, vaihtaa tietoa ja siirtää toimintoja
-eteenpäin. Nimi kuvasi hyvin sitä, mitä AIMEAT silloin oli. Ydinprotokolla kantaa yhä tätä nimeä ja
-näitä osia, ja ne ovat edelleen kaiken pohjana.
+eteenpäin. Nimi kuvasi hyvin sitä, mitä AIMEAT silloin oli. Ydinprotokollalla on yhä tämä nimi ja
+nämä osat, ja ne ovat edelleen kaiken pohjana.
 
 ## Mitä siitä kasvoi
 
@@ -140,7 +140,7 @@ määriä dataa ja jalostavat sen toiselle osapuolelle. Toisen ihmisen agentti e
 juuri niin kuin hän sitä tarvitsee, jotta hän voi tehdä päätöksen tai vastata nopeasti. Tämä tekee
 viestinnästä ja tekemisestä huomattavasti tehokkaampaa.
 
-## Vähemmän kannettavaa
+## Vähemmän muistettavaa
 
 Ihmisen ei tarvitse pitää kaikkea päässään. Tekoäly pitää kirjaa yksityiskohdista, joten ihminen
 muistaa vähemmän, näkee kokonaisuuden ja on silti mukana jokaisessa päätöksessä.

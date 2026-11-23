@@ -111,7 +111,7 @@ The node sends what the caller put in the call. The caller is a person's AI chat
 | Classification judgement | content the policy names, with personal data removed first, to the node's decision model or the person's own text model | a write, or the hourly queue `core:classification-queue` | yes | [Data classification](../data-classification.md) |
 | AI job (`aimeat_ai_job_start`) | the job's prompt, on the person's own key | a person or agent | runs in the background | `aimeat/.env.example` (AI jobs section) |
 
-Each provider carries a sentence that says where its data goes ("The prompt goes to api.openai.com, outside this machine"), shown on the settings page and in data maps (`aimeat/src/services/ai/providers.ts`). An OpenRouter answer names the region that processed it (`route.answeredBy.region`, [OpenRouter region](../operations/openrouter-region.md)).
+Each provider has a sentence that says where its data goes ("The prompt goes to api.openai.com, outside this machine"), shown on the settings page and in data maps (`aimeat/src/services/ai/providers.ts`). An OpenRouter answer names the region that processed it (`route.answeredBy.region`, [OpenRouter region](../operations/openrouter-region.md)).
 
 ## Data kept to a local model
 
@@ -246,7 +246,7 @@ Native fixed types, reached only at the vendor's official address ([provider typ
 
 ## Limits
 
-- No provider record can send an `api-key` header, a custom header, a refreshing token or a SigV4 signature; every OpenAI-compatible call carries `Authorization: Bearer <key>` or nothing.
+- No provider record can send an `api-key` header, a custom header, a refreshing token or a SigV4 signature; every OpenAI-compatible call sends `Authorization: Bearer <key>` or nothing.
 - Azure OpenAI with Microsoft Entra ID authentication is not supported; only an Azure API key accepted as a bearer value can work, and the project has not tested it.
 - AWS Bedrock works only with a long-term Bedrock API key on the Chat Completions endpoint; short-term keys and SigV4 are not supported, and AWS recommends against long-term keys in production.
 - AIMEAT calls Chat Completions, not the Responses API.

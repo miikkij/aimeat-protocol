@@ -157,7 +157,7 @@ server {
 
 ## Process manager
 
-- **systemd:** [`aimeat/deploy/aimeat.service`](../../aimeat/deploy/aimeat.service) carries the start
+- **systemd:** [`aimeat/deploy/aimeat.service`](../../aimeat/deploy/aimeat.service) contains the start
   command, restart on failure with a back-off, the memory limits, the jemalloc preload and the heap
   ceiling (`NODE_OPTIONS`). `LD_PRELOAD` must be in the unit or the environment; a `.env` read by Node
   is too late for it.

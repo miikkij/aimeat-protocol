@@ -22,7 +22,7 @@ This page is for the architect and the network or firewall owner. It names the c
 
 There is no Redis, message queue or search cluster. The cache is an in-process map by design (`aimeat/src/services/cache.ts`).
 
-The Docker image runs as the unprivileged `node` user, pins its base image by digest, preloads jemalloc and carries only the production dependencies: the build stage drops the development dependencies with `pnpm prune --prod` before the image copies `node_modules` (`aimeat/Dockerfile`). The systemd unit runs as a dedicated user with `NoNewPrivileges=true` and `PrivateTmp=true` (`aimeat/deploy/aimeat.service`). Neither compose file keeps the node key directory on a volume: mount one or set `AIMEAT_NODE_KEY_PATH` ([Production deployment](../operations/production-deployment.md#process-manager)).
+The Docker image runs as the unprivileged `node` user, pins its base image by digest, preloads jemalloc and contains only the production dependencies: the build stage drops the development dependencies with `pnpm prune --prod` before the image copies `node_modules` (`aimeat/Dockerfile`). The systemd unit runs as a dedicated user with `NoNewPrivileges=true` and `PrivateTmp=true` (`aimeat/deploy/aimeat.service`). Neither compose file keeps the node key directory on a volume: mount one or set `AIMEAT_NODE_KEY_PATH` ([Production deployment](../operations/production-deployment.md#process-manager)).
 
 ```mermaid
 flowchart LR
@@ -135,7 +135,7 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 |---|---|---|---|---|
 | Any public `http(s)` address | Link previews of a pasted link (`GET /v1/unfurl`), also the preview image, proxied | Any signed-in person | On | `aimeat/src/routes/unfurl.ts` |
 | The `client_id` URL of an MCP client | OAuth Client ID Metadata Documents: the node reads who the AI client is when it signs in | The AI client vendor | On | `aimeat/src/services/oauth/client-metadata.ts` |
-| Outside MCP servers | A person or a group attaches another MCP server to the node | Any signed-in person in their own session; an agent or token needs `mcp:manage`, which no wildcard carries. No node setting turns it off (`aimeat_mcp_attach`, `aimeat/src/routes/mcp-servers.ts`) | Possible | `aimeat/src/services/mcp-client/transport.ts` |
+| Outside MCP servers | A person or a group attaches another MCP server to the node | Any signed-in person in their own session; an agent or token needs `mcp:manage`, which no wildcard includes. No node setting turns it off (`aimeat_mcp_attach`, `aimeat/src/routes/mcp-servers.ts`) | Possible | `aimeat/src/services/mcp-client/transport.ts` |
 | Webhook addresses | Action webhooks, agent webhooks, board subscribers, A2A push notifications (`aimeat_v2_push_set`) | The owner or agent that registers them | Possible | `aimeat/src/services/webhook-dispatcher.ts`, `aimeat/src/routes/agent-webhook.ts`, `aimeat/src/services/boards/subscribers.ts` |
 | Operator hooks | Actions bound to node events by the operator | The operator (`aimeat_admin_hook_set`) | None bound | `aimeat/src/services/hooks.ts` |
 | Capability webhooks | Capabilities published in the capability registry | `AIMEAT_CAPABILITY_WEBHOOKS` (`disabled`, `allowlist_only`, `open`), `AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST` | Disabled | `aimeat/src/services/capabilities/invoke.ts` |
@@ -164,7 +164,7 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 | `AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS` | Private origins a person's own storage may be at | `aimeat/.env.example` |
 | `AIMEAT_DATASPACE_CALLBACK_ORIGINS` | Private origins a data space callback may be at | `aimeat/.env.example` |
 | `AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST` | Domains capability webhooks may call in `allowlist_only` mode | `aimeat/.env.example` |
-| Federation carve-out | Calls to peers go to operator-approved addresses and may reach private networks, so that nodes inside one network can federate. Each such call site carries a written reason | `aimeat/scripts/check-outbound-fetch.ts`, `aimeat/security/outbound-fetch-exemptions.json` |
+| Federation carve-out | Calls to peers go to operator-approved addresses and may reach private networks, so that nodes inside one network can federate. Each such call site has a written reason | `aimeat/scripts/check-outbound-fetch.ts`, `aimeat/security/outbound-fetch-exemptions.json` |
 
 ## Resources and scaling
 
@@ -206,7 +206,7 @@ For availability, use a process manager restart, a second process as a standby o
 - Link previews let any signed-in person make the node fetch any public address, and the node reads the `client_id` URL that any MCP client presents; a host-only egress allowlist breaks these features for hosts not listed.
 - The code has no support for an outbound HTTP proxy; no proxy agent is configured for the node's own fetch calls.
 - Neither compose file keeps the node key on a volume, and the Docker image's `HEALTHCHECK` (`/v1/health/ready`) asks 127.0.0.1, so a node bound to another address needs its own ([Production deployment](../operations/production-deployment.md#process-manager)).
-- Calls to OpenRouter carry `HTTP-Referer: https://aimeat.io` and `X-Title: AIMEAT` (`aimeat/src/services/ai/adapters/sdk.ts`, `aimeat/src/services/openrouter.ts`): OpenRouter sees the software name, not the organisation.
+- Calls to OpenRouter send `HTTP-Referer: https://aimeat.io` and `X-Title: AIMEAT` (`aimeat/src/services/ai/adapters/sdk.ts`, `aimeat/src/services/openrouter.ts`): OpenRouter sees the software name, not the organisation.
 - The default STUN server given to browsers is Google's (`stun:stun.l.google.com:19302`, `aimeat/src/config.ts`); change `AIMEAT_STUN_SERVERS` if browsers must not contact it.
 - No Docker image is published by the project; the image is built from `aimeat/Dockerfile`.
 

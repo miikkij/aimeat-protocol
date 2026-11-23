@@ -9,7 +9,7 @@ AIMEAT has **two** storage providers, and they MUST stay in sync:
 | **PostgreSQL + Kysely** | production; must always pass | `pg` + Kysely (async) | `src/storage/providers/postgres-kysely/`: numbered SQL migrations in `migrations/*.sql` (applied on boot by `migrate.ts`), the Kysely `DB` interface in `db-types.ts`, method groups in `methods/*.ts` |
 | **SQLite** | first-class; must always pass | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/`: schema files `schema*.ts`, method groups in `methods/*.ts`, row-level helpers in `repos/*.ts` |
 
-The Prisma-era backends (MongoDB and the Prisma `postgres` provider) were removed on 2026-07-16. Every schema change lands in **both** remaining providers in the same commit.
+The Prisma-era backends (MongoDB and the Prisma `postgres` provider) were removed on 2026-07-16. Every schema change goes into **both** remaining providers in the same commit.
 
 `AIMEAT_STORAGE=memory` opens SQLite on `:memory:` (`src/storage/storage-factory.ts`): the same code, no persistence.
 
@@ -30,7 +30,7 @@ To find which file holds a record type, grep: `grep -rn "export interface AgentR
 
 Three checks hold the two providers together. All three run in `pnpm check:fast`, so in `pnpm gate` and CI:
 
-- `pnpm check:storage-file-parity`: a method lives in the methods file **of the same name** in both providers, and each provider defines the same methods. A method one provider needs alone is declared in its internals interface (`SqliteInternals` in `providers/sqlite/methods/internal.ts`).
+- `pnpm check:storage-file-parity`: a method is in the methods file **of the same name** in both providers, and each provider defines the same methods. A method one provider needs alone is declared in its internals interface (`SqliteInternals` in `providers/sqlite/methods/internal.ts`).
 - `pnpm check:storage-parity`: every table with an owner column on its list (`OWNER_COLUMNS` in `scripts/check-storage-parity.ts`) is cleared by both deletion cascades, or has a written reason in `aimeat/security/storage-parity-exemptions.json`.
 - `pnpm check:migration-hashes`: a Postgres migration file on `main` never changes, and a new one is listed in `aimeat/security/migration-hashes.json` in the same commit.
 
@@ -90,7 +90,7 @@ Files under `providers/postgres-kysely/`:
 3. **`db-types.ts`.** Add the column to the table's Kysely interface (`aiProvenanceId: string | null`).
 4. **Methods.** Update the methods file with the same name as the SQLite one: `insertInto(...).values(...)`, the select, `updateTable(...).set(...)`, and the row mapper. jsonb columns go through the `jsonb()` helper, and **PG jsonb does not preserve key order**, so do not compare `JSON.stringify` output for dedup.
 
-### Step 5: Check what else carries the record
+### Step 5: Check what else holds the record
 
 - A field that reaches the API goes into `openapi.yaml` in the same commit (`.claude/rules/backend.md`).
 - A field on `OwnerRecord` or `AgentRecord` stays out of `GET /v1/admin/backup` until it is named in `OWNER_FIELDS` or `AGENT_FIELDS` in `src/services/node-admin/backup-projection.ts`. That list is an allowlist on purpose.

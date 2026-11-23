@@ -27,7 +27,7 @@
 memory namespace (no one else writes there). It can fetch external APIs,
 run scheduled jobs, and read other namespaces via `ctx.memory.getPublic()`.
 It is the only layer trusted to call out to the internet. It does not act
-on the node in the caller's name: `ctx.fetch` carries no session, and there
+on the node in the caller's name: `ctx.fetch` sends no session, and there
 is no `ctx.api` or `ctx.task`. Work for an agent is passed on by the
 cortex, in the person's own session (§5.2).
 
@@ -168,7 +168,7 @@ exceptions:
   should check who is calling. The node runs every action for any signed-in
   caller, so the script decides: `ctx.caller.roles` tells an owner from an
   agent, and `ctx.caller.scopes` lists the permission words an agent's or
-  app's credential carries (an owner session carries none, because owners
+  app's credential holds (an owner session holds none, because owners
   bypass scopes). Throw when the caller may not do it.
 - **Read** actions are almost always fine for agents
 
@@ -255,7 +255,7 @@ precondition must `throw`.
 ### 4.3 Giving work to an agent
 
 An extension cannot create an agent's task. The sandbox has no `ctx.task`
-and no `ctx.api`, and `ctx.fetch` carries no session, so a script cannot
+and no `ctx.api`, and `ctx.fetch` sends no session, so a script cannot
 call the node's routes in the caller's name. The task is created one layer
 up, by the cortex, with the person's own session: `POST /v1/agents/{name}/tasks`
 (§5.2, `assignToAgent`). The route looks the name up among the caller's own

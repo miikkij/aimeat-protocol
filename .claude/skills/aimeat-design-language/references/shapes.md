@@ -70,7 +70,7 @@ and the CSS differ, the CSS wins and this file is corrected.
 | Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
 | Box initials mark | `.poster-box--avatar.poster-box--agent` | A dashed frame and grey initials: an agent's mark (and a mark for something not connected yet) in Contacts, Notifications, Email and MCP. |
 | Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
-| Box meter | `.poster-box--quota` | Card ground with coral consumption; `.is-full` changes the fill to danger. The quota meter is a named data role, with its ratio carried by SVG geometry. The figure written on a meter is `.poster-meter-figure` (typewriter .72rem, at the left). |
+| Box meter | `.poster-box--quota` | Card ground with coral consumption; `.is-full` changes the fill to danger. The quota meter is a named data role, with its ratio drawn as SVG geometry. The figure written on a meter is `.poster-meter-figure` (typewriter .72rem, at the left). |
 | Aside | `.poster-aside--small` | .9rem 1.1rem padding, .92rem / 1.55 text; the compact explanation used throughout organism settings and admin pages. |
 | Aside | `.poster-aside--large` | 1.25rem 1.5rem padding, surrounding body size and leading; Members and the shared human contact card. |
 | Aside | `.poster-aside--irreversible` | Solid coral border; the named irreversible-act explanation, composed with the same aside geometry. |

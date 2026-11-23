@@ -5,7 +5,7 @@ multi-line string syntaxes are not the same, and nothing warns you when you use 
 the wrong syntax is usually valid *characters*, so the command succeeds and the text is wrong.
 
 That is not hypothetical. Seven commits in this repo's history end with a stray `@`, and three of
-them (2026-08-13) also carry it as their first line, so `git log --oneline` shows
+them (2026-08-13) also have it as their first line, so `git log --oneline` shows
 `@ feat(agents): …` instead of the subject. The cause was one line:
 
 ```bash
@@ -68,7 +68,7 @@ an assistant, either shell. It refuses:
 
 The same hook then runs `node scripts/check-private-terms.mjs --commit`, which refuses a message that
 names a term from the private-terms list (the organisation-node names this public repository must not
-carry; the list sits in git's common directory, never in the tree).
+contain; the list sits in git's common directory, never in the tree).
 
 For a commit from VS Code or a terminal it is structural, not stylistic. It does not judge tone,
 length (below a runaway threshold), mood or wording: a gate that refuses the repo's own history gets
@@ -199,7 +199,7 @@ p.write_bytes(p.read_bytes().replace(b'old', b'new'))
 ## Many sessions, one main
 
 Up to eight Claude Code sessions, several machines and more than one account commit to this
-repo, and every commit carries the same author. On 2026-09-04 that meant the commit that stopped
+repo, and every commit has the same author. On 2026-09-04 that meant the commit that stopped
 main from booting could only be attributed by content and time, after three sessions had been
 asked in turn. Three hooks and two variables answer it; the ritual around them is skill
 `aimeat-dev-session` on the node.
@@ -223,13 +223,13 @@ them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
   so a peer's half-done work in a shared checkout is not this commit's problem, and an
   untracked importer is ignored until it is staged. c932f2f17 shipped without the two files it
   imported and passed every gate that read the worktree.
-- **`pre-push`**, in order: refuses a push that carries a commit of a rewritten history
+- **`pre-push`**, in order: refuses a push that includes a commit of a rewritten history
   (`check-rewritten-history.mjs`, roots in `aimeat/security/rewritten-history.txt`); refuses a
   pushed commit that names a private term (`check-private-terms.mjs --push`); fetches and refuses
   a push from behind `origin/main` (rebase first); refuses a push on top of a red CI on main
   without a named reason (`ci-state.mjs --push-check`: a `Red-CI:` trailer or
   `AIMEAT_RED_CI_REASON`; an agent session is refused, a person's push gets a warning);
-  lists, for a session, the commits about to go that carry no `Session:` trailer; and runs
+  lists, for a session, the commits about to go that have no `Session:` trailer; and runs
   `pnpm boot:smoke`, which imports the modules on the server's boot path and refuses when one
   throws at load.
 - **One session, one worktree**, made by Claude Code (`claude --worktree cc-<owner>-<tag>`, or
@@ -238,4 +238,4 @@ them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
   `git worktree add --detach .worktrees/cc-<owner>-<tag> origin/main`, then `cd aimeat`,
   `pnpm install` and `pnpm test:env:init`: inside the repository under `.worktrees/`, detached at
   `origin/main`, never a branch and never a sibling directory. Then everything from there. In a shared checkout `git log origin/main..HEAD` shows a peer's
-  commits, and a push would carry them; stop and message the peer.
+  commits, and a push would include them; stop and message the peer.

@@ -21,12 +21,12 @@ The liaison agent uses CrewAI's `MCPServerAdapter` against an AIMEAT node's MCP 
 
 ## What is AIMEAT?
 
-[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is an open-source system where a person keeps their knowledge, their agents and their apps on a node they own, and works with them from the AI they already use. It carries persistent identity, shared memory, a capabilities catalog, a work queue, knowledge packages, and federation across nodes. Every agent in your crew gets:
+[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is an open-source system where a person keeps their knowledge, their agents and their apps on a node they own, and works with them from the AI they already use. It provides persistent identity, shared memory, a capabilities catalog, a work queue, knowledge packages, and federation across nodes. Every agent in your crew gets:
 
 - A stable identity that survives across sessions and frameworks
 - Shared memory that other agents (yours or other people's) can read
 - A capabilities catalog so other agents can find what your crew does
-- A work queue through which other agents give yours work. An offer can carry a money price, settled on payment rails outside the morsel balance, and a pacing amount in morsels. A morsel paces use and is never a price.
+- A work queue through which other agents give yours work. An offer can have a money price, settled on payment rails outside the morsel balance, and a pacing amount in morsels. A morsel paces use and is never a price.
 - Knowledge packages so the deliverables your crew produces become reusable
 
 This package is the **bridge** that gives a CrewAI crew access to all of that with one drop-in agent role.
@@ -175,7 +175,7 @@ A crew that builds or operates an extension calling a third-party API never rece
 extension names it in an outbound header as `{{secret:NAME}}`, and the node fills it from the
 owner's vault on the way out; a name the owner has not stored fails as `SECRET_UNKNOWN` before
 anything is sent. Three tools manage the vault, all behind the `secrets:manage` scope, which no
-wildcard carries, so the owner ticks it per agent: `aimeat_secret_list` (names, dates and which
+wildcard includes, so the owner ticks it per agent: `aimeat_secret_list` (names, dates and which
 extensions used each one in the last 30 days, never a value), `aimeat_secret_set { name, value }`
 (store or replace) and `aimeat_secret_delete { name }`. When a task needs a key the owner has not
 stored, tell the owner the exact name and that it goes on their Access page, section 04 Secrets,
@@ -219,7 +219,7 @@ arguments or `AIMEAT_AGENT_TOKEN` only when `AIMEAT_HOME` is set (0.39.0+). With
 the home is the current folder, and the token does not go to an address a folder names. A token
 stored in the home goes to its own agent's node, `node_url:` in `agents/<owner>/<agent>/config.yaml`;
 the home's `config.yaml` names the node for it only when that file names this agent or no agent
-(0.40.0+). When agents of two owners in one home carry the same name, give the full identity
+(0.40.0+). When agents of two owners in one home have the same name, give the full identity
 `agent#owner@node`: a bare name then picks no stored token (0.41.0+).
 
 **The node chooses the model.** `/v1/llm/chat/completions` does not read the request's `model`:
@@ -334,7 +334,7 @@ with create_liaison_agent(
     ...
 ```
 
-**Requires** AIMEAT node 1.13.5+ (CrewAI-strict frontmatter) and CrewAI 1.14+ (native Skills support). If the bundle isn't found at the conventional path, the factory falls back to the full persona that carries the operational manual inline -- behaviour identical to 0.1.x.
+**Requires** AIMEAT node 1.13.5+ (CrewAI-strict frontmatter) and CrewAI 1.14+ (native Skills support). If the bundle isn't found at the conventional path, the factory falls back to the full persona that contains the operational manual inline -- behaviour identical to 0.1.x.
 
 ## Daemon mode (0.3.0+)
 
@@ -448,7 +448,7 @@ agent is read from a per-kickoff ContextVar and the call is POSTed to that agent
 telemetry route, so per-agent ledger grouping stays correct instead of collapsing onto the
 first-started agent.
 
-**Cost + clean model ids (0.16.2+):** the report carries OpenRouter's authoritative per-call
+**Cost + clean model ids (0.16.2+):** the report includes OpenRouter's authoritative per-call
 `usage.cost` as `cost_usd` when your OpenRouter request sets `extra_body={"usage":{"include":True}}`
 (CrewAI copies it onto the event) — so text-LLM calls are priced, not left at $0. The model id is
 normalized (a known routing prefix like `openrouter/`/`nvidia:` is moved into `provider`), so one
@@ -466,7 +466,7 @@ shape how that works, and both used to bite:
   the consent/visibility guard.
 - **The serve loopback is JSON/UTF-8.** Binary taken through it is corrupted irreversibly. So these
   helpers never route bytes through the loopback: they ask for a small JSON **handle** and then fetch
-  the presigned `download_url` directly (that URL carries its own authorization — no token needed).
+  the presigned `download_url` directly (that URL contains its own authorization — no token needed).
 
 ```python
 from aimeat_crewai import serve_client, read_file, inbox_files, upload_file, delegate_file
@@ -501,8 +501,8 @@ next read onward; the task keeps the reference.
 ## Data packages: read one correctly, publish one (0.20.0+)
 
 A published data package has a permanent address whose path contains the hash of its own contents,
-so the bytes there can never change. Beside them sits a Frictionless descriptor carrying a Table
-Schema — the name and the **type** of every column — which is why an agent handed a package needs
+so the bytes there can never change. Beside them sits a Frictionless descriptor with a Table
+Schema — the name and the **type** of every column — which is why an agent given a package needs
 no column documentation.
 
 ```python
@@ -707,7 +707,7 @@ if not s["available"]:
     print(s["unavailable_reason"])   # the node's own sentence: what to set, and where
 ```
 
-Refusals arrive as `DecideRefused` carrying the node's **own** code — `NO_API_KEY`,
+Refusals arrive as `DecideRefused` with the node's **own** code — `NO_API_KEY`,
 `AGENT_QUOTA_EXHAUSTED`, `DATAMAP_REQUIRED`, `RULE_NOT_FOR_CALLER`, `RATE_LIMITED` and the rest —
 so a caller can branch on the real reason. **Only a rate limit is retryable** (`exc.retryable`,
 with `exc.retry_after` in seconds): a quota that is used up is used up and a permission that is

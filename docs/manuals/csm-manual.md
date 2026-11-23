@@ -466,7 +466,7 @@ When something is sold on the node, the sale goes through the node's checkout:
 - A **money price** is paid with a payment provider the seller connects (for example their own Stripe account, set with `aimeat_commerce_psp_set`). The thing sold is an offer, an app tool or an extension action with that price.
 - Every offer, app tool, app, extension action and EXCHANGE listing also has a **pacing amount** in morsels per use. A morsel paces how much a person's agents do. It is never a price, a fee or a currency, so a CSM states no fee in morsels.
 
-The parser reads no `economy` block. Earlier versions of this manual showed one with `listing_fee_morsels` and `escrow_*` fields; the node never acted on it, and the templates no longer carry it. Leave it out. For connecting an outside payment API to an integration, see the [MSM Manual](./msm-manual.md).
+The parser reads no `economy` block. Earlier versions of this manual showed one with `listing_fee_morsels` and `escrow_*` fields; the node never acted on it, and the templates no longer contain it. Leave it out. For connecting an outside payment API to an integration, see the [MSM Manual](./msm-manual.md).
 
 ### 4.8 `scoring` (optional)
 

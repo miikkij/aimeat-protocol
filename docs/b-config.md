@@ -2,7 +2,7 @@
 
 What a node actually reads, where each value comes from, and how an operator changes it.
 
-This appendix used to carry an aspirational JSON schema from the v1 era, with roughly seventy-five
+This appendix used to contain an aspirational JSON schema from the v1 era, with roughly seventy-five
 settings that exist nowhere in the code. It now describes the reference implementation, checked
 against `aimeat/src/services/config/schema.ts` and `aimeat/.env.example` on 3 September 2026.
 
@@ -85,7 +85,7 @@ be reset. Secrets never appear as values: an API key shows up as `<path>_configu
 
 A reset (`DELETE /v1/admin/config/{path}`, the Reset control on the Config page) removes the value
 saved in the database. It does not change the running value: the node keeps the removed value until
-it restarts, and then reads the layer below. Until then the field carries `restartPending: true`,
+it restarts, and then reads the layer below. Until then the field has `restartPending: true`,
 its `source` names that layer, and the Config page says so on the setting's line.
 
 ### Changing it

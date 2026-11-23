@@ -71,7 +71,7 @@ mirror the agent levels; the last column says what the node enforces today.
 | **0, Connected** | Completes the hello handshake, has a per-user GEAI, holds a tunnel, reads and writes within its granted scopes | ✓ Built: `ecosystem-apps.ts`; the tunnel accepts the `ecosystem` role |
 | **1, Provides capabilities** | Declares `capabilities` (id and input and output schema) that agents and schedules can invoke, and the `scopes` it uses against AIMEAT | ✓ Manifest fields, static validation and capability invocation over the tunnel are built. Pricing and visibility per capability are a design target. |
 | **2, Exchanges events** | Emits events that AIMEAT workflows use as triggers, and subscribes to AIMEAT events | ✓ The event envelope, the inbound and outbound catalogs and the router are built. Payload schemas per event are a design target: `emits` and `subscribes` are name lists today. |
-| **3, Workflow-compatible** | Capabilities carry workflow signals (`success_signal`, `required_to_function`, `deliverable.location`), so a call or a deposit can be a chained, checked step | Design target: not in `EcoManifestSchema` yet. The grammar exists for agents (`workflow-schemas.ts`), and ecosystem capabilities will reuse it. |
+| **3, Workflow-compatible** | Capabilities include workflow signals (`success_signal`, `required_to_function`, `deliverable.location`), so a call or a deposit can be a chained, checked step | Design target: not in `EcoManifestSchema` yet. The grammar exists for agents (`workflow-schemas.ts`), and ecosystem capabilities will reuse it. |
 
 An ecosystem app is AIMEAT-compatible in the full sense when it reaches level 3 on at least one
 capability. Levels 0 to 2 are real and usable now.
@@ -143,14 +143,14 @@ the request with its `user_code` on the **Outside apps** tab of Settings & Contr
 - `GET /v1/ecosystem-apps/pending`: the owner lists pending hello requests.
 - `POST /v1/ecosystem-apps/:userCode/approve`: the owner approves or denies, and chooses the scopes
   and data areas the GEAI may use. The status becomes active and the credential can be picked up.
-- A scope that no wildcard carries (`receivers:manage`, `party:manage`, `share:manage`, the
+- A scope that no wildcard includes (`receivers:manage`, `party:manage`, `share:manage`, the
   `*-as-owner` words and the rest) is granted only when the owner ticks it. The pending row lists
   them as `own_tick_scopes`, the Outside apps tab shows them unticked, and an approval that names no
   scopes leaves them out unless your app already held them (`held_back_scopes` in the answer). Ask
   for such a scope only when your app needs it, and say why in your setup guide.
 - A hello from an app the owner already connected is a **reconnect**. The pending row says so
   (`reconnect: true`) and whether the key differs from the pinned one (`key_changed`; a change also
-  carries `pinned_key_fingerprint` and `key_fingerprint`, and a same-key reconnect carries
+  includes `pinned_key_fingerprint` and `key_fingerprint`, and a same-key reconnect includes
   `key_proven`). Approving a key change ends every session of the GEAI issued before it, as a
   delete does, so the old credential answers 401 and your app picks up the new one. A reconnect with
   the same key (the yearly re-approval) keeps its sessions. Send a hello with a new key only when the
@@ -180,12 +180,12 @@ Authorization: Bearer <your current GEAI token>
   is accepted once.
 - No proof: `401 ECO_KEY_PROOF_REQUIRED`. Another key, a stale timestamp or a reused signature:
   `401 ECO_KEY_PROOF_INVALID`.
-- **One approval carries one year of renewals.** The token from the pickup carries `auth_time`, the
+- **One approval covers one year of renewals.** The token from the pickup contains `auth_time`, the
   moment the owner approved, and every renewal keeps it. A year after that the renewal answers
   `401 ECO_REAPPROVAL_REQUIRED`: send hello again, and the owner approves the app again and sees its
-  permissions. The renewal answer carries `reapprove_by`, so you can ask the owner before it runs out,
+  permissions. The renewal answer includes `reapprove_by`, so you can ask the owner before it runs out,
   and a renewed token never outlives the approval.
-- Renew while your current token is still valid: an expired bearer cannot renew, and the way back is
+- Renew while your current token is still valid: an expired bearer cannot renew, and the fix is
   hello again.
 
 **What an app built before 2026-10-09 must change.** Generate a real Ed25519 keypair if you sent a
@@ -365,7 +365,7 @@ delivery are skipped and say that the app is not reachable, rather than failing 
 1. **Keep your own user management and access control.** No delegated tokens, no shared permission
    minting. When an agent calls your capability, you enforce the bound account's access rules. When
    the GEAI reads or writes AIMEAT, AIMEAT enforces consent and scopes.
-2. **The binding is only a marker** ("owner X maps to your account ref Y"). It carries no rights of
+2. **The binding is only a marker** ("owner X maps to your account ref Y"). It gives no rights of
    its own.
 3. **You own raw data; the user owns refined data.** Deposit the distilled output into the user's own
    namespace or organism (with the grant), as an agent does. Prefer references, read-through and
@@ -447,12 +447,12 @@ schema-valid output, (c) an emitter for each event in `emits`, (d) a handler for
       the token picked up is a GEAI JWT with `roles:['ecosystem']` and
       `sub = eco:{app}#{owner}@{node}`.
 - [ ] `public_key` is a real Ed25519 public key (base64), and every renewal at `POST /v1/auth/refresh`
-      carries `{ timestamp, signature }` signed with its private half (section 3.3a); the app asks its
+      sends `{ timestamp, signature }` signed with its private half (section 3.3a); the app asks its
       owner to approve again before `reapprove_by`.
 - [ ] If a `manifest` is sent, all six static checks pass (`validation.ok === true`).
 - [ ] `manifest.app` equals the hello `app`; `manifest.scopes` is a subset of the requested scopes;
       capability ids are unique.
-- [ ] The manifest carries a `setup` guide in English and Finnish, and `automation.schedulable` names
+- [ ] The manifest includes a `setup` guide in English and Finnish, and `automation.schedulable` names
       the capability that publishes data, with its `produces_key`.
 - [ ] Capabilities answer with schema-valid output over the tunnel; subscribed events are
       acknowledged; emitted events use the `{ version, event, …, data }` envelope.

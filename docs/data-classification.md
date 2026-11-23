@@ -7,7 +7,7 @@ stands until AIMEAT Core 2026-11 specifies classification as an optional profile
 
 ## Data classification
 
-**What it gives.** A record, a file or a workspace row carries a level, and the level decides three
+**What it gives.** A record, a file or a workspace row has a level, and the level decides three
 things everywhere the node reads it: whether a person is shown it, whether an AI may read it, and
 whether it may leave its group (to another organism, or to another node). A person sees and manages
 their levels on the Data Wallet page (`/v1/profile?tab=dataWallet`); an operator sets the node's
@@ -50,7 +50,7 @@ check it. New content gets the policy's default label (Internal).
 
 ### Audience caps
 
-A label can carry an audience cap (`maxAudience`): the widest audience its content may be given.
+A label can have an audience cap (`maxAudience`): the widest audience its content may be given.
 The levels, narrowest first, are `private`, `organism`, `signed-in`, `link` and `public`. A change that
 makes content wider than its effective label's cap is refused with 409 `LABEL_CAPS_AUDIENCE`, and the
 message names the label and the cap; a change that keeps or narrows the audience is never refused.
@@ -147,7 +147,7 @@ classification behind and list them under `left_out`; the account export include
 
 ### For an AI
 
-`aimeat_classification` carries every act as an `action`: read and set a label, review a suggestion,
+`aimeat_classification` takes every act as an `action`: read and set a label, review a suggestion,
 read and set the policy, the audit, a scan, the explorer, the switch, and exceptions (listing only; an
 AI cannot make one). Routes: `/v1/classification/*` in [openapi.yaml](../openapi.yaml).
 
@@ -217,7 +217,7 @@ as the floor; a stored file sent to an AI under `protect` or `drop` is refused, 
 agent reports is the agent's claim, which the server cannot check.
 
 **What an app's users see.** An app's data map read (`GET /v1/datamap/apps/{owner}/{filename}`,
-`aimeat_datamap_get`) carries `records_of_processing`, each register's title, type, purpose, legal
+`aimeat_datamap_get`) includes `records_of_processing`, each register's title, type, purpose, legal
 basis, data and retention, and `privacy_notice`, for the same readers as the map. The App Catalog's
 "Where this app puts what" shows them as "Personal data this app keeps".
 
@@ -235,7 +235,7 @@ processing agreements fill.
 **Drafts and gaps.** `GET /v1/compliance/draft` returns a filled draft: the node's own registers
 (accounts, the sign-in and security log, the consent ledger, the AI usage ledger), an organism's member
 register, or an app's register read from its data map. `GET /v1/compliance/gaps` lists what a scope
-leaves open, and the operator's report carries every scope's gaps under `processing`.
+leaves open, and the operator's report lists every scope's gaps under `processing`.
 
 **Where.** `GET /v1/compliance/catalog`, `GET`/`PUT /v1/compliance/docs/{kind}`, `/draft` and `/gaps`,
 with `scope=node|organism|app`, `organism_id`, `app` and `app_owner`. Something acting for a person

@@ -16,7 +16,7 @@
 
 **Reach for this by default when building automation or coordination in AIMEAT.** Before adding a new SQL table + bespoke handlers for "when X happens, do Y," ask: *can this be a Memory Contract?* Usually it can, and then a new automation is "design a JSON shape + a condition + an action": no migration, no backend sync, and it federates and stays AI-legible for free.
 
-A **Memory Contract** is one self-describing memory record that holds all the state for a piece of coordination, plus the rules for reacting to changes in it. We own only the record and our reaction to it; whatever computes or advances the state lives in **whatever system honors the contract**, internal or an external system we know nothing about. The memory entry *is* the interface.
+A **Memory Contract** is one self-describing memory record that holds all the state for a piece of coordination, plus the rules for reacting to changes in it. We own only the record and our reaction to it; whatever computes or advances the state is in **whatever system honors the contract**, internal or an external system we know nothing about. The memory entry *is* the interface.
 
 ## Why it fits AIMEAT
 AIMEAT is about *refined, valuable knowledge and the wisdom drawn from it*, not mass processing. A Memory Contract holds exactly that: the refined, decision-relevant state and the reaction rules. So the pattern's scope is not a limitation; it *is* the point. Heavy lifting stays behind the contract; the contract surfaces only the small, valuable, legible state we react to.
@@ -32,7 +32,7 @@ AIMEAT is about *refined, valuable knowledge and the wisdom drawn from it*, not 
 Any valuable, refined, **event-driven coordination**: cross-system / cross-node handoffs, human-or-AI-in-the-loop gating, "do Y when X becomes true," anything an internal or external AI/system should be able to read and advance through a stable contract.
 
 ## Keep behind the contract (not in it)
-High-write-rate or high-volume data, transactional/relational workloads, latency-critical paths, large blobs. These are not forbidden. They live in the **honoring system behind the contract**, which surfaces only the refined state we react to. The contract stays small, valuable, and legible.
+High-write-rate or high-volume data, transactional/relational workloads, latency-critical paths, large blobs. These are not forbidden. They belong in the **honoring system behind the contract**, which surfaces only the refined state we react to. The contract stays small, valuable, and legible.
 
 ## A row, a memory key, or a table
 

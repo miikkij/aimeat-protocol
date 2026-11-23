@@ -489,7 +489,7 @@ date format gets `3 päivää sitten` beside `13/09/2026`. Everything else here 
 separators, a date's order, a clock) follows the regional format.
 
 **Never write a `{n} min ago` translation key.** It cannot produce `eilen`, and one `{n}` cannot
-carry a language whose noun changes with the number: Polish writes `1 dzień` but `2 dni`, Russian
+handle a language whose noun changes with the number: Polish writes `1 dzień` but `2 dni`, Russian
 `1 день`, `2 дня`, `5 дней`. CLDR holds those rules, and `relative()` and `duration()` read them.
 
 **A moment and a calendar date are different things, and mixing them gives a wrong number rather
@@ -556,7 +556,7 @@ engines disagree on what the keyboard does to the viewport:
 
 Fix it with two layers:
 
-1. **Viewport meta (primary, iOS 16+ and Android):** `public/spa.html` carries
+1. **Viewport meta (primary, iOS 16+ and Android):** `public/spa.html` has
    `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">`.
    `interactive-widget=resizes-content` makes the keyboard resize the **layout** viewport, so
    `100dvh` and `fixed inset: 0` shrink to the area above the keyboard and the composer stays
@@ -760,7 +760,7 @@ render, the shell shows a retry message instead of a blank app.
 ### API Errors
 
 `api()` and its shorthands return the parsed AIMEAT envelope `{ ok, data, hints }` and **throw** when
-the server answers `ok: false`. The thrown error carries `message`, `code` (for example
+the server answers `ok: false`. The thrown error has `message`, `code` (for example
 `NOT_FOUND`), `status` and `response`.
 
 ```javascript
@@ -791,7 +791,7 @@ What `api()` does around the call:
 - **Reads are retried, writes are not.** A `GET`, `HEAD` or `OPTIONS` that gets a 429, a 5xx, a
   network error or a timeout is retried up to 3 times with exponential backoff. A write is never
   retried automatically, because a failure does not prove it did not happen.
-- **`POST` and `PUT` carry an `Idempotency-Key` header**, one per call.
+- **`POST` and `PUT` send an `Idempotency-Key` header**, one per call.
 - **A 401 refreshes the session once** and repeats the call.
 - **A network failure** that runs out of retries throws with `code: 'NETWORK_ERROR'`.
 - **The timeout is 30 seconds**; pass `timeoutMs` for a slow call.
@@ -991,7 +991,7 @@ deployed new code.
 **Solution:** `serveSpa()` in `src/routes/portal-spa.ts` tags the shell's first-party assets with
 `?v=<content hash>` on every response, one hash per file (`src/utils/asset-version.ts`). A changed
 file gets a new address; an unchanged file keeps its address across deploys. Until 2026-11-06 every
-file carried the build stamp, so each release gave all ~790 files new addresses at once, and Search
+file's address included the build stamp, so each release gave all ~790 files new addresses at once, and Search
 Console listed 4 515 of them as crawled and not indexed (TARGET-090).
 
 **How it works:**
@@ -1006,10 +1006,10 @@ Console listed 4 515 of them as crawled and not indexed (TARGET-090).
    maps it. Never append a query to one: `'/views/help.js?v=…'` is not the importmap's key, so it
    loads a second copy of a module the views share. `test/unit/spa-asset-stamp.test.ts` holds both.
 4. `serveSpa()` injects `window.__BUILD_ID`, and the same script sets `window.__BUILD_ID` and, after load, calls `watchBuild()` in
-   `public/lib/live-updates.js`. Every live stream opens with `event: hello` carrying the build
+   `public/lib/live-updates.js`. Every live stream opens with `event: hello`, which contains the build
    (`src/routes/sse.ts`), and a restart drops every stream, so the reconnect reads the new build and
    the page reloads itself. A signed-out page holds a visitor stream for it
-   (`POST /v1/events/visitor-ticket`), which carries the build and nothing else. Nothing asks
+   (`POST /v1/events/visitor-ticket`), which sends the build and nothing else. Nothing asks
    `/v1/build` on a timer: live data is an event, never a poll (Jouni, 2026-10-18).
 
 **Rule: when you add a shared JS module** on an absolute path (`/js/services/foo.js`,

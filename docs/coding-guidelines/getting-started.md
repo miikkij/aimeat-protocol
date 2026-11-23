@@ -43,7 +43,7 @@ Node, pnpm, this checkout's test settings or the pinned CodeQL. What a machine n
 - **The git hooks.** `pnpm install` at the root sets `core.hooksPath` to `.githooks`.
 - **PostgreSQL 16 or 17**, only for the PostgreSQL suites. CI and `docker-compose.yml` run 16,
   which is the oldest version the node supports, and the node logs a warning at start on an older
-  server. The test settings example carries the CI service's account (`appuser:devpassword123`).
+  server. The test settings example contains the CI service's account (`appuser:devpassword123`).
   When your server has another account, write yours together with this checkout's database:
 
   ```bash
@@ -179,7 +179,7 @@ start log prints (`docker compose logs aimeat`, the line that starts with "Setup
 request from outside the container does not come from the node's own machine. The compose file
 publishes PostgreSQL on 127.0.0.1:5432 only.
 
-The `aimeat` CLI carries the operator commands: `aimeat config` prints every setting and where its
+The `aimeat` CLI has the operator commands: `aimeat config` prints every setting and where its
 value comes from (`config export` and `config import` move it), `aimeat validate` checks the
 configuration for problems, `aimeat update` copies the installed package's asset files into the
 working folder and skips any file you changed, `aimeat backup [file]` and `aimeat restore <file>`
@@ -198,7 +198,7 @@ leaves AI keys, vault secrets and two-step sign-in secrets unreadable, and the d
 not restore the node's identity. If you set them outside `.env` (Docker, systemd), back them up from
 there.
 
-`aimeat backup` is a partial export, not a backup: it carries accounts, agents and agents' memory but
+`aimeat backup` is a partial export, not a backup: it contains accounts, agents and agents' memory but
 not the records people keep under their own accounts, organisms, apps or files, and no credential.
 It needs a personal access token of an operator account (`--token <token>` or `AIMEAT_OP_TOKEN`),
 and a refusal writes no file and exits 1. The procedure, the restore and its test:

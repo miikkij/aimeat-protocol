@@ -71,7 +71,7 @@ The node's own metrics, as registered in `src/services/prometheus.ts` (all with 
 | `aimeat_rate_limit_hits_total` | Counter | Rate limit triggers (label: tier) |
 | `aimeat_scope_denials_total` | Counter | Scope/permission denials |
 
-The endpoint also carries the Node.js process metrics of `prom-client` (`collectDefaultMetrics`): `process_*` and `nodejs_*` (CPU, resident memory, heap, event-loop lag, garbage collection), without the `aimeat_` prefix.
+The endpoint also exposes the Node.js process metrics of `prom-client` (`collectDefaultMetrics`): `process_*` and `nodejs_*` (CPU, resident memory, heap, event-loop lag, garbage collection), without the `aimeat_` prefix.
 
 Uptime, the number of owners and agents, memory reads and writes, consent operations and schema validations are not Prometheus metrics. They are in the JSON from `GET /v1/stats` (`uptime_seconds`, `active_owners`, `active_agents`, `memory_writes`, and the rest listed above).
 

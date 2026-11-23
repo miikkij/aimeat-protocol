@@ -46,7 +46,7 @@ JetBrains Mono vendored 2026-07-25 for the AIMEAT theme system, Archivo and Arch
 2026-08-29 as the house faces, and on the same day Fjalla One (the headline face,
 `--font-headline` in theme.css), DM Sans (the body fallback and the older static pages) and
 VT323 (the OS front page): the last three had still been fetched from fonts.googleapis.com by
-sixteen HTML files. Every `@font-face` lives in `/lib/aimeat-fonts.css`, which
+sixteen HTML files. Every `@font-face` is in `/lib/aimeat-fonts.css`, which
 `/lib/aimeat-theme.css` imports and the standalone pages link, so nothing on the node reaches
 an external CDN and the CSP no longer allows one. Bungee vendored 2026-09-20: a Design Book look
 on production named it as its display face and nothing served it. All subsets are latin + latin-ext, so
@@ -56,8 +56,8 @@ Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne,
 Geist Mono, Martian Mono, Mona Sans and Hubot Sans vendored 2026-10-02, so a theme has display and
 text faces beyond the house ones (Jouni asked for more faces in the package). The nine
 from Google Fonts are its latin and latin-ext subsets, unchanged. Mona Sans and Hubot Sans are not
-on Google Fonts: each is the variable woff2 file of GitHub's own release, unchanged, which carries
-latin and latin-ext in one file and so has no `unicode-range` in `aimeat-fonts.css`. Both carry a
+on Google Fonts: each is the variable woff2 file of GitHub's own release, unchanged, which has
+latin and latin-ext in one file and so has no `unicode-range` in `aimeat-fonts.css`. Both have a
 Reserved Font Name under the OFL, which only matters to someone who modifies the font and ships it
 under the same name; these files are not modified.
 
@@ -65,7 +65,7 @@ Press Start 2P and Selawik vendored 2026-10-03 for two themes Jouni asked for, a
 and an Azure portal one. Press Start 2P is Google Fonts' latin and latin-ext subsets, unchanged.
 Selawik is Microsoft's open-source face built with the metrics of Segoe UI; the five woff2 files
 are the ones in `Selawik_Release.zip` of its 1.01 release, unchanged and renamed by weight
-(`selawkl` 300, `selawksl` 350, `selawk` 400, `selawksb` 600, `selawkb` 700). Both carry a Reserved
+(`selawkl` 300, `selawksl` 350, `selawk` 400, `selawksb` 600, `selawkb` 700). Both have a Reserved
 Font Name, which binds only someone who modifies the font.
 
 Newsreader and the Fraunces italic vendored 2026-10-17 for the kirjapaino look, the printed-letter

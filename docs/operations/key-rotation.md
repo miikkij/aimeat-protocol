@@ -117,7 +117,7 @@ header names it (`kid`, for example `session.Ab3dE9xY`). A token of one kind doe
 another kind, whatever its claims say.
 
 Every process of a node derives the same keys from the same node key, so a token signed by one process
-verifies on another. A token issued before 2026-11-04 carries no `kid` and was signed with the node key
+verifies on another. A token issued before 2026-11-04 has no `kid` and was signed with the node key
 itself; the node verifies it with the node key until it expires, as before.
 
 The other direction does not hold: a release from before 2026-11-04 verifies tokens with the node key

@@ -1,7 +1,7 @@
 # Running federation
 
 How an operator connects a node to other AIMEAT nodes, what each level of peering allows, what a signed
-request between nodes carries, what to watch, and how to remove a peer. The routes and their bodies
+request between nodes contains, what to watch, and how to remove a peer. The routes and their bodies
 are in [openapi.yaml](../../openapi.yaml); the catalogue and memory exchange between genesis peers is
 in [cross-federation](../aimeat-cross-federation.md); the protocol is in the
 [Core specification](../AIMEAT-Core-2026-11.md), §9.
@@ -23,7 +23,7 @@ There is no single on switch. A node's place in a federation comes from:
 | `AIMEAT_GENESIS_URL` | the federation's genesis node, written by `aimeat join` |
 | `AIMEAT_FEDERATION_OPEN_JOIN` | whether this node takes introductions from nodes it has not invited |
 | `AIMEAT_FEDERATION_AUTH_POLICY`, `AIMEAT_FEDERATION_DEFAULT_SCOPES` | whether people from peer nodes can sign in here, and with what |
-| `AIMEAT_FEDERATION_RELAY_CLAIM` | whether a relayed request must carry a signed claim (see below) |
+| `AIMEAT_FEDERATION_RELAY_CLAIM` | whether a relayed request must include a signed claim (see below) |
 | `AIMEAT_FEDERATION_AUDIENCE_REQUIRED` | whether a message must prove it was meant for this node (see below) |
 | `AIMEAT_DEPEERING_GRACE_HOURS` | how long a removed peer keeps working while work in flight settles |
 | `AIMEAT_MAX_RELAY_HOPS` | how many nodes a relayed request may pass through |
@@ -68,7 +68,7 @@ A peer has a tier. Higher tiers allow more:
 A visiting peer becomes a member with `POST /v1/federation/peers/{nodeId}/promote`. Other changes to a
 peer go through `PUT /v1/federation/peers/{nodeId}`.
 
-## What a request between nodes carries
+## What a request between nodes contains
 
 Every request from one node to another is signed with the sending node's key and checked by the
 receiver:
@@ -78,11 +78,11 @@ receiver:
   `REPLAYED`). Keep both nodes' clocks synchronised (NTP).
 - **Audience.** The node it is meant for. A message signed for another node is refused
   (`WRONG_AUDIENCE`), so a message one peer received cannot be replayed to another. Messages that
-  carry stored data (replication, catalogue sync, the read receipt) also carry their send time under
+  contain stored data (replication, catalogue sync, the read receipt) also include their send time under
   the same signature. A message without this proof is refused with `AUDIENCE_REQUIRED` when
   `AIMEAT_FEDERATION_AUDIENCE_REQUIRED` says so, and always from a peer that has sent a proof before.
   From 4.0.0 the format without it is refused whatever the setting says ([upgrading](upgrading.md#what-400-removes)).
-- **Relay claim.** A request that one node forwards for another carries `x-relay-claim`, a short-lived,
+- **Relay claim.** A request that one node forwards for another includes `x-relay-claim`, a short-lived,
   single-use statement signed by the relaying node (which node, for whom, which method and path), and
   `x-relay-signature`. Without it the request is refused with `RELAY_CLAIM_REQUIRED`, unless the
   setting or that peer's own answer is `optional`. Set a peer's answer with

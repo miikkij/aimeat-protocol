@@ -26,7 +26,7 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   his. Ask also before a new entry in `docs/known_gaps.md`, before publishing a roadmap item or a
   ruling, and at the end of every feature with the proposed `aimeat/public/changelog.json` entry.
 - **A fix covers the whole defect**, not the reported symptom: a delete that leaves data behind is
-  checked in every table and store that carries the id.
+  checked in every table and store that holds the id.
 - **Never claim anything about production without probing it**: `curl <node>/v1/build` gives the
   commit that runs. Test at the size production has, not with two fixtures.
 - **Every place you mention comes with its URL**: production, or your sandbox with the account and
@@ -79,17 +79,17 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   you chose by looking at the result.
 - **English and Finnish, always, unless he asks for one.** The language of the conversation is not
   the app's language list. Every string goes through a dictionary; the node's own sign-in bar
-  carries the switch. Never write a header control or a language switch of your own.
+  has the switch. Never write a header control or a language switch of your own.
 - **The working screen is a mosaic inside the genre, and its arrangement comes from the Design
   Book.** The genre is the frame; the list, the numbers, the form and the history are
   `AIMEAT.atelier.mosaic({ target, sources, fallback })` mounted into one element of the genre
   page, with `fallback` taken from a Book fill. A genre page with no mosaic cannot use one part of
-  the Book. The page names the parts (`<meta name="aimeat-book-parts">`) and carries the layout as
+  the Book. The page names the parts (`<meta name="aimeat-book-parts">`) and contains the layout as
   data (`<script type="application/json" id="aimeat-layout">`); the publish counts the parts and
   stores the layout, so nothing is called afterwards. The proposal owes one line: "From the Design Book I take: …" or "… I take nothing,
   because …".
 - **Write down why, as you choose, and put nothing into the Design Book because a build is
-  finished.** The page carries `<script type="application/json" id="aimeat-build-notes">` with
+  finished.** The page contains `<script type="application/json" id="aimeat-build-notes">` with
   `took`, `passed` and `made`, one true sentence of why each; the publish keeps them with the
   version. Jouni rebuilt one app three times and liked the third: only an app its owner says
   turned out well teaches the Book anything. When he says so, record it with
@@ -123,7 +123,7 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   <name>` makes it the way Claude Code's WorktreeCreate hook does. Never copy `.env.test.*` by
   hand: the examples name one port and one database, and the runner empties that database between
   suites, so two sessions testing at once wipe each other.
-- Coordination lives on aimeat.io, not in chat. Export the session and the project in the shell
+- Coordination happens on aimeat.io, not in chat. Export the session and the project in the shell
   that commits (`AIMEAT_SESSION=<tool>-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the
   Lifecycle Central board with your project (`board_read { project }`), and claim the paths and the
   E2E port before you edit (a free port in 40251-40499 that no active claim names). Apply that

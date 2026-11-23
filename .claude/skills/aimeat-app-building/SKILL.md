@@ -18,10 +18,10 @@ This is a hard precondition of the build, not an optional preamble, and it comes
 Five node-side stores answer almost everything, and they are shared by every session:
 
 - **`aimeat_appdev_overview`**: what apps, extensions and capabilities already exist. Check before building anything.
-- **`aimeat_skill_list`** then **`aimeat_skill_get`**: most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
+- **`aimeat_skill_list`** then **`aimeat_skill_get`**: most published apps have their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
 - **App Development Notes**: the dev organism's workspace `fbb51de5-56d5-4143-9871-b998a1187655` / `ws-mslr8u99kzk`, one `appnote` document per app: locked design decisions, prod organism/workspace ids, traps hit while building, open questions the developer still owns. Read the app's note before changing it; write back what the next session would want.
 - **`aimeat_appdev_pitfall_list`**: the app-building trap catalogue (curated plus what other sessions learned).
-- **`node:aimeat-app-workstation`**, once the app is past roughly 300 kB or a few thousand lines. One file has no natural brake and the cost lands on the edit loop: a 3.18 MB app on this node turned five-minute changes into forty-minute ones, and 477 kB of it was base64 images inlined into the source. The skill is the way out (assets to storage, sources split behind a build script that assembles the one file, `GET /v1/app-templates/workstation-project` for the scaffold). The publish response's `next_steps.size` says when you are there.
+- **`node:aimeat-app-workstation`**, once the app is past roughly 300 kB or a few thousand lines. One file has no natural size limit, and the cost is in the edit loop: a 3.18 MB app on this node turned five-minute changes into forty-minute ones, and 477 kB of it was base64 images inlined into the source. The skill is the fix (assets to storage, sources split behind a build script that assembles the one file, `GET /v1/app-templates/workstation-project` for the scaffold). The publish response's `next_steps.size` says when you are there.
 
 Where a new lesson goes depends on who needs it, and the three are not interchangeable:
 
@@ -39,11 +39,11 @@ Non-negotiables that flow enforces:
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
-- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications carry the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/builder/events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11).
+- **Data on the node reaches the screen through an event, and a timer is the last resort.** `AIMEAT.live.subscribe(['agent-tasks'], …)`, the mosaic's `live` map (a `keyPrefix` for the owner's records, `domains` for the rest) and `AIMEAT.agents.watch` for one task. Both build specifications contain the rule, the domains an app may hear and the three places a timer belongs; the text and what happened without it are in `aimeat/src/services/builder/events-first.ts`. An app built from this repo read an agent task's stage every 30 seconds and showed it 37 seconds late on aimeat.io (Jouni, 2026-10-11).
 - Morsels are plain integers, never the meat emoji.
 - Check `aimeat_appdev_overview.apps` for an existing app or capability before building. Reuse beats duplicate.
 
-App sources live in the `aimeat-apps/` repo, not in this protocol repo.
+App sources are in the `aimeat-apps/` repo, not in this protocol repo.
 
 ## When an app is finished: six records beside it
 
@@ -164,7 +164,7 @@ tools and asks for no permissions (`bundled-agent-permissions`). An agent approv
 permissions its tools need does the work and then has it refused: measured 2026-11-11, with the
 marketplace tools on an agent that held only the memory permissions.
 
-When the code behind this changes, the facts live in `aimeat/src/models/crew-def-schemas.ts`,
+When the code behind this changes, the facts are in `aimeat/src/models/crew-def-schemas.ts`,
 `aimeat/src/services/app/bundled-crews.ts`, `app/agent-propose.ts`, `app/agent-deploy.ts` and
 `app-agents/app-agent-link.ts`, and the skill text in `aimeat/src/data/builtin-skills.app-agents.ts`.
 
@@ -180,13 +180,13 @@ lib, not the app**; the fix then reaches every app instead of one.
 ## A key for an outside service is named, never held
 
 An app never asks for, stores or sends an API key: the browser cannot keep a secret. The call that
-needs one lives in an extension, and the extension writes the key into an outbound header by name,
+needs one is made from an extension, and the extension writes the key into an outbound header by name,
 `{{secret:NAME}}`. The node fills it from the **signed-in person's own vault** on the way out (then
 from the extension's operator-level `type: secret` config, then fails as `SECRET_UNKNOWN` naming
 the header and the secret, with nothing sent). No script, record, log or tool ever reads a stored
 value back. What the app owes the person is the NAME and where it goes: their Access page, section
 04 Secrets, or their own AI (`aimeat_secret_set { name, value }`, behind `secrets:manage`, which no
-wildcard scope carries; `aimeat_secret_list` shows names and which extensions used them). A living
+wildcard scope includes; `aimeat_secret_list` shows names and which extensions used them). A living
 document names a key the same way in a trigger's or a source's `headers`, and its gear dialogs pick
 from the stored names. Show a missing key by its name in the UI; never draw a text field for the key.
 → `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace). A different trap is the one that the `{{secret:NAME}}` placeholder exposed: a capability with a shared builder and a VM bridge was implemented twice, and one copy was dead.

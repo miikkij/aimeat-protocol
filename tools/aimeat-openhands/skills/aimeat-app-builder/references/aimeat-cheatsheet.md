@@ -43,11 +43,11 @@ was retired on 2026-11-19.
 ```
 
 (Take the exact head from `GET /v1/app-templates/shell-atelier`, or the genre you fork, rather
-than this copy. On the finest level a fork of a genre carries its own `aimeat-register`.)
+than this copy. On the finest level a fork of a genre has its own `aimeat-register`.)
 
 ## Sign-in
 
-The shell carries it: the login pill, the language switch, the theme. `onReady` hands you the
+The shell provides it: the login pill, the language switch, the theme. `onReady` gives you the
 session. Never mount your own sign-in, theme toggle or language switch.
 
 ## Data (the user's private memory)

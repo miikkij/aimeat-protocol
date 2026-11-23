@@ -21,7 +21,7 @@ not kept.
   code `ZZ`, so the map does not look more complete than it is.
 
 A place tells where a person's network is, which is not always where the person is. A VPN or a
-mobile carrier moves them to another city or country. The report carries that sentence with the
+mobile carrier moves them to another city or country. The report includes that sentence with the
 numbers.
 
 The owner who switches this on answers for it towards their visitors. Counting visits by place

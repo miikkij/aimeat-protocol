@@ -1,6 +1,6 @@
 ---
 name: aimeat-app-retheme
-description: Migrate an already-published AIMEAT app onto the platform theme system (aimeat-theme.css v2 - data-theme light/dark x data-palette, control cluster in the login pill) without changing behaviour. The paved path for any "re-theme / update <app>.html to the new theming" request - covers both token-based apps and self-contained apps with their own CSS variables, plus the language-control migration and live browser verification. Use whenever the owner asks to bring an old app onto the theme system.
+description: Migrate an already-published AIMEAT app onto the platform theme system (aimeat-theme.css v2 - data-theme light/dark x data-palette, control cluster in the login pill) without changing behaviour. The recommended way for any "re-theme / update <app>.html to the new theming" request - covers both token-based apps and self-contained apps with their own CSS variables, plus the language-control migration and live browser verification. Use whenever the owner asks to bring an old app onto the theme system.
 license: MIT
 metadata:
   audience: agent
@@ -29,7 +29,7 @@ an attribution badge into served pages, and publishing a served copy bakes it in
 raw source already CONTAINS a baked-in `<div id="aimeat-app-badge">…</div>`, delete it
 (the node re-injects a fresh tokenised one at serve time).
 
-Fetch the manifest too (`aimeat_app_get`) to carry name/description/tags/icon forward.
+Fetch the manifest too (`aimeat_app_get`) to keep name/description/tags/icon.
 
 ## 2. Inventory before editing
 
@@ -68,7 +68,7 @@ then remap the app's own variables to tokens with the old values as fallbacks:
 | font | `var(--font-body, <old>)` |
 | ok/warn/err as text | `color-mix(in oklab, var(--color-success/-warning/-error) 55-62%, var(--color-base-content))`; their soft washes: `color-mix(token 14-16%, var(--color-base-100))` |
 
-DELETE the app's hand-kept `[data-theme="dark"]` variable block — tokens carry both modes
+DELETE the app's hand-kept `[data-theme="dark"]` variable block — tokens cover both modes
 and every palette. Do not touch component rules; the variable remap is the fix.
 
 **C. Language**: declare `<meta name="aimeat-locales" content="fi en">` (only languages
@@ -94,8 +94,8 @@ the legacy language key; zero references to the removed switcher element.
 ## 5. Publish
 
 `aimeat_app_publish` in presigned mode (omit content → PUT the raw HTML to `upload_url`),
-carrying the old manifest fields; omit `cortex_agents` so an existing agent-bundle carries
-forward. Publishing goes straight live; the previous version stays recoverable via
+with the old manifest fields; omit `cortex_agents` so an existing agent-bundle stays
+in place. Publishing goes straight live; the previous version stays recoverable via
 `aimeat_app_manage` with action `versions`.
 
 ## 6. Verify live (Playwright MCP browser on the app subdomain)

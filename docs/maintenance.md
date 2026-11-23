@@ -9,7 +9,7 @@ Every tracked file in both documentation trees has one row in [catalog.md](catal
 | maintained | Relevant guidance or specification for the current system | Update with changes to the related implementation |
 | runtime | Loaded or distributed data/code, even though stored under `docs` | Preserve paths and validate with its loader; changes can affect behavior |
 | reference | Example, provider report, template or proposed contract | Check the stated scope and prerequisites before use |
-| historical | A recorded result kept for an existing reference | Carries a history notice at its top; use the linked current source for new work. A new plan or build note is never filed here: it goes to the node |
+| historical | A recorded result kept for an existing reference | Has a history notice at its top; use the linked current source for new work. A new plan or build note is never filed here: it goes to the node |
 | entry | Short link to the maintained source | Keep its destination available |
 
 A retained file is useful for its stated purpose. This is not a claim that every
@@ -59,7 +59,7 @@ the end of the output. The warning does not fail the check: read the guide again
 move the date. Name the narrowest source that decides what the guide says, so a warning means that
 something the guide describes changed. A row that says "held by <check>" names a test, a check
 script or a ledger under `aimeat/test/`, `aimeat/scripts/` or `aimeat/security/` as its source and
-carries no date (a runtime asset's loader test, the it-adoption ledger). The check refuses a holder
+has no date (a runtime asset's loader test, the it-adoption ledger). The check refuses a holder
 whose text does not name the file: its path, its file name, or a folder above it that the holder
 loads as a whole. A folder is not enough for a Markdown file, because a loader reads the yaml and the
 scripts in a folder and not the README beside them, so a `.md` file also needs its own name in the

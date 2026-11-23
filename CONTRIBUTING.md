@@ -112,7 +112,7 @@ such names). Leave it unset when you commit by hand. A Claude Code commit withou
 
 - [Code style](docs/coding-guidelines/code-style.md): TypeScript strict mode, `.js` extensions in
   ESM imports, the response envelope, route patterns.
-- [File headers](docs/coding-guidelines/file-headers.md): every source file carries one.
+- [File headers](docs/coding-guidelines/file-headers.md): every source file has one.
 - No source file over 800 lines. Split a large file by moving a coherent group to a sibling file
   and changing nothing else.
 - A route change updates `openapi.yaml` in the same commit.

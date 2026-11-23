@@ -1,7 +1,7 @@
 # Connector Forward Tunnel
 
 How `aimeat connect serve` talks to an AIMEAT node over **one persistent
-WebSocket per agent** — carrying forward API calls *and* realtime task delivery —
+WebSocket per agent** — used for forward API calls *and* realtime task delivery —
 instead of a storm of short-lived HTTPS requests, and how local clients (CrewAI
 crews, MCP runtimes) attach to it over loopback.
 
@@ -85,7 +85,7 @@ The tunnel is full-duplex JSON frames, id-correlated where applicable. The frame
 shape is `ConnectFrame` in `aimeat/src/services/connect-tunnel/wire.ts`, which
 lists all 19 types.
 
-One socket can carry several identities of the same owner. The first is the one
+One socket can serve several identities of the same owner. The first is the one
 the upgrade authenticated; each further one is proved with an `attach` frame. A
 frame names its identity in `agent` (the full GAII or GEAI); a frame without it
 belongs to the upgrade identity, which is how a client from before 2026-09-03,
@@ -105,9 +105,9 @@ has not proved is refused.
 | `invoke_result` | C→S | `{ id, ok, result }`: the principal's answer to an `invoke` |
 | `subscribe` | C→S | `{ id, spaces }`: workspace record spaces (`organism_id`, `ws`, `space`) to get record-write pushes for |
 | `subscribed` | S→C | `{ id, payload: { accepted, rejected } }`: which space references were accepted and which refused |
-| `attach` | C→S | `{ id, agent, token }`: carry one more identity on this socket; the token is verified as at the upgrade |
+| `attach` | C→S | `{ id, agent, token }`: add one more identity to this socket; the token is verified as at the upgrade |
 | `attached` | S→C | `{ id, agent }`: the attach was accepted |
-| `detach` | C→S | `{ agent }`: this socket stops carrying that identity |
+| `detach` | C→S | `{ agent }`: this socket stops serving that identity |
 | `auth_revoked` | S→C | `{ agent, message, reason? }`: that identity's credential was revoked; stop it. `reason` is `moved` (sent to another connector) or `deleted` |
 | `scopes_changed` | S→C | that identity's permissions changed: mint a fresh token, keep running |
 | `disconnect` | both | graceful close |
@@ -115,7 +115,7 @@ has not proved is refused.
 
 ## Which installation a socket belongs to
 
-The WebSocket upgrade carries three headers beside `Authorization`. None of them is signed and none
+The WebSocket upgrade sends three headers beside `Authorization`. None of them is signed and none
 is a credential: the token still authenticates, and these only tell one owner's own machines apart.
 
 | header | value | what the node does with it |
@@ -130,14 +130,14 @@ The node records each connector for its owner when it connects and keeps it afte
 last seen, the agents on it and the agents that wait for it. A proposal (`connector`), an approval
 (`install_id`) and `POST /v1/agents/v2/agents/:name/move` name one connector, and only that one is
 offered the agent. The id belongs to the connector folder, so two folders on one computer are two
-connectors, and a copied folder carries its id with it.
+connectors, and a copied folder keeps its id.
 
 ### When an agent leaves a connector
 
 The node detaches one identity with an `auth_revoked` frame that names it (`agent`), and since
 2026-10-11 the frame says why when the node knows: `reason: "moved"` when the owner sent the agent
 to another connector, `reason: "deleted"` when the agent no longer exists. A revoked token and a
-deactivated account carry no reason, because that credential may be minted again.
+deactivated account get no reason, because that credential may be minted again.
 
 - **Moved.** The connector removes the agent from its home: the key file, a stored bearer, the
   agent's `config.yaml`, and the agent's directory when that left it empty. It rewrites `serve.json`.
@@ -151,7 +151,7 @@ deactivated account carry no reason, because that credential may be minted again
   waiting on a long-poll, the queued deliveries and the subscriptions are the same afterwards.
 - **A move re-decides the run mode.** A `resident` agent moved to a connector that reported `spawn`
   only becomes `spawn`, and the answer of the move says so (`run_mode_corrected`).
-- **`GET /v1/agents` rows carry `install_id`**: the connector that holds the agent, or the one it
+- **`GET /v1/agents` rows include `install_id`**: the connector that holds the agent, or the one it
   waits for. A runtime reads its roster and its own share of it in that one call.
 
 ## Forward API call (agent → server)
@@ -278,7 +278,7 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   stale-detected by pid (a live pid refuses a second daemon).
 - **Admission, in front of every local endpoint:** the Host header must be
   `127.0.0.1`, `localhost` or `[::1]` with the daemon's own port (403
-  otherwise, which stops DNS rebinding); a request that carries an `Origin`
+  otherwise, which stops DNS rebinding); a request that has an `Origin`
   header comes from a web page and is refused (403); and every request sends
   `Authorization: Bearer <secret>` with the `secret` from serve.json. A wrong
   secret gets 401. The secret is new at every start, so a client reads it
@@ -308,7 +308,7 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   runtime started later still reads it. A revocation with no reason (a
   deactivated account) writes no record, because that account can be enabled
   again. A record is dropped after 30 days (`max_age_days` in the answer), and
-  as soon as the daemon carries the identity again: an agent created again
+  as soon as the daemon serves the identity again: an agent created again
   under the same name, or moved back, is not reported. Reading changes nothing,
   so more than one runtime can read the same home; `since` leaves out what a
   reader has already seen. A daemon older than this route answers 404.
@@ -323,7 +323,7 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
 - **Console:** every line the daemon prints starts with the local date and time
   (`2026-09-07 18:42:38`), the same format the serve watchdog writes, so the two
   logs read side by side. It is done at the stream, so the tunnel's reconnect and
-  token-refresh lines carry it too — those are the ones read when something is
+  token-refresh lines have it too — those are the ones read when something is
   wrong, and until 2026-09-07 the only clock in that window was the binary's
   build time. `AIMEAT_LOG_TIMESTAMPS=0` turns it off for a caller that stamps the
   lines itself.

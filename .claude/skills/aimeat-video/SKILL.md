@@ -7,7 +7,7 @@ description: How AIMEAT videos are made from live captures and existing recordin
 
 Every video here shows the production node with real data. Nothing is mocked and no slide is
 re-narrated: the deck says what is claimed, the video shows it moving. Three tools cover the
-three kinds of footage, and all three live in `aimeat/scripts/demo-video/`, which is gitignored
+three kinds of footage, and all three are in `aimeat/scripts/demo-video/`, which is gitignored
 on purpose (marketing tooling, plus login paths). They exist on Jouni's MAIN machine only, in the
 main checkout, together with `genimages/videos/` and its two worked examples: a fresh clone, a
 worktree and his other machines do not have them (checked 2026-09-19, when neither folder was on
@@ -38,7 +38,7 @@ video, ten scenes, 2:56).
   (`browser_resize` first). Sign in through the app's own Sign In button: it opens the
   app-grant page on aimeat.io, and the credentials go into `#aimeat-username` /
   `#aimeat-password` there. Apps on their own subdomains share that session afterwards.
-- **A capture lands in the repo root by default.** Move it into the project's `src/` at once;
+- **A capture is saved to the repo root by default.** Move it into the project's `src/` at once;
   no scratch files stay in the root.
 
 ## Capture rules, each one paid for
@@ -57,10 +57,10 @@ video, ten scenes, 2:56).
    selector list (AIMEAT Pages lists some), CADENCE with real customer rows, and admin pages that list people's names or e-mails (use compliance,
    statistics and federation). SUUNTA's competitor matrix is shown only when Jouni says so for
    that video.
-5. **His own e-mail is on some surfaces** (hatchery cockpit top bar, M-ROOM deliver panel). Say
+5. **His own e-mail is on some surfaces** (hatchery dashboard top bar, M-ROOM deliver panel). Say
    so in the report and let him decide whether to crop.
 6. **Clips come from the clean masters** in `genimages/videos/<name>/<name>.mp4`. The copies in
-   `assets/video/` carry burned captions that collide with new cards. `captions.ass` and
+   `assets/video/` have burned-in captions that collide with new cards. `captions.ass` and
    `<name>.marks.json` next to a master give exact timecodes without watching it.
 7. **Anything that would spend money is asked first**: Band Jam's "Compose whole song" and any
    other AI action on Jouni's key.
@@ -69,7 +69,7 @@ video, ten scenes, 2:56).
 
 Narrator text is on cards, not in a voice-over, unless a voice is asked for. One thought per
 card, at most about ten words, at least three seconds on screen, DM Sans Medium in coral on a
-paper plate in the lower third. Corner captions (JetBrains Mono, indigo, top right) carry the
+paper plate in the lower third. Corner captions (JetBrains Mono, indigo, top right) show the
 honesty marks: `recorded in July` on archive footage, `overnight, compressed` and `time jump`
 where time is cut. Every time jump and every piece of older footage gets one; that is the same
 rule the decks follow. The end card is the AIME♥AT wordmark over the domain on paper.
@@ -120,14 +120,14 @@ not a check of the frame; only the frame is.
 
 Masters stay gitignored. A clip that goes into the README is re-encoded into `assets/video/`
 (`-c:v libx264 -preset slow -crf 30 -pix_fmt yuv420p -an -movflags +faststart`; the faststart
-is what lets GitHub stream it). YouTube: unlisted by default, because a cut can carry the
+is what lets GitHub stream it). YouTube: unlisted by default, because a cut can show the
 competitor matrix, personal e-mail and numbers that age; visibility can be raised later on the
 same link. "Set as instant Premiere" stays off, since a juror opening the link wants the video,
 not a waiting room. The description names what is on screen, states that everything is the
 production node with real data and that time jumps are marked, and ends with the two links
 (aimeat.io, the GitHub repo); `assets/video/youtube-metadata.md` holds the house-style
-descriptions of the three published clips. The 30 MB chat upload limit means the file is handed
-over by path, not attached.
+descriptions of the three published clips. The 30 MB chat upload limit means the file is given
+by its path, not attached.
 
 ## Reporting
 

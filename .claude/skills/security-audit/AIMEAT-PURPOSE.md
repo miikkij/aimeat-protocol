@@ -10,7 +10,7 @@ the trap is `docs/pitfalls.md` §126.
 
 ## The Security register: look up first, write after
 
-Every AIMEAT security record lives in one place on aimeat.io: organism **AIMEAT SECURITY**
+Every AIMEAT security record is kept in one place on aimeat.io: organism **AIMEAT SECURITY**
 (`ec7a728f-ad61-4b05-b6f0-e5bf9b47c16c`), workspace **Security register** (`ws-mvkjtfqtfgn`). It
 holds every earlier audit's report and findings with their status, the fixes and their commits, the
 accepted exceptions with their expiry dates, the security and dependency changes, and the CVE rounds,

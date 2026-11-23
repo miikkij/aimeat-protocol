@@ -10,7 +10,7 @@ metadata:
 
 Thirteen agents built thirteen modules in one evening (2026-09-02) and every brief restated the
 same twelve rules; four agents also each built their own fake Phaser scene to test against. This
-is the one copy of the rules. A brief carries this contract and then only what is specific: the
+is the one copy of the rules. A brief includes this contract and then only what is specific: the
 module, its seams, its demo.
 
 **The lead pastes this contract into the brief.** module-builder has no AIMEAT tool and cannot
@@ -31,7 +31,7 @@ the sections below.
 - **File headers** on every file: `@file`, `@description` (the why, in prose), `@structure`,
   `@usage`, `@version-history` with today's date, as any source file in the directory shows.
 - **JSDoc-typed ESM** with `.js` in relative imports, no backticks anywhere inside JSDoc (a
-  stray one closes the template that carries a served lib), `pnpm typecheck:sdk` clean for a
+  stray one closes the template that contains a served lib), `pnpm typecheck:sdk` clean for a
   served lib, `pnpm typecheck` for the node.
 
 ## What the code obeys (served libraries and the Atelier kit)

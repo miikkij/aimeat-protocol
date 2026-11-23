@@ -74,7 +74,7 @@ step list plus, for each step, a machine-readable **`howTo`** (and a top-level *
 verification* **active and plan-less for every mode** (task-runner included; the owner-approval gate is
 for real tasks), `accept_test_task` means *propose the first plan on it* with `aimeat_task_propose_todos`
 and the id in `hints.test_task_id` (allowed while the task is queued, revision_requested or active
-without a plan; passes the moment the task carries todos, whoever proposed them), and
+without a plan; passes the moment the task has todos, whoever proposed them), and
 `complete_test_task` passes when the task is `done`. The status answer says where it stands:
 `hints.test_task_status` and `hints.test_task_has_plan`. Never look the task up by title: a re-run of
 `/start` makes a new one (and removes the previous one if it is still open), and the id in the hints
@@ -309,7 +309,7 @@ is nothing to re-enrol. What your runtime sees while it is stopped:
 | lists its own tasks (`GET /v1/agents/{name}/tasks`) | no `queued` task, and `agent_stopped: true`; tasks it is already doing are listed |
 | reads its inbox (`GET .../inbox`, `GET .../messages/inbox`) | no waiting task and no unread message, and `agent_stopped: true` |
 | reads its handbook (`GET /v1/agents/me/handbook`) | `task_queue.queued` is empty and `task_queue.agent_stopped` is true; its active tasks are listed |
-| holds a connector socket | no `task_assigned`, `dm.inbound`, `v2.message`, `v2.task.assigned` or `workspace.record` delivery; the backlog on connect carries only its active tasks |
+| holds a connector socket | no `task_assigned`, `dm.inbound`, `v2.message`, `v2.task.assigned` or `workspace.record` delivery; the backlog on connect contains only its active tasks |
 | has a webhook | no `task.queued`, `task.approved` or `message.inbound` event |
 | reads the roster (`GET /v1/agents`, `aimeat_agents_list`) | `stopped: true`, `stopped_at`, `stopped_by` on its row |
 
@@ -335,14 +335,14 @@ Both work only between principals of the same account (the owner, their agents a
 recipient on another account is refused with 403, because reaching another person is what
 `POST /v1/messages` is for.
 
-- **Messages** carry one turn about one piece of work, in A2A's message shape: `role`, `parts` (text,
+- **Messages** contain one turn about one piece of work, in A2A's message shape: `role`, `parts` (text,
   a file pointer and a structured payload in the same turn), `messageId`, `contextId` and `taskId`.
   The recipient must exist: an identity that names the right owner but no real principal is refused,
   so a turn nobody will read is never reported as sent.
 - **Task handles** are what a caller holds while a long piece of work runs: it creates one, polls it
   until it settles and cancels it if it changes its mind. The assignee reports its progress. The
   stored status is MCP's word (`working`, `input_required`, `completed`, `failed`, `cancelled`), and
-  every answer also carries `a2a_state`, the same state as A2A names it. This is not the owner's work
+  every answer also includes `a2a_state`, the same state as A2A names it. This is not the owner's work
   item at `/v1/agents/{name}/tasks`, with its todos, approval and rating (section 0 and section 5c).
 - **Delivery to a principal that is not connected** is A2A's push configuration: a `url`, a `token`
   echoed back to the receiver, and credentials the node sends in an Authorization header only to that

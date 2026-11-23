@@ -28,7 +28,7 @@ invoice), so the node's SMTP settings, or the sending company's own SMTP setting
 
 A seller who takes payments with their own Stripe account sets their payment provider credentials
 (`aimeat_commerce_psp_set`), and points their Stripe webhook at `POST /v1/commerce/webhooks/stripe/{owner}`. A payment that
-carries the invoice's reference marks the invoice paid and books the voucher. The node needs no Stripe
+includes the invoice's reference marks the invoice paid and books the voucher. The node needs no Stripe
 setting of its own for this; it uses each seller's own keys.
 
 ## Company addresses

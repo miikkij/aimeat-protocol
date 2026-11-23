@@ -1,6 +1,6 @@
 # marketplace-behaviors Extension
 
-Multi-instance marketplace extension for AIMEAT nodes: access-controlled marketplaces with listings that carry a money price, an agreement to buy, delivery confirmation and buyer ratings.
+Multi-instance marketplace extension for AIMEAT nodes: access-controlled marketplaces with listings that have a money price, an agreement to buy, delivery confirmation and buyer ratings.
 
 **This extension does not move money.** A listing's price is money, stored as data. The buyer pays the seller outside the extension (cash at pickup, a bank transfer), or through the node's checkout when the seller sells the item as an offer or app tool with a money price. The extension records who agreed to buy what, and tracks delivery and the rating.
 

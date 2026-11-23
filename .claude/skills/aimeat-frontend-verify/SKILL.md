@@ -107,7 +107,7 @@ And one measurement only phone width reveals: a kit component that declares `con
 
 Automated checks prove overflow, contrast and element counts. They say nothing about these, and all four came from the developer having to point at something visible in a screenshot I had already taken.
 
-1. **Look at the screen a VISITOR lands on first**, not only the inner view you were working on. A missing header or sign-in pill on the first-touch screen passes every metric.
+1. **Look at the screen a VISITOR sees first**, not only the inner view you were working on. A missing header or sign-in pill on the first-touch screen passes every metric.
 2. **Check column alignment and the style register**, not just whether an element exists. A per-row grid with an auto column drifts out of line, and an arcade sticker style dropped into a serious tool is wrong even when it renders. The register to check against is the one the screen declares: the node's own screens follow skill `aimeat-design-language`, an app follows the Design Book genre it forked, never the node's look.
 3. **An empty state reads as broken**, not as "nothing has happened yet". Prefer a cumulative counter that is always populated ("this node has X apps, Y organisms, Z agents") over an event feed that can be empty.
 4. **The primary action belongs on the landing surface.** If an app's main use is "copy a prompt for your agent", the button that opens it goes in the hero or toolbar, with the requirements written out in plain language and the prompt visible. A prompt reachable only through a help page makes the whole product look broken while the mechanics work.
@@ -122,7 +122,7 @@ Full guide: `docs/frontend-development-guide.md`. The ones that recur:
 - No inline `style=""` for layout, colour, spacing or typography, and no CSS constants in JS. All CSS in external `.css` files.
 - Colours, spacing and typography come from `theme.css` variables. Never hardcode `#E8564A` or similar in JS.
 - No `rgba(255,255,255,...)` in CSS (dark-theme-only). Use `var(--card)`, `var(--border)`, `var(--bg-dim)`, `var(--surface)`.
-- **The classic classes are for the old views only**, the ones not yet on the components, and the classic shell is not extended. When you edit such a view: button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`, with no `.btn` base class (`class="btn btn-*"` is wrong); view classes carry the prefix `pf-` profile, `gn-` portal, `adm-` admin; section headers use `.section-title` + `.section-desc`; the shared parts are in `views/profile/shared.js` and `views/admin/shared.js`.
+- **The classic classes are for the old views only**, the ones not yet on the components, and the classic shell is not extended. When you edit such a view: button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`, with no `.btn` base class (`class="btn btn-*"` is wrong); view classes have the prefix `pf-` profile, `gn-` portal, `adm-` admin; section headers use `.section-title` + `.section-desc`; the shared parts are in `views/profile/shared.js` and `views/admin/shared.js`.
 - All user-visible text through `t()`.
 - No emoji in the interface: not in a heading, a button, a menu item, a dialog title, a label, a
   notice, and not inside a locale string, where they hide until the screen is up. Icons are inline

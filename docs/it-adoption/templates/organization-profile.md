@@ -88,7 +88,7 @@ Classification is off on a new node (`AIMEAT_CLASSIFICATION`, values `off`, `own
 
 ## 7. Applicable regulations
 
-The node carries question sets for eight of the regulations below (GDPR, NIS2, DORA, Cyber Resilience Act, European Accessibility Act, Digital Services Act, HIPAA, export control) and reads an unanswered set as unclassified, never as "does not apply" (`aimeat/src/data/compliance-frameworks.ts`). The AI Act row belongs to the AI use-case register (`aimeat_compliance_register_read`, part `usecases`); sector rules and national law have no question set. Mark each one and keep the answers on the admin Compliance page (`aimeat_compliance_register_write`, part `frameworks`).
+The node has question sets for eight of the regulations below (GDPR, NIS2, DORA, Cyber Resilience Act, European Accessibility Act, Digital Services Act, HIPAA, export control) and reads an unanswered set as unclassified, never as "does not apply" (`aimeat/src/data/compliance-frameworks.ts`). The AI Act row belongs to the AI use-case register (`aimeat_compliance_register_read`, part `usecases`); sector rules and national law have no question set. Mark each one and keep the answers on the admin Compliance page (`aimeat_compliance_register_write`, part `frameworks`).
 
 | Regulation | Applies | Who decided, and when |
 |---|---|---|

@@ -29,7 +29,7 @@ read, without asking the operator.
 
 **How.**
 
-| Export | Route | What it carries |
+| Export | Route | What it contains |
 |---|---|---|
 | Account export | `GET /v1/owners/{name}/export` (`aimeat/src/routes/owners/export.ts`) | the account, profile, memory of the person and every agent, work given and taken, consents and their audit, stored files as a list, board posts and subscriptions, memberships, disputes, push subscriptions |
 | Memory export | `GET /v1/memory/export` | records as JSON, optionally one prefix or one agent, in the shape `POST /v1/memory/import` reads back |
@@ -87,7 +87,7 @@ model wrote it.
 **How.** Each write through the person's own saves, their agents' memory tools, workspace writes,
 extensions and scheduled jobs is counted per writer (`aimeat/src/services/data-map/write-tally-buffer.ts`),
 and `GET /v1/memory/{key}/hands` (`aimeat_memory_hands`) answers with each writer, how many writes and
-deletes, and when. A write by a model carries an AI provenance record (`aimeat/src/routes/ai-provenance.ts`),
+deletes, and when. A write by a model gets an AI provenance record (`aimeat/src/routes/ai-provenance.ts`),
 returned with the record and readable at `GET /v1/provenance/{id}`; a non-human writer that declares
 nothing is recorded as model-written. See [AI transparency](ai-transparency.md).
 
@@ -147,7 +147,7 @@ behalf (an operator acting on another person's account writes the operator-acces
 
 **How.** Stored secrets (AI provider keys, vault entries, two-step sign-in secrets, attached MCP
 server tokens, payment provider settings) are encrypted with `AIMEAT_ENCRYPTION_KEY`, and no export,
-backup or API answer carries them. Attaching an MCP server with a token, for one, is refused on a
+backup or API answer contains them. Attaching an MCP server with a token, for one, is refused on a
 node with no encryption key (503 `NO_ENCRYPTION_KEY`) rather than stored in plain text.
 
 ## 8. The operator is accountable
@@ -159,7 +159,7 @@ node with no encryption key (503 `NO_ENCRYPTION_KEY`) rather than stored in plai
 on, adds levels that decide what an AI may read and what may leave a group, with its own audit
 ([data classification](data-classification.md)).
 
-**Limits today.** The node-level JSON backup (`GET /v1/admin/backup`) carries accounts and agents but
+**Limits today.** The node-level JSON backup (`GET /v1/admin/backup`) contains accounts and agents but
 not people's own records; the operator's real backup is the database ([backup and restore](operations/backup-and-restore.md)),
 which holds everything, including what people deleted until the bin's window passed and what they
 erased after the backup was taken.

@@ -126,7 +126,7 @@ method.
   no `tollMorsels` (the manifest is refused otherwise). The source stays on the server either way. No endpoint returns the source to someone who calls the
   action. Those who manage the extension can read it: the installer and the operator with
   `GET /v1/extensions/{name}?full=true` (an agent of the installer needs `ext:write`), the
-  operator for the bundled extensions, and a package that ships the extension carries its
+  operator for the bundled extensions, and a package that ships the extension contains its
   scripts, because they are the package's content. Sell the use of an action, not a package of
   it, when the code is the value.
 - **Secrets stay server-side.** `type: secret` config is encrypted at rest and decrypted

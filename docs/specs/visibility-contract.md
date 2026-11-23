@@ -82,7 +82,7 @@ report says so in its `reading.not_seen` line.
   visitor typed. At most 50 targets a day; the rest count in `pathsOther`.
 - **A discovery file** fetch counts under its document and its fetcher (an AI family, `human` or `bot`).
   The node's own files count for the operator account.
-- **A purchase** counts when a checkout completes, under the attribution the checkout session carried
+- **A purchase** counts when a checkout completes, under the attribution the checkout session kept
   from the moment it opened: a page's Referer and `utm_source`, sent by the commerce library and
   reduced to a channel at once; or the agent that opened it at a checkout endpoint (named from its
   `UCP-Agent` profile address or its User-Agent), as `via: agent`. A buyer who opted out, or a
@@ -104,7 +104,7 @@ report says so in its `reading.not_seen` line.
 
 No IP address, no cookie, no identifier across page loads, no Referer, no query string, no
 User-Agent. That is why counting is on by default with no consent banner. The E2E suite
-`test/e2e-ai-visibility.ts` reads every row of every table after requests that carried an address, a
+`test/e2e-ai-visibility.ts` reads every row of every table after requests that included an address, a
 Referer path and a User-Agent, and finds none of them.
 
 ## Lifecycle
@@ -128,7 +128,7 @@ against its shape before it is stored and again before it is written into a page
 The banner such a page gets names the services the owner uses, in English, Finnish or Spanish, and
 says that Clarity records the visit and where the data goes. It links to the node's privacy page
 in the visitor's language, or to the address the operator set. A cookie mark on the page's row of
-marks opens the choices again. The node's privacy page carries a paragraph about account holders'
+marks opens the choices again. The node's privacy page has a paragraph about account holders'
 analytics only while at least one of them has a tag set. When the visitor takes the consent
 back, the cookies the two services set on that page's host (`_clck`, `_clsk`, `_ga`, `_ga_<id>`,
 `_gid`) are removed, on that host and on every parent domain, and the page reloads without the

@@ -30,7 +30,7 @@ you could not write and hand the text back, rather than putting it somewhere els
 
 - One document per topic; extend an existing one before opening a new one. Read the index with aimeat_workspace_read (no ids) first.
 - To change one part of an existing document use aimeat_workspace_doc_section_replace on an H2; replacing the H1 replaces the whole document.
-- Sections a build note carries: what shipped (with the commit), what it cost (the traps, with the fix), what is open. Prose, not a changelog; numbers in tables.
+- Sections a build note has: what shipped (with the commit), what it cost (the traps, with the fix), what is open. Prose, not a changelog; numbers in tables.
 - Publish every draft you write (aimeat_workspace_publish) unless the lead says the workspace is gated.
 - English in notes and decisions; Finnish when the lead hands you Finnish; never a translated sentence.
 - Declare ai_provenance on every write.

@@ -65,7 +65,7 @@ PCM starts playing incrementally. A provider that does not support PCM must use 
 
 Timing events measure milliseconds from submitting the turn. firstAudio is the first audio block
 scheduled in the browser, not an acoustic measurement at the speaker. complete includes playback.
-Usage events carry each stage's terminal usage, budget and provenance when available. Display the
+Usage events contain each stage's terminal usage, budget and provenance when available. Display the
 AI conversation notice and disclose generated content with the existing AIMEAT.ai helpers when
 the app displays or publishes it. Synthetic audio is marked in the server stream metadata and its
 provenance identifies the generated audio bytes, not the text that was read aloud.
@@ -152,14 +152,14 @@ response_format (pcm/mp3), speed and instructions. Both require ai:use and retur
 JSON: start, text/audio, done. After headers, failures are error frames; a stream without done is
 not a successful turn. Audio frames contain base64 bytes. Abort the HTTP request to cancel.
 
-The speech `start` and `done` frames carry `audio` { `mime`, `sample_rate`, `channels`,
+The speech `start` and `done` frames include `audio` { `mime`, `sample_rate`, `channels`,
 `sample_format` }: the provider's real format, which `AIMEAT.ai.speak()` and the voice library's node
 adapter use to type and play the bytes. Refusals before the first byte: a speech request with no
 voice, when the owner's speech provider and the node name none either, is 400 `NO_TTS_VOICE`; a voice the model catalogue
 says the model does not have is 400 `INVALID_VOICE`, before any paid call; a provider's permanent
 refusal is 422 `PROVIDER_REJECTED` with the provider's reason (an mp3 the model does not make says to
 ask for pcm); a provider's 429 is `RATE_LIMITED` with its `Retry-After`. After the first byte, an
-error frame carries `TOO_LARGE` (413) at a size limit or `PROVIDER_ERROR` (502) for a broken stream,
+error frame contains `TOO_LARGE` (413) at a size limit or `PROVIDER_ERROR` (502) for a broken stream,
 with the refusal's details.
 
 The built-in adapters use the authenticated session and refresh once on 401. Every stage shares

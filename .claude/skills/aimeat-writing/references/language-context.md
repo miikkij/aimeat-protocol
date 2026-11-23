@@ -51,5 +51,5 @@ useful part.
   information the source string does not contain.
 
 So: it moves terminology and nothing else, which is worth its cost because terminology is the part
-that compounds across screens. The seven shared findings are why the table now carries rows for the
+that compounds across screens. The seven shared findings are why the table now has rows for the
 service, the directory, the token, the identifier and the username: the test named the gaps.

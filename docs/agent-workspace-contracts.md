@@ -7,7 +7,7 @@ This guide moved to the node. Every AIMEAT node serves it as the built-in skill
 - over REST: `GET /v1/skills/aimeat-workspace-contracts?scope=node`, for example
   <https://aimeat.io/v1/skills/aimeat-workspace-contracts?scope=node>
 
-It covers the contract an agent carries, adding its spaces to a workspace, the `workspace.record`
+It covers the contract an agent has, adding its spaces to a workspace, the `workspace.record`
 event that wakes a connected agent, a loop that is safe to run again, the discovery tags, the
 `adopt-contract` task, engagements, and the optional objectives, KPIs and `_meta` note.
 

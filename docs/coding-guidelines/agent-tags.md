@@ -1,6 +1,6 @@
 # Agent Tags & Modes
 
-Agents have two distinct metadata mechanisms for owner-side classification: **mode** (fundamental agent type) and **tags** (free-form owner labels). They do different jobs and live in different fields. Do not collapse them.
+Agents have two distinct metadata mechanisms for owner-side classification: **mode** (fundamental agent type) and **tags** (free-form owner labels). They do different jobs and are in different fields. Do not collapse them.
 
 ## Mode (fundamental type)
 
@@ -14,7 +14,7 @@ Set at registration (`POST /v1/agents/device-authorize`, body field `mode`) and 
 | `interactive` | Responds to user requests in a chat or IDE session (Claude Code, Cursor, Cline, Falcon). | Full 17-step flow (12 required + 5 optional) |
 | `task-runner` | Triggered by a task, runs it, exits. No interactive command surface, no continuous presence (CrewAI crews, Inngest-style workers). | Reduced 8-step flow (7 required) -- `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `accept_test_task`, `complete_test_task`, `publish_config`, and the optional `set_avatar`. The test-task pair is kept as the runner's smoke test; the omitted steps are not in the record at all -- not pending, not skipped. |
 | `coordinator` | Orchestrates other agents (Claude Desktop with MCP, LangGraph supervisor, CrewAI Manager Agent). Treated as interactive for onboarding. | Full 17-step flow (12 required + 5 optional) |
-| `workstation` | Node-visiting agent that lives in the user's own environment (VSCode, Claude Desktop) and uses MCP directly -- not node-resident, so it has no runtime config, slash commands, telemetry, or task queue. | Narrowest 5-step flow (4 required) -- `authenticate`, `identify_platform`, `report_capabilities`, `read_directives`, and the optional `set_avatar`. The MCP round-trip it already made to authenticate + report capabilities is its smoke test, so no test task is created. The omitted steps are not in the record at all. |
+| `workstation` | Node-visiting agent that runs in the user's own environment (VSCode, Claude Desktop) and uses MCP directly -- not node-resident, so it has no runtime config, slash commands, telemetry, or task queue. | Narrowest 5-step flow (4 required) -- `authenticate`, `identify_platform`, `report_capabilities`, `read_directives`, and the optional `set_avatar`. The MCP round-trip it already made to authenticate + report capabilities is its smoke test, so no test task is created. The omitted steps are not in the record at all. |
 
 Existing agents (created before this field existed) default to `interactive` -- they already went through the full flow. New agents declare a mode at registration; if omitted, the server treats it as `interactive`.
 
@@ -71,6 +71,6 @@ The filter applies before grouping. Filtering to a tag and then grouping by mode
 
 ## Don't
 
-- Don't make tags carry semantics the backend depends on (e.g. don't gate scopes by `tag === 'admin'`). Tags are owner UI labels only.
+- Don't give tags semantics the backend depends on (e.g. don't gate scopes by `tag === 'admin'`). Tags are owner UI labels only.
 - Don't use mode for grouping things tags should handle (which crew, which project). Mode is one of five, tags are free-form.
 - Don't add another mode without a corresponding doc + UI + onboarding-step decision in the same change.

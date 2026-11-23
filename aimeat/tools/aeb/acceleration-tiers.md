@@ -37,7 +37,7 @@ in the ai_doc.
 ### Tier `frontier` — reliable on strong models, a version-drift TRAP for weak ones
 Pinned API has a **breaking change vs the version most examples show**. Strong models handle it (know
 the new API or fetch the doc); weak models code the OLD API from memory and **crash**. The ai_doc
-already carries the correct idiom — the failure is that weak models *don't read it*.
+already contains the correct idiom — the failure is that weak models *don't read it*.
 Ships fine (frontier-usable = still valuable), but the prompt pipeline should not steer a weak model
 here without forcing the ai_doc / inlining the breaking idiom.
 

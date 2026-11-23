@@ -79,7 +79,7 @@ project's README, in the agent's instructions, and inline in the cortex.
 
 Earlier versions of this recipe put a small extension between the cortex
 and the agent, to create the deep-dive task. An extension cannot do that:
-the sandbox has no `ctx.api` and no `ctx.task`, and `ctx.fetch` carries no
+the sandbox has no `ctx.api` and no `ctx.task`, and `ctx.fetch` sends no
 session, so a script cannot call `POST /v1/agents/{name}/tasks` in the
 person's name.
 

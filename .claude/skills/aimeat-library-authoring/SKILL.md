@@ -51,7 +51,7 @@ is refused; it serves from the bare name.
   `spec.version` will not refresh an installed node.
 - Updating is `PUT /v1/cortex/<name>` with `{manifest, libs}`.
 - **A cortex pack cannot import a served SDK lib**, and the portal under `public/js/` cannot either.
-  When one needs a function a lib already has, it carries a copy whose header names the original,
+  When one needs a function a lib already has, it keeps a copy whose header names the original,
   and a unit test feeds both the same inputs: `test/unit/cortex-surface-parse-amount.test.ts` holds
   two copies of `parseAmount` to `commerce/amount.js`. A third hand-written variant is how
   `'1,500.00'` came to read as 1.5 in three places at once.
@@ -106,7 +106,7 @@ guest receives is missing from that table, so change the table in the same commi
 - An `undefined` or `null` argument to a `ctx` call throws, naming the method and the position
   (until 2026-09-13 it crossed the bridge as the text "undefined").
 - `ctx.ai.start` starts a background model call, billed to the extension's owner, and is absent on a
-  schedule and a workflow step. Its answer lands in the owner's namespace, out of `ctx.memory`'s
+  schedule and a workflow step. Its answer is written to the owner's namespace, out of `ctx.memory`'s
   reach: the `on_done` action gets it as `input.result`, and `ctx.ai.result(job_id)` reads it later. For a synchronous paid answer, call the provider through `ctx.fetch`
   with a `type: secret` config or a `{{secret:NAME}}` header. A secret nobody set is `undefined` in
   `ctx.config` (until 2026-09-13 it read as the descriptor object or the mask, both truthy).
@@ -149,12 +149,12 @@ guest receives is missing from that table, so change the table in the same commi
   count toward an archived memory key limit of their own (10 000 per identity by default,
   `AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`): past it the call throws `QUOTA_EXCEEDED` and archives none of
   the ids, so a space that archives for ever also deletes the archived records it no longer needs.
-- **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
+- **A collector writes one key per PERIOD, never one per item fetched.** The namespace has the
   same budget as any principal: 1024 kB per value, 1000 keys by default. One alert-map extension on
   this node keeps a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; a
   news collector kept one key per article and reached 1,014 keys, over the shipped ceiling, while a
   448 kB `index` key sat in the same namespace proving the megabyte works. The gate before shipping a scheduled collector: if
-  `keys_per_day × 365` exceeds 1000, fold. Carry a `<prefix>.__index` key listing the periods held so
+  `keys_per_day × 365` exceeds 1000, fold. Keep a `<prefix>.__index` key listing the periods held so
   a reader finds them without a scan.
 - The sandbox has no `Date.now()` you should trust for reproducibility: take `input.now` or `ctx.now()`.
 
@@ -166,12 +166,12 @@ source every AI-facing list derives from**: the build-app prompt, `GET /v1/libs`
 rather than to any of those lists.
 
 **Version policy (`public/lib/VENDORED.md`): the major-pinned filename IS the contract.** Minor and
-patch land in place with a changelog entry written *for an AI*; a major is a NEW file and the old one
+patch replace the file in place with a changelog entry written *for an AI*; a major is a NEW file and the old one
 is never removed. Cortex wrappers are append-only within a name; a breaking change takes a `-v2` name.
 
-Each pack carries a `modelTier`: `any` (pin matches what models know), `frontier` (the pin breaks
+Each pack has a `modelTier`: `any` (pin matches what models know), `frontier` (the pin breaks
 against the version dominant in training data, so a weak model writes the old API and crashes) or
-`needs-doc` (AIMEAT-authored, no priors, must fetch the doc). A frontier pack must carry an
+`needs-doc` (AIMEAT-authored, no priors, must fetch the doc). A frontier pack must have an
 `apiCaveat`, and that caveat is inlined into the build prompt because a weak model skips the doc.
 
 ## Where a new lesson goes

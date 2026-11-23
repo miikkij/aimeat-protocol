@@ -14,7 +14,7 @@
 | **GEAI** | `eco:app#owner@node-id` | `eco:example#alice@aimeat-fi-001-genesis` | Ecosystem app. Scoped permissions and a data-area allowlist. The owner holds the balance. |
 | **Party** | `party:owner/name@node-id` | `party:alice/matti@aimeat-fi-001-genesis` | An outside party: a person or a program with NO account here (a Power BI, an ETL job, a partner). Not a principal: no namespace, no scopes, no balance. Reads only the data packages its owner shared with it by name (Core §3.8). |
 
-There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs. `req.auth!.owner` carries it on every principal that acts for this person: the owner, an agent, an app grant and an ecosystem app alike, so comparing it answers "same person", never "which principal" ([invariant 11](security-development-dna.md#11-the-owner-name-is-not-a-principal)). A visitor from another node is the exception: its `sub` and `owner` are both its home GHII (`alice@home-node`), never a bare name.
+There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs. `req.auth!.owner` holds it on every principal that acts for this person: the owner, an agent, an app grant and an ecosystem app alike, so comparing it answers "same person", never "which principal" ([invariant 11](security-development-dna.md#11-the-owner-name-is-not-a-principal)). A visitor from another node is the exception: its `sub` and `owner` are both its home GHII (`alice@home-node`), never a bare name.
 
 ## How a principal arrives
 
@@ -27,7 +27,7 @@ There is also a bare **Owner** name (`alice`) which is the account layer. It app
 - **An ecosystem app** is onboarded hello, approve, token, with TOFU key pinning plus a scope and
   data-area allowlist; it writes into its own `eco:` namespace and is consented like an agent
   ([Building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md)).
-- **A hosted app** carries identity through a scoped app grant, which resolves `role:'app'` to the
+- **A hosted app** gets its identity from a scoped app grant, which resolves `role:'app'` to the
   owner but limits the app to the scopes the owner approved.
 
 ## Authentication paths
@@ -59,7 +59,7 @@ of the auth layer:
 - **L3, one `parties` record per owner**, service-owned (`utils/reserved-keys.ts`), with each key's
   SHA-256; a share is a consent bound to the party's uid, so a name made again inherits nothing.
 
-A party's reader (`DatapackageReader.party`) carries no `owner`, so `isNodeAccount` refuses it and the
+A party's reader (`DatapackageReader.party`) has no `owner`, so `isNodeAccount` refuses it and the
 members and organism levels never admit it; `datapackageReadable` admits it only to the package its
 share names, and `versionOpenTo` only to the version the share pins.
 
@@ -94,7 +94,7 @@ const gaii = caller.principal;            // GHII for owners, GAII for agents, G
 if (!caller.has('memory:write')) { ... }  // the answer requireScope gives for that word
 ```
 
-The object carries `principal` (the `resolveIdentity()` result), `owner` and `ownerGhii` (the account the caller acts in), `kind` (`anonymous`, `visitor`, `ecosystem`, `app`, `agent` or `owner`), `inPerson` (the account holder in person), `visitor`, `roles`, `scopes`, `has(word)`, `operator(word?)`, and the `auth` and `principalView` shapes services take. A caller built by hand, a literal role or an inline role or wildcard test is counted per file by `pnpm check:single-entry`, and the count only goes down.
+The object has `principal` (the `resolveIdentity()` result), `owner` and `ownerGhii` (the account the caller acts in), `kind` (`anonymous`, `visitor`, `ecosystem`, `app`, `agent` or `owner`), `inPerson` (the account holder in person), `visitor`, `roles`, `scopes`, `has(word)`, `operator(word?)`, and the `auth` and `principalView` shapes services take. A caller built by hand, a literal role or an inline role or wildcard test is counted per file by `pnpm check:single-entry`, and the count only goes down.
 
 `caller.principal` is `resolveIdentity(req.auth!, config.nodeId)` from `src/utils/gaii.ts`:
 

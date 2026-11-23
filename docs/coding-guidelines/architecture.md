@@ -21,7 +21,7 @@ See [the agent guide](../building-an-aimeat-compatible-agent.md) and
 [agents-v2.ts](../../aimeat/src/routes/agents-v2.ts). Read an agent's identity
 version before choosing its authentication or delivery path.
 
-The identity-wallet verification path is off by default. A presentation must carry a
+The identity-wallet verification path is off by default. A presentation must include a
 Key Binding JWT from the credential's holder key, answer the node's own nonce and audience,
 and is accepted once. It is not yet tested with a production wallet. See
 [the current status](../aimeat-eudiw-integration.md).
@@ -57,7 +57,7 @@ Owner ("alice")
     └── cursor#alice@node (roles: ['agent'], scopes: ['memory:read'])
 ```
 
-**Agent mode**: every agent carries one of **five** modes. The mode says how the agent is used and which Hello Integration steps apply (`AgentMode` in `models/agent-onboarding-schemas.ts`):
+**Agent mode**: every agent has one of **five** modes. The mode says how the agent is used and which Hello Integration steps apply (`AgentMode` in `models/agent-onboarding-schemas.ts`):
 
 - `autonomous`: runs continuously (Hermes, OpenClaw). Full 17-step Hello Integration (12 required, 5 optional).
 - `interactive`: a chat or IDE session (Claude Code, Cursor, Cline). Full 17-step Hello Integration. **The default** when the mode is omitted.
@@ -169,7 +169,7 @@ The boundary test is *"would a second, different service also use this?"*. If ye
 
 ## Subsystem Reference
 
-Short notes on the subsystems that carry most real use. The v4.0 specification has the normative detail; this section is the map.
+Short notes on the subsystems that handle most real use. The v4.0 specification has the normative detail; this section is the map.
 
 ### Collaboration: Organisms and Workspaces (Core)
 
@@ -207,7 +207,7 @@ An agent declares what it can do and then has to prove it. This matters most for
 
 - **`python/aimeat-crewai/`** (in this repository): the pip-installable **liaison and connector**, a CrewAI integration that mirrors the node contract (`liaison.py`, `mcp_client.py`, `daemon.py`, `offers.py`, `workflow_spec.py`, `cli.py`). It has its own version line and is published to PyPI from a tag. The **node schema wins** on any mismatch (`models/offer-schemas.ts`, `models/workflow-schemas.ts`), so keep the liaison in sync when an agent-facing contract changes (offers, workflow signals, onboarding, MCP surface).
 - **`aimeat-desktop/`** (in this repository): a Tauri desktop app. It attaches AI tools on the person's computer to their AIMEAT and can run a local node with persistent SQLite. See its [README](../../aimeat-desktop/README.md).
-- **The crew runtime** (the fleet daemon and its crew templates) lives in the sibling repository `miikkij/crewaimeat` and builds on the Python liaison.
+- **The crew runtime** (the fleet daemon and its crew templates) is in the sibling repository `miikkij/crewaimeat` and builds on the Python liaison.
 
 ### Programmable Compute and Metered AI (Platform)
 
@@ -433,7 +433,7 @@ do not collide. Global data omits the owner segment.
 **Tags:** tag entries with `domain:<d>` (and `owner:<owner>:<d>` when identity-scoped) for each domain
 whose writes should drop the entry. `initProcessBuffers()` in `server-bootstrap/process-buffers.ts`
 subscribes to the event bus and turns every `emitChange(domain, ownerGaii?)` into
-`invalidateTag('domain:<d>')`, plus the owner-scoped tag when the write carries an owner. The TTL is
+`invalidateTag('domain:<d>')`, plus the owner-scoped tag when the write names an owner. The TTL is
 the backstop and the tags are the precise drop. Many write paths call `emitChange(domain)` *without*
 an owner, so always include the broad `domain:<d>` tag. Cache health (entries, tags, evictions) is
 in the `GET /v1/stats` gauges.

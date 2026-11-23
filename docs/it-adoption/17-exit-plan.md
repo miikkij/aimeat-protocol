@@ -11,13 +11,13 @@ This page is for the system owner and the DPO of the adopting organisation. It a
 | Stop using AIMEAT and move the data to another system | Per-person and per-group exports, plus the database in a standard format | [Data export](#data-export-and-portability) |
 | Close the node | A shutdown sequence and the destruction of every copy | [Shutting down](#shutting-down-a-node), [Data destruction](#data-destruction) |
 | Keep running without the maintainer | The licence, the source and your own build | [Independence](#independence-from-the-maintainer-and-any-vendor) |
-| Continue the development yourselves | A fork, your own team, and the rules, checks and tests the repository carries | [Continue it yourselves](#continue-it-yourselves) |
+| Continue the development yourselves | A fork, your own team, and the rules, checks and tests the repository contains | [Continue it yourselves](#continue-it-yourselves) |
 
 ## Data export and portability
 
 ### What each person can take out
 
-| Export | Interface | Format | What it carries | Source |
+| Export | Interface | Format | What it contains | Source |
 |---|---|---|---|---|
 | Account export (GDPR Articles 15 and 20) | `GET /v1/owners/:name/export`, own signed-in session or the operator | JSON | The account, profile, memory records of the person and every agent, work given and taken, consents and their audit, stored files as a list (metadata, not bytes), board posts and subscriptions, memberships, disputes, AI provenance records, connections (never the credential). Organism records the person or their agents hold are included and named under `classified_organism_content` | `aimeat/src/routes/owners/export.ts` |
 | Memory export | `GET /v1/memory/export` | JSON, in the shape `POST /v1/memory/import` reads | Records, optionally one key prefix or one agent. Records under an organism's classification are left out and listed under `left_out` | `aimeat/src/routes/memory/bulk.ts` |
@@ -32,7 +32,7 @@ Credentials never leave in an export: an AI key, a payment key or a token appear
 
 An organism is a group with members; a workspace is a shared space inside it.
 
-| Export | Interface | Format | What it carries | Source |
+| Export | Interface | Format | What it contains | Source |
 |---|---|---|---|---|
 | Whole organism | `GET /v1/organisms/:id/export`, or `aimeat_organism_export` over MCP | ZIP (base64 over MCP) | Settings and every workspace the exporting member can read: records, documents, images and row spaces. Reports `truncated` at a limit (200 000 memory records, or the most rows a workspace may hold) and `left_out` for what classification kept back. The MCP answer is size-capped; a large organism is downloaded over REST or the UI | `aimeat/src/routes/organisms/workspace-transfer.ts`, `aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts` |
 | One workspace | `GET /v1/organisms/:id/workspace/export` | ZIP | One workspace | `aimeat/src/routes/organisms/workspace-transfer.ts` |
@@ -124,7 +124,7 @@ The steps:
 
 ## Limits
 
-- The account export lists stored files but does not carry their bytes; the bytes come out through the bundle (`POST /v1/memory/bundle`) or one file at a time (`aimeat_storage_download`).
+- The account export lists stored files but does not include their bytes; the bytes come out through the bundle (`POST /v1/memory/bundle`) or one file at a time (`aimeat_storage_download`).
 - Account erasure has no MCP tool and no page; a person calls the route from their own session or asks the operator ([Data ownership](../data-ownership.md#6-a-person-can-leave)).
 - The account export and the memory export have no MCP tool; only organism and data package exports do.
 - Moving to another AIMEAT node is an export there and an import here, by hand; an organism import does not restore membership or the board.

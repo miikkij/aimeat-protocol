@@ -26,13 +26,13 @@ flowchart TD
 | Security release exception | A security release may go out over a red, missing or running nightly sweep when it names its reason (a `Red-Nightly:` line in the annotated tag message, or `AIMEAT_RELEASE_RED_REASON`). CI must still be green | `aimeat/scripts/release-ready.mjs` |
 | MCP registry | On a `v*` tag, the workflow checks that the tag, `server.json` and `aimeat/package.json` name the same version, runs the gate, then publishes `server.json` with a pinned, checksum-verified publisher. The registry key is an environment secret that only `v*` tags reach | `.github/workflows/publish-mcp.yml`, `server.json` |
 | npm package | `npm publish` runs `prepublishOnly`: the release gate, `pnpm check:licenses`, `pnpm gen:notices`, `pnpm build`, `pnpm gen:shrinkwrap`, `pnpm check:pack-contents` and a smoke test that installs the packed tarball in an empty folder and starts it | `aimeat/package.json`, `aimeat/scripts/check-pack-contents.mjs`, `aimeat/scripts/pack-smoke.mjs` |
-| Change record | Shipped features, and fixes the maintainer chooses, have an entry in `aimeat/public/changelog.json` with a kind (`feature`, `fix`, `security`, `notice`). The maintainer decides which changes get one, so not every fix, security fixes included, has an entry. Fix and security entries carry an impact sentence | `aimeat/public/changelog.json`, `.claude/rules/feature-documentation.md` (row 6) |
+| Change record | Shipped features, and fixes the maintainer chooses, have an entry in `aimeat/public/changelog.json` with a kind (`feature`, `fix`, `security`, `notice`). The maintainer decides which changes get one, so not every fix, security fixes included, has an entry. Fix and security entries have an impact sentence | `aimeat/public/changelog.json`, `.claude/rules/feature-documentation.md` (row 6) |
 
 ## What a release consists of
 
 | Artefact | Where | Notes | Source |
 |---|---|---|---|
-| Node package `aimeat` | npm registry | Carries `npm-shrinkwrap.json`, so `npm install -g aimeat` and `npx aimeat` install the exact dependency versions the lock file pins, each checked against its integrity hash | `aimeat/scripts/gen-shrinkwrap.mjs` |
+| Node package `aimeat` | npm registry | Includes `npm-shrinkwrap.json`, so `npm install -g aimeat` and `npx aimeat` install the exact dependency versions the lock file pins, each checked against its integrity hash | `aimeat/scripts/gen-shrinkwrap.mjs` |
 | Source | Git tag `vX.Y.Z` on GitHub | Build from source with `pnpm install` and `pnpm build` in the aimeat folder | [Upgrading](../operations/upgrading.md#the-update) |
 | MCP registry entry | The name in `server.json` | Points at the project's demo node, not at your node; it is not an installable artefact | `server.json` |
 | Docker image | Not published | Build it yourself from `aimeat/Dockerfile`: `docker compose up --build` in `aimeat/`, or `docker build --build-context repo=.. .` there for the image alone; the base image is pinned by digest, and the nightly workflow builds and starts the image | `aimeat/Dockerfile`, `.github/workflows/e2e-full.yml` |
@@ -79,7 +79,7 @@ What you can verify yourself:
 |---|---|---|
 | Notice in the node | An operator sees a header notice when npm has a newer version. `aimeat_admin_node_update` (`GET /v1/admin/node-update`) gives the running and newest versions, what is new, the detected install method and the steps for it | [Upgrading](../operations/upgrading.md#find-out-what-is-available), `aimeat/src/services/node/update-check.ts` |
 | Turning it off | `AIMEAT_UPDATE_CHECK=false`; `AIMEAT_UPDATE_CHECK_SOURCE` points it at an internal mirror | `aimeat/src/config/update-check.ts` |
-| Change log | `/changelog.json` and `/v1/changelog` on every node; entries of kind `security` carry an impact sentence | `aimeat/public/changelog.json` |
+| Change log | `/changelog.json` and `/v1/changelog` on every node; entries of kind `security` have an impact sentence | `aimeat/public/changelog.json` |
 | npm | `npm view aimeat version` | `.github/SECURITY.md` |
 
 ## Update procedure
@@ -114,7 +114,7 @@ The rollback point is the backup. Its recovery point is the moment you took it: 
 ## Limits
 
 - Only the newest release receives security fixes, so every fix means moving to the newest version, including its other changes (`.github/SECURITY.md`).
-- The node release carries no signature, checksum file or provenance attestation; the npm package is published from the maintainer's machine, not from a CI workflow.
+- The node release has no signature, checksum file or provenance attestation; the npm package is published from the maintainer's machine, not from a CI workflow.
 - No Docker image is published; you build it from `aimeat/Dockerfile`.
 - The SBOM is generated on demand and kept as a weekly scan artefact; it is not attached to a release.
 - Database changes are forward only; rollback needs the backup taken before the update, and loses what was written after it.

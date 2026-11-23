@@ -26,7 +26,7 @@ Rules that follow from this:
 - Store the database backup and the secrets apart, or encrypt the set: the database holds people's data and the `.env` holds the key to their secrets ([Backup and restore](../operations/backup-and-restore.md)).
 - Docker: neither compose file keeps the node key directory on a volume. Mount one or set `AIMEAT_NODE_KEY_PATH` to a file on a volume, and back it up ([Production deployment](../operations/production-deployment.md)).
 
-What is **not** a backup: `GET /v1/admin/backup`, the admin Maintenance tab's backup and `aimeat backup` write a JSON export of accounts, agents and some rows. They leave out the records people keep in their own accounts, organisms, workspaces, apps and files, and carry no credential ([Backup and restore](../operations/backup-and-restore.md)).
+What is **not** a backup: `GET /v1/admin/backup`, the admin Maintenance tab's backup and `aimeat backup` write a JSON export of accounts, agents and some rows. They leave out the records people keep in their own accounts, organisms, workspaces, apps and files, and contain no credential ([Backup and restore](../operations/backup-and-restore.md)).
 
 ## Procedure in short
 
@@ -83,7 +83,7 @@ The repository records one exercised restore, on 2026-10-12 on SQLite with a san
 
 ## Limits
 
-- With `AIMEAT_FILE_STORE=s3` or `azure`, or a person's own storage, the file bytes are outside the database, and the database backup does not carry them ([Backup and restore](../operations/backup-and-restore.md#what-a-node-is)).
+- With `AIMEAT_FILE_STORE=s3` or `azure`, or a person's own storage, the file bytes are outside the database, and the database backup does not contain them ([Backup and restore](../operations/backup-and-restore.md#what-a-node-is)).
 - With a bucket file store, the daily sweep (03:37) removes objects in the node's folder that no file of the node names and that are older than one day; a store with no folder set is not swept (`aimeat/src/services/file-store/file-store-sweep.ts`, `SWEEP_MIN_AGE_MS`; `aimeat/src/services/job-seeding.ts`). After a restore of an older database, objects for files written after that backup are no longer named, and the next sweep deletes each one older than a day. Object versioning in the bucket protects against this.
 - The node has no built-in backup scheduler; the schedule, encryption and off-site copy are the operator's.
 - `GET /v1/admin/backup` and `aimeat backup` are partial exports and do not restore a node.

@@ -9,13 +9,13 @@ Every source file (`.ts`, `.js`, `.mjs`, `.css`) has a header comment that says 
 ### What lint enforces, and what is policy
 
 - **Enforced:** the ESLint rule `aimeat/file-header` (`aimeat/eslint-rules/file-header.js`) is an error, so it blocks the commit. It requires a block comment that starts within the first five lines and contains `@file` and `@description`. It runs on what `pnpm lint` lints: `aimeat/src/` and `aimeat/public/`, without the vendored and generated folders listed under `ignores` in `aimeat/eslint.config.js` (among them `public/lib/`, `public/cortex-bundled/`, `src/generated/`, and `src/static/` apart from `src/static/sdk-libs/`). It is off for `aimeat/test/`.
-- **Policy, not checked by any tool:** `@author`, the SPDX line, `@structure`, `@usage` and `@version-history`, every header on a `.css` file (ESLint does not read CSS), and headers on `.mjs` scripts outside `src/` and `public/`. Existing files carry them; keep doing so.
+- **Policy, not checked by any tool:** `@author`, the SPDX line, `@structure`, `@usage` and `@version-history`, every header on a `.css` file (ESLint does not read CSS), and headers on `.mjs` scripts outside `src/` and `public/`. Existing files have them; keep doing so.
 
 ---
 
 ## Header Format: TypeScript / JavaScript
 
-This is the shape the tracked source files carry:
+This is the shape the tracked source files use:
 
 ```typescript
 /**
@@ -41,7 +41,7 @@ This is the shape the tracked source files carry:
  */
 ```
 
-`@file` is the path from `aimeat/` (`src/services/my-thing.ts`); older files give only the file name, and both pass the lint rule. Copy the `@author` and `SPDX-License-Identifier: MIT` lines as existing files carry them.
+`@file` is the path from `aimeat/` (`src/services/my-thing.ts`); older files give only the file name, and both pass the lint rule. Copy the `@author` and `SPDX-License-Identifier: MIT` lines as existing files have them.
 
 ### Minimal Header (for simple utility files)
 
@@ -124,7 +124,7 @@ This is the shape the tracked source files carry:
 |---------|-----------|-------------|
 | `@file` | **Yes (lint)** | Path from `aimeat/`, or the file name |
 | `@description` | **Yes (lint)** | What it does, its role, and why it exists |
-| `@author`, `SPDX-License-Identifier` | Yes (policy) | Copied as existing files carry them |
+| `@author`, `SPDX-License-Identifier` | Yes (policy) | Copied as existing files have them |
 | `@version-history` | Yes (policy) | Dated changelog with the reason for each change |
 | `@structure` | Recommended | Key exports, sections, or classes |
 | `@usage` | Recommended | Import example, the command that runs it, or how it is consumed |

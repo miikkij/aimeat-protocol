@@ -31,7 +31,7 @@ a person forwards themselves an invoice, a booking, a meter reading, and it is i
 tool of theirs can see.
 
 **Sending** puts something out under their name — a post, a message, an email that leaves from their
-own address, carries their domain's SPF and DKIM, and is stored in their own Sent folder.
+own address, passes their domain's SPF and DKIM checks, and is stored in their own Sent folder.
 
 ## Read and send are different consent
 
@@ -152,7 +152,7 @@ leaves. Three ways, in order: the caller's own connected mailbox, the company's 
 shared sender.
 
 The connection is resolved and authorised **before the first gate**, so a refused send is logged
-with the sender who attempted it. It must be the caller's own and must carry `send-mail`; otherwise
+with the sender who attempted it. It must be the caller's own and must have `send-mail`; otherwise
 the refusal names the repair. Scopes: `outbound:send` and `connections:use`, both.
 
 A send that did not go out is an error on every endpoint and tool, and it is still in the send log. Over REST
@@ -184,7 +184,7 @@ Three steps, and the first two happen at Google:
 `GET`ting the alias list is `POST /v1/connections/:id/read/sendAs`, and it needs only
 `gmail.readonly` — the read connection already has it, so the picker costs nothing. **Only verified
 addresses are listed**, because an unverified one is refused at send time for a reason the message
-does not carry. An alias added at Google after the mailbox was connected can take a day to appear;
+does not state. An alias added at Google after the mailbox was connected can take a day to appear;
 read the list live rather than caching it, so the delay is Google's and not ours.
 
 A send with a `from_alias` the mailbox has not verified is refused with `400 ALIAS_NOT_VERIFIED`.
@@ -242,7 +242,7 @@ Graph never hears of it.
 `/files/store` (kept as a private file, tagged `sharepoint` and `sharepoint-item:<id>`; needs
 `storage:write`). The node reads the item with the token and downloads the bytes from the
 pre-authenticated address Graph gives, **with no token**: the token is spent on Graph and nowhere else.
-Every answer carries `source`: the file's address in SharePoint, its eTag and its last change. A kept
+Every answer includes `source`: the file's address in SharePoint, its eTag and its last change. A kept
 copy does not update itself; `changes` with the last token says when it went stale.
 
 **Writing** is `POST /v1/connections/:id/write/:resource` with `connections:use`, the word that
@@ -264,7 +264,7 @@ Optional, off by default, and a header rather than a line in the body:
 ai_disclosure: 'none' | 'ai-assisted' | 'ai-generated' | 'autonomous'
 ```
 
-`X-AI-Disclosure` carries the word, and `X-AI-Disclosure-Record` carries a resolvable address when a
+`X-AI-Disclosure` contains the word, and `X-AI-Disclosure-Record` contains a resolvable address when a
 provenance id is supplied. `none` adds no header at all: a recipient's filter reading
 `X-AI-Disclosure: none` would be reading a claim nobody made about a message nobody generated. A
 word outside the four is refused rather than coerced.

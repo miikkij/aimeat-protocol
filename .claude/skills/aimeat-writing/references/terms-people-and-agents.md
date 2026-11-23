@@ -7,7 +7,7 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 
 | The thing | In one sentence | en | fi | es |
 |---|---|---|---|---|
-| the person's own system | the running AIMEAT their account lives in | your own AIMEAT | oma AIMEAT | tu propio AIMEAT |
+| the person's own system | the running AIMEAT their account is on | your own AIMEAT | oma AIMEAT | tu propio AIMEAT |
 | someone else's system | another AIMEAT they can sign into and whose memory they browse | environment / remote environment | ympäristö / etäympäristö | entorno / entorno remoto |
 | another AIMEAT joined to this one | an installation this one federates with: its people may sign in here and data crosses between the two; an operator word, on the federation and security admin pages | peer | vertainen | par |
 | what a peer credits here | a signed message from a peer that adds morsels to a person on this AIMEAT; an operator word, on the federation page and its notices | settlement | selvitys | liquidación |
@@ -16,7 +16,7 @@ forbidden, and how a row is added or changed. `language-context.md` lists the ot
 | whoever pays for the shared AI key | the operator of this installation, on an operator surface | this server / the server's key | palvelin / palvelimen avain | este servidor / la clave del servidor |
 | stored knowledge | what the person and their agents wrote here | memory | muisti | memoria |
 | one stored thing | a single record under one key | entry | merkintä | entrada |
-| refined knowledge kept to reuse | research or other material the person brought, packed by their AI into entries that each carry their sources; the page that holds it is Knowledge / Tietopankki / Conocimiento | knowledge base | tietopankki | base de conocimiento |
+| refined knowledge kept to reuse | research or other material the person brought, packed by their AI into entries that each name their sources; the page that holds it is Knowledge / Tietopankki / Conocimiento | knowledge base | tietopankki | base de conocimiento |
 | one bundle of that knowledge | a named set of knowledge entries with their sources and the links between them, made by the person's AI; it can be listed in the public library, copied into another person's knowledge base, or shared with a shared place | knowledge package | tietopaketti | paquete de conocimiento |
 | the AI acting for them | scoped, named, revocable, acts in their name | agent | agentti | agente |
 | what sort of agent it is, as a column | the column of the Agents list that holds an agent's mode (task runner, workstation…), the platform it runs on and whether it is federated; a heading for those tags, never a setting (Jouni, 2026-10-19) | Kind | Tyyppi | Tipo |

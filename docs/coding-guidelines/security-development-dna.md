@@ -40,7 +40,7 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 Ask the caller object. On a route, `callerOf(req, config.nodeId, storage)` (`src/middleware/caller.ts`)
 builds one `CallerContext` (`src/services/caller-context.ts`) per request; an MCP tool group gets the
 same object from the session's `caller()`. Its `principal` is what `resolveIdentity(req.auth!, config.nodeId)`
-returns: the identity a record is stored and read under. It also carries `owner`/`ownerGhii`, `kind`,
+returns: the identity a record is stored and read under. It also has `owner`/`ownerGhii`, `kind`,
 `inPerson`, `visitor`, `scopes`, `has(word)` (the answer `requireScope` gives) and `operator()`.
 Authorize against **that** principal: never raw `req.auth.sub`, never a `req.params`/`req.body`/`req.query`
 `id`/`owner`/`gaii`. Load the object, then check ownership/membership **before** the read/mutate.
@@ -57,7 +57,7 @@ templates do (`__network_policy__`, `SITE_OWNER_GAII`) so no owner-scoped princi
 (`openrouter.*`, `ai-usage.*`, `profile.*`, …).
 A record that one service keeps **for an account** uses the per-account form of (a): the account's service
 namespace `svc:<owner>@<node>`, read and written only through `serviceRecords<T>(storage, prefix)`
-(`services/service-records.ts`). No memory route reads or writes it, the account's data export carries it
+(`services/service-records.ts`). No memory route reads or writes it, the account's data export includes it
 and the account erasure removes it. `SERVICE_OWNED_KEY_PREFIXES` (the owner-namespace keys no memory route
 writes) may only shrink; `pnpm check:trusted-keys` refuses a new entry (codebase analysis 2026-11-03, B6).
 *Why:* an app the owner granted `memory:write` can otherwise poison the owner's own config (e.g. redirect
@@ -123,7 +123,7 @@ documented local override. Never hardcode a permissive value, never delete funct
 ---
 
 ### 11. The owner name is not a principal
-`req.auth!.owner` carries the HUMAN's account name on every principal that belongs to them: an
+`req.auth!.owner` holds the HUMAN's account name on every principal that belongs to them: an
 app-grant token (`roles:['app']`), an ecosystem app, an agent JWT and an agent PAT alike. So a check
 written as `req.auth!.owner !== name` is a CROSS-OWNER check and nothing more. It refuses a different
 person and admits everything acting in this person's name, which is not what its author meant and not
@@ -162,7 +162,7 @@ Four scoping-shape endpoints were found by hand on 2026-09-04, all now behind `r
 
 - `GET`/`DELETE /v1/auth/sessions` and `DELETE /v1/auth/sessions/:id` pass `req.auth!.owner` to
   `listActiveSessions` and revoke what comes back: the human's device list, and signing them out of
-  every device they own, their current one included, for any principal carrying their account name.
+  every device they own, their current one included, for any principal that has their account name.
 - `GET /v1/ghii/cors` names the web origins that already hold credentialed access to the account.
   Audit H-7 guarded the PUT and left the read, which is the reconnaissance for the same attack.
 
@@ -185,7 +185,7 @@ agent reading something it should not. It is a person's identity recorded as ver
 that is not theirs, by the one flow on this node whose entire purpose is to be trusted afterwards.
 
 **Guarding half a flow is worse than not guarding it, because the guarded leg makes the flow look done.** Both
-POSTs carried `requireOwnerPrincipal()` and a reader checking "is the verification path guarded"
+POSTs had `requireOwnerPrincipal()` and a reader checking "is the verification path guarded"
 found a guard. The gate has to sit where the STATE IS MINTED, because after that there is nowhere to
 put it: the callback has no principal to test.
 
@@ -204,12 +204,12 @@ be listed in `aimeat/security/owner-principal-exemptions.json` with the sentence
 right question there. When it was added it counted 45 refusals: 15 endpoints already naming the principal and
 30 listed and triaged (`pnpm check:owner-principal:report` gives today's numbers). It found
 `GET /v1/ghii/:ghii/credential` minting a SIGNED verifiable identity credential for any principal
-carrying the account name. The same file's two write endpoints had been gated in August, and the read
+with the account name. The same file's two write endpoints had been gated in August, and the read
 that returns the identity had not. Three of those 30 were marked an open question rather than cleared:
 `requireRole('owner')` keeps machine principals out but an owner-level PAT satisfies it, and the endpoint
 grants something (an agent's scopes, an agent's key, an ecosystem app's access). What counts as a
 principal guard is one list, `AUTHORIZATION_GATES` in `aimeat/scripts/inventory/principals.ts`. This
-script and `check:route-scopes` used to carry one each, and they disagreed about four names.
+script and `check:route-scopes` used to have one each, and they disagreed about four names.
 
 #### 11c. A session from ANOTHER node is a visitor, and its name is never cut back to a local one
 
@@ -342,7 +342,7 @@ the right way to move a hundred routes, and it is wrong often enough that the re
 the method rather than diligence on top of it: grep the resulting diff for READ endpoints given a
 write-flavoured word and re-test each one per operation. On 2026-09-04 that step caught six of
 ninety-one, and each of the six had TWO independent reasons to be left alone: no read tool demanded
-the word, and the two extension reads already carried an owner check in the handler (15c). The
+the word, and the two extension reads already had an owner check in the handler (15c). The
 mechanical pass saw neither.
 
 *Check:* `TOOL_SCOPES` in `src/tool-catalog/scopes.ts` is the register (built from each tool's `scope` on
@@ -378,7 +378,7 @@ an app without the word instead (QA audit 2026-10-16, F05b-01). Before choosing 
 
 **And an endpoint whose permission depends on the answer is decided after the answer, not before it.** The
 extension-invoke routes hold their decision until the paywall knows whether the call costs anything.
-This codebase had already learned it once, and `e2e-money-audit` carries the sentence: the permission
+This codebase had already learned it once, and `e2e-money-audit` contains the sentence: the permission
 "used to be demanded before the node knew whether the call cost anything, so an app holding only
 `memory:read` was refused with `SCOPE_DENIED` on a capability that charges nobody — which locked
 published apps out of their own free extensions." Both invoke endpoints were re-gated on 2026-09-04 by a
@@ -464,7 +464,7 @@ board subscription still delivering after the member was removed, a withdrawn di
 served, replicated public memory that no peer ever expires or retracts.
 
 *Check:* for every revocation, list the derived state it must reach (open sessions and tokens that
-carry no session id, grants that name the principal as GRANTEE not owner, memberships and listing
+have no session id, grants that name the principal as GRANTEE not owner, memberships and listing
 arrays keyed by bare name, subscriptions, caches, issued share references, peer replicas) and reach
 each one, or re-check authority at use time. A GAII is rebuilt from a name, so a grant left behind
 rebinds to the next holder of that name.
@@ -570,7 +570,7 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 - [ ] **Anonymous:** no `if(!req.auth)` gate; `members` reads check `!req.auth.anonymous` (Inv. 6).
 - [ ] **Secrets:** encrypted at rest, never returned/logged, destination allowlisted (Inv. 7).
 - [ ] **Config:** any security value that differs local↔public is in `.env.example` with a safe public default (Inv. 10).
-- [ ] **Provenance:** does this path produce or serve model output? If yes, does it mint or propagate provenance? Minting goes through `services/ai/provenance.ts`; serving carries it via `services/ai/provenance-marks.ts`. A new publishing container also goes in `PUBLICLY_LINKED_CONTAINERS` and both providers' predicates, or the labels it produces resolve to a 404 and read as "no provenance". `pnpm check:ai-disclosure` enforces the parts it can see.
+- [ ] **Provenance:** does this path produce or serve model output? If yes, does it mint or propagate provenance? Minting goes through `services/ai/provenance.ts`; serving adds it through `services/ai/provenance-marks.ts`. A new publishing container also goes in `PUBLICLY_LINKED_CONTAINERS` and both providers' predicates, or the labels it produces resolve to a 404 and read as "no provenance". `pnpm check:ai-disclosure` enforces the parts it can see.
 - [ ] **Spec + campsite:** `openapi.yaml` marks the route's auth; fixed any adjacent gaps you passed.
 - [ ] **Action binding:** a scheduled, queued, approved or second-surface action re-resolves its principal at the sink and runs only the approved operation, target and arguments (Inv. 17).
 - [ ] **Cross-principal content:** a secondary write path that writes content another principal's agent loads passes the same write gate as the primary endpoint for that key or namespace (Inv. 18).

@@ -53,20 +53,20 @@ There are **two kinds of thing**, and they follow different rules:
 |---|---|---|
 | Internal TS types, Zod models, variables | `camelCase` | `createdAt`, `blockSize`, `periodSeconds` |
 | **Route DTOs on the wire** | `snake_case`, **mapped at the route boundary** | `created_at: p.createdAt` (`access-tokens.ts`), `usage.prompt_tokens` (`ai.ts`) |
-| **Self-describing documents that carry their own `spec`** | **ONE spelling, `camelCase`, on every carrier** | ODPS `provenance` (`legalBasis`, `odpsVersion`), AI provenance (`humanInvolvement`, `generatedAt`) |
+| **Self-describing documents that contain their own `spec`** | **ONE spelling, `camelCase`, in every container** | ODPS `provenance` (`legalBasis`, `odpsVersion`), AI provenance (`humanInvolvement`, `generatedAt`) |
 
 **Route DTOs** are snake_case on the wire and camelCase inside, and the mapping happens once, in the
 route handler. Do not let snake_case leak inward and do not let camelCase leak outward.
 
 **Self-describing documents are different, and the difference is deliberate.** A document that
-carries its own `spec` identifier (`"spec": "aimeat.provenance/v1"`, an ODPS descriptor) is not a
-DTO of one endpoint. It travels through many carriers: a memory record, YAML frontmatter, a C2PA
+contains its own `spec` identifier (`"spec": "aimeat.provenance/v1"`, an ODPS descriptor) is not a
+DTO of one endpoint. It is embedded in many containers: a memory record, YAML frontmatter, a C2PA
 assertion, an MCP tool result, a WebMCP listing, `/v1/provenance/:id`, and a published JSON Schema
-external validators read. Mapping it at each boundary would mean one mapping site per carrier, and
+external validators read. Mapping it at each boundary would mean one mapping site per container, and
 one of them would drift. So it keeps **one spelling everywhere**, and the spelling is camelCase.
 
 Which means `meta.provenance.humanInvolvement` sitting next to `usage.prompt_tokens` in the same
-response is **not** an inconsistency: one is a document riding in an envelope, the other is a field
+response is **not** an inconsistency: one is a document embedded in the response, the other is a field
 of that endpoint's DTO.
 
 The one place the two meet: an **MCP parameter name** is snake_case like every sibling parameter
@@ -203,7 +203,7 @@ All data access goes through the `Storage` interface (`src/storage/interface.ts`
 ### Adding New Data Types
 
 1. Add the record type to a file in `src/storage/types/` and re-export it from `src/storage/interface.ts`.
-2. Add a repository interface in `src/storage/repositories/<name>.repository.ts`, with method names that carry the record name (`createMyThing`, `getMyThing`), because every repository is merged into the one `Storage` interface.
+2. Add a repository interface in `src/storage/repositories/<name>.repository.ts`, with method names that include the record name (`createMyThing`, `getMyThing`), because every repository is merged into the one `Storage` interface.
 3. Add that interface to the list `Storage` extends in `src/storage/interface.ts`.
 4. Implement it in both providers under `src/storage/providers/`, with a migration for PostgreSQL.
 
@@ -263,7 +263,7 @@ logger.error('Database connection failed', { ...errorFields(err), host });
 
 A caught error goes in through `errorFields(err)`, which gives the message and the stack. The caught
 value itself as a field (`{ error: err }`) is refused by `aimeat/no-error-object-log-field`: JSON
-writes an Error as `{}`. Every line carries the request id and the caller by itself. A route that
+writes an Error as `{}`. Every line includes the request id and the caller by itself. A route that
 answers a caught exception with a 500 passes the error along so its stack reaches the log line:
 `res.status(500).json(carryError(error(config.nodeId, 'INTERNAL_ERROR', String(err)), err))`
 (`src/middleware/internal-error-text.ts`). An MCP tool that catches everything returns

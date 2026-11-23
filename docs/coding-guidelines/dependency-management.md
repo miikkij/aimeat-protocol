@@ -72,7 +72,7 @@ Every licence tool in the ecosystem walks the npm tree and stops. That describes
 what this node distributes:
 
 - **The npm tree**, the production packages, read by `pnpm licenses list`. Dev dependencies are
-  excluded on purpose: the toolchain does not ship, so it carries no obligation for anyone.
+  excluded on purpose: the toolchain does not ship, so it creates no obligation for anyone.
 - **`aimeat/public/lib/`**, twenty-odd browser libraries fetched from a CDN and committed by hand.
   No npm tool has ever looked at them, and serving a file to a browser is distribution in the same
   sense a tarball is. [`licenses.json`](../../aimeat/public/lib/licenses.json) is their manifest and
@@ -99,7 +99,7 @@ three components, because a new major of p5 and of ffmpeg is a separate componen
 
 `aimeat-desktop` distributes two things the web node does not, and neither is a declared
 dependency: the Node runtime, staged as a Tauri sidecar from the build machine's own installation,
-whose 146 kB `LICENSE` carries the notices for OpenSSL, V8, ICU and the rest; and
+whose 146 kB `LICENSE` contains the notices for OpenSSL, V8, ICU and the rest; and
 `WebView2Loader.dll`, a Microsoft redistributable under Microsoft's terms rather than the MIT of the
 crate it came from. `aimeat-desktop/scripts/stage-licenses.mjs` stages both, plus AIMEAT's own licence and the
 generated notices, into the installer. It fails the build rather than shipping without them.
@@ -119,7 +119,7 @@ Two scanners, because one of them cannot see a third of what this node ships.
 that cuts a release. `-- --json` is the CI shape.
 
 **The gap is not theoretical.** On 2026-08-31, `pnpm audit` reported zero vulnerabilities across
-730 packages while the served libraries carried six: a HIGH-severity arbitrary JavaScript execution
+730 packages while the served libraries had six: a HIGH-severity arbitrary JavaScript execution
 in PDF.js 6.1.200 (opening a malicious PDF), and five in Mermaid 11.15.0: prototype pollution twice,
 CSS injection reaching outside the diagram, and two denial-of-service paths. Nothing had ever
 scanned them, because they are committed files with no manifest above them and every dependency
@@ -138,7 +138,7 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
   Scorecard and secret scanning with push protection all run.
 - **There is deliberately no `.github/dependabot.yml`, and no automatic security-update PRs.**
   This is a decision, not an omission, and it has been re-made by mistake once: a solo maintainer
-  does not want a queue of bot pull requests, and alerts on the Security tab carry the same
+  does not want a queue of bot pull requests, and alerts on the Security tab give the same
   information without the noise. The cost is that nothing opens a fix PR for you, so the Security
   tab is a place you go and look. If you ever want the PRs, the switch is
   `dependabot_security_updates` in the repository settings, and a version-update config file after
@@ -186,7 +186,7 @@ Three commands, and none of them opens a pull request:
 
 | Command | Answers |
 |---|---|
-| `pnpm outdated:libs` | What moved upstream: our version, the newest release on the line we pin (which lands in place with no decision), the newest one overall, how old the bytes we serve are, whether anybody still releases it. |
+| `pnpm outdated:libs` | What moved upstream: our version, the newest release on the line we pin (which replaces the file in place with no decision), the newest one overall, how old the bytes we serve are, whether anybody still releases it. |
 | `pnpm libs:usage -- --node https://aimeat.io` | Which published apps load which FILE: directly, through a served SDK lib or cortex pack that can load it (`aimeat-markdown` loads Mermaid), and whether the portal loads it. Reads public endpoints only, so it needs no token. |
 | `pnpm audit:security` | Both of the above plus the vulnerability scanners and the licence gate, as one dated report. |
 
@@ -221,7 +221,7 @@ That is what `licenses.json` fixes: it gives each file a real package URL, which
 `pnpm scan:vulns` matches against a vulnerability feed. An update is four steps, and they must all
 happen together.
 
-**A minor or patch lands in place, same filename, no app changes:**
+**A minor or patch replaces the file in place, same filename, no app changes:**
 
 1. Fetch the new build over the old path.
 2. Update the version in `public/lib/VENDORED.md`, in `public/lib/licenses.json` (version **and**
@@ -254,7 +254,7 @@ keeps published apps alive, and it was first walked on 2026-08-31 for p5 2, Phas
   hooks from another gave two different `options` objects, every hook ran outside a render, and the
   SPA died with "AIMEAT failed to start". The library was fine; the fetch was wrong.
 - **A file that imports a sibling relatively cannot work here.** `stampAssets()` in `src/routes/portal-spa.ts` stamps
-  `?v=<content tag>` on every importmap entry, and a relative `./preact.mjs` does not carry that query, so the same file
+  `?v=<content tag>` on every importmap entry, and a relative `./preact.mjs` does not have that query, so the same file
   arrives twice under two URLs, as two modules. The vendored build must import the bare specifier.
 
 And the reason step 4 says a real browser: every one of those failures compiles, typechecks and
@@ -270,10 +270,10 @@ When adding new overrides:
 1. Document which vulnerability (CVE) it fixes
 2. Test that the override doesn't break functionality
 3. Plan to remove once the direct dependency updates
-4. Keep the range inside the major the dependents asked for (`^2.1.4`, never `>=2.1.4`); when dependents of several majors overlap the selector, name each major (`^7.3.5 || ^8.0.0`). `pnpm check:overrides` refuses an open value and says why (`aimeat/scripts/lib/override-ranges.mjs`). After a change, `pnpm install` so `pnpm-lock.yaml` carries it.
+4. Keep the range inside the major the dependents asked for (`^2.1.4`, never `>=2.1.4`); when dependents of several majors overlap the selector, name each major (`^7.3.5 || ^8.0.0`). `pnpm check:overrides` refuses an open value and says why (`aimeat/scripts/lib/override-ranges.mjs`). After a change, `pnpm install` so `pnpm-lock.yaml` records it.
 5. Add the same rule to the npm `overrides` field beside it (a parent rule `a>b` becomes `"a": { "b": … }`). npm reads neither the `pnpm` block nor `pnpm-lock.yaml`, and `aimeat/test/unit/npm-shrinkwrap.test.ts` refuses the two lists when they differ. A removal (`"-"`) has no npm form and stays only in `pnpm.overrides`.
 
-The published npm package carries `aimeat/npm-shrinkwrap.json`, so `npx aimeat` and `npm install -g aimeat` install the versions `pnpm-lock.yaml` pins, with pnpm's integrity hashes and every override applied, removals included. `pnpm gen:shrinkwrap` writes it from `pnpm-lock.yaml` (prepublishOnly and the nightly pack-smoke run it; the file is not tracked) and refuses to write one that breaks an override or resolves differently from the lock. `aimeat/scripts/pack-smoke.mjs` installs the packed tarball with npm and checks the installed tree against both.
+The published npm package includes `aimeat/npm-shrinkwrap.json`, so `npx aimeat` and `npm install -g aimeat` install the versions `pnpm-lock.yaml` pins, with pnpm's integrity hashes and every override applied, removals included. `pnpm gen:shrinkwrap` writes it from `pnpm-lock.yaml` (prepublishOnly and the nightly pack-smoke run it; the file is not tracked) and refuses to write one that breaks an override or resolves differently from the lock. `aimeat/scripts/pack-smoke.mjs` installs the packed tarball with npm and checks the installed tree against both.
 
 ---
 

@@ -184,7 +184,7 @@ The one builtin today: the two endpoints a living document uses to call outside 
   written in dots and brackets (`prices[0].price`). Needs `memory:read`. The same address is
   fetched at most once every ten seconds per owner.
 
-A refusal is a normal answer carrying `{ error: { code, message } }`, not a thrown error, so the
+A refusal is a normal answer with `{ error: { code, message } }`, not a thrown error, so the
 browser half can show the words: `ALLOWLIST_REFUSED`, `RATE_LIMITED` (60 sends and 120 reads a
 minute per owner), `PAYLOAD_TOO_LARGE` (256 kB), `TOO_LARGE` (a read over 1 MB, or any answer
 over the 4 MB the node reads, on send as well), `UPSTREAM_FAILED` (with
@@ -337,7 +337,7 @@ If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TI
 
 ## Federation
 
-A manifest may carry `federation: { advertise, capabilities }`. The node stores both with the
+A manifest may include `federation: { advertise, capabilities }`. The node stores both with the
 extension. No route lists extension capabilities to peers, and nothing on the node reads the block
 yet, so it is a declaration for the future and not a way to be found.
 

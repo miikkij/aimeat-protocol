@@ -38,7 +38,7 @@ Twelve SVG files: three icons in four variations each.
 
 | Icon | Files | Aspect | Use it when |
 |------|-------|--------|-------------|
-| **Basic** | `ai-basic_*.svg` | **1:1** (square) | AI was involved in a deepfake or published text, and a custom text label or an interactive second layer carries the detail |
+| **Basic** | `ai-basic_*.svg` | **1:1** (square) | AI was involved in a deepfake or published text, and a custom text label or an interactive second layer gives the detail |
 | **Fully AI-Generated** | `ai-generated_*.svg` | **≈3.16:1** (wide lockup) | The whole item is AI-generated with no human-created elements and no editorial control beyond prompting |
 | **Partially AI-Modified** | `ai-modified_*.svg` | **3:1** (wide lockup) | Pre-existing human-made content was partially modified with AI |
 
@@ -88,7 +88,7 @@ placement specifications):
   AI-generated or manipulated.
 - If shown for a limited time, visible long enough to be read by users with cognitive or processing
   difficulties.
-- If a second interactive layer carries more information, the icon indicates that it exists, and
+- If a second interactive layer has more information, the icon indicates that it exists, and
   that layer is navigable with assistive technology.
 
 User testing behind the design found that **the basic icon performed better on every measure when

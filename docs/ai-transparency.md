@@ -27,7 +27,7 @@ Picking only one is the expensive mistake, so there are two and they fail indepe
 
 ### The record
 
-Content generated through the node carries an `aimeat.provenance/v1` document: which model, which
+Content generated through the node has an `aimeat.provenance/v1` document: which model, which
 provider, which principal, which node, when, how much a human was involved, which sources, and the
 hash of the exact bytes the statement is about. The published JSON Schema is served per version at
 `/v1/schemas/ai-provenance/v1.json`.
@@ -62,7 +62,7 @@ the `Link` header instead. This is a real limit, not a bug you should keep retry
 
 ### Files: a clip, a picture, a document you store
 
-A stored file carries the record of its bytes. When the node made the bytes (`POST /v1/ai/speak`,
+A stored file has the record of its bytes. When the node made the bytes (`POST /v1/ai/speak`,
 `POST /v1/ai/image`), the file it stores names the record it minted while it watched them, so a
 picture stored public or a clip made public in place
 (`PATCH /v1/storage/{key}/visibility`, folder paths included) is served from `/v1/pub` with the
@@ -105,7 +105,7 @@ Read this section before you quote anything from section 1.
   in-band mark is gone. The addressable record survives that — which is exactly why both layers
   exist — but nothing here makes text tamper-proof, and we do not pretend otherwise.
 - **It marks what it observes or what someone declares.** Content that existed before the node
-  started recording carries no record, and will not acquire one: a statement about bytes nobody
+  started recording has no record, and will not acquire one: a statement about bytes nobody
   witnessed would be a fabrication. Expect a mixed corpus for as long as your node has history.
 - **It does not label what other people publish through you and do not declare.** An agent that says
   nothing is recorded as model-written (that default is deliberate), but a principal that lies to the
@@ -135,7 +135,7 @@ duty is the vendor's. See the private future-proofing notes (not distributed) §
 is why `generator.upstreamMarks` exists in the record: a downstream provider may rely on an upstream
 mark while staying responsible for it.
 
-**The open-source project itself is not an AI system.** Publishing infrastructure code carries no
+**The open-source project itself is not an AI system.** Publishing infrastructure code creates no
 Article 50 duty. The duty attaches to whoever *runs* a node and *publishes* with it.
 
 ---
@@ -214,7 +214,7 @@ If you deliberately run without them, say so on your own node. Silence reads as 
 
 ## 7. If someone reports unlabelled AI content
 
-Anyone with an account on the node can report content that should carry a label and does not (the
+Anyone with an account on the node can report content that should have a label and does not (the
 report needs a sign-in and the `social:write` permission). A visible label links to its own
 provenance record, and that record id is what to report.
 
@@ -230,7 +230,7 @@ operator's moderation queue — the one that already has reviewers, an auto-hide
 appeal path — and an organism admin for organism content. It is deliberately not a second inbox: a
 new address would look like a procedure without being one.
 
-An operator can see the shape of their own node's corpus, including public content that carries no
+An operator can see the shape of their own node's corpus, including public content that has no
 label, at `GET /v1/admin/ai-transparency-report`. An account can see its own at
 `GET /v1/ai-transparency/mine`.
 
@@ -243,7 +243,7 @@ Discipline for this repository, our marketing and our listings — and worth ado
 | Do not say | Say instead |
 |---|---|
 | "AIMEAT is EU AI Act compliant" | "AIMEAT implements the Article 50 transparency mechanisms on the node's own surfaces, and gives builders the primitives to meet their own obligations." |
-| "All AI content on AIMEAT is watermarked" | "Content generated through the node carries a machine-readable provenance record and a visible label at first exposure." |
+| "All AI content on AIMEAT is watermarked" | "Content generated through the node has a machine-readable provenance record and a visible label at first exposure." |
 | "We are certified" | "We follow the Code of Practice's layered-marking approach." |
 | "Your app is compliant because it runs on AIMEAT" | "Your app inherits the marking and labelling primitives; the deployer duties for what you publish remain yours." |
 

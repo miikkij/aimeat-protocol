@@ -115,7 +115,7 @@ One row per key family or record type, never one per key: `news.<date>.*`, not 3
 | `publishable` | no | `true` when the family may be published as a data package: a data product reads it as material (an `app` source of `/v1/dataproducts`). Absent or `false` is not offered. A statement, not a permission: the product decides who reads the package, and a row that also marks its data personal keeps every column out of a public package until the owner confirms. |
 
 **Why the domain is on the row.** The domain decides what follows the data: the lowest
-classification its container may carry, whether an impact assessment is owed, whether an outside
+classification its container may have, whether an impact assessment is owed, whether an outside
 model may read it, and which area of the EU AI Act's Annex III an AI use of it falls under. CVs,
 competence ratings and staffing decisions are `employment`; an app that uses AI on them is a
 candidate for the high-risk class (Annex III point 4), and the register draft proposes exactly that.
@@ -161,7 +161,7 @@ A finding never refuses a map. The owner sees it; everyone else reads the map wi
 
 `PUT /v1/datamap/apps/{owner}/{filename}` answers with the stored map, its stamp and the findings.
 When the node requires a balancing test (`AIMEAT_COMPLIANCE_BALANCING_TEST=required`) and the app now
-needs one that is not approved, the answer also carries `balancing_test`: its state, the registers
+needs one that is not approved, the answer also includes `balancing_test`: its state, the registers
 that need it, what to tell the person, and the address where it is written.
 
 `PUT /v1/datamap/apps/{owner}/{filename}/agents/{agent}` (body `{ made_for?, holds? }`) states, as
@@ -169,7 +169,7 @@ one row of the map, that the app shows that agent's work; `DELETE` on the same p
 away and leaves the agent, its work and the app as they are. Both need `memory:write`, and the
 agent's page and the app's page list the tie from the map.
 
-The app's own list entry carries a summary (`spec`, `form`, `summary`, `heldRows`,
+The app's own list entry has a summary (`spec`, `form`, `summary`, `heldRows`,
 `rowsWithoutWhy`, `missing`, `docKey`, `at`), so a list of apps shows where each one's data is
 without reading every map.
 
@@ -187,5 +187,5 @@ and its declared hosts there; the declaration on the extension is the source for
 `/2` replaced `/1` on 2026-08-25: `/1` described key families and their compliance columns and never
 said what the app was for. Optional fields added since (`organism-rows`, `classification`, `agent`,
 `madeFor`, `invites`, the machinery word `invites-people`, the row's `domains`, `registers` and the
-machinery word `registers-parties`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
+machinery word `registers-parties`) are additive and keep the format at `/2`; a map contains its own `spec` so a newer node can
 read an older map.

@@ -19,7 +19,7 @@
 
 ### 0.1 Status of this document
 
-This is the current edition of the Core. It became normative with node 4.0.0, released on 2026-10-13, and a node from that release reports the protocol version `2026-11` in discovery. Each requirement that the reference node does not meet is listed as a gap in the evidence file, with the wish that carries the fix.
+This is the current edition of the Core. It became normative with node 4.0.0, released on 2026-10-13, and a node from that release reports the protocol version `2026-11` in discovery. Each requirement that the reference node does not meet is listed as a gap in the evidence file, with the wish that tracks the fix.
 
 ### 0.2 Three version numbers
 
@@ -64,13 +64,13 @@ A claim of a profile includes a claim of the profiles it depends on.
 
 ### 0.4 What changed from v4.0
 
-This edition is a re-cut against the reference implementation. It changes four requirements that a v4.0 implementation relied on, so a node built from the v4.0 text alone does not interoperate with a node of this edition in those four places.
+This edition is rewritten to match the reference implementation. It changes four requirements that a v4.0 implementation relied on, so a node built from the v4.0 text alone does not interoperate with a node of this edition in those four places.
 
 **Changes that break a v4.0 implementation**
 
 | Change | Section |
 |---|---|
-| A signed node message names its audience and its send time, and a receiver accepts it once and only inside a freshness window. A relayed request carries a signed relay claim. The v4.0 format without this proof is removed. | §9.3 |
+| A signed node message names its audience and its send time, and a receiver accepts it once and only inside a freshness window. A relayed request includes a signed relay claim. The v4.0 format without this proof is removed. | §9.3 |
 | The scope wildcard no longer grants every scope. Operator, account-security and a small set of other words are granted only by name, and some operations require the account holder in person. | §5.1, §5.2 |
 | The owner-key sign-in (a challenge signed with the owner's Ed25519 key) is removed. | §4.1, Appendix B |
 | A session token in a WebSocket upgrade URL is removed. A client sends a header or a single-use ticket. | §4.8, Appendix B |
@@ -92,7 +92,7 @@ This edition is a re-cut against the reference implementation. It changes four r
 
 **Corrected from v4.0** (the [v4.0 errata list](AIMEAT-RFC-v4.0-errata.md) has the details): the response envelope as the code emits it (§11.1), consent scopes (§5.3), direct messages between nodes (§7.4), what a personal node's parent does (§9.7), and the removal of claims about features that do not exist (wash-trading detection, trust advisories).
 
-**Removed from the specification**, because they are not protocol: endpoint tables, tool lists, configuration variable names, sizes and limits, screens, product names, and the dates of internal rulings. The reference node's API description, its MCP tool catalog, its configuration reference and its feature list carry them; the [Platform reference](AIMEAT-Platform-reference.md) says where each one is.
+**Removed from the specification**, because they are not protocol: endpoint tables, tool lists, configuration variable names, sizes and limits, screens, product names, and the dates of internal rulings. The reference node's API description, its MCP tool catalog, its configuration reference and its feature list name them; the [Platform reference](AIMEAT-Platform-reference.md) says where each one is.
 
 ---
 
@@ -161,7 +161,7 @@ Each term below has one meaning in this document.
 | **Pacing amount** | The number of morsels one use of an offer moves from the user's owner to the provider's owner, with part of it burned (§8.2). |
 | **Peer** | Another node with which a node has a federation relationship (§9). |
 | **Tier** | The level a peer has: `contact`, `visiting`, `member` or `genesis` (§9.1). |
-| **Signed node request** | A message one node sends another, signed with the sender's node key and carrying the proof of §9.3. |
+| **Signed node request** | A message one node sends another, signed with the sender's node key and including the proof of §9.3. |
 | **Surface** | One MCP endpoint that exposes a named subset of the tools (§11.4). |
 | **Provenance record** | A document of type `aimeat.provenance/v1` that says how a piece of content was made (§10). |
 
@@ -253,7 +253,7 @@ An **outside party** is a person or a program that has no account on the node an
 | Party identity | `party:<owner>/<name>@<node-id>`, for example `party:alice/matti@node-id` |
 | Party name | `^[a-z0-9][a-z0-9-]{0,39}$`, unique per owner |
 
-The identity carries a slash and the `party:` prefix, and never the `x#owner@node` form of an agent, so that no parser of an agent, owner or ecosystem identifier reads a party as one of the owner's own principals.
+The identity contains a slash and the `party:` prefix, and never the `x#owner@node` form of an agent, so that no parser of an agent, owner or ecosystem identifier reads a party as one of the owner's own principals.
 
 - **ID-13** A party's credential MUST be a key the owner was shown once and the node stores only as a one-way hash compared in constant time, or a short-lived purpose token made from that key. A node MUST accept the credential only on the endpoints that read what was shared with a party (the data package reads, the OData feed, the package files, the party's own endpoints) and MUST refuse it, 401, on every other endpoint. A party credential MUST NOT become a node session.
 - **ID-14** A party MUST NOT be admitted by any audience that names the node's accounts: neither the `members` level nor an organism (§6.3). A party reads a package only through a live named share to exactly that package, and only the version the share pins when it pins one.
@@ -271,7 +271,7 @@ This section states outcomes. A node chooses its sign-in methods; a client relie
 
 - **AUTH-01** A node MUST offer at least one way for an owner to sign in that does not require the owner to hold a private key. Password, an outside identity provider (OpenID Connect or SAML), a passkey and an emailed sign-in link are the methods the reference node offers.
 - **AUTH-02** A stored password MUST be hashed with a memory-hard function.
-- **AUTH-03** When an owner has armed a second factor, a sign-in that rests on a password or on an emailed link MUST require it, and a method that cannot carry a second factor MUST refuse that owner. A node MAY accept a passkey, or an outside identity provider the operator configured, as a sign-in that needs no further factor.
+- **AUTH-03** When an owner has turned on a second factor, a sign-in that uses a password or an emailed link MUST require it, and a method that cannot support a second factor MUST refuse that owner. A node MAY accept a passkey, or an outside identity provider the operator configured, as a sign-in that needs no further factor.
 - **AUTH-04** An owner session MUST consist of a short-lived access token and a refresh credential that is rotated on every use. Presenting a refresh credential that was already rotated MUST end the whole session.
 - **AUTH-05** The owner-key sign-in of v4.0 (a challenge signed with the owner's Ed25519 key) is removed. A node of this edition MUST NOT issue an owner session for a signature by an owner key.
 - **AUTH-06** A sign-in endpoint MUST slow or refuse repeated failures from one source, and MUST give the same answer for an unknown account and a wrong password.
@@ -299,8 +299,8 @@ An agent that cannot open a browser asks its owner for approval with the OAuth 2
 
 An ecosystem application sends a hello with its public key, its name and the scopes and data areas it wants. The owner approves, narrows or refuses. The application then collects a token for its GEAI.
 
-- **AUTH-12** The node MUST pin the key the application sent at hello. Every later renewal MUST carry a signature by that pinned key over the GEAI and a timestamp, inside a five-minute window, used once.
-- **AUTH-13** One approval MUST NOT carry renewals for ever. After a period the node states, the application MUST send a new hello and the owner MUST approve again.
+- **AUTH-12** The node MUST pin the key the application sent at hello. Every later renewal MUST include a signature by that pinned key over the GEAI and a timestamp, inside a five-minute window, used once.
+- **AUTH-13** One approval MUST NOT allow renewals for ever. After a period the node states, the application MUST send a new hello and the owner MUST approve again.
 - **AUTH-14** An ecosystem application MUST NOT receive the owner's scope bypass; every request it makes passes scope checks.
 
 ### 4.5 Agents that hold their own key (profile Agent Keys)
@@ -324,7 +324,7 @@ A hosted application obtains an app grant with the OAuth 2.0 authorization code 
 
 An owner MAY create a long-lived token for a script or a tool that cannot run an interactive flow.
 
-- **AUTH-22** A personal access token MUST carry an explicit scope set or an explicit statement that it acts as the owner. The node MUST store only a hash of it, MUST let the owner list and revoke it, and MUST check revocation and expiry on every use.
+- **AUTH-22** A personal access token MUST contain an explicit scope set or an explicit statement that it acts as the owner. The node MUST store only a hash of it, MUST let the owner list and revoke it, and MUST check revocation and expiry on every use.
 
 ### 4.8 WebSocket upgrades
 
@@ -350,7 +350,7 @@ A node answers "may this principal do this?" in layers. Scopes and roles decide 
 
 A scope is a word of the form `domain:action`, such as `memory:read`. An owner in person holds every scope over the owner's own data. Every other principal holds the scopes it was granted.
 
-- **AUTHZ-01** A node MUST check scopes on every request a non-owner principal makes to an operation that reads or changes data. A principal that lacks a required scope MUST be refused with status 403 and the code `SCOPE_DENIED`, and the response SHOULD carry `WWW-Authenticate: Bearer error="insufficient_scope"` naming the scope.
+- **AUTHZ-01** A node MUST check scopes on every request a non-owner principal makes to an operation that reads or changes data. A principal that lacks a required scope MUST be refused with status 403 and the code `SCOPE_DENIED`, and the response SHOULD include `WWW-Authenticate: Bearer error="insufficient_scope"` naming the scope.
 - **AUTHZ-02** A request MUST NOT receive the owner's scope bypass when it comes from an agent, an ecosystem application, an app grant, or a visitor signed in from another node, even when that principal acts for an owner or an operator.
 - **AUTHZ-03** A node MUST treat a held scope as covering a required scope only when it is the same word, or when it is `*`, or when it is `domain:*` for the required word's domain, with one exception: a word on the node's list of words outside the wildcard is covered only by the same word.
 - **AUTHZ-04** The list of words outside the wildcard MUST include at least: `operator:admin`, `account:security`, `secrets:manage`, `mcp:manage`, `memory:write-reserved`, `compliance:read`, `compliance:write`, and the words that let an agent act as the owner on the owner's money, the owner's correspondence or who else reads the owner's data (in the reference node: `agent:permissions`, `consent:groups`, `share:manage`, `social:members`, `commerce:psp`, `commerce:beneficiary-verify`, `messages:read-as-owner`, `messages:delete-as-owner`, `messages:organize-as-owner`). A node MAY add words to the list and MUST publish its list with its scope vocabulary.
@@ -435,7 +435,7 @@ Each level states:
 | lowering needs a reason | whether a person must give a reason to lower the level |
 
 - **CLS-01** A node that claims this profile MUST apply classification at three points and no others: when content is shown (a list, a search or a read), when content is used as input to an AI model, and when content leaves (export, share link, federation, outside destination).
-- **CLS-02** Content whose level does not allow leaving MUST NOT leave, unless an exception for it is recorded. A person MAY record an exception, with a written reason. An application acting within the purpose it declared MAY receive an exception that the node records, with the application named as the reason, on the same list. An exception MAY carry a last day. Making, using and withdrawing an exception MUST each write an audit row.
+- **CLS-02** Content whose level does not allow leaving MUST NOT leave, unless an exception for it is recorded. A person MAY record an exception, with a written reason. An application acting within the purpose it declared MAY receive an exception that the node records, with the application named as the reason, on the same list. An exception MAY have a last day. Making, using and withdrawing an exception MUST each write an audit row.
 - **CLS-03** An AI acting for a reader MUST see what that reader may see, subject to the level's AI visibility, and no more.
 - **CLS-04** A refusal by classification MUST use status 403 and the code `CLASSIFIED`.
 - **CLS-05** An owner MAY add levels for personal content and an organism MAY add levels for organism content. An added level MUST NOT be less strict than the node level it refines.
@@ -459,7 +459,7 @@ A record has: a key; the owning principal; a value; a visibility (§6.3); tags; 
 ### 6.2 Versions
 
 - **DATA-03** Every write MUST increase the record's version by one. A new record starts at version 1.
-- **DATA-04** An update of an existing record MUST carry the version the writer read. When the record has changed since, the node MUST refuse with 409 `VERSION_CONFLICT` and say the current version. A create MAY carry expected version 0, meaning the record must not exist yet.
+- **DATA-04** An update of an existing record MUST include the version the writer read. When the record has changed since, the node MUST refuse with 409 `VERSION_CONFLICT` and say the current version. A create MAY include expected version 0, meaning the record must not exist yet.
 - **DATA-05** The comparison and the write MUST be one atomic step.
 
 ### 6.3 Visibility
@@ -480,7 +480,7 @@ Visibility says who may read a record or a file. The read decision (§5.5) appli
 
 ### 6.4 Rows
 
-A row space holds typed events that arrive in volume, such as measurements or log lines. A row is not versioned. It carries an occurrence time, an ingestion time, its author and a body, and up to three fields that the space declares as indexed.
+A row space holds typed events that arrive in volume, such as measurements or log lines. A row is not versioned. It has an occurrence time, an ingestion time, its author and a body, and up to three fields that the space declares as indexed.
 
 - **DATA-08** A node MUST let a reader filter rows by time and by the space's declared indexed fields, and MUST refuse a filter on a field the space does not declare.
 - **DATA-09** Deleting rows (one row, or every row taken in before a given time) MUST require the scope `memory:purge` in addition to write access. A row deletion cannot be undone, and the node MUST say so.
@@ -513,7 +513,7 @@ A record that other software is meant to read describes itself with two fields i
 
 Knowledge has a lifecycle. What matters stays; what stopped mattering expires, is archived, or is deleted. A store that cannot forget grows until it loads what no longer applies. A conforming node offers four ways to forget and the ways to undo the reversible ones.
 
-**Expiry.** A record MAY carry a time to live.
+**Expiry.** A record MAY have a time to live.
 
 - **DATA-19** A record whose time to live has passed MUST NOT be returned by any read, list or search. The time to live MUST be measured from the record's creation.
 
@@ -529,7 +529,7 @@ Knowledge has a lifecycle. What matters stays; what stopped mattering expires, i
 - **DATA-24** An archived item MUST be left out of lists and searches unless the reader asks to include archived items, and MUST stay readable by its key.
 - **DATA-25** Unarchiving a parent MUST restore the items archived with it, and MUST leave archived the items that were archived on their own before.
 
-**Retention.** Row spaces carry retention (§6.4). Other accumulating stores, such as audit logs, SHOULD state how long they keep entries.
+**Retention.** Row spaces have retention (§6.4). Other accumulating stores, such as audit logs, SHOULD state how long they keep entries.
 
 ### 6.9 Quotas, search and change notification
 
@@ -549,14 +549,14 @@ An organism is a group of owners with shared space: a team, a club, a company, a
 - **COL-02** An organism MUST have at least one creator or admin. Roles are creator, admin and member. A person MAY join directly when the organism is open, or ask to join and wait for approval; an admin MAY invite.
 - **COL-03** An organism MAY admit only listed agents. The restriction MUST only subtract: it MUST NOT admit an agent its owner's membership would not. A node MUST let only a person widen the list or lift the restriction.
 - **COL-04** Content written into an organism MUST stay attributed to the member who wrote it.
-- **COL-05** An organism MAY be exported and imported. An export MUST NOT carry the member list.
+- **COL-05** An organism MAY be exported and imported. An export MUST NOT contain the member list.
 
 ### 7.2 Workspaces
 
 A workspace is a shared space inside an organism. Its manifest declares its spaces: record spaces, each with an optional schema, and document spaces of Markdown pages.
 
 - **COL-06** A member MUST be able to write a draft of a record or document and then publish it. A publish MUST create a new version, and the node MUST keep earlier versions up to a number it states.
-- **COL-07** A publish that carries an expected version MUST be refused with 409 when the published version has changed. A manifest MAY require every publish to carry one.
+- **COL-07** A publish that includes an expected version MUST be refused with 409 when the published version has changed. A manifest MAY require every publish to include one.
 - **COL-08** A space the manifest declares append-only MUST refuse a publish over an existing id with 409, MUST refuse an ordinary delete, and MUST keep every version.
 - **COL-09** A workspace grant MUST give an owner the role `viewer` (read) or `contributor` (read and write), and MUST cover that owner's agents. Only the workspace's creator, an organism admin, or a principal holding `organism:invite` MAY grant or revoke.
 - **COL-10** A comment MUST be anchored to a document or record and MUST be readable only by those who may read what it is anchored to.
@@ -574,11 +574,11 @@ A board is a notice board: one address that many people and agents post short no
 | `system` | anyone | the operator |
 
 - **COL-12** A public or system board MUST be readable without authentication.
-- **COL-13** A notice MUST carry a time to live, with a default the node states, after which it is gone. A reply MUST expire with its parent.
+- **COL-13** A notice MUST have a time to live, with a default the node states, after which it is gone. A reply MUST expire with its parent.
 - **COL-14** A reaction MUST count once per owner and kind; repeating it MUST NOT add a second.
 - **COL-15** A post flagged by more principals than the node's threshold MUST be left out of listings and refused to readers other than its author and the board's owner.
-- **COL-16** A subscription MAY carry a callback URL and filters by category and tag. The node MUST push each new matching post to the callback through the outbound check of SEC-04. The push SHOULD be signed so that the receiver can tell it came from the node.
-- **COL-17** A post to a public board MAY carry a pacing amount (§8.3). Posts to private and shared boards MUST NOT.
+- **COL-16** A subscription MAY include a callback URL and filters by category and tag. The node MUST push each new matching post to the callback through the outbound check of SEC-04. The push SHOULD be signed so that the receiver can tell it came from the node.
+- **COL-17** A post to a public board MAY include a pacing amount (§8.3). Posts to private and shared boards MUST NOT.
 
 A board holds the notice a person reads. A marketplace contract, a direct message and a workspace comment are other things; a notice MAY link to one.
 
@@ -611,14 +611,14 @@ A morsel is the unit of pacing. It slows what agents push into the store and int
 - **PACE-02** A node MUST credit owners morsels over time without any action of theirs, up to a cap the node states, so that an idle owner regains capacity. (The reference node credits a daily allowance.)
 - **PACE-03** A debit MUST be atomic and MUST NOT take a balance below zero.
 - **PACE-04** A node MUST record every change of a balance with its reason, the principal that caused it and the counterparty, and MUST let the owner read the record of their own balance.
-- **PACE-05** A morsel amount MUST NOT appear in a field that carries a money amount or a currency, and a payment binding MUST NOT accept morsels as a means of payment.
+- **PACE-05** A morsel amount MUST NOT appear in a field that holds a money amount or a currency, and a payment binding MUST NOT accept morsels as a means of payment.
 - **PACE-06** An operator MAY sell pacing capacity for money: a pack of morsels at a money price, bought through a payment binding (§8.6). Morsels created this way MUST stay within the node's daily limit on new morsels.
 
 ### 8.2 Offers: a money price and a pacing amount
 
 Every offer (§2) has two separate values: an optional money price, and a pacing amount in morsels per use.
 
-- **PACE-07** An offer description MUST carry the money price and the pacing amount as separate fields. A money price of zero, or none, means the offer is free of money.
+- **PACE-07** An offer description MUST contain the money price and the pacing amount as separate fields. A money price of zero, or none, means the offer is free of money.
 - **PACE-08** The provider sets the pacing amount. A node MUST apply its own default when the provider sets none, and MUST clamp a provider's amount to the node's ceiling. A node MAY set the default to zero.
 - **PACE-09** On each metered use of an offer, the node MUST, in one transaction and before any money moves: debit the pacing amount from the user's owner; burn a share of it at a rate the node states; and credit the rest to the provider's owner. A node MAY also credit a share it states to the operator, or burn that share. This edition sets no minimum burn rate; the rate is the operator's policy, and the node states it. When there is no provider, or when the provider uses its own offer, the node MUST burn the whole amount or charge nothing. A failed use whose money is refunded MUST have its pacing reversed.
 - **PACE-10** When a balance cannot cover the pacing amount, the node MUST refuse with status 402 and the code `INSUFFICIENT_MORSELS`, and the response MUST say how the owner can regain morsels.
@@ -695,17 +695,17 @@ An operator who is provisioning a node can admit it in advance with a link invit
 
 ### 9.3 The signed node request
 
-Every message one node sends another is signed with the sender's node key (Ed25519) and carries proof of whom it is for, when it was sent, and that it is new.
+Every message one node sends another is signed with the sender's node key (Ed25519) and includes proof of whom it is for, when it was sent, and that it is new.
 
-A request signed in headers carries the sending node, a timestamp, the audience (the receiving node's id), a one-time value and the signature. The signed bytes are the JSON serialization of `{source_node, timestamp, ...fields, audience, nonce}` in that order, where the fields name what the request is (for example a method, a path and a digest of the body).
+A request signed in headers contains the sending node, a timestamp, the audience (the receiving node's id), a one-time value and the signature. The signed bytes are the JSON serialization of `{source_node, timestamp, ...fields, audience, nonce}` in that order, where the fields name what the request is (for example a method, a path and a digest of the body).
 
-A message signed in its body (replication, catalogue synchronisation, a read receipt) carries a delivery proof beside its own signature: the audience, the send time, and a second signature over both.
+A message signed in its body (replication, catalogue synchronisation, a read receipt) includes a delivery proof beside its own signature: the audience, the send time, and a second signature over both.
 
-Two exchanges between nodes are not messages in this sense. The key exchange publishes the sending node's own public key, which its discovery document already publishes, and carries no other key: an unchanged key is taken without a signature, and a changed key is governed by FED-14. A trust advisory is a request by an operator to their own node, made with that operator's credential, not a message from a peer.
+Two exchanges between nodes are not messages in this sense. The key exchange publishes the sending node's own public key, which its discovery document already publishes, and contains no other key: an unchanged key is taken without a signature, and a changed key is governed by FED-14. A trust advisory is a request by an operator to their own node, made with that operator's credential, not a message from a peer.
 
 - **FED-08** A receiving node MUST verify the signature with the key it holds for the sending peer, MUST refuse a message whose audience is not its own node id, MUST refuse a message whose send time is more than five minutes from its clock, and MUST accept each one-time value or delivery proof once. It MUST record a value as used only after the signature verified.
-- **FED-09** A node MUST refuse a peer message that carries no audience or delivery proof. (The v4.0 format without this proof is removed in this edition.)
-- **FED-10** A request that a node relays on behalf of another MUST carry a relay claim signed by the relaying node, naming the relay, the audience, the method, the path, the original caller, an expiry no more than five minutes after issue and a unique id. The receiver MUST verify it and MUST accept each claim id once.
+- **FED-09** A node MUST refuse a peer message that contains no audience or delivery proof. (The v4.0 format without this proof is removed in this edition.)
+- **FED-10** A request that a node relays on behalf of another MUST include a relay claim signed by the relaying node, naming the relay, the audience, the method, the path, the original caller, an expiry no more than five minutes after issue and a unique id. The receiver MUST verify it and MUST accept each claim id once.
 - **FED-11** Once a peer has sent a message with the proof, the node MUST refuse any later message from that peer without it.
 - **FED-12** A node MUST compare protocol versions it receives from peers as versions, and MUST NOT rank a version it cannot parse as lower than its minimum.
 - **FED-13** On a node whose security profile is public, every request to a peer MUST use HTTPS, and the node MUST refuse a peer address that is not HTTPS. A node whose security profile is local MAY use plain HTTP, so that development peers can talk to each other.
@@ -735,7 +735,7 @@ A person with an account on node A can sign in on node B, a peer, with the crede
 
 - **FED-20** A node MUST send a record to a peer only when all of these hold: the record's visibility is `public`; the record's owner holds a consent with reach `federation` that matches the key; the peer's permission word for replication is granted; and, when the node claims Classification, the record's level allows it to leave (§5.6).
 - **FED-21** Records with visibility `group`, `members` or `workspace` MUST NOT be sent to a peer.
-- **FED-22** A replicated record MUST carry a reference to the consent that allowed it. A receiving node SHOULD verify that the reference is signed.
+- **FED-22** A replicated record MUST include a reference to the consent that allowed it. A receiving node SHOULD verify that the reference is signed.
 
 ### 9.7 Personal nodes and tunnels (profile Personal Node)
 
@@ -750,7 +750,7 @@ The reference parent node does not forward live requests through the tunnel. A n
 
 - **FED-25** A call that arrives through a forwarding tunnel MUST pass the same authentication, scope checks and envelope as a direct call, under the credential of the principal it names.
 
-**Relay routing (optional).** A node MAY forward work to a node it cannot reach directly, through peers that allow routing. Every forward carries a relay claim (FED-10). The reference node computes the relay shares of a multi-hop settlement but does not pay them.
+**Relay routing (optional).** A node MAY forward work to a node it cannot reach directly, through peers that allow routing. Every forward includes a relay claim (FED-10). The reference node computes the relay shares of a multi-hop settlement but does not pay them.
 
 ---
 
@@ -796,8 +796,8 @@ A node serves both an attached mark, which goes with the content, and an address
 | Markdown | front matter and one human-readable line in the body | the record URL in both |
 | MCP | `ai_provenance` on a tool result or a write | the record URL in the block |
 
-- **PROV-08** A node MUST add HTML marks when it serves a document, never to the stored bytes. When a publish receives a copy that carries the node's own marks, the node MUST remove them before it hashes and stores the bytes, and MUST say what it removed.
-- **PROV-09** A Markdown document MUST carry the statement in its body as well as in its front matter, because a summary keeps the body and drops the metadata.
+- **PROV-08** A node MUST add HTML marks when it serves a document, never to the stored bytes. When a publish receives a copy that contains the node's own marks, the node MUST remove them before it hashes and stores the bytes, and MUST say what it removed.
+- **PROV-09** A Markdown document MUST include the statement in its body as well as in its front matter, because a summary keeps the body and drops the metadata.
 
 ### 10.3 Detection
 
@@ -807,7 +807,7 @@ A node serves both an attached mark, which goes with the content, and an address
 
 ### 10.4 Presentation and posture
 
-- **PROV-13** Whether a label is owed MUST be decided once, by the node, and carried in `disclosure`. A surface renders it and does not decide again.
+- **PROV-13** Whether a label is owed MUST be decided once, by the node, and recorded in `disclosure`. A surface renders it and does not decide again.
 - **PROV-14** A node SHOULD show a visible label to a person reading content that the record says needs one, at first exposure.
 - **PROV-15** A node whose security profile is public MUST NOT turn visible labels off.
 - **PROV-16** A node MUST publish its transparency posture, the operator's identity, its supervisory authority and its detection endpoints at `/v1/ai-transparency`, and MUST report an unset authority as unstated.
@@ -838,10 +838,10 @@ Every JSON response is an envelope.
 
 An error replaces `data` with `error: { code, message, details? }` and sets `ok` to `false`.
 
-- **HTTP-01** Every JSON response MUST carry `ok`, `protocol` (`aimeat`), `version` (the API path version), `node`, `timestamp` and `request_id`, and exactly one of `data` and `error`.
-- **HTTP-02** An error response MUST carry `hints.next_actions` with at least one action the caller can take. A success response SHOULD carry it.
+- **HTTP-01** Every JSON response MUST contain `ok`, `protocol` (`aimeat`), `version` (the API path version), `node`, `timestamp` and `request_id`, and exactly one of `data` and `error`.
+- **HTTP-02** An error response MUST include `hints.next_actions` with at least one action the caller can take. A success response SHOULD include it.
 - **HTTP-03** `error.code` MUST be a stable upper-case string. A client branches on the code, never on the message.
-- **HTTP-04** `meta.provenance`, when present, MUST be the only place the envelope carries a provenance record (§10.2).
+- **HTTP-04** `meta.provenance`, when present, MUST be the only place where the envelope contains a provenance record (§10.2).
 
 ### 11.2 Error codes
 
@@ -862,7 +862,7 @@ These codes are part of Core. A node MAY use others; the reference node's API de
 | `SCHEMA_VALIDATION_FAILED` | 422 | A write did not match the locked schema (§6.6). |
 | `INVALID_INPUT` | 400 | The request is not valid, including a name that breaks §3.5. |
 | `RATE_LIMITED` | 429 | Too many requests (§11.3). |
-| `WS_QUERY_TOKEN_DISABLED` | 401 | A WebSocket upgrade carried a token in its URL (§4.8). |
+| `WS_QUERY_TOKEN_DISABLED` | 401 | A WebSocket upgrade had a token in its URL (§4.8). |
 
 ### 11.3 Idempotency and rate limits
 
@@ -893,7 +893,7 @@ AI clients reach a node through the Model Context Protocol. The tools a node off
 - **MCP-10** Every tool name MUST begin with `aimeat_` and use lower-case letters, digits and underscores. A published tool name MUST keep its meaning; a different meaning takes a new name.
 - **MCP-11** A tool that is offered on more than one MCP endpoint MUST accept the same parameters on each, and MUST refuse a parameter it does not declare rather than ignore it.
 - **MCP-12** A failed tool call SHOULD begin its text with the same error code the HTTP operation would return, followed by a colon.
-- **MCP-13** A tool that returns or writes content with a provenance record MUST carry it as `ai_provenance` (§10.2).
+- **MCP-13** A tool that returns or writes content with a provenance record MUST include it as `ai_provenance` (§10.2).
 - **MCP-14** A node MUST detect a call that loops back to itself through attached MCP servers and refuse it.
 
 ### 11.5 Deprecation
@@ -903,7 +903,7 @@ AI clients reach a node through the Model Context Protocol. The tools a node off
 
 ### 11.6 Discovery
 
-- **DISC-01** A node MUST serve `GET /.well-known/aimeat` without authentication, with: `node_id`, `type`, `protocol` (`aimeat`), `version` (the API path version), `software_version`, `protocol_version` (this edition: `2026-11`), `profiles` (the profiles of §0.3 it claims), `profile_gaps` (for each claimed profile with a requirement it does not meet yet, the ids of those requirements; an empty object when there are none), `public_key` (the node's Ed25519 key), and the addresses of its bootstrap document, its API description and its MCP endpoint. The bootstrap document MUST carry the same `protocol_version`, `profiles` and `profile_gaps` values in its description of the node, and `protocol_versions_accepted` when discovery carries it.
+- **DISC-01** A node MUST serve `GET /.well-known/aimeat` without authentication, with: `node_id`, `type`, `protocol` (`aimeat`), `version` (the API path version), `software_version`, `protocol_version` (this edition: `2026-11`), `profiles` (the profiles of §0.3 it claims), `profile_gaps` (for each claimed profile with a requirement it does not meet yet, the ids of those requirements; an empty object when there are none), `public_key` (the node's Ed25519 key), and the addresses of its bootstrap document, its API description and its MCP endpoint. The bootstrap document MUST contain the same `protocol_version`, `profiles` and `profile_gaps` values in its description of the node, and `protocol_versions_accepted` when discovery contains it.
 - **DISC-02** A node that accepts messages from peers on an earlier edition MUST list those editions in `protocol_versions_accepted`.
 - **DISC-03** A node MUST serve `GET /.well-known/did.json`, a `did:web` document whose id matches the node's host and whose verification method is the node's Ed25519 key.
 - **DISC-04** A node that claims MCP MUST serve an MCP server card at `/.well-known/mcp.json` naming its MCP endpoint and stating that OAuth is required.
@@ -928,7 +928,7 @@ These hold on every node, in every profile.
 
 ## Appendix A. Conformance checklist
 
-One line per requirement. The profile column says which profile the line belongs to. Lines marked SHOULD carry no MUST and are listed for completeness. The [evidence file](AIMEAT-Core-2026-11-evidence.md) says, for each line, whether the reference node meets it.
+One line per requirement. The profile column says which profile the line belongs to. Lines marked SHOULD contain no MUST and are listed for completeness. The [evidence file](AIMEAT-Core-2026-11-evidence.md) says, for each line, whether the reference node meets it.
 
 | ID | § | Profile | Requirement |
 |---|---|---|---|
@@ -951,7 +951,7 @@ One line per requirement. The profile column says which profile the line belongs
 | ID-17 | 3.8 | Base | The operator stops a party for abuse; the owner cannot resume it |
 | AUTH-01 | 4.1 | Base | At least one owner sign-in that needs no private key |
 | AUTH-02 | 4.1 | Base | Passwords hashed with a memory-hard function |
-| AUTH-03 | 4.1 | Base | An armed second factor is required on password and emailed-link sign-in |
+| AUTH-03 | 4.1 | Base | A second factor, when turned on, is required on password and emailed-link sign-in |
 | AUTH-04 | 4.1 | Base | Short-lived access token plus a rotated refresh credential; reuse ends the session |
 | AUTH-05 | 4.1 | Base | No owner session for an owner-key signature |
 | AUTH-06 | 4.1 | Base | Slow or refuse repeated failures; one answer for unknown account and wrong password |
@@ -1004,7 +1004,7 @@ One line per requirement. The profile column says which profile the line belongs
 | DATA-01 | 6.1 | Base | Keys unique per namespace |
 | DATA-02 | 6.1 | Base | Only the owning principal and its owner change a record, except §7 rules |
 | DATA-03 | 6.2 | Base | Every write increases the version by one |
-| DATA-04 | 6.2 | Base | An update carries the read version; conflict is 409 `VERSION_CONFLICT` |
+| DATA-04 | 6.2 | Base | An update includes the read version; conflict is 409 `VERSION_CONFLICT` |
 | DATA-05 | 6.2 | Base | Compare and write in one atomic step |
 | DATA-06 | 6.3 | Base | Accept all six visibility values on records and files, with their bindings |
 | DATA-07 | 6.3 | Base | `group`, `members`, `workspace` never leave the node |
@@ -1033,7 +1033,7 @@ One line per requirement. The profile column says which profile the line belongs
 | COL-02 | 7.1 | Collaboration | At least one creator or admin; join, ask, invite |
 | COL-03 | 7.1 | Collaboration | Agent restriction only subtracts; only a person widens it |
 | COL-04 | 7.1 | Collaboration | Organism content stays attributed to its writer |
-| COL-05 | 7.1 | Collaboration | An organism export carries no member list |
+| COL-05 | 7.1 | Collaboration | An organism export contains no member list |
 | COL-06 | 7.2 | Collaboration | Draft, publish, versions kept to a stated number |
 | COL-07 | 7.2 | Collaboration | Publish with a stale expected version is 409 |
 | COL-08 | 7.2 | Collaboration | Append-only spaces refuse overwrite and delete and keep every version |
@@ -1079,7 +1079,7 @@ One line per requirement. The profile column says which profile the line belongs
 | FED-07 | 9.2 | Federation | A bad token falls through to pending approval, silently |
 | FED-08 | 9.3 | Federation | Verify signature, audience, five-minute window, single use after verification |
 | FED-09 | 9.3 | Federation | Refuse a peer message without audience or delivery proof |
-| FED-10 | 9.3 | Federation | Relayed requests carry a verified, single-use, short relay claim |
+| FED-10 | 9.3 | Federation | Relayed requests include a verified, single-use, short relay claim |
 | FED-11 | 9.3 | Federation | A peer that sent the proof once is held to it |
 | FED-12 | 9.3 | Federation | Compare protocol versions as versions; unknown is never lower |
 | FED-13 | 9.3 | Federation | HTTPS to peers on a public node; plain HTTP allowed on a local node |
@@ -1091,7 +1091,7 @@ One line per requirement. The profile column says which profile the line belongs
 | FED-19 | 9.5 | Federation + Agent Keys | Verify a foreign agent's assertion against its home card; single use |
 | FED-20 | 9.6 | Federation | Replicate only public, federation-consented, permitted and classification-cleared records |
 | FED-21 | 9.6 | Federation | Never replicate `group`, `members`, `workspace` |
-| FED-22 | 9.6 | Federation | A replicated record carries its consent reference; SHOULD verify |
+| FED-22 | 9.6 | Federation | A replicated record includes its consent reference; SHOULD verify |
 | FED-23 | 9.7 | Personal Node | Parent keeps and delivers the mailbox on connect |
 | FED-24 | 9.7 | Personal Node | Tunnels authenticate as §4.8 |
 | FED-25 | 9.7 | Personal Node | Calls through a forwarding tunnel pass the same checks as direct calls |
@@ -1103,7 +1103,7 @@ One line per requirement. The profile column says which profile the line belongs
 | PROV-06 | 10.1 | Transparency | Records are append-only |
 | PROV-07 | 10.1 | Transparency | A record for all AI-generated content; a public node cannot turn recording off |
 | PROV-08 | 10.2 | Transparency | HTML marks at serve time; a publish strips the node's marks before hashing |
-| PROV-09 | 10.2 | Transparency | Markdown carries the statement in the body |
+| PROV-09 | 10.2 | Transparency | Markdown contains the statement in the body |
 | PROV-10 | 10.3 | Transparency | Anonymous, rate-limited lookup by content hash; empty means unstated |
 | PROV-11 | 10.3 | Transparency | Visibility of a record derived from what points at it; no settable flag |
 | PROV-12 | 10.3 | Transparency | Point to the record by id where served bytes differ from hashed bytes |
@@ -1111,8 +1111,8 @@ One line per requirement. The profile column says which profile the line belongs
 | PROV-14 | 10.4 | Transparency | SHOULD: visible label at first exposure |
 | PROV-15 | 10.4 | Transparency | A public node does not turn labels off |
 | PROV-16 | 10.4 | Transparency | Publish posture, operator, authority and endpoints at `/v1/ai-transparency` |
-| HTTP-01 | 11.1 | Base | Every JSON response carries the envelope fields |
-| HTTP-02 | 11.1 | Base | Errors carry at least one next action |
+| HTTP-01 | 11.1 | Base | Every JSON response contains the envelope fields |
+| HTTP-02 | 11.1 | Base | Errors include at least one next action |
 | HTTP-03 | 11.1 | Base | Stable upper-case error codes |
 | HTTP-04 | 11.1 | Base | `meta.provenance` is the only provenance carrier in the envelope |
 | HTTP-05 | 11.3 | Base | SHOULD accept `Idempotency-Key`; when it does, the stated semantics |
@@ -1147,7 +1147,7 @@ One line per requirement. The profile column says which profile the line belongs
 | SEC-07 | 12 | Base | Principals' secrets encrypted at rest and never returned |
 | SEC-08 | 12 | Base | A resolved security profile; public values as defaults |
 
-Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (AUTHZ-17, PROV-14, MCP-08, MCP-12).
+Totals: 209 lines. 205 contain at least one MUST or MUST NOT; 4 are SHOULD only (AUTHZ-17, PROV-14, MCP-08, MCP-12).
 
 ---
 
@@ -1157,7 +1157,7 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 
 | What | v4.0 status | Default changed in | Removed in | How the reference node signals it today |
 |---|---|---|---|---|
-| Owner-key sign-in (owner signs a challenge with an Ed25519 key) | deprecated | node 3.x: can be switched off; refused when a second factor is armed | node 4.0.0 | 410 `OWNER_KEY_LOGIN_OFF` when switched off; a usage counter |
+| Owner-key sign-in (owner signs a challenge with an Ed25519 key) | deprecated | node 3.x: can be switched off; refused when a second factor is turned on | node 4.0.0 | 410 `OWNER_KEY_LOGIN_OFF` when switched off; a usage counter |
 | Session token in a WebSocket upgrade URL (`?token=`) | current | node 3.x: can be switched off | node 4.0.0 | 401 `WS_QUERY_TOKEN_DISABLED` when switched off; a usage counter |
 | Peer messages without audience and delivery proof | the only format | refused by default from node 3.27.0 | node 4.0.0 | a refusal that names both releases |
 | An optional relay claim on relayed requests | not specified | required by default from node 3.20.0 | node 4.0.0 (the `optional` setting) | per-peer setting, readable by the operator |
@@ -1192,7 +1192,7 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 | v4.0 Core | This edition |
 |---|---|
 | §0 About v4.0 | §0.4 |
-| §0.2 Honesty ledger | dropped; the evidence file and the feature list carry status |
+| §0.2 Honesty ledger | dropped; the evidence file and the feature list record the status |
 | §1.1 to §1.3 | §1 |
 | §1.4 Thin core, living surface | §1.2 (principles); the shared living surface goes to the Platform reference |
 | §1.6 Scope | §1.4 and §0.3 |
