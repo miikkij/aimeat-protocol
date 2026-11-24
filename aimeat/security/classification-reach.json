@@ -2748,9 +2748,9 @@
     "src/services/packages/peer/package-peer-limits.ts": {
       "reads": {
         "getMemory": 1,
-        "listMemory": 2
+        "listMemory": 1
       },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the grants and sellers in the package-entitlements system namespace, read only for which node ids they name."
+      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the sellers in the package-entitlements system namespace, read only for which node ids they name. The grants are read through package-grant-shards.ts since 2026-11-25."
     },
     "src/services/packages/sale/package-account-checkout.ts": {
       "reads": {
@@ -2770,12 +2770,12 @@
       },
       "why": "Reviewed 2026-10-31, the node's own read: the account sale records in the package-account-sales system namespace, listed for the packages on sale, a buyer's own purchases and a refund by charge id. Commercial records, not anybody's content."
     },
-    "src/services/packages/sale/package-entitlements.ts": {
+    "src/services/packages/sale/package-grant-shards.ts": {
       "reads": {
-        "getMemory": 1,
-        "listMemory": 1
+        "getMemory": 3,
+        "listMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
+      "why": "Reviewed 2026-11-25 (package sale decision, part b), the node's own read: a package group's grant index and grant shards in the package-entitlements system namespace that no principal addresses, read for which node may receive which package. Moved here from package-entitlements.ts (reviewed 2026-09-29, TARGET-082 V4). Commercial records, not anybody's content."
     },
     "src/services/packages/sale/package-offer.ts": {
       "reads": {
@@ -2842,9 +2842,9 @@
     },
     "src/services/peer/origin-view.ts": {
       "reads": {
-        "listMemory": 2
+        "listMemory": 1
       },
-      "why": "Reviewed 2026-10-01, the node's own read: the entitlement and seller records in the package-entitlements system namespace, listed only to show the operator which of them name an older packages-only peer."
+      "why": "Reviewed 2026-10-01, the node's own read: the seller records in the package-entitlements system namespace, listed only to show the operator which of them name an older packages-only peer. The grants are read through package-grant-shards.ts since 2026-11-25."
     },
     "src/services/peer/origin.ts": {
       "reads": {
