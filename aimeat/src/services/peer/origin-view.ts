@@ -18,12 +18,14 @@
  *   can be read now (the operator's check), and that says only what the url answers today.
  * @structure PeerOriginView · describePeerOrigins()
  * @version-history
+ *   2026-11-25 — The entitlement grants are read through listAllGrants (package-grant-shards.ts): a
+ *     group's grants are in shards now, and the index record holds none of them.
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../federation.js';
 import { listPeerOrigins, listPendingPeers, type PendingPeer } from './origin.js';
-import { NS_PACKAGE_ENTITLEMENTS } from '../packages/sale/package-entitlements.js';
+import { NS_PACKAGE_ENTITLEMENTS, listAllGrants } from '../packages/sale/package-grant-shards.js';
 
 export type PeerOriginView =
     | { kind: 'recorded'; source: string; by: string; group_id?: string; proof: string; requested_at: string; proven_at: string }
@@ -41,10 +43,9 @@ type Named = { record: 'entitlement' | 'seller'; group_id?: string; by: string; 
 async function namedInPackageRecords(storage: Storage): Promise<Map<string, Named[]>> {
     const out = new Map<string, Named[]>();
     const add = (nodeId: string, n: Named): void => { out.set(nodeId, [...(out.get(nodeId) ?? []), n]); };
-    for (const row of await storage.listMemory(NS_PACKAGE_ENTITLEMENTS, { prefix: 'entitlements.' })) {
-        const v = row.value as { groupId?: string; nodes?: Record<string, { grantedBy?: string; grantedAt?: string; note?: string }> } | undefined;
-        for (const [nodeId, e] of Object.entries(v?.nodes ?? {})) {
-            add(nodeId, { record: 'entitlement', group_id: v?.groupId, by: e.grantedBy ?? '', at: e.grantedAt ?? '', ...(e.note ? { note: e.note } : {}) });
+    for (const { groupId, grants } of await listAllGrants<{ nodeId: string; grantedBy?: string; grantedAt?: string; note?: string }>(storage)) {
+        for (const e of grants) {
+            add(e.nodeId, { record: 'entitlement', group_id: groupId, by: e.grantedBy ?? '', at: e.grantedAt ?? '', ...(e.note ? { note: e.note } : {}) });
         }
     }
     for (const row of await storage.listMemory(NS_PACKAGE_ENTITLEMENTS, { prefix: 'sellers.' })) {

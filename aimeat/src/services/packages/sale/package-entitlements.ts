@@ -14,7 +14,8 @@
  *   moves the instant forward. Phase 5 (purchase) writes these; until then the package's author or
  *   an operator grants them.
  *
- *   WHERE IT LIVES. One record per package group in the system namespace `package-entitlements`, a
+ *   WHERE IT LIVES. Per package group, an index record and shards of grants in the system namespace
+ *   `package-entitlements` (package-grant-shards.ts, which every read and write goes through), a
  *   literal with no `@`, so no principal can address it (the pattern of commerce/beneficiary-split.ts).
  *   A package's author could otherwise grant themselves entitlements to their own package from an app
  *   token, which is harmless, but a customer node's owner could not be kept from writing to it if it
@@ -28,6 +29,10 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   2026-11-25 — The grants of a package group are stored in shards with an index, through
+ *     package-grant-shards.ts: the one record outgrew the 1024 kB value cap at about 2,088 installs
+ *     (Jouni, 2026-11-24, package sale decision part b). An older single record is read as before and
+ *     converted on its group's next write.
  *   2026-10-27 — grantEntitlement takes peerOpts.securityProfile for the node link, so a public node
  *     takes only an https node address (secaudit2026oct26, linkPackagePeer-no-peerUrlRefusal).
  *   v1.9.0 — 2026-10-10 — resolveNodeRead adopts a pending node only for a request signed with the key
@@ -72,9 +77,9 @@ import { bundleOfPackage } from '../../install/set-spec.js';
 import { linkPackagePeer, adoptPendingPeer } from '../peer/package-peer-register.js';
 import { nodeRequestSignedBy } from '../../signed-node-request.js';
 import { withdrawnVersions } from '../compose/package-withdrawals.js';
-import { updateRecord } from '../../record-cas.js';
+import { NS_PACKAGE_ENTITLEMENTS, readGrants, writeGrant, listAllGrants } from './package-grant-shards.js';
 
-export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
+export { NS_PACKAGE_ENTITLEMENTS };
 
 export type PackageChannel = 'stable' | 'beta';
 
@@ -104,30 +109,19 @@ export interface PackageEntitlement {
     updatedAt: string;
 }
 
-type Record_ = { groupId: string; nodes: Record<string, PackageEntitlement> };
-
-const key = (groupId: string): string => `entitlements.${groupId}`;
-
+/** Every node's entitlement to `groupId`, from the group's grant shards (package-grant-shards.ts). */
 export async function readEntitlements(storage: Storage, groupId: string): Promise<PackageEntitlement[]> {
-    const rec = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(groupId));
-    const value = rec?.value as Record_ | undefined;
-    return value?.nodes ? Object.values(value.nodes) : [];
+    return readGrants<PackageEntitlement>(storage, groupId);
 }
 
 /**
  * Set one node's entitlement (null removes it) and leave every other node as it is NOW. The grant
  * wrote the whole record from the copy it read before its network step, so a grant to one node
- * wiped any other node granted in that window (secaudit 2026-10, PKG-7).
+ * wiped any other node granted in that window (secaudit 2026-10, PKG-7). writeGrant writes the one
+ * shard that holds the node, on its record version.
  */
 async function writeNode(storage: Storage, groupId: string, nodeId: string, entitlement: PackageEntitlement | null): Promise<void> {
-    await updateRecord<Record_>(storage, NS_PACKAGE_ENTITLEMENTS, key(groupId),
-        v => ({ groupId, nodes: { ...((v as Record_ | undefined)?.nodes ?? {}) } }),
-        cur => {
-            const nodes = { ...cur.nodes };
-            if (entitlement) nodes[nodeId] = entitlement; else delete nodes[nodeId];
-            return { groupId, nodes };
-        },
-        { tag: 'package-entitlements' });
+    await writeGrant<PackageEntitlement>(storage, groupId, nodeId, entitlement);
 }
 
 export type EntitlementResult =
@@ -471,12 +465,10 @@ export async function repositoryListing(
 
 /** The private packages this node is entitled to, for the repository's listing. */
 export async function entitledGroupsOf(storage: Storage, nodeId: string): Promise<Array<{ groupId: string; entitlement: PackageEntitlement }>> {
-    const rows = await storage.listMemory(NS_PACKAGE_ENTITLEMENTS, { prefix: 'entitlements.' });
     const out: Array<{ groupId: string; entitlement: PackageEntitlement }> = [];
-    for (const row of rows) {
-        const value = row.value as Record_ | undefined;
-        const ent = value?.nodes?.[nodeId];
-        if (value && ent) out.push({ groupId: value.groupId, entitlement: ent });
+    for (const { groupId, grants } of await listAllGrants<PackageEntitlement>(storage)) {
+        const ent = grants.find(g => g.nodeId === nodeId);
+        if (ent) out.push({ groupId, entitlement: ent });
     }
     return out;
 }

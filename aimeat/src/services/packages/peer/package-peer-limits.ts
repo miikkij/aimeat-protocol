@@ -22,6 +22,9 @@
  * @structure PACKAGE_PEER_SOURCES · DEFAULT_PACKAGE_PEER_CAP · packagePeerCount() · capRefusal() ·
  *   cleanupPackagePeers()
  * @version-history
+ *   2026-11-25 — The cleanup reads the entitlement grants through listAllGrants
+ *     (package-grant-shards.ts): a group's grants are in shards now, so a node whose grant sits in a
+ *     shard is not taken for unused.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 5: finding F's cap and cleanup).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -31,6 +34,7 @@ import { listPeerOrigins, listPendingPeers, NS_PEER_ORIGIN, type PeerOriginSourc
 import { recordSecurityIncident } from '../../security-incident.js';
 import { removePeer } from '../../federation/peer-remove.js';
 import { logger } from '../../../utils/logger.js';
+import { listAllGrants } from '../sale/package-grant-shards.js';
 
 export const PACKAGE_PEER_SOURCES: ReadonlySet<PeerOriginSource> = new Set<PeerOriginSource>(['package-grant', 'package-sale', 'package-seller']);
 export const DEFAULT_PACKAGE_PEER_CAP = 500;
@@ -91,8 +95,8 @@ export async function cleanupPackagePeers(
     const removed: string[] = [];
     try {
         const used = new Set<string>();
-        for (const row of await storage.listMemory('package-entitlements', { prefix: 'entitlements.' })) {
-            for (const nodeId of Object.keys((row.value as { nodes?: Record<string, unknown> } | undefined)?.nodes ?? {})) used.add(nodeId);
+        for (const { grants } of await listAllGrants(storage)) {
+            for (const g of grants) used.add(g.nodeId);
         }
         for (const row of await storage.listMemory('package-entitlements', { prefix: 'sellers.' })) {
             for (const nodeId of Object.keys((row.value as { nodes?: Record<string, unknown> } | undefined)?.nodes ?? {})) used.add(nodeId);
