@@ -339,8 +339,9 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 cfg.say(scope.code.length
                     ? `the candidate reaches code (${scope.code.length} file(s)): the ${scope.suites.length} suite(s) it can reach, on both backends: ${scope.suites.join(', ')}. The nightly runs the full sweep.`
                     : `the candidate is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
-                stages.push(sweepStage(passed, 'the changed-text suites on SQLite', 'test:e2e:sqlite', cfg.lanes, scope.suites, `sqlite:${picked}`));
-                stages.push(sweepStage(passed, 'the changed-text suites on PostgreSQL', 'test:e2e:postgres-kysely', cfg.pgLanes, scope.suites, `postgres:${picked}`));
+                const which = scope.code.length ? 'the reached suites' : 'the changed-text suites';
+                stages.push(sweepStage(passed, `${which} on SQLite`, 'test:e2e:sqlite', cfg.lanes, scope.suites, `sqlite:${picked}`));
+                stages.push(sweepStage(passed, `${which} on PostgreSQL`, 'test:e2e:postgres-kysely', cfg.pgLanes, scope.suites, `postgres:${picked}`));
             } else {
                 cfg.say(scope.code.length
                     ? 'the candidate reaches code that no E2E suite calls: no sweep. The nightly runs the full sweep, and CI runs on main after the push.'
