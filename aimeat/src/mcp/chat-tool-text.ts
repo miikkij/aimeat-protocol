@@ -18,8 +18,9 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
- *   2026-11-24 — aimeat_workspace_read's text says the index is one page per space, with `counts`
- *     and `q`.
+ *   2026-11-24 — aimeat_workspace_read's text says the index is one page per space, with `counts`,
+ *     `page.more` and `q`. Its three new parameters took the start set to 26 467 characters, over
+ *     26 000, so its parameters get short words and `limit` stays off the chat listing.
  *   v1.2.0 — 2026-11-14 — aimeat_task_create gets a short text and leaves rules, verification,
  *     todos, resources and parent_task_id off the chat listing: the five fields the tool gained on
  *     2026-11-13 took the start set to 28 299 characters, over 26 000. aimeat_skill_get and
@@ -99,8 +100,15 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
     aimeat_memory_search: {
         description: 'Search your own memory by words; each hit is a snippet, not the whole value. Read a hit in full with aimeat_memory_read. `type` keeps to one kind of record, such as schema:Person.',
     },
+    // The page size stays off the chat listing: the default page is what a chat reads, and `q` and
+    // `cursor` reach the rest. The parameters the description names carry few words of their own.
     aimeat_workspace_read: {
-        description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, `counts` with each space\'s total, and the newest items\' id and title, one page per space; `q` finds an item by its title). Then with `ids:[…]`: the full items you need.',
+        description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, each space\'s total in `counts`, and item ids and titles, newest first, one page per space; `page.more` names the rest). `q` finds an item by its title. Then with `ids:[…]`: the full items you need.',
+        params: {
+            organism_id: '', ws: 'From aimeat_workspace_list.', ids: 'Item ids from the index.', space: 'One space alone, by name.',
+            cursor: 'With `space`: its `next_cursor` from `page.more`.', q: '', include_archived: '', archived: '',
+        },
+        unlisted: ['limit'],
     },
     aimeat_home_feed: {
         description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new. Name an agent by `data.agent_shown_name` and give a time as `at_local` when a row has them.',
