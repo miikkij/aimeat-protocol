@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.72.2 — 2026-11-24 — --ak-grain-paper: the grain material's own noise at opacity 0.5. At 0.16
+ *     (--ak-grain) it darkened the surface by about 2 %, so the paper grain could not be seen.
+ *     --ak-grain itself is unchanged, so no hero and no look's page changes.
  *   v0.72.1 — 2026-11-22 — --ak-main-max 100% → 100rem: the composition grid stops at 1600 px, so
  *     a wide window no longer draws a main card far wider than its fields.
  *   v0.72.0 — 2026-11-22 — tour.css: the app's guided tour (spotlight, step card or bottom sheet,
@@ -545,6 +548,9 @@
   --ak-blur:          14px;
   /* Film grain — an inline, colourless SVG noise; costs no request and no generation. */
   --ak-grain:         url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/></svg>");
+  /* Paper grain — the same noise, strong enough to SEE on the grain material (.ak-mat--grain).
+   * --ak-grain stays faint because it lies under every hero and some looks' pages. */
+  --ak-grain-paper:   url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
 
   /* ── Shape and depth ──────────────────────────────────────────────────────────────────── */
   --ak-radius:        var(--radius-box, 14px);

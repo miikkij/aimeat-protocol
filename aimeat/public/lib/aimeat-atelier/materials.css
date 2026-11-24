@@ -13,6 +13,7 @@
  *   Motion:    magnet · tilt (JS) · sheen · thumb (JS) · odometer (JS) · deal
  * @structure .ak-mat--* · .ak-move--* · .ak-thumb · .ak-odo · reduced-motion
  * @version-history
+ *   v0.72.2 — 2026-11-24 — The grain material reads --ak-grain-paper, a noise strong enough to see.
  *   v0.41.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 2).
  */
 
@@ -30,7 +31,7 @@
     radial-gradient(at 50% 95%, color-mix(in oklab, var(--ak-spectrum-3) 24%, var(--ak-surface)), transparent 58%),
     var(--ak-surface);
 }
-.ak-mat--grain { background-color: var(--ak-surface); background-image: var(--ak-grain); }
+.ak-mat--grain { background-color: var(--ak-surface); background-image: var(--ak-grain-paper, var(--ak-grain)); }
 .ak-mat--ink { background: var(--ak-ink); color: var(--ak-bg); }
 /* The signal sheet: the crawl's ground promoted to a surface — one loud slab per screen. */
 .ak-mat--signal {
