@@ -4,6 +4,8 @@
  *   federate flag, policy update persistence, and network directory (service summary,
  *   ping hash, cross-catalogue filtering).
  * @version-history
+ *   2026-11-25 — Core FED-16: the operator turns allow_federated_auth on for the fake peer before the
+ *     sign-in checks, which the node now needs as well as the tier.
  *   2026-11-15 — Audit L133: the wildcard auth consent id is asserted, the revoke always runs, and
  *     auth verify is refused after it.
  *   2026-10-23 — The admin-registered owner gets a password, and both owners sign in with the
@@ -713,6 +715,17 @@ await test('Authenticate federation login user', async () => {
     assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
     fedLoginToken = body.data?.token;
     assert(typeof fedLoginToken === 'string', 'got token');
+});
+
+// The home node answers a sign-in check only for a peer the operator allowed it for, beside its tier
+// (Core FED-16, 2026-11-24), so the operator turns allow_federated_auth on for the fake peer here.
+await test('Setup: the operator lets the fake peer ask sign-in checks (allow_federated_auth)', async () => {
+    const { body } = await json(`/v1/federation/peers/${fakePeerNodeId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ allow_federated_auth: true }),
+    });
+    assert(body.ok === true, `allow_federated_auth: ${JSON.stringify(body.error)}`);
 });
 
 // The home node answers only an active peer whose link may carry a sign-in, and only a request that
