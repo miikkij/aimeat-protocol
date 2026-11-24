@@ -15,6 +15,8 @@
  *   2026-11-23 -- `--workers` reads the last value given, so a caller of a package script can add its
  *     own after the script's (pnpm ready names the lanes its machine carries). `--stop-on-lost-lane`:
  *     a lane that cannot restart its node ends the run (test/run-e2e-lane.ts LaneOptions.stop).
+ *   2026-11-24 -- e2e-workspace-read-bounded.ts joins the list (not the guard tier): a workspace of
+ *     1100 records read over MCP inside the size of one tool answer.
  *   2026-11-23 -- e2e-file-open-link.ts joins the list (not the guard tier): a file link opened in a new
  *     tab with no session goes to /v1/file-open.
  *   2026-11-21 -- e2e-workspace-write-role.ts joins the list (not the guard tier): a record space's
@@ -1613,6 +1615,9 @@ const ALL_SUITES = [
     'test/e2e-no-silent-drops.ts',
     // A batch read of an id two spaces hold names both spaces in `ambiguous` (tool-ops readWorkspaceOp).
     'test/e2e-workspace-read-ambiguous.ts',
+    // aimeat_workspace_read at production size answers inside one tool answer: the index in pages,
+    // a batch-open up to the budget with the rest in `not_opened` (services/workspace/read-page.ts).
+    'test/e2e-workspace-read-bounded.ts',
     // The new-version check behind the operator's header notice: against a stub registry, the
     // diff of the change logs, the registry failing, and the switch that stops the requests.
     'test/e2e-node-update.ts',

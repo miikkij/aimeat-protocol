@@ -34,6 +34,11 @@
  *     document the reader's own person wrote is not checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — A batch open names `ambiguous`: an id asked without `space` that records of more than
  *     one space carry, with the spaces and the one that answered (the first, as before).
+ *   2026-11-24 — readWorkspaceOp takes `bounded`, the read of a caller whose answer has a size limit:
+ *     the index answers one page per space with `page.more` and a next_cursor (./read-page.ts), `q`
+ *     filters by title and id, and a batch-open stops at the tool answer budget and names the rest
+ *     in `not_opened`. An index of 1040 records was 249 000 characters. Without `bounded` the read
+ *     is whole, as before.
  *   2026-11-21 — readWorkspaceOp's index carries manifest_version, the stored manifest's version that
  *     aimeat_workspace_update takes back as expected_version.
  *   2026-11-21 — readWorkspaceOp's opened items carry content_risk to an AI reader, and a held item's
@@ -180,6 +185,8 @@ import { riskForRead, riskReaderOf, withRisk } from '../content/risk-read.js';
 import { contentRiskTextOf } from '../content/risk-intake.js';
 import { isPageStale } from './opened.js';
 import { directiveFields } from '../organism/directives.js';
+import { pageIndex, pageLimitOf, decodeCursor, type BoundedRead } from './read-page.js';
+import { TOOL_ANSWER_BUDGET_CHARS } from '../../models/answer-budget.js';
 
 /** What the index says of a page's life: an HTML page's kind, the day it was last opened, and whether it went stale. */
 const pageLifeOf = (cur: MemoryRecord, lastOpened: string | undefined): Record<string, unknown> => ({
@@ -235,6 +242,13 @@ export interface ReadWorkspaceArgs {
     archived?: 'only' | 'include';
     /** The classification reader (TARGET-082): the loader takes one, so no read skips the check. */
     reader: ContentReader;
+    /**
+     * The read of a caller whose answer has a size limit: an AI over MCP, and the connector's route.
+     * The index then answers one page per space (./read-page.ts), and a batch-open stops at the tool
+     * answer budget and names the ids it left in `not_opened`. Absent, the read is whole, as the
+     * extension sandbox's ctx.workspace and a page of the web app read it.
+     */
+    bounded?: BoundedRead;
 }
 
 // instanceFromKey moved to ./workspace-record-key.ts (max-file-lines), re-exported for its importers.
@@ -250,8 +264,12 @@ export async function readWorkspaceOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: ReadWorkspaceArgs,
 ): Promise<WorkspaceOpResult<Record<string, unknown>>> {
     const { storage, config } = deps;
-    const { organismId, ws, ids, space } = args;
+    const { organismId, ws, ids, space, bounded } = args;
     const root = wsRoot(organismId, ws);
+    // A page is asked for before anything is loaded: a cursor names a position in ONE space.
+    const cursorAt = bounded?.cursor ? decodeCursor(bounded.cursor) : undefined;
+    if (bounded?.cursor && !cursorAt) return refuse(400, 'INVALID_INPUT', '`cursor` is not a next_cursor this read gave. Read the index again and pass the next_cursor of the space you are paging.');
+    if (cursorAt && !space) return refuse(400, 'INVALID_INPUT', 'A `cursor` continues one space: pass `space` with it, the space whose next_cursor this is.');
     // The one loader (services/workspace/content.ts): it loads, decides the read with
     // decideWorkspaceRead, and passes the classification reader. The manifest decision is made with
     // the owner GHII, as this operation always has, so a grant naming the owner works for their agent.
@@ -323,15 +341,22 @@ export async function readWorkspaceOp(
         const found: Array<Record<string, unknown>> = [];
         const missing: string[] = [];
         const shown: MemoryRecord[] = [];
+        // A bounded read opens records in the order asked until the answer reaches the tool answer
+        // budget, and names the rest: 60 records asked in one call answered with 171 000 characters
+        // (2026-11-24). The first record is always opened, whatever its size.
+        const notOpened: string[] = [];
+        /** The id asked for, for each entry of `found` and `shown`. */
+        const askedOf: string[] = [];
+        let chars = 0;
+        // What the items may take: the budget less the ids themselves, which the answer may have to
+        // list again in `not_opened`, and the fields around the items.
+        const itemBudget = Math.max(TOOL_ANSWER_BUDGET_CHARS - JSON.stringify(asks.map(a => a.asked)).length - 800, 4000);
         for (const { asked, hit } of asks) {
             const latest = wholeOf(hit?.slot.latest);
             const draft = wholeOf(hit?.slot.draft);
             const cur = latest ?? draft;
             if (!hit || !cur) { missing.push(asked); continue; }
-            // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
-            recordValueRead({ ownerGaii: cur.ownerGaii, key: cur.key, readerPrincipal: caller.principal });
-            shown.push(cur);
-            found.push({
+            const item = {
                 space: hit.name, id: hit.id, value: cur.value,
                 published: !!latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
                 // The draft's own version is what a compare-and-swap write needs to name.
@@ -339,16 +364,50 @@ export async function readWorkspaceOp(
                 ...provFor(cur.aiProvenanceId),
                 // TARGET-082: an AI shown a warning-classified record is told so, per item.
                 ...warningFieldSnake(cur),
-            });
+            };
+            if (bounded) {
+                const size = JSON.stringify(item).length;
+                if (notOpened.length || (found.length > 0 && chars + size + 1 > itemBudget)) { notOpened.push(asked); continue; }
+                chars += size + 1;
+            }
+            shown.push(cur);
+            found.push(item);
+            askedOf.push(asked);
         }
         // The content risk marks travel with each item to an AI reader; a held item's value and draft
         // are not in this answer (services/content/risk-read.ts). The record's provenance names its
         // writer, which tells the read whether the words came from the reader's own person.
-        const rr = await riskForRead(deps, riskReaderOf(caller), shown.map(r => ({
+        const riskOf = () => riskForRead(deps, riskReaderOf(caller), shown.map(r => ({
             subject: { kind: 'memory' as const, owner: r.ownerGaii, key: r.key }, text: contentRiskTextOf(r.value), provenanceId: r.aiProvenanceId,
         })));
-        const items = found.map((it, i) => withRisk(it, rr.items[i] ?? null, ['value', 'draft']));
-        return { ok: true, data: { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), organism_id: organismId, ws, mode: 'content', items, ...(missing.length ? { missing } : {}),
+        let rr = await riskOf();
+        let items = found.map((it, i) => withRisk(it, rr.items[i] ?? null, ['value', 'draft']));
+        if (bounded) {
+            // The marks are part of each item (a mark with its excerpt is over a thousand characters),
+            // so the cut that counts is made on the items as they are answered. When it drops some,
+            // the marks are read again for the ones kept: the warning counts the items of THIS answer.
+            let keep = 0;
+            let total = 0;
+            for (const it of items) {
+                const size = JSON.stringify(it).length + 1;
+                if (keep > 0 && total + size > itemBudget) break;
+                total += size;
+                keep++;
+            }
+            if (keep < items.length) {
+                notOpened.unshift(...askedOf.slice(keep));
+                shown.length = keep;
+                found.length = keep;
+                rr = await riskOf();
+                items = found.map((it, i) => withRisk(it, rr.items[i] ?? null, ['value', 'draft']));
+            }
+        }
+        // A reader other than the maker opened an AI-made record: a use (services/value/signal-buffer.ts).
+        for (const cur of shown) recordValueRead({ ownerGaii: cur.ownerGaii, key: cur.key, readerPrincipal: caller.principal });
+        return { ok: true, data: { ...(rr.warning ? { content_risk_warning: rr.warning } : {}), organism_id: organismId, ws, mode: 'content',
+            // Before the items, so a reader sees it without reading to the end of a long answer.
+            ...(notOpened.length ? { not_opened: notOpened, not_opened_note: `These ids were not opened: the ${found.length} before them reached the size of one answer. Ask for them in the next call.` } : {}),
+            items, ...(missing.length ? { missing } : {}),
             ...(ambiguous.length ? { ambiguous, ambiguous_note: 'These ids are records of more than one space; each was answered from the first space. Pass `space` to read another.' } : {}),
             ...(got.truncated ? { truncated: true } : {}),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
@@ -365,10 +424,9 @@ export async function readWorkspaceOp(
         const rec = await metaReader.pick(ws, `meta.sections.${ot.name}`, items);
         if (rec) sections[ot.name] = readStoredSections(rec.value);
     }
-    const index: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
     const opened = ((await metaReader.pick(ws, 'meta.opened', items))?.value ?? {}) as Record<string, string>;
-    for (const [name, s] of spaces) {
+    const listed = [...spaces].map(([name, s]) => {
         const isDocSpace = s.ot.mode === 'document' || (!s.ot.mode && s.ot.kind === 'document');
         const entries = [...s.inst.entries()]
             .map(([id, slot]) => {
@@ -376,19 +434,21 @@ export async function readWorkspaceOp(
                 return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft, ...warningFieldSnake(cur), ...(isDocSpace ? pageLifeOf(cur, opened[`${name}/${id}`]) : {}) };
             })
             .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
-        index[name] = entries;
         counts[name] = entries.length;
-    }
+        return { name, namespace: s.ot.namespace, entries };
+    });
     // Row spaces answer with a count, never with rows: this index materialises every value.
     const rowSpaces = await workspaceRowIndex({ storage, config }, organismId, ws, manifest.objectTypes as RowObjectType[] | undefined);
     for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
-    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest,
+    // Everything the index answers with beside the entries themselves.
+    const head = { organism_id: organismId, ws, mode: 'index', manifest,
         // The stored manifest record's version, which aimeat_workspace_update takes back as
         // expected_version (not the manifest's own manifestVersion field, its format version).
         manifest_version: manRec.version,
-        apps, rules, counts, index,
+        apps, rules, counts };
+    const tail = {
         // What the organism's creators ask a member's AI to do here (services/organism/directives.ts).
         // On the index only: a batch open reads nothing but the records it opens (C7), and the AI
         // reads the index before it opens records.
@@ -400,9 +460,31 @@ export async function readWorkspaceOp(
         ...(Object.keys(sections).length ? { sections } : {}),
         ...(Object.keys(schemas).length ? { schemas } : {}),
         ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
-        hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
-            + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '')
-            + (Object.keys(rowSpaces).length ? ' Row spaces show a count and a span here; read their rows with aimeat_workspace_rows_read.' : '') } };
+    };
+    const hint = 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
+        + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '')
+        + (Object.keys(rowSpaces).length ? ' Row spaces show a count and a span here; read their rows with aimeat_workspace_rows_read.' : '');
+
+    if (!bounded) {
+        const index: Record<string, unknown[]> = {};
+        for (const s of listed) index[s.name] = s.entries;
+        return { ok: true, data: { ...head, index, ...tail, hint } };
+    }
+    // One page per space, and the whole answer inside the tool answer budget: what the rest of the
+    // answer takes is counted first, and the entries get what is left (./read-page.ts).
+    const only = space ? listed.find(s => s.name === space || s.namespace === space) : undefined;
+    if (space && !only) return refuse(400, 'INVALID_INPUT', `This workspace has no records or document space "${space}". Its spaces: ${listed.map(s => s.name).join(', ') || 'none'}.`);
+    const fixedChars = JSON.stringify({ ...head, ...tail, hint }).length;
+    const { index, page } = pageIndex(listed, {
+        limit: pageLimitOf(bounded.limit), q: bounded.q,
+        ...(only ? { only: only.name } : {}), ...(cursorAt ? { cursor: cursorAt } : {}),
+        budgetChars: Math.max(TOOL_ANSWER_BUDGET_CHARS - fixedChars - 2000, 4000),
+    });
+    const moreSpaces = Object.keys(page.more);
+    return { ok: true, data: { ...head, index, page, ...tail,
+        hint: hint + (moreSpaces.length
+            ? ` The index shows the newest ${page.limit} entries of a space at most; \`counts\` has every space's total and \`page.more\` what is left. Next page of a space: aimeat_workspace_read with space:"<space>" and cursor:"<its next_cursor>". One record by its title or id: q:"<text>".`
+            : '') } };
 }
 
 export interface WriteWorkspaceDraftsArgs {

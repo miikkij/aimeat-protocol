@@ -38,6 +38,8 @@
  *   2026-11-08 — findWsEntry is the gate's (services/organism-gate.ts, workspaceRegistrations), so the
  *     access, member and transfer tools name the creator the REST gate and the access layer name
  *     (secaudit2026nov08 round 14, mcp/workspaces.ts:findWsEntry:first-store-order-registry-copy).
+ *   2026-11-24 — aimeat_workspace_read is the bounded read (services/workspace/read-page.ts): limit,
+ *     cursor and q page the index, and a batch-open stops at the tool answer budget.
  *   2026-10-27 — aimeat_workspace_object_delete and _revert_to_draft ask the fenced-space rule for the
  *     workspace the record's key lies in, not the ws argument (secaudit2026oct26,
  *     mcp-workspace:delete-fence-ws-from-input).
@@ -402,16 +404,17 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_read ──
-    // Two modes, one tool. DEFAULT (no `ids`) → the INDEX: per space, every instance's id + title +
-    // updated + version + byte-size — titles only, NO bodies — plus the manifest + pinned apps. This
-    // stays small no matter how many/large the documents are (the old "return every object's full value
-    // in one blob" grew to 100s of KB — too big for an MCP round-trip). BATCH-OPEN (`ids` given) →
-    // the FULL value of only the requested instances. So the flow is: read the index → pick the ids
-    // that likely hold what you need → read those ids. Both calls are size-bounded.
+    // Two modes, one tool. DEFAULT (no `ids`) → the INDEX: per space, the newest instances' id + title +
+    // updated + version + byte-size — titles only, NO bodies — plus the manifest + pinned apps, one
+    // page per space (`limit`, `cursor`, `q`; services/workspace/read-page.ts). BATCH-OPEN (`ids`
+    // given) → the FULL value of the requested instances, up to the tool answer budget, with the rest
+    // named in `not_opened`. So the flow is: read the index → pick the ids that likely hold what you
+    // need → read those ids. Both calls are bounded by models/answer-budget.ts; until 2026-11-24 the
+    // index listed every instance, and a workspace of 1040 records answered with 375 kB.
     mcp.registerTool('aimeat_workspace_read', { description: descriptionFor('aimeat_workspace_read'),
         inputSchema: zodShapeFor('aimeat_workspace_read'),
         annotations: annotationsFor('aimeat_workspace_read') },
-        async ({ organism_id, ws, ids, space, include_archived, archived }): Promise<TextResult> => {
+        async ({ organism_id, ws, ids, space, include_archived, archived, limit, cursor, q }): Promise<TextResult> => {
             // The work is services/workspace/tool-ops.ts, which the extension sandbox's
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
             // level (whoever may read the manifest sees all of its content), version history is
@@ -420,6 +423,8 @@ export function registerWorkspaceTools(
                 organismId: organism_id, ws, ids, space, includeArchived: include_archived,
                 ...(archived ? { archived } : {}),
                 reader: readerForAgent({ storage, config }, agentGaii),
+                // An MCP answer has a size limit, so this read is always the bounded one.
+                bounded: { limit, cursor, q },
             });
             return r.ok ? ok(r.data) : fail(r.message);
         });

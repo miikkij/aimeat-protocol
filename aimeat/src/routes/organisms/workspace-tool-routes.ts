@@ -16,6 +16,9 @@
  * @structure registerOrganismWorkspaceToolRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceToolRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   2026-11-24 — GET .../workspace/index takes ?bounded=true, ?limit, ?cursor and ?q: the bounded
+ *     read aimeat_workspace_read answers with, one page of the index per space and a batch-open that
+ *     stops at the size of one tool answer.
  *   2026-11-13 — GET .../workspace/index takes ?archived=only, the archived content alone, as GET
  *     /v1/organisms/:id/workspace does on organism:read (structure programme 2026-11, unit 3b).
  *   v1.0.2 — 2026-10-06 — The caller carries the session's scopes; a provenance declaration the
@@ -62,8 +65,8 @@ export function registerOrganismWorkspaceToolRoutes(
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.'));
     };
 
-    /** GET /v1/organisms/:id/workspace/index?ws=&ids=a,b&space=&include_archived=true — the index
-     *  (titles, no bodies), or the full values of the named ids. */
+    /** GET /v1/organisms/:id/workspace/index?ws=&ids=a,b&space=&include_archived=true&bounded=true
+     *  &limit=&cursor=&q= — the index (titles, no bodies), or the full values of the named ids. */
     router.get('/v1/organisms/:id/workspace/index', requireAuth(), requireScope('organism:read'), async (req: Request, res: Response) => {
         const caller = opsCallerOf(req);
         if (!caller) { visitorRefusal(res); return; }
@@ -72,14 +75,28 @@ export function registerOrganismWorkspaceToolRoutes(
         const ids = typeof req.query.ids === 'string'
             ? req.query.ids.split(',').map(s => s.trim()).filter(Boolean)
             : undefined;
+        // ?bounded=true, or any of ?limit, ?cursor and ?q, asks for the read aimeat_workspace_read
+        // answers on the node's MCP: one page of the index per space, and a batch-open that stops at
+        // the size of one tool answer. The connector asks for it on every call. Without them the
+        // read is whole, as a page of the web app reads it.
+        const text = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
+        const limit = text(req.query.limit);
+        const cursor = text(req.query.cursor);
+        const q = text(req.query.q);
+        const bounded = req.query.bounded === 'true' || limit !== undefined || cursor !== undefined || q !== undefined;
+        if (limit !== undefined && !/^\d{1,6}$/.test(limit)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', '`limit` is a whole number of entries per space.', 400, { field: 'limit' }));
+            return;
+        }
         const r = await readWorkspaceOp(deps, caller, {
             organismId: req.params.id as string, ws,
             ids: ids?.length ? ids : undefined,
-            space: typeof req.query.space === 'string' && req.query.space ? req.query.space : undefined,
+            space: text(req.query.space),
             includeArchived: req.query.include_archived === 'true',
             // ?archived=only, as GET /v1/organisms/:id/workspace reads it on the same word.
             ...(req.query.archived === 'only' ? { archived: 'only' as const } : {}),
             reader: readerFor({ storage, config }, req.auth),
+            ...(bounded ? { bounded: { ...(limit !== undefined ? { limit: Number(limit) } : {}), cursor, q } } : {}),
         });
         if (!r.ok) { refuse(res, r); return; }
         res.json(success(config.nodeId, r.data));

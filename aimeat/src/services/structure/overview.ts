@@ -22,6 +22,8 @@
  *   import { buildOrganismOverview, buildWorkspaceOverview } from './overview.js';
  *   const md = await buildOrganismOverview(storage, config, { orgId, viewerGaii });
  * @version-history
+ *   2026-11-24 — The workspace overview lists the newest ANSWER_PAGE_DEFAULT entries of a space, and
+ *     says how to read the rest; it listed every entry, over 100 000 characters for 1040 records.
  *   v1.0.0 — 2026-06-13 — Initial: OKF-style organism + workspace structure overview (Markdown).
  *   v1.1.0 — 2026-06-13 — Organism overview is now the workspace overviews COMPOSED at the same
  *     fidelity (each workspace a ## section with its spaces' recent ids+titles) instead of a
@@ -73,6 +75,7 @@ import { isRecordsSource, evaluateRecordsKpi, type RecordsKpiSource } from '../k
 import { readOrganismMetaValue } from '../organism/record-helpers.js';
 import { spacePrefixesOf, spaceRowAt } from '../workspace/record-key.js';
 import { logger } from '../../utils/logger.js';
+import { ANSWER_PAGE_DEFAULT } from '../../models/answer-budget.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
 export const MAX_ITEMS = 10;
@@ -415,18 +418,19 @@ function date(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '—';
 }
 
-/** DEEP overview of one workspace: per space, EVERY entry's id + title (uncapped — this is the
- *  agent's table of contents for a targeted batch read). Titles-only keeps it small. */
+/** DEEP overview of one workspace: per space, the newest ANSWER_PAGE_DEFAULT entries' id + title and
+ *  the total (the agent's table of contents for a targeted batch read). */
 export async function buildWorkspaceOverview(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; ws: string; name?: string; viewerGaii: string; reader: ContentReader },
 ): Promise<{ markdown: string; readable: boolean; summary: WorkspaceSummary }> {
-  // DEEP view of ONE workspace: list EVERY instance id (uncapped), not just the MAX_ITEMS most-recent
-  // — this is the agent's "table of contents" for a targeted batch read, so a big space (e.g. 40+
-  // documents) must expose all ids. Titles-only, so even hundreds of rows stay small. The SHALLOW
-  // organism overview keeps the MAX_ITEMS cap (it composes every workspace, so it must stay bounded).
-  const s = await collectWorkspaceSummary(storage, config, { ...opts, itemLimit: Number.MAX_SAFE_INTEGER });
+  // DEEP view of ONE workspace: more entries per space than the SHALLOW organism overview's
+  // MAX_ITEMS, so a space of 40 documents shows all its ids. It listed EVERY entry until 2026-11-24,
+  // on the reasoning that titles stay small: a space of 1040 records made a map of over 100 000
+  // characters, more than a client accepts in one answer (models/answer-budget.ts). The rest of a
+  // space is read in pages, or found by title, with aimeat_workspace_read.
+  const s = await collectWorkspaceSummary(storage, config, { ...opts, itemLimit: ANSWER_PAGE_DEFAULT });
   const out: string[] = [];
   out.push(fm({
     okf_type: 'workspace-structure-overview',
@@ -448,6 +452,9 @@ export async function buildWorkspaceOverview(
   out.push(...objectiveLines(s.objectives, '##'));
   if (!s.spaces.length) out.push('_No spaces with content yet._\n');
   for (const sp of s.spaces) out.push(...spaceLines(sp, '##'));
+  if (s.spaces.some(sp => sp.total > sp.recent.length)) {
+    out.push('> A space with more entries than it shows lists its newest. Read the rest in pages with `aimeat_workspace_read` (`space`, then `cursor`), or find one record by its title with `q`.\n');
+  }
   out.push(...skillLines(opts.orgId, s.ws, s.skills, '##'));
   return { markdown: out.join('\n'), readable: true, summary: s };
 }

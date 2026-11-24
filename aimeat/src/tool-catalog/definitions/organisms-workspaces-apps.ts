@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-24 — aimeat_workspace_read takes limit, cursor and q: the index is one page per space,
+ *     and a batch-open names the ids it did not open in `not_opened`.
  *   2026-11-21 — aimeat_workspace_read's ids say what `ambiguous` means (an id two spaces hold).
  *   2026-11-21 — aimeat_workspace_update takes expected_version (the manifest version lock); its
  *     manifest names an objective's level, serves and until.
@@ -109,6 +111,7 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+import { ANSWER_PAGE_DEFAULT, ANSWER_PAGE_MAX } from '../../models/answer-budget.js';
 
 /**
  * Where an organism is, how many may join and who sees its members: fields POST /v1/organisms and
@@ -461,7 +464,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_read',
-        description: 'Read one workspace in TWO steps so you never pull a huge blob. DEFAULT (no `ids`) returns the INDEX: the manifest (the objectTypes it declares — each a records space with a JSON schema, or a document space of markdown pages), the JSON Schemas currently LOCKED on the records spaces and the row spaces as `schemas` (keyed by namespace, in the shape aimeat_workspace_update takes back — read this before you change one, because that update REPLACES rather than merges), plus, per space, EVERY instance as { id, title, updated, version, bytes, published, has_draft } — titles only, NO bodies — so it stays small however many/large the documents are. Scan the index (or aimeat_workspace_overview for the same as a Markdown map), pick the ids that likely hold what you need, then call this again with `ids:[...]` to BATCH-OPEN just those instances\' full values. Version history (.version.N) is never returned here — read a specific version via the memory API. Member-only.',
+        description: 'Read one workspace in TWO steps so you never pull a huge blob. DEFAULT (no `ids`) returns the INDEX: the manifest (the objectTypes it declares — each a records space with a JSON schema, or a document space of markdown pages), the JSON Schemas currently LOCKED on the records spaces and the row spaces as `schemas` (keyed by namespace, in the shape aimeat_workspace_update takes back — read this before you change one, because that update REPLACES rather than merges), plus, per space, its instances as { id, title, updated, version, bytes, published, has_draft } — titles only, NO bodies — newest change first, ONE PAGE per space: `limit` entries (default 50, at most 150). `counts` has every space\'s total, and `page.more` names each space that has entries left with a `next_cursor`: read its next page with `space` and that `cursor`. To find one record by its title or id, pass `q` instead of paging. Scan the index (or aimeat_workspace_overview for the same as a Markdown map), pick the ids that likely hold what you need, then call this again with `ids:[...]` to BATCH-OPEN just those instances\' full values. A batch-open stops at the size of one answer: the ids it did not open are in `not_opened`, to ask for in the next call. Version history (.version.N) is never returned here — read a specific version via the memory API. Member-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Workspace', readOnlyHint: true },
@@ -473,7 +476,10 @@ export const organismsWorkspacesAppsTools = [
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
             ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index. An id that records of more than one space have, asked without `space`, is answered from the first space and named in `ambiguous` with every space that holds it: pass `space` to read another.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
-            space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
+            space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace). On the index: show this space alone, which `cursor` needs.' },
+            limit: { type: 'number', description: `Index: entries per space in one answer, newest change first (default ${ANSWER_PAGE_DEFAULT}, at most ${ANSWER_PAGE_MAX}).`, zod: z.number().int().min(1).max(ANSWER_PAGE_MAX) },
+            cursor: { type: 'string', description: 'Index: the `next_cursor` that `page.more` gave for a space, with `space`, to read that space\'s next page.', zod: z.string().max(INPUT_LIMITS.key) },
+            q: { type: 'string', description: 'Index: keep the entries whose title or id contains this text, whatever the letter case. `page.matched` says how many each space has.', zod: z.string().max(INPUT_LIMITS.title) },
             include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
             // As GET /v1/organisms/:id/workspace reads ?archived=only on organism:read (unit 3b).
             archived: { type: 'string', enum: ['only'], description: "'only' reads the archived content alone. Wins over include_archived." },
@@ -495,7 +501,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_overview',
-        description: 'Get a fast, OKF-style STRUCTURE MAP of ONE workspace as Markdown — per space, the most-recently-updated entries (up to 10) with their instance id + title, and the total count of each space. Read this to find WHICH id you need, then call aimeat_workspace_read (or the memory API) to pull that record. Cheaper than reading the whole workspace when you only need to navigate. Same read access as aimeat_workspace_read; if you lack access the map says so. Member-only.',
+        description: 'Get a fast, OKF-style STRUCTURE MAP of ONE workspace as Markdown — per space, the most-recently-updated entries (up to 50) with their instance id + title, and the total count of each space. Read this to find WHICH id you need, then call aimeat_workspace_read (or the memory API) to pull that record. Cheaper than reading the whole workspace when you only need to navigate. Same read access as aimeat_workspace_read; if you lack access the map says so. Member-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Workspace Structure Overview', readOnlyHint: true },

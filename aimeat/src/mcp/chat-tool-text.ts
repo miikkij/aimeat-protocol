@@ -18,6 +18,8 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
+ *   2026-11-24 — aimeat_workspace_read's text says the index is one page per space, with `counts`
+ *     and `q`.
  *   v1.2.0 — 2026-11-14 — aimeat_task_create gets a short text and leaves rules, verification,
  *     todos, resources and parent_task_id off the chat listing: the five fields the tool gained on
  *     2026-11-13 took the start set to 28 299 characters, over 26 000. aimeat_skill_get and
@@ -98,7 +100,7 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
         description: 'Search your own memory by words; each hit is a snippet, not the whole value. Read a hit in full with aimeat_memory_read. `type` keeps to one kind of record, such as schema:Person.',
     },
     aimeat_workspace_read: {
-        description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, every item\'s id and title). Then with `ids:[…]`: the full items you need.',
+        description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, `counts` with each space\'s total, and the newest items\' id and title, one page per space; `q` finds an item by its title). Then with `ids:[…]`: the full items you need.',
     },
     aimeat_home_feed: {
         description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new. Name an agent by `data.agent_shown_name` and give a time as `at_local` when a row has them.',

@@ -19,6 +19,7 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-field-adds
  * @version-history
+ *   2026-11-24 — The archived-only workspace read is compared with the route's bounded read.
  *   v1.1.0 — 2026-11-13 — federate on aimeat_board_create and aimeat_storage_upload, relation on
  *     aimeat_knowledge_links, ttl_hours on aimeat_board_post.
  *   v1.0.0 — 2026-11-13 — Initial (structure programme 2026-11, unit 3b).
@@ -635,7 +636,8 @@ console.log('\nThe other read filters');
         assert(!normal.isError, `read: ${normal.text.slice(0, 200)}`);
         const only = await callTool(o.session, 'aimeat_workspace_read', { organism_id: orgId, ws, archived: 'only' });
         assert(!only.isError, `archived read: ${only.text.slice(0, 200)}`);
-        const rest = await get(`/v1/organisms/${orgId}/workspace/index?ws=${encodeURIComponent(ws)}&archived=only`, o.agent.token);
+        // bounded=true: the tool makes the route's bounded read since 2026-11-24, as the connector does.
+        const rest = await get(`/v1/organisms/${orgId}/workspace/index?ws=${encodeURIComponent(ws)}&archived=only&bounded=true`, o.agent.token);
         assert(rest.status === 200, `REST index archived only: ${rest.status} ${JSON.stringify(rest.body.error)}`);
         assert(JSON.stringify(only.data) === JSON.stringify(rest.body.data), `tool and route answer the same archived read: ${JSON.stringify(only.data).slice(0, 200)} / ${JSON.stringify(rest.body.data).slice(0, 200)}`);
     });

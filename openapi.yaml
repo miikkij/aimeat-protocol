@@ -53373,6 +53373,13 @@ paths:
         answered_from }). Version history is never returned. A session from another
         node is refused. For an active member, `organism_directive` holds the organism's directive and this
         workspace's own (organism.{id}.w.{ws}.meta.directive), as on GET /v1/organisms/{id}.
+        With `bounded=true`, or any of `limit`, `cursor` and `q`, the read is the one a caller with
+        a size limit on its answer gets, and the one the MCP tool always answers with: the index
+        shows one page per space, newest change first, with `counts` holding every space's total
+        and `page` ({ limit, shown, more, matched?, q? }) naming in `more` each space that has
+        entries left ({ remaining, next_cursor? }); and a read of `ids` stops at the size of one
+        tool answer (40 000 characters) and lists the ids it did not open in `not_opened`. The
+        first record asked for is always opened. Without these parameters the read is whole.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -53391,7 +53398,25 @@ paths:
           schema: { type: string }
         - name: space
           in: query
-          description: With ids, restrict the lookup to this space (name or namespace).
+          description: >-
+            With ids, restrict the lookup to this space (name or namespace). On a bounded index,
+            show this space alone; `cursor` needs it.
+          schema: { type: string }
+        - name: bounded
+          in: query
+          description: true asks for the bounded read without naming a limit, a cursor or a filter.
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          description: Bounded index. Entries per space in one answer.
+          schema: { type: integer, minimum: 1, maximum: 150, default: 50 }
+        - name: cursor
+          in: query
+          description: Bounded index. The next_cursor that page.more gave for the space named in `space`.
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Bounded index. Keep the entries whose title or id contains this text, whatever the letter case.
           schema: { type: string }
         - name: include_archived
           in: query
@@ -53404,7 +53429,9 @@ paths:
         '200':
           description: data is the index (mode index) or the opened records (mode content, with missing ids listed).
         '400':
-          description: WS_REQUIRED — no ws.
+          description: >-
+            WS_REQUIRED — no ws. INVALID_INPUT — a limit that is not a whole number, a cursor this
+            read did not give, a cursor without space, or a space the workspace does not have.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -53470,9 +53497,10 @@ paths:
       summary: OKF-style structure overview of ONE workspace (Markdown)
       description: |
         A deterministic, size-bounded Markdown map of a single workspace (Open Knowledge Format
-        style). DEEP: for each space it lists the most-recently-updated entries (up to 10) with their
+        style). DEEP: for each space it lists the most-recently-updated entries (up to 50) with their
         instance id + title, and always reports the total count (no silent truncation) so a consumer
-        knows when to page deeper. The ids let the next targeted read
+        knows when to page deeper (GET /v1/organisms/{id}/workspace/index with `space` and
+        `cursor`, or `q` to find one by its title). The ids let the next targeted read
         (`GET /v1/organisms/{id}/workspace?ws=` or the memory API) go straight to the record. Same
         workspace-level read gate as `GET /v1/organisms/{id}/workspace`: the manifest is the single
         gate — without read access the body says so and lists nothing.

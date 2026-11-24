@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-24 — aimeat_workspace_read asks .../workspace/index for the bounded read on every call
+ *     and forwards limit, cursor and q.
  *   2026-11-21 — aimeat_workspace_update forwards expected_version (the manifest version lock).
  *   2026-11-19 — aimeat_workspace_share forwards ics_key through shareBodyFromToolInput.
  *   2026-11-15 — aimeat_organism_import forwards preview, people and team (team setup T12).
@@ -472,14 +474,21 @@ export const organismTools: ConnectCliToolDefinition[] = [
         // → GET /v1/organisms/:id/workspace/index: readWorkspaceOp(), the index or the named ids,
         // as the node's MCP answers. This definition read GET /v1/organisms/:id/workspace, which reads
         // none of ids, space or include_archived, so every read was the whole workspace.
+        // bounded=true on every call: a tool answer has a size limit, so the index comes one page per
+        // space and a batch-open stops at the size of one answer, as on the node's MCP.
         handler: ({ client }, input) => {
             const ids = optionalArray(input, 'ids')?.filter((i): i is string => typeof i === 'string');
+            const limit = optionalNumber(input, 'limit');
             return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/index${query({
                 ws: requiredString(input, 'ws'),
                 ids: ids?.length ? ids.join(',') : undefined,
                 space: optionalString(input, 'space'),
                 include_archived: optionalBoolean(input, 'include_archived') ? 'true' : undefined,
                 archived: optionalString(input, 'archived') === 'only' ? 'only' : undefined,
+                bounded: 'true',
+                limit: limit !== undefined ? String(limit) : undefined,
+                cursor: optionalString(input, 'cursor'),
+                q: optionalString(input, 'q'),
             })}`);
         },
     },

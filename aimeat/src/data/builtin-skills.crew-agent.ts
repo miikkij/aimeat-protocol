@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-11-24 -- Section 2: the record count of a space is read from the index's \`counts\`; the
+ *     index lists a space's records a page at a time.
  *   2026-11-15 -- A resident agent suits one that answers whatever arrives, not "a front door".
  *   2026-11-10 -- Section 2: in an organism that admits every member's agent, a listed agent works
  *     with its owner's rights; the line that kept it off the list described a node defect, fixed
@@ -135,8 +137,9 @@ examples: email, a calendar, meeting notes from a recording.
    record arrives, and writes nothing. The agent works on what is published after it has started.
    When the owner wants the records that are already in a space worked on as well, add
    \`"backfill": true\` to that item, and only when \`features\` lists \`record_backfill\`; say
-   to the owner how many records that is first (\`aimeat_workspace_read\` without ids lists each
-   space's records, with \`published\` on each), because each published one becomes a task and a
+   to the owner how many records that is first (\`aimeat_workspace_read\` without ids gives each
+   space's total in \`counts\` and lists its records a page at a time, with \`published\` on each),
+   because each published one becomes a task and a
    run of their model, ten at a time. It acts the first time the agent looks at the space and
    never after. Ask \`organism:read\` for it, and \`organism:write\` with
    \`memory:write\` when it writes back into the workspace. The owner sees the spaces on the

@@ -5,6 +5,8 @@
  *   schema) via REST, then drives the tools as the owner's agent over MCP, and checks the
  *   membership gate with a second owner's organism.
  * @version-history
+ *   2026-11-24 — 44 compares the tool with the route's bounded read (?bounded=true), the read the tool
+ *     makes since the index answers in pages.
  *   2026-10-30 — 9b: an agent embedding ANOTHER agent's image leaves it private (it read 'workspace',
  *     the hole closed: an agent opens only its own files, Jouni 2026-10-30). 9b2: the owner's write in
  *     person scopes the same image. 9b3: a public image stays public (it was narrowed before). 9e
@@ -1041,11 +1043,15 @@ const restAs = (token: string, path: string, opts: RequestInit = {}) =>
     json(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...(opts.headers as Record<string, string> | undefined) } });
 
 await test('44. GET /workspace/index answers what aimeat_workspace_read answers, index and opened ids', async () => {
-    const idx = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}`);
+    // The tool's read is the route's bounded read since 2026-11-24 (one page of the index per space,
+    // a batch-open up to the size of one tool answer): the comparison asks the route for that read,
+    // as the connector does. The setup had asked for the whole read, which the tool no longer makes.
+    const idx = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}&bounded=true`);
     assert(idx.status === 200, `index ${idx.status}: ${JSON.stringify(idx.body.error)}`);
     const tool = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 144)).result.content[0].text);
     assert(JSON.stringify(idx.body.data) === JSON.stringify(tool), 'the index differs from the MCP tool');
-    const opened = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}&ids=n1,no-such-id&space=note`);
+    assert(tool.page && typeof tool.page.limit === 'number', `the tool's index carries its page: ${JSON.stringify(tool.page)}`);
+    const opened = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}&ids=n1,no-such-id&space=note&bounded=true`);
     const toolOpened = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n1', 'no-such-id'], space: 'note' }, 1441)).result.content[0].text);
     assert(opened.status === 200 && JSON.stringify(opened.body.data) === JSON.stringify(toolOpened), `opened ids differ: ${JSON.stringify(opened.body).slice(0, 300)}`);
     assert((opened.body.data.missing ?? []).includes('no-such-id'), 'an unknown id is reported missing');
