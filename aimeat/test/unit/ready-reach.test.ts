@@ -1,0 +1,47 @@
+/**
+ * @file test/unit/ready-reach.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Which E2E suites pnpm ready runs for a code change (scripts/lib/ready-reach.ts), read
+ *   against this repository's own source and suites: a change picks the suites that call what it
+ *   reaches and leaves the rest, and a change on every request's path runs the whole sweep.
+ * @version-history
+ *   v1.0.0 — 2026-11-24 — Initial.
+ */
+import path from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { codeReach } from '../../scripts/lib/ready-reach.js';
+
+const repo = path.resolve(process.cwd(), '..');
+
+describe('codeReach', () => {
+  it('runs the whole sweep for a change on every request\'s path', () => {
+    expect(codeReach(repo, ['aimeat/src/server-bootstrap/service-init.ts']).full).toMatch(/every request/);
+    expect(codeReach(repo, ['aimeat/package.json']).full).not.toBeNull();
+  });
+
+  it('picks the federation suites for the federated sign-in check, and not the library suites', () => {
+    const r = codeReach(repo, ['aimeat/src/services/federation/auth-consent.ts']);
+    expect(r.full).toBeNull();
+    expect(r.suites).toEqual(expect.arrayContaining(['e2e-federated-session', 'e2e-federation-peer-consent', 'e2e-federation-peer-bounds']));
+    expect(r.suites).not.toContain('e2e-libs');
+  });
+
+  it('picks the library suites for a change in the served libraries\' registry, and not the federation suites', () => {
+    const r = codeReach(repo, ['aimeat/src/data/library-packs/sdk-ui.ts']);
+    expect(r.full).toBeNull();
+    expect(r.suites).toContain('e2e-libs');
+    expect(r.suites).not.toContain('e2e-federated-session');
+  });
+
+  it('matches a route by every fixed part of its path, not by its start alone', () => {
+    // /v1/ghii/:ghii/credential: a suite that signs in (/v1/ghii/login) does not call it.
+    const r = codeReach(repo, ['aimeat/src/services/vc-issuer.ts']);
+    expect(r.full).toBeNull();
+    expect(r.suites.length).toBeLessThan(40);
+  });
+
+  it('runs no node suite for the Python package', () => {
+    expect(codeReach(repo, ['python/aimeat-crewai/src/aimeat_crewai/daemon.py'])).toEqual({ full: null, suites: [] });
+  });
+});

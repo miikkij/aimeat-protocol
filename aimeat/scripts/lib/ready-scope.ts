@@ -2,9 +2,10 @@
  * @file scripts/lib/ready-scope.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Decides how much of the E2E sweep pnpm ready runs for the commits it brings: the whole
- *   sweep when the change reaches code the server runs, and only the suites that name a changed text
- *   when the change is text.
+ * @description Decides how much of the E2E sweep pnpm ready runs for the commits it brings: for code,
+ *   the suites the change can reach (./ready-reach.ts), and the whole sweep only when a changed file is
+ *   on every request's path; for text, only the suites that name a changed text. The nightly runs the
+ *   whole sweep (Jouni, 2026-11-24).
  *
  *   WHY. A change of words (locale files, docs, comments, the text inside a string) cannot break a
  *   suite unless the suite quotes the old words or is itself changed, and the full sweep on this
@@ -30,8 +31,10 @@
  *   an AI reads in the product (not Markdown, docs/ or the session guides), or removes WIDE_TEXTS or
  *   more texts. Then the full sweep runs on SQLite, the faster backend, and the picked suites on
  *   PostgreSQL.
- * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope()
+ * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope() (codeReach in ./ready-reach.ts)
  * @version-history
+ *   v2.0.0 — 2026-11-24 — A code change runs the suites it can reach (ready-reach.ts), not the whole
+ *     sweep; the whole sweep stays for a change on every request's path and for the nightly.
  *   v1.3.0 — 2026-11-23 — public/changelog.json is text: a changelog entry alone ran the full sweep
  *     on both backends.
  *   v1.2.0 — 2026-11-23 — A wide text change (WIDE_FILES files or WIDE_TEXTS removed texts) also runs
@@ -45,6 +48,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { parse as parseYaml } from 'yaml';
+import { codeReach } from './ready-reach.js';
 
 const git = (repo: string, ...args: string[]): string =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -261,17 +265,27 @@ export function targetedSuites(repo: string, base: string, files: string[], text
   return [...picked].sort();
 }
 
-/** `wide` says why a text change also runs the full SQLite sweep, or is null. */
-export interface ReadyScope { full: boolean; code: string[]; suites: string[]; wide: string | null }
+/**
+ * `wide` says why a text change also runs the full SQLite sweep, or is null. `fullWhy` says why a code
+ * change runs the whole sweep (ready-reach.ts), or is null.
+ */
+export interface ReadyScope { full: boolean; code: string[]; suites: string[]; wide: string | null; fullWhy?: string | null }
 
 /**
- * The whole sweep when any changed file is code; otherwise the suites the text change can reach, and
- * for a wide text change the reason it also runs the full sweep on SQLite.
+ * For code: the suites the changed code can reach (ready-reach.ts), or the whole sweep when a changed
+ * file is on every request's path. For text: the suites that changed or quote the changed words, and
+ * for a wide text change the reason it also runs the full sweep on SQLite. The suites a text change
+ * picks are added to a code change's.
  */
 export function readyScope(repo: string, base: string): ReadyScope {
   const files = changedFiles(repo, base);
   const code = files.filter(f => !isTextOnly(repo, base, f));
-  if (code.length) return { full: true, code, suites: [], wide: null };
   const removed = removedTexts(repo, base, files);
-  return { full: false, code: [], suites: targetedSuites(repo, base, files, removed.parts), wide: isWideText(files, removed.count) };
+  const textSuites = targetedSuites(repo, base, files, removed.parts);
+  if (code.length) {
+    const reach = codeReach(repo, code);
+    if (reach.full) return { full: true, code, suites: [], wide: null, fullWhy: reach.full };
+    return { full: false, code, suites: [...new Set([...reach.suites, ...textSuites])].sort(), wide: null, fullWhy: null };
+  }
+  return { full: false, code: [], suites: textSuites, wide: isWideText(files, removed.count) };
 }

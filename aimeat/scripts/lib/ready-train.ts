@@ -38,6 +38,8 @@
  *   await ensureTrain(cfg);
  *   const verdicts = await runBatch(trainDeps(cfg), entries, batchId);
  * @version-history
+ *   v1.1.0 — 2026-11-24 — A code change runs the E2E suites it can reach (ready-reach.ts) and the unit
+ *     files it reaches (vitest --changed); --full and the nightly run everything (Jouni, 2026-11-24).
  *   v1.0.1 — 2026-11-23 — A sweep's probe answers green only when every red suite ran again: it ran
  *     the first 20 and answered for all of them.
  *   v1.0.0 — 2026-11-23 — Initial (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
@@ -211,7 +213,9 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
         };
     };
 
-    const unitStage = (passed: PassedStore | null): Stage => ({
+    // The unit files the change reaches through their imports (vitest --changed), unless --full asked for
+    // all of them; the nightly runs every unit file (Jouni, 2026-11-24).
+    const unitStage = (passed: PassedStore | null, all: boolean): Stage => ({
         name: 'the unit suite',
         run: async (): Promise<StageResult> => {
             const before = passed?.at('unit');
@@ -226,7 +230,8 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 if (alone >= 0) again = args.slice(alone + 1);
                 return runLoggedSync(cfg, 'the unit suite', cmd, args, { cwd });
             };
-            const r = await timed(cfg, 'the unit suite', () => runUnitWithRerun({ cwd: aimeat, cmd: ['pnpm', 'exec', 'vitest', 'run'], tag: 'ready', run }), x => x.ok);
+            const cmd = all ? ['pnpm', 'exec', 'vitest', 'run'] : ['pnpm', 'exec', 'vitest', 'run', '--changed', 'origin/main', '--passWithNoTests'];
+            const r = await timed(cfg, 'the unit suite', () => runUnitWithRerun({ cwd: aimeat, cmd, tag: 'ready', run }), x => x.ok);
             if (r.ok) {
                 passed?.add('unit');
                 return { ok: true, notes: r.passedAlone.map(f => `[unit-flaky] ${f}: red in the parallel run, green alone`) };
@@ -317,13 +322,13 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             const passed = entries.some(e => e.flags.fresh) ? null : passedStore(cfg.stateDir, tree());
             const stages: Stage[] = [];
             if (!entries.every(e => e.flags.noChecks)) stages.push(checksStage());
-            stages.push(unitStage(passed));
+            stages.push(unitStage(passed, full));
             // How much of the sweep the candidate needs (scripts/lib/ready-scope.ts): all of it for
             // code, the suites that quote the changed words for text.
             const scope = full ? { full: true, code: ['(--full)'], suites: [] as string[], wide: null } : readyScope(root, 'origin/main');
             const picked = scope.suites.join(',');
             if (scope.full) {
-                cfg.say(`the candidate reaches code (${scope.code.slice(0, 5).join(', ')}${scope.code.length > 5 ? ` and ${scope.code.length - 5} more` : ''}): the full sweep on both backends, ${cfg.lanes} lanes on SQLite and ${cfg.pgLanes} on PostgreSQL`);
+                cfg.say(`the candidate reaches code${scope.fullWhy ? ` on every request's path (${scope.fullWhy})` : ` (${scope.code.slice(0, 5).join(', ')}${scope.code.length > 5 ? ` and ${scope.code.length - 5} more` : ''})`}: the full sweep on both backends, ${cfg.lanes} lanes on SQLite and ${cfg.pgLanes} on PostgreSQL`);
                 stages.push(sweepStage(passed, 'the full E2E sweep on SQLite', 'test:e2e:sqlite', cfg.lanes, [], 'sqlite:full'));
                 stages.push(sweepStage(passed, 'the full E2E sweep on PostgreSQL', 'test:e2e:postgres-kysely', cfg.pgLanes, [], 'postgres:full'));
             } else if (scope.wide) {
@@ -331,11 +336,15 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                 stages.push(sweepStage(passed, 'the full E2E sweep on SQLite', 'test:e2e:sqlite', cfg.lanes, [], 'sqlite:full'));
                 if (scope.suites.length) stages.push(sweepStage(passed, 'the changed-text suites on PostgreSQL', 'test:e2e:postgres-kysely', cfg.pgLanes, scope.suites, `postgres:${picked}`));
             } else if (scope.suites.length) {
-                cfg.say(`the candidate is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
+                cfg.say(scope.code.length
+                    ? `the candidate reaches code (${scope.code.length} file(s)): the ${scope.suites.length} suite(s) it can reach, on both backends: ${scope.suites.join(', ')}. The nightly runs the full sweep.`
+                    : `the candidate is text only: the ${scope.suites.length} suite(s) that changed or quote the changed words, on both backends: ${scope.suites.join(', ')}`);
                 stages.push(sweepStage(passed, 'the changed-text suites on SQLite', 'test:e2e:sqlite', cfg.lanes, scope.suites, `sqlite:${picked}`));
                 stages.push(sweepStage(passed, 'the changed-text suites on PostgreSQL', 'test:e2e:postgres-kysely', cfg.pgLanes, scope.suites, `postgres:${picked}`));
             } else {
-                cfg.say('the candidate is text only, and no E2E suite changed or quotes the changed words: no sweep. CI runs on main after the push.');
+                cfg.say(scope.code.length
+                    ? 'the candidate reaches code that no E2E suite calls: no sweep. The nightly runs the full sweep, and CI runs on main after the push.'
+                    : 'the candidate is text only, and no E2E suite changed or quotes the changed words: no sweep. CI runs on main after the push.');
             }
             return stages;
         },

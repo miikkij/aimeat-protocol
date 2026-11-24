@@ -80,12 +80,16 @@
  *   cd aimeat && pnpm ready --fresh                            # run every step, also one green on this tree
  *   cd aimeat && pnpm ready --workers=6                        # the sweep's lanes by hand (1 to 16), when this run drives
  *
- *   HOW MUCH OF THE SWEEP. A candidate that reaches code runs the full sweep. A change of words only
+ *   HOW MUCH OF THE SWEEP. A candidate that reaches code runs the E2E suites that call what it reaches
+ *   and the unit files it reaches (scripts/lib/ready-reach.ts, vitest --changed); the full sweep only
+ *   for a change on every request's path, or with --full; the nightly runs everything (Jouni,
+ *   2026-11-24). A change of words only
  *   (locales, docs, comments, the prose inside strings) runs the suites that changed or quote the
  *   changed words, and none when no suite does (scripts/lib/ready-scope.ts; Jouni, 2026-11-22). A wide
  *   change of words (20 product files, or 100 removed texts) also runs the full sweep on SQLite, because
  *   the search misses a suite that quotes only a short part of a sentence (Jouni, 2026-11-23).
  * @version-history
+ *   v3.1.0 — 2026-11-24 — A code change runs what it can reach, not the full sweep (ready-reach.ts).
  *   v3.0.0 — 2026-11-23 — One run for every waiting session: a queue, a batch tested in a worktree of
  *     its own, and a verdict for each session (wish-pnpm-ready-valmis-ty-mainiin-nopeasti-yht-turvallisesti).
  *   v2.4.0 — 2026-11-23 — One run at a time on a machine (the `whole-run` lock), a waiting run rebases onto
