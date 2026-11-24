@@ -17,6 +17,8 @@
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.3.1 — 2026-11-24 — 4b waits for the held notice as 2a does: the node writes it after the
+ *     answer, and the test read it once, so it was red in two of three runs alone on PostgreSQL.
  *   v1.3.0 — 2026-10-28 — Section 8: the node never narrows a ready `*` agent by itself; it keeps `*`,
  *     its tasks start, and no `agent_narrowed` notice is sent (Jouni, 2026-10-28).
  *   v1.2.0 — 2026-10-23 — Section 9: the owner in person accepts floor permissions per agent
@@ -264,7 +266,10 @@ await test('4b. A plan that says it will delete sends a started task back to wai
   const p = await propose(worker, id, [{ title: 'Delete the old records', effects: ['delete'] }]);
   assert(p.status === 200 && p.body.data.task.status === 'queued', `held back ${p.status}: ${p.body?.data?.task?.status}`);
   assert((p.body.data.task.todos ?? []).some((t: any) => (t.effects ?? []).includes('delete')), 'the effect is kept on the todo');
-  const notices = await noticesFor(owner.token, id);
+  // The node writes the notice after it has answered the proposal (task-write.ts), so it is waited
+  // for, as in 2a. Read once, this was red in two of three runs alone on PostgreSQL (2026-11-24).
+  let notices: any[] = [];
+  for (let i = 0; i < 30 && notices.length === 0; i++) { notices = await noticesFor(owner.token, id); if (!notices.length) await new Promise(res => setTimeout(res, 100)); }
   assert(notices.some(n => n.type === 'task_waiting' && n.i18n?.key === 'task_waiting_held'), `held notice ${JSON.stringify(notices.map(n => n.i18n))}`);
   const chatTry = await startTask(chat.token, 'worker', id);
   assert(chatTry.status === 403, `chat AI ${chatTry.status}`);
