@@ -49,7 +49,7 @@ async function called(actor: string, surface: UsageCallRecord['surface'] = 'appt
     await storage.appendUsageCall([{
         id: randomUUID(), ts: earlier(), ownerGhii: `${owner}@${NODE_ID}`, actorGaii: actor, actorKind: 'agent', surface,
         coordinate: 'apptool:seller/tools.html/run', appId: 'seller/tools.html', counterpartyGhii: '', outcome: 'ok', reason: '',
-        durationMs: 0, chargedUnits: 0, unit: '', currency: '', entitlementId: '', runId: '', meta: {},
+        durationMs: 0, answerChars: 0, chargedUnits: 0, unit: '', currency: '', entitlementId: '', runId: '', meta: {},
     }]);
 }
 

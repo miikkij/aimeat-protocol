@@ -17,6 +17,8 @@
  *   - usageMethods.queryUsageRollup / clearUsageRollupRange
  * @usage Object.assign(PostgresKyselyStorage.prototype, usageMethods) in ../index.ts
  * @version-history
+ *   2026-11-24 — A call's answerChars, and the rollup's answerCharsSum, answerCharsMax and
+ *     answersOverBudget (migration 0137).
  *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
  *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
@@ -77,6 +79,7 @@ function toCall(r: Record<string, unknown>): UsageCallRecord {
     outcome: ((r.outcome as string) || 'ok') as UsageOutcome,
     reason: (r.reason as string) ?? '',
     durationMs: num(r.durationMs),
+    answerChars: num(r.answerChars),
     chargedUnits: num(r.chargedUnits),
     unit: ((r.unit as string) ?? '') as UsageCallRecord['unit'],
     currency: (r.currency as string) ?? '',
@@ -111,6 +114,9 @@ function toRollup(r: Record<string, unknown>): UsageRollupRow {
     chargedUnits: num(r.chargedUnits),
     durationMsSum: num(r.durationMsSum),
     durationMsMax: num(r.durationMsMax),
+    answerCharsSum: num(r.answerCharsSum),
+    answerCharsMax: num(r.answerCharsMax),
+    answersOverBudget: num(r.answersOverBudget),
     actorsSeen: num(r.actorsSeen),
     extra: numObj(r.extra),
     updatedAt: r.updatedAt as string,
@@ -153,13 +159,13 @@ function toEvent(r: Record<string, unknown>): AgentUsageEvent & { appId?: string
 const NAMED_OPEN = sql.raw(`"surface" = 'app' AND "ownerGhii" <> '' AND "ownerGhii" <> '${USAGE_FOLDED_VISITOR}'`);
 const VISIT_CUTS = sql.raw(APP_VISIT_ROLLUP_CUTS.map(c => `'${c}'`).join(', '));
 
-/** The metrics that add. durationMsMax takes the greater, and actorsSeen is set per fold. */
+/** The metrics that add. The two maxima take the greater, and actorsSeen is set per fold. */
 const ADDING_METRICS = [
   'calls', 'errors', 'refusals', 'tokensIn', 'tokensOut', 'costUsd', 'unpricedCalls',
-  'chargedUnits', 'durationMsSum',
+  'chargedUnits', 'durationMsSum', 'answerCharsSum', 'answersOverBudget',
 ] as const;
 type AddingMetric = typeof ADDING_METRICS[number];
-type FoldMetrics = Record<AddingMetric, number> & { durationMsMax: number; actorsSeen: number };
+type FoldMetrics = Record<AddingMetric, number> & { durationMsMax: number; answerCharsMax: number; actorsSeen: number };
 
 function addingMetricsOf(r: UsageRollupRow): Record<AddingMetric, number> {
   const out = {} as Record<AddingMetric, number>;
@@ -188,6 +194,8 @@ async function addIntoRow(
     tokensIn: m.tokensIn, tokensOut: m.tokensOut, costUsd: m.costUsd,
     unpricedCalls: m.unpricedCalls, chargedUnits: m.chargedUnits,
     durationMsSum: m.durationMsSum, durationMsMax: m.durationMsMax,
+    answerCharsSum: m.answerCharsSum, answerCharsMax: m.answerCharsMax,
+    answersOverBudget: m.answersOverBudget,
     actorsSeen: m.actorsSeen,
     extra: '{}',
     updatedAt,
@@ -205,6 +213,9 @@ async function addIntoRow(
       chargedUnits: sql`"UsageRollup"."chargedUnits" + ${m.chargedUnits}`,
       durationMsSum: sql`"UsageRollup"."durationMsSum" + ${m.durationMsSum}`,
       durationMsMax: sql`GREATEST("UsageRollup"."durationMsMax", ${m.durationMsMax})`,
+      answerCharsSum: sql`"UsageRollup"."answerCharsSum" + ${m.answerCharsSum}`,
+      answerCharsMax: sql`GREATEST("UsageRollup"."answerCharsMax", ${m.answerCharsMax})`,
+      answersOverBudget: sql`"UsageRollup"."answersOverBudget" + ${m.answersOverBudget}`,
       actorsSeen: sql`"UsageRollup"."actorsSeen" + ${m.actorsSeen}`,
       updatedAt,
     })).execute();
@@ -240,7 +251,7 @@ async function moveOpensOutOfAppUse(db: Kysely<DB>, opens: UsageRollupRow, updat
   await addIntoRow(db, {
     cut: APP_USE_CUT, grain: 'day', bucket: use.bucket, ownerGhii: USAGE_FOLDED_VISITOR, actorGaii: '',
     appId: use.appId, model: '', provider: '', surface: '', outcome: '', coordinate: '', counterpartyGhii: '',
-  }, { ...moved, durationMsMax: opens.durationMsMax, actorsSeen: 1 }, updatedAt);
+  }, { ...moved, durationMsMax: opens.durationMsMax, answerCharsMax: opens.answerCharsMax, actorsSeen: 1 }, updatedAt);
   return 1;
 }
 
@@ -257,6 +268,7 @@ export const usageMethods = {
       chargedUnits: r.chargedUnits, unit: r.unit, currency: r.currency,
       entitlementId: r.entitlementId, runId: r.runId,
       meta: JSON.stringify(r.meta),
+      answerChars: r.answerChars ?? 0,
     }))).execute();
   },
 
@@ -337,11 +349,11 @@ export const usageMethods = {
         INSERT INTO "UsageCallArchive" (
           "id","ts","ownerGhii","actorGaii","actorKind","surface","coordinate","appId",
           "counterpartyGhii","outcome","reason","durationMs","chargedUnits","unit","currency",
-          "entitlementId","runId","meta","archivedAt")
+          "entitlementId","runId","meta","answerChars","archivedAt")
         SELECT
           "id","ts","ownerGhii","actorGaii","actorKind","surface","coordinate","appId",
           "counterpartyGhii","outcome","reason","durationMs","chargedUnits","unit","currency",
-          "entitlementId","runId","meta", ${archivedAt}
+          "entitlementId","runId","meta","answerChars", ${archivedAt}
         FROM "UsageCall" WHERE "id" = ANY(${ids})
         ON CONFLICT ("id") DO NOTHING
       `.execute(this.db);
@@ -432,7 +444,7 @@ export const usageMethods = {
         // how many opens there were is gone.
         if (r.cut === 'call.owner.tool' && r.coordinate) moved += await moveOpensOutOfAppUse(this.db, r, updatedAt);
         await addIntoRow(this.db, { ...r, ownerGhii: USAGE_FOLDED_VISITOR },
-          { ...addingMetricsOf(r), durationMsMax: r.durationMsMax, actorsSeen: 1 }, updatedAt);
+          { ...addingMetricsOf(r), durationMsMax: r.durationMsMax, answerCharsMax: r.answerCharsMax, actorsSeen: 1 }, updatedAt);
         await this.db.deleteFrom('UsageRollup').where('id', '=', r.id).execute();
       }
       return { rollupRows: named.length, appUseRows: moved };
@@ -478,6 +490,8 @@ export const usageMethods = {
           tokensIn: d.tokensIn, tokensOut: d.tokensOut, costUsd: d.costUsd,
           unpricedCalls: d.unpricedCalls, chargedUnits: d.chargedUnits,
           durationMsSum: d.durationMsSum, durationMsMax: d.durationMsMax,
+          answerCharsSum: d.answerCharsSum ?? 0, answerCharsMax: d.answerCharsMax ?? 0,
+          answersOverBudget: d.answersOverBudget ?? 0,
           actorsSeen: d.actorsSeen,
           extra: JSON.stringify(d.extra ?? {}),
           updatedAt,
@@ -494,8 +508,11 @@ export const usageMethods = {
             unpricedCalls: sql`"UsageRollup"."unpricedCalls" + ${d.unpricedCalls}`,
             chargedUnits: sql`"UsageRollup"."chargedUnits" + ${d.chargedUnits}`,
             durationMsSum: sql`"UsageRollup"."durationMsSum" + ${d.durationMsSum}`,
-            // A maximum is not a sum. This is the one metric that does not add.
+            // A maximum is not a sum. These two are the metrics that do not add.
             durationMsMax: sql`GREATEST("UsageRollup"."durationMsMax", ${d.durationMsMax})`,
+            answerCharsSum: sql`"UsageRollup"."answerCharsSum" + ${d.answerCharsSum ?? 0}`,
+            answerCharsMax: sql`GREATEST("UsageRollup"."answerCharsMax", ${d.answerCharsMax ?? 0})`,
+            answersOverBudget: sql`"UsageRollup"."answersOverBudget" + ${d.answersOverBudget ?? 0}`,
             actorsSeen: sql`"UsageRollup"."actorsSeen" + ${d.actorsSeen}`,
             extra: sql`"UsageRollup"."extra" || ${JSON.stringify(d.extra ?? {})}::jsonb`,
             updatedAt,

@@ -86,7 +86,7 @@ function monthsAgo(months: number, extraDays = 0): string {
 function row(over: Partial<UsageCallRecord> & { id: string; ts: string }): UsageCallRecord {
   return {
     ownerGhii: '', actorGaii: '', actorKind: 'owner', surface: 'app', coordinate: '', appId: '',
-    counterpartyGhii: '', outcome: 'ok', reason: '', durationMs: 0, chargedUnits: 0, unit: '',
+    counterpartyGhii: '', outcome: 'ok', reason: '', durationMs: 0, answerChars: 0, chargedUnits: 0, unit: '',
     currency: '', entitlementId: '', runId: '', meta: {},
     ...over,
   };

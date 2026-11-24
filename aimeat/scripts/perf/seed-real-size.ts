@@ -323,7 +323,7 @@ async function storePhase(storage: Storage, s: Seeded): Promise<void> {
     const calls = Array.from({ length: PROFILE.usageCalls }, (_, i) => ({
         id: randomUUID(), ts: daysAgo(10), ownerGhii, actorGaii: s.agents[i % s.agents.length], actorKind: 'agent' as never,
         surface: 'mcp' as never, coordinate: pick(['aimeat_memory_write', 'aimeat_memory_read', 'aimeat_task_event', 'aimeat_workspace_write']),
-        appId: '', counterpartyGhii: '', outcome: 'ok' as never, reason: '', durationMs: Math.floor(rnd() * 200), chargedUnits: 0,
+        appId: '', counterpartyGhii: '', outcome: 'ok' as never, reason: '', durationMs: Math.floor(rnd() * 200), answerChars: Math.floor(rnd() * 8000), chargedUnits: 0,
         unit: '' as const, currency: '', entitlementId: '', runId: '', meta: {},
     }));
     await inBatches(calls, 1000, b => storage.appendUsageCall(b));

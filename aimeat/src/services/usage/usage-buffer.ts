@@ -26,6 +26,8 @@
  *   import { recordUsageCall } from '../services/usage/usage-buffer.js';
  *   recordUsageCall({ ownerGhii, surface: 'mcp', coordinate: toolName, outcome: 'ok', durationMs });
  * @version-history
+ *   2026-11-24 — A call records `answerChars`, the size of the text it answered with (0 when the
+ *     caller names none).
  *   v1.3.0 — 2026-11-14 — holdUsageForErasure: the erasure drops the account's waiting calls and waits
  *     for a write in progress before its cascade, and no call of the account is kept until it ends. A
  *     call that waited was stored after the cascade had deleted the account's calls (register finding
@@ -97,6 +99,7 @@ export function recordUsageCall(input: UsageCallInput): void {
       outcome: input.outcome ?? 'ok',
       reason: input.reason ?? '',
       durationMs: Math.max(0, Math.round(input.durationMs ?? 0)),
+      answerChars: Math.max(0, Math.round(input.answerChars ?? 0)),
       chargedUnits: Math.max(0, Math.round(input.chargedUnits ?? 0)),
       unit: input.unit ?? '',
       currency: input.currency ?? '',

@@ -11,6 +11,7 @@
  *   Design: docs/internal/telemetria/02-design.md
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-tool-usage-wrap.test.ts
  * @version-history
+ *   2026-11-24 — The wrapper records the size of the answer in characters of text.
  *   v1.0.0 — 2026-08-14 — Initial.
  */
 
@@ -71,6 +72,42 @@ describe('the wrapper records', () => {
     expect(recorded[0].ownerGhii).toBe('alice@node-1');
     expect(recorded[0].outcome).toBe('ok');
     expect(recorded[0].durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('the size of the answer: the characters of every text part, and nothing for a part that is not text', async () => {
+    const { registered, register } = registrar();
+    const wrapped = wrapToolHandler(register, () => PRINCIPAL);
+    const body = JSON.stringify({ index: 'x'.repeat(61_000) });
+    wrapped('aimeat_workspace_read', async () => ({
+      content: [
+        { type: 'text', text: body },
+        { type: 'image', data: 'A'.repeat(5_000), mimeType: 'image/png' },
+        { type: 'text', text: 'What to do next.' },
+      ],
+    }));
+    wrapped('aimeat_memory_write', async () => ({ ok: true }));
+
+    await registered.aimeat_workspace_read({});
+    await registered.aimeat_memory_write({});
+
+    const recorded = pendingUsageCalls({ surface: 'mcp' });
+    expect(recorded.find(r => r.coordinate === 'aimeat_workspace_read')?.answerChars)
+      .toBe(body.length + 'What to do next.'.length);
+    // A result with no content parts answered with no text.
+    expect(recorded.find(r => r.coordinate === 'aimeat_memory_write')?.answerChars).toBe(0);
+  });
+
+  it('the size of a failing answer as well, since a client reads that text too', async () => {
+    const { registered, register } = registrar();
+    const wrapped = wrapToolHandler(register, () => PRINCIPAL);
+    const text = 'NOT_FOUND: no such workspace';
+    wrapped('aimeat_workspace_read', async () => ({ isError: true, content: [{ type: 'text', text }] }));
+
+    await registered.aimeat_workspace_read({});
+
+    const [call] = pendingUsageCalls({ surface: 'mcp' });
+    expect(call.outcome).toBe('error');
+    expect(call.answerChars).toBe(text.length);
   });
 
   it('a thrown error as an error, not as a success', async () => {

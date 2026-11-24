@@ -37,6 +37,8 @@
  *     half of 0085 no longer runs (schema-identity-backfill.ts).
  *   2026-09-26 — The move to the GHII runs once for each database, as its Postgres migration does,
  *     and records that it ran (schema-identity-backfill.ts).
+ *   2026-11-24 — usage_calls(.archive).answerChars and usage_rollup.answerCharsSum/.answerCharsMax/
+ *     .answersOverBudget for existing databases (migration 0137).
  *   2026-09-26 — Actions a person published and the work on them move to the GHII
  *     (schema-identity-backfill.ts, migration 0085).
  *   2026-09-26 — app_grants.ownerAddedScopes (migration 0084): the words the owner added by hand.
@@ -597,6 +599,13 @@ export function initializeSchema(db: Database.Database): void {
   // live budget counter, and its composite PRIMARY KEY cannot take a new column by ALTER anyway.
   safeAddColumn('agent_usage_event', 'appId', "TEXT NOT NULL DEFAULT ''");
   safeAddColumn('agent_usage_event', 'surface', "TEXT NOT NULL DEFAULT ''");
+  // The size of a call's answer, and its sum, maximum and over-budget count in the rollup (mirrors
+  // Postgres 0137), for a database made before 2026-11-24.
+  safeAddColumn('usage_calls', 'answerChars', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('usage_calls_archive', 'answerChars', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('usage_rollup', 'answerCharsSum', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('usage_rollup', 'answerCharsMax', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('usage_rollup', 'answersOverBudget', 'INTEGER NOT NULL DEFAULT 0');
 
   // ── Owner lifecycle (mirrors Postgres 0047, BR-04) ──
   // The first "account exists but cannot act" state: deactivation flag, who set it, and the SSO

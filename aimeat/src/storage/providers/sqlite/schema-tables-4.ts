@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   2026-11-24 — usage_calls and usage_calls_archive carry answerChars; usage_rollup carries
+ *     answerCharsSum, answerCharsMax and answersOverBudget. Mirrors Postgres 0137.
  *   v1.22.0 — 2026-11-20 — Ends with applyValueSchema: value_keys and value_daily (what happened to the
  *     records an AI made). Mirrors Postgres 0135.
  *   v1.21.0 — 2026-11-15 — Ends with applyAppPartySchema: app_parties and app_party_data (an app's own
@@ -364,7 +366,9 @@ export function applySchemaTables4(db: Database.Database): void {
       currency         TEXT NOT NULL DEFAULT '',
       entitlementId    TEXT NOT NULL DEFAULT '',
       runId            TEXT NOT NULL DEFAULT '',
-      meta             TEXT NOT NULL DEFAULT '{}'
+      meta             TEXT NOT NULL DEFAULT '{}',
+      -- Characters of text the call answered with; a column because the rollup sums it.
+      answerChars      INTEGER NOT NULL DEFAULT 0
     );
     -- (ts, id) is a total order over the stream, so the fold's watermark can resume exactly.
     CREATE INDEX IF NOT EXISTS idx_usage_calls_cursor ON usage_calls(ts, id);
@@ -389,7 +393,8 @@ export function applySchemaTables4(db: Database.Database): void {
       entitlementId    TEXT NOT NULL DEFAULT '',
       runId            TEXT NOT NULL DEFAULT '',
       meta             TEXT NOT NULL DEFAULT '{}',
-      archivedAt       TEXT NOT NULL
+      archivedAt       TEXT NOT NULL,
+      answerChars      INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_usage_calls_archive_owner ON usage_calls_archive(ownerGhii, ts);
 
@@ -445,6 +450,11 @@ export function applySchemaTables4(db: Database.Database): void {
       chargedUnits     INTEGER NOT NULL DEFAULT 0,
       durationMsSum    INTEGER NOT NULL DEFAULT 0,
       durationMsMax    INTEGER NOT NULL DEFAULT 0,
+      -- The size of the answers, in characters: the sum, the largest one, and how many were over
+      -- the tool answer budget (models/answer-budget.ts).
+      answerCharsSum    INTEGER NOT NULL DEFAULT 0,
+      answerCharsMax    INTEGER NOT NULL DEFAULT 0,
+      answersOverBudget INTEGER NOT NULL DEFAULT 0,
       -- Distinct actors within one fold batch, summed across batches: an approximation FROM
       -- BELOW. Labelled as such wherever it is served, never used for billing.
       actorsSeen       INTEGER NOT NULL DEFAULT 0,

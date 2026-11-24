@@ -23,6 +23,8 @@
  * @usage
  *   const report = await readUsageReport(storage, { report: 'model', ownerGhii, from, to });
  * @version-history
+ *   2026-11-24 — Every group and the totals carry answer_chars_avg, answer_chars_max and
+ *     answers_over_budget: the report on tools names the tool whose answers pass the budget.
  *   2026-11-14 — NODE_REPORTS moved unchanged to models/tool-input-vocabulary.ts and is re-exported:
  *     aimeat_admin_usage states the node reports.
  *   2026-11-14 — Every group carries `last_bucket`, the latest bucket with a call: `apps-used` then
@@ -83,6 +85,14 @@ export interface UsageGroup {
   charged_units: number;
   duration_ms_avg: number;
   duration_ms_max: number;
+  /**
+   * The size of the answers, in characters of text: the average over the group's calls, the largest
+   * single answer, and how many were over the tool answer budget (models/answer-budget.ts). Measured
+   * on MCP tool calls; 0 on a code path that measures none.
+   */
+  answer_chars_avg: number;
+  answer_chars_max: number;
+  answers_over_budget: number;
   /** Distinct actors, undercounted across fold batches. Never use for billing. */
   actors_seen_approx: number;
   /**
@@ -121,7 +131,9 @@ function emptyTotals(): UsageSums {
   return {
     calls: 0, errors: 0, refusals: 0, tokens_in: 0, tokens_out: 0, total_tokens: 0,
     cost_usd: 0, unpriced_calls: 0, charged_units: 0,
-    duration_ms_avg: 0, duration_ms_max: 0, actors_seen_approx: 0,
+    duration_ms_avg: 0, duration_ms_max: 0,
+    answer_chars_avg: 0, answer_chars_max: 0, answers_over_budget: 0,
+    actors_seen_approx: 0,
   };
 }
 
@@ -208,7 +220,7 @@ export async function queryUsageRollupLive(
 }
 
 /** Fold one stored row into a group accumulator. */
-function addRow(target: UsageSums, r: UsageRollupRow, durationCalls: { n: number; sum: number }): void {
+function addRow(target: UsageSums, r: UsageRollupRow, durationCalls: { n: number; sum: number; answer: number }): void {
   target.calls += r.calls;
   target.errors += r.errors;
   target.refusals += r.refusals;
@@ -222,6 +234,10 @@ function addRow(target: UsageSums, r: UsageRollupRow, durationCalls: { n: number
   if (r.durationMsMax > target.duration_ms_max) target.duration_ms_max = r.durationMsMax;
   durationCalls.n += r.calls;
   durationCalls.sum += r.durationMsSum;
+  // A row folded before the columns existed, and a pending delta of the LLM stream, carry none.
+  durationCalls.answer += r.answerCharsSum ?? 0;
+  if ((r.answerCharsMax ?? 0) > target.answer_chars_max) target.answer_chars_max = r.answerCharsMax;
+  target.answers_over_budget += r.answersOverBudget ?? 0;
 }
 
 /**
@@ -267,9 +283,9 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
   }, cut.stream);
 
   // ── Group by the cut's dimension tuple ──
-  const groups = new Map<string, { g: UsageGroup; d: { n: number; sum: number } }>();
+  const groups = new Map<string, { g: UsageGroup; d: { n: number; sum: number; answer: number } }>();
   const totals = emptyTotals();
-  const totalDuration = { n: 0, sum: 0 };
+  const totalDuration = { n: 0, sum: 0, answer: 0 };
   const series = new Map<string, { bucket: string; calls: number; cost_usd: number; total_tokens: number }>();
 
   // The dimensions a row is actually GROUPED by, after two removals.
@@ -307,7 +323,7 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
 
     let entry = groups.get(groupKey);
     if (!entry) {
-      entry = { g: { key, dims, ...emptyTotals(), last_bucket: r.bucket }, d: { n: 0, sum: 0 } };
+      entry = { g: { key, dims, ...emptyTotals(), last_bucket: r.bucket }, d: { n: 0, sum: 0, answer: 0 } };
       groups.set(groupKey, entry);
     }
     addRow(entry.g, r, entry.d);
@@ -325,8 +341,10 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
 
   for (const { g, d } of groups.values()) {
     g.duration_ms_avg = d.n > 0 ? Math.round(d.sum / d.n) : 0;
+    g.answer_chars_avg = d.n > 0 ? Math.round(d.answer / d.n) : 0;
   }
   totals.duration_ms_avg = totalDuration.n > 0 ? Math.round(totalDuration.sum / totalDuration.n) : 0;
+  totals.answer_chars_avg = totalDuration.n > 0 ? Math.round(totalDuration.answer / totalDuration.n) : 0;
 
   const limit = Math.min(Math.max(args.limit ?? 200, 1), 2000);
   const ordered = [...groups.values()].map(e => e.g).sort((a, b) => {

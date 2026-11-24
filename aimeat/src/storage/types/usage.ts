@@ -22,6 +22,9 @@
  * @usage
  *   import type { UsageCallInput } from '../storage/interface.js';
  * @version-history
+ *   2026-11-24 — A call carries `answerChars`, the size of the text it answered with, and the rollup
+ *     its sum, its maximum and the count of answers over the tool answer budget
+ *     (models/answer-budget.ts): which tool's answers grow is read from the usage report.
  *   v1.3.0 — 2026-10-11 — Comment only: `chargedUnits` in morsels is pacing, never a price.
  *   v1.2.0 — 2026-09-25 — The visit-retention fold: the marker a folded row carries instead of the
  *     account, the cuts it folds, and what one sweep reports.
@@ -87,6 +90,11 @@ export interface UsageCallRecord {
   reason: string;
   durationMs: number;
   /**
+   * Characters of text the call answered with (an MCP tool result's text parts). 0 where the code
+   * path does not measure it. A column and not a `meta` key, because the rollup sums it.
+   */
+  answerChars: number;
+  /**
    * 0 for a call that moved nothing. Denominated by `unit`, and morsels and money minor units never
    * mix: `money` is what the call was paid, `morsels` the PACING the caller's owner was debited, which
    * is never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A call
@@ -116,6 +124,7 @@ export interface UsageCallInput {
   outcome?: UsageOutcome;
   reason?: string;
   durationMs?: number;
+  answerChars?: number;
   chargedUnits?: number;
   unit?: 'morsels' | 'money' | '';
   currency?: string;
@@ -163,7 +172,10 @@ export interface UsageRollupDims {
   counterpartyGhii: string;
 }
 
-/** The metric columns. All add on conflict except `durationMsMax`, which takes the greater. */
+/**
+ * The metric columns. All add on conflict except `durationMsMax` and `answerCharsMax`, which take
+ * the greater.
+ */
 export interface UsageRollupMetrics {
   calls: number;
   errors: number;
@@ -175,6 +187,12 @@ export interface UsageRollupMetrics {
   chargedUnits: number;
   durationMsSum: number;
   durationMsMax: number;
+  /** Characters answered, summed over the calls; with `calls` it gives the average answer. */
+  answerCharsSum: number;
+  /** The largest single answer in the bucket, in characters. Takes the greater on conflict. */
+  answerCharsMax: number;
+  /** Calls whose answer was larger than the tool answer budget (models/answer-budget.ts). */
+  answersOverBudget: number;
   /**
    * Distinct actors within ONE fold batch, summed across batches: an approximation from below,
    * because an actor seen in two batches counts twice as one each. Served with that caveat, and

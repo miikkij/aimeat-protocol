@@ -20,6 +20,9 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   2026-11-24 — Every call records `answerChars`, the characters of text in its result. An answer
+ *     that grows with the caller's data passed the limit a client accepts (a workspace index of
+ *     1040 records was 375 kB) and nothing on the node had measured it.
  *   2026-11-21 — A failing result is recorded with the error code it names as its reason
  *     (`tool_error_result` when it names none), and an INVALID_INPUT result as `refused`, not
  *     `error`: one call in seven to aimeat_app_tool_invoke failed and the report could not say why.
@@ -74,6 +77,19 @@ function firstText(value: unknown): string {
   return Array.isArray(content) && typeof content[0]?.text === 'string' ? content[0].text : '';
 }
 
+/**
+ * The characters of text a tool result holds, over every text part. This is what a client counts
+ * against its limit for one answer (models/answer-budget.ts); an image or a resource part is not text
+ * and is not counted. 0 for a result with no content.
+ */
+export function answerCharsOf(value: unknown): number {
+  const content = (value as { content?: Array<{ text?: unknown }> } | null | undefined)?.content;
+  if (!Array.isArray(content)) return 0;
+  let chars = 0;
+  for (const part of content) if (typeof part?.text === 'string') chars += part.text.length;
+  return chars;
+}
+
 /** The error code a failing tool result carries: `CODE: …` text, or a JSON object's `error` or `code`. */
 export function resultErrorCode(text: string): string | undefined {
   const prefixed = /^([A-Z][A-Z0-9_]+):/.exec(text)?.[1];
@@ -122,8 +138,10 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
       const gaii = principal();
       let outcome: 'ok' | 'refused' | 'error' = 'ok';
       let reason = '';
+      let answerChars = 0;
       try {
         const result = await (handler as AnyFn)(...handlerArgs);
+        answerChars = answerCharsOf(result);
         if (isErrorResult(result)) {
           // The code the result names is the reason, so a report can tell a refused input from a
           // fault. A refused input is the caller's to correct: `refused`, the way the metered gate
@@ -159,6 +177,7 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
           outcome,
           reason,
           durationMs: Date.now() - startedAt,
+          answerChars,
         });
       }
     };

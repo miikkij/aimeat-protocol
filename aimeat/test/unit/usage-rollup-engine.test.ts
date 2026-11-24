@@ -15,6 +15,7 @@
  *   - describe blocks: projection into cuts · refusals · exactly-once · resume · rebuild
  * @usage cd aimeat && pnpm exec vitest run test/unit/usage-rollup-engine.test.ts
  * @version-history
+ *   2026-11-24 — The size of each answer folds per tool: sum, largest, and the count over the budget.
  *   v1.0.0 — 2026-08-14 — Initial: the fold's correctness gates.
  */
 
@@ -23,6 +24,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, UsageCallRecord, AgentUsageEvent } from '../../src/storage/interface.js';
 import { runUsageRollup, rebuildUsageRollup } from '../../src/services/usage/rollup-engine.js';
 import { CUTS } from '../../src/services/usage/rollup-cuts.js';
+import { TOOL_ANSWER_BUDGET_CHARS } from '../../src/models/answer-budget.js';
 
 let storage: Storage;
 
@@ -34,7 +36,7 @@ function seedCalls(rows: Array<Partial<UsageCallRecord> & { id: string; ts: stri
   return storage.appendUsageCall(rows.map(r => ({
     ownerGhii: 'alice@node', actorGaii: 'claude#alice@node', actorKind: 'agent' as const,
     surface: 'mcp' as const, coordinate: 'aimeat_memory_write', appId: '', counterpartyGhii: '',
-    outcome: 'ok' as const, reason: '', durationMs: 0, chargedUnits: 0, unit: '' as const,
+    outcome: 'ok' as const, reason: '', durationMs: 0, answerChars: 0, chargedUnits: 0, unit: '' as const,
     currency: '', entitlementId: '', runId: '', meta: {},
     ...r,
   })));
@@ -152,6 +154,30 @@ describe('refusals are counted apart from errors', () => {
     const [node] = await storage.queryUsageRollup({ cut: 'call.node', grain: 'day' });
     expect(node.durationMsSum).toBe(800);
     expect(node.durationMsMax).toBe(700);
+  });
+
+  it('folds the size of each answer per tool: the sum, the largest, and how many passed the budget', async () => {
+    // Three reads of one tool: two that fit and one the size a workspace index of a thousand
+    // records had. The report on tools has to name that tool, and it reads these three numbers.
+    await seedCalls([
+      { id: 'c1', ts: '2026-08-14T10:00:00.000Z', coordinate: 'aimeat_workspace_read', answerChars: 12_000 },
+      { id: 'c2', ts: '2026-08-14T10:00:01.000Z', coordinate: 'aimeat_workspace_read', answerChars: TOOL_ANSWER_BUDGET_CHARS },
+      { id: 'c3', ts: '2026-08-14T10:00:02.000Z', coordinate: 'aimeat_workspace_read', answerChars: 375_000 },
+      { id: 'c4', ts: '2026-08-14T10:00:03.000Z', coordinate: 'aimeat_memory_write', answerChars: 300 },
+    ]);
+    await runUsageRollup(storage);
+
+    const tools = await storage.queryUsageRollup({ cut: 'call.tool', grain: 'day' });
+    const read = tools.find(r => r.coordinate === 'aimeat_workspace_read');
+    expect(read?.calls).toBe(3);
+    expect(read?.answerCharsSum).toBe(12_000 + TOOL_ANSWER_BUDGET_CHARS + 375_000);
+    expect(read?.answerCharsMax).toBe(375_000);
+    // An answer exactly at the budget is inside it; only the 375 000 one is over.
+    expect(read?.answersOverBudget).toBe(1);
+
+    const write = tools.find(r => r.coordinate === 'aimeat_memory_write');
+    expect(write?.answerCharsMax).toBe(300);
+    expect(write?.answersOverBudget).toBe(0);
   });
 });
 

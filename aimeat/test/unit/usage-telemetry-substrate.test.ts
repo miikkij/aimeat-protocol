@@ -16,6 +16,7 @@
  *   - describe blocks: layer 1 · fold cursor · rollup arithmetic · exactly-once · archive
  * @usage cd aimeat && pnpm exec vitest run test/unit/usage-telemetry-substrate.test.ts
  * @version-history
+ *   2026-11-24 — A call's answerChars round-trips; the rollup adds the answer sizes and keeps the largest.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 
@@ -33,7 +34,7 @@ function call(over: Partial<UsageCallRecord> & { id: string; ts: string }): Usag
   return {
     ownerGhii: 'alice@node', actorGaii: 'claude#alice@node', actorKind: 'agent',
     surface: 'mcp', coordinate: 'aimeat_memory_write', appId: '', counterpartyGhii: '',
-    outcome: 'ok', reason: '', durationMs: 0, chargedUnits: 0, unit: '', currency: '',
+    outcome: 'ok', reason: '', durationMs: 0, answerChars: 0, chargedUnits: 0, unit: '', currency: '',
     entitlementId: '', runId: '', meta: {},
     ...over,
   };
@@ -45,7 +46,8 @@ function delta(over: Partial<UsageRollupDelta> = {}): UsageRollupDelta {
     ownerGhii: '', actorGaii: '', appId: '', model: '', provider: '',
     surface: 'mcp', outcome: 'ok', coordinate: 'aimeat_memory_write', counterpartyGhii: '',
     calls: 1, errors: 0, refusals: 0, tokensIn: 0, tokensOut: 0, costUsd: 0,
-    unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0, actorsSeen: 1,
+    unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0,
+    answerCharsSum: 0, answerCharsMax: 0, answersOverBudget: 0, actorsSeen: 1,
     ...over,
   };
 }
@@ -54,7 +56,7 @@ describe('layer 1: the hot call stream', () => {
   it('round-trips every field, including the JSON meta blob', async () => {
     await storage.appendUsageCall([call({
       id: 'c1', ts: '2026-08-14T10:00:00.000Z', outcome: 'refused', reason: 'no_right',
-      durationMs: 42, chargedUnits: 7, unit: 'morsels', appId: 'alice/tool.html',
+      durationMs: 42, answerChars: 61234, chargedUnits: 7, unit: 'morsels', appId: 'alice/tool.html',
       counterpartyGhii: 'bob@node', meta: { note: 'kept', n: 3 },
     })]);
 
@@ -62,6 +64,7 @@ describe('layer 1: the hot call stream', () => {
     expect(row.outcome).toBe('refused');
     expect(row.reason).toBe('no_right');
     expect(row.durationMs).toBe(42);
+    expect(row.answerChars).toBe(61234);
     expect(row.chargedUnits).toBe(7);
     expect(row.unit).toBe('morsels');
     expect(row.appId).toBe('alice/tool.html');
@@ -116,6 +119,23 @@ describe('layer 3: the rollup upsert', () => {
     expect(rows[0].durationMsSum).toBe(1020);
     // The bug this asserts against: a maximum summed to 1020, which is a duration no call took.
     expect(rows[0].durationMsMax).toBe(900);
+  });
+
+  it('adds the answer sizes and the over-budget count, and keeps the largest answer', async () => {
+    await storage.advanceUsageRollup({
+      stream: 'call', lastTs: 't1', lastId: 'c1',
+      deltas: [delta({ calls: 2, answerCharsSum: 61000, answerCharsMax: 60000, answersOverBudget: 1 })],
+    });
+    await storage.advanceUsageRollup({
+      stream: 'call', lastTs: 't2', lastId: 'c2',
+      deltas: [delta({ calls: 1, answerCharsSum: 45000, answerCharsMax: 45000, answersOverBudget: 1 })],
+    });
+
+    const [row] = await storage.queryUsageRollup({ cut: 'call.tool' });
+    expect(row.answerCharsSum).toBe(106000);
+    expect(row.answersOverBudget).toBe(2);
+    // The largest single answer, never the sum of two maxima.
+    expect(row.answerCharsMax).toBe(60000);
   });
 
   it('keeps rows with different dimensions apart', async () => {

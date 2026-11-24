@@ -351,6 +351,7 @@ export interface UsageCall {
   entitlementId: Generated<string>;
   runId: Generated<string>;
   meta: Generated<unknown>;
+  answerChars: Generated<string | number | bigint>;
 }
 
 /** Column-identical to UsageCall plus archivedAt. */
@@ -374,6 +375,7 @@ export interface UsageCallArchive {
   runId: Generated<string>;
   meta: Generated<unknown>;
   archivedAt: string;
+  answerChars: Generated<string | number | bigint>;
 }
 
 /**
@@ -406,6 +408,9 @@ export interface UsageRollup {
   chargedUnits: Generated<string | number | bigint>;
   durationMsSum: Generated<string | number | bigint>;
   durationMsMax: Generated<string | number | bigint>;
+  answerCharsSum: Generated<string | number | bigint>;
+  answerCharsMax: Generated<string | number | bigint>;
+  answersOverBudget: Generated<string | number | bigint>;
   actorsSeen: Generated<string | number | bigint>;
   extra: Generated<unknown>;
   updatedAt: string;

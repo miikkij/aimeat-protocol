@@ -17,6 +17,8 @@
  *   - getUsageCursor / setUsageCursor / advanceUsageRollup
  *   - queryUsageRollup / clearUsageRollupRange
  * @version-history
+ *   2026-11-24 — A call's answerChars, and the rollup's answerCharsSum, answerCharsMax and
+ *     answersOverBudget (mirrors Postgres migration 0137).
  *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
  *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
@@ -88,6 +90,7 @@ function toCall(r: Row): UsageCallRecord {
     outcome: ((r.outcome as string) || 'ok') as UsageOutcome,
     reason: (r.reason as string) ?? '',
     durationMs: num(r.durationMs),
+    answerChars: num(r.answerChars),
     chargedUnits: num(r.chargedUnits),
     unit: ((r.unit as string) ?? '') as UsageCallRecord['unit'],
     currency: (r.currency as string) ?? '',
@@ -122,6 +125,9 @@ function toRollup(r: Row): UsageRollupRow {
     chargedUnits: num(r.chargedUnits),
     durationMsSum: num(r.durationMsSum),
     durationMsMax: num(r.durationMsMax),
+    answerCharsSum: num(r.answerCharsSum),
+    answerCharsMax: num(r.answerCharsMax),
+    answersOverBudget: num(r.answersOverBudget),
     actorsSeen: num(r.actorsSeen),
     extra: numObj(r.extra),
     updatedAt: r.updatedAt as string,
@@ -160,14 +166,15 @@ export function appendUsageCall(db: Database.Database, rows: UsageCallRecord[]):
   const stmt = db.prepare(
     `INSERT INTO usage_calls
        (id, ts, ownerGhii, actorGaii, actorKind, surface, coordinate, appId, counterpartyGhii,
-        outcome, reason, durationMs, chargedUnits, unit, currency, entitlementId, runId, meta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        outcome, reason, durationMs, chargedUnits, unit, currency, entitlementId, runId, meta,
+        answerChars)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertAll = db.transaction((batch: UsageCallRecord[]) => {
     for (const r of batch) {
       stmt.run(r.id, r.ts, r.ownerGhii, r.actorGaii, r.actorKind, r.surface, r.coordinate,
         r.appId, r.counterpartyGhii, r.outcome, r.reason, r.durationMs, r.chargedUnits,
-        r.unit, r.currency, r.entitlementId, r.runId, JSON.stringify(r.meta));
+        r.unit, r.currency, r.entitlementId, r.runId, JSON.stringify(r.meta), r.answerChars ?? 0);
     }
   });
   insertAll(rows);
@@ -236,7 +243,7 @@ export function listUsageEventsForFold(db: Database.Database, c: UsageFoldCursor
  *  silently shift values into the wrong archive columns. */
 const CALL_COLS =
   'id, ts, ownerGhii, actorGaii, actorKind, surface, coordinate, appId, counterpartyGhii, ' +
-  'outcome, reason, durationMs, chargedUnits, unit, currency, entitlementId, runId, meta';
+  'outcome, reason, durationMs, chargedUnits, unit, currency, entitlementId, runId, meta, answerChars';
 const EVENT_COLS =
   'id, ts, agentGaii, ownerGhii, runId, model, provider, promptTokens, completionTokens, ' +
   'costUsd, priceRef, source, apiKeyScope, organismId, workspaceId, capabilityId, ' +
@@ -304,12 +311,13 @@ export function pruneUsageArchive(
 const NAMED_OPEN = `surface = 'app' AND ownerGhii <> '' AND ownerGhii <> '${USAGE_FOLDED_VISITOR}'`;
 const VISIT_CUTS_SQL = APP_VISIT_ROLLUP_CUTS.map(c => `'${c}'`).join(', ');
 
-/** The metrics that add. durationMsMax takes the greater, and actorsSeen is set per fold. */
+/** The metrics that add. The two maxima take the greater, and actorsSeen is set per fold. */
 const ADDING_METRICS = [
   'calls', 'errors', 'refusals', 'tokensIn', 'tokensOut', 'costUsd', 'unpricedCalls',
-  'chargedUnits', 'durationMsSum',
+  'chargedUnits', 'durationMsSum', 'answerCharsSum', 'answersOverBudget',
 ] as const;
 type AddingMetric = typeof ADDING_METRICS[number];
+type FoldMetrics = Record<AddingMetric, number> & { durationMsMax: number; answerCharsMax: number; actorsSeen: number };
 
 /**
  * Add `metrics` into the row with the given key, creating it if it is not there. `actorsSeen` is
@@ -319,15 +327,16 @@ type AddingMetric = typeof ADDING_METRICS[number];
 function addIntoRow(
   db: Database.Database,
   key: Pick<UsageRollupRow, 'cut' | 'grain' | 'bucket'> & UsageRollupDims,
-  metrics: Record<AddingMetric, number> & { durationMsMax: number; actorsSeen: number },
+  metrics: FoldMetrics,
   updatedAt: string,
 ): void {
   db.prepare(
     `INSERT INTO usage_rollup
        (id, cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface, outcome,
         coordinate, counterpartyGhii, calls, errors, refusals, tokensIn, tokensOut, costUsd,
-        unpricedCalls, chargedUnits, durationMsSum, durationMsMax, actorsSeen, extra, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)
+        unpricedCalls, chargedUnits, durationMsSum, durationMsMax, answerCharsSum, answerCharsMax,
+        answersOverBudget, actorsSeen, extra, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)
      ON CONFLICT(cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface,
                  outcome, coordinate, counterpartyGhii)
      DO UPDATE SET
@@ -341,6 +350,9 @@ function addIntoRow(
        chargedUnits  = usage_rollup.chargedUnits + excluded.chargedUnits,
        durationMsSum = usage_rollup.durationMsSum + excluded.durationMsSum,
        durationMsMax = MAX(usage_rollup.durationMsMax, excluded.durationMsMax),
+       answerCharsSum    = usage_rollup.answerCharsSum + excluded.answerCharsSum,
+       answerCharsMax    = MAX(usage_rollup.answerCharsMax, excluded.answerCharsMax),
+       answersOverBudget = usage_rollup.answersOverBudget + excluded.answersOverBudget,
        actorsSeen    = usage_rollup.actorsSeen + excluded.actorsSeen,
        updatedAt     = excluded.updatedAt`
   ).run(
@@ -348,7 +360,8 @@ function addIntoRow(
     key.provider, key.surface, key.outcome, key.coordinate, key.counterpartyGhii,
     metrics.calls, metrics.errors, metrics.refusals, metrics.tokensIn, metrics.tokensOut,
     metrics.costUsd, metrics.unpricedCalls, metrics.chargedUnits, metrics.durationMsSum,
-    metrics.durationMsMax, metrics.actorsSeen, updatedAt,
+    metrics.durationMsMax, metrics.answerCharsSum, metrics.answerCharsMax, metrics.answersOverBudget,
+    metrics.actorsSeen, updatedAt,
   );
 }
 
@@ -380,7 +393,7 @@ function moveOpensOutOfAppUse(db: Database.Database, opens: UsageRollupRow, upda
   addIntoRow(db, {
     cut: APP_USE_CUT, grain: 'day', bucket: use.bucket, ownerGhii: USAGE_FOLDED_VISITOR, actorGaii: '',
     appId: use.appId, model: '', provider: '', surface: '', outcome: '', coordinate: '', counterpartyGhii: '',
-  }, { ...moved, durationMsMax: opens.durationMsMax, actorsSeen: 1 }, updatedAt);
+  }, { ...moved, durationMsMax: opens.durationMsMax, answerCharsMax: opens.answerCharsMax, actorsSeen: 1 }, updatedAt);
   return 1;
 }
 
@@ -419,7 +432,8 @@ export function foldNamedAppVisits(
       if (r.cut === 'call.owner.tool' && r.coordinate) appUseRows += moveOpensOutOfAppUse(db, r, updatedAt);
       const metrics = {} as Record<AddingMetric, number>;
       for (const m of ADDING_METRICS) metrics[m] = r[m];
-      addIntoRow(db, { ...r, ownerGhii: USAGE_FOLDED_VISITOR }, { ...metrics, durationMsMax: r.durationMsMax, actorsSeen: 1 }, updatedAt);
+      addIntoRow(db, { ...r, ownerGhii: USAGE_FOLDED_VISITOR },
+        { ...metrics, durationMsMax: r.durationMsMax, answerCharsMax: r.answerCharsMax, actorsSeen: 1 }, updatedAt);
       db.prepare('DELETE FROM usage_rollup WHERE id = ?').run(r.id);
     }
     return { rollupRows: named.length, appUseRows };
@@ -465,8 +479,9 @@ export function advanceUsageRollup(
     `INSERT INTO usage_rollup
        (id, cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface, outcome,
         coordinate, counterpartyGhii, calls, errors, refusals, tokensIn, tokensOut, costUsd,
-        unpricedCalls, chargedUnits, durationMsSum, durationMsMax, actorsSeen, extra, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        unpricedCalls, chargedUnits, durationMsSum, durationMsMax, answerCharsSum, answerCharsMax,
+        answersOverBudget, actorsSeen, extra, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface,
                  outcome, coordinate, counterpartyGhii)
      DO UPDATE SET
@@ -479,8 +494,11 @@ export function advanceUsageRollup(
        unpricedCalls = usage_rollup.unpricedCalls + excluded.unpricedCalls,
        chargedUnits  = usage_rollup.chargedUnits + excluded.chargedUnits,
        durationMsSum = usage_rollup.durationMsSum + excluded.durationMsSum,
-       -- A maximum is not a sum. This is the one metric that does not add.
+       -- A maximum is not a sum. These two are the metrics that do not add.
        durationMsMax = MAX(usage_rollup.durationMsMax, excluded.durationMsMax),
+       answerCharsSum    = usage_rollup.answerCharsSum + excluded.answerCharsSum,
+       answerCharsMax    = MAX(usage_rollup.answerCharsMax, excluded.answerCharsMax),
+       answersOverBudget = usage_rollup.answersOverBudget + excluded.answersOverBudget,
        actorsSeen    = usage_rollup.actorsSeen + excluded.actorsSeen,
        extra         = json_patch(usage_rollup.extra, excluded.extra),
        updatedAt     = excluded.updatedAt`
@@ -497,7 +515,8 @@ export function advanceUsageRollup(
         randomUUID(), d.cut, d.grain, d.bucket, d.ownerGhii, d.actorGaii, d.appId, d.model,
         d.provider, d.surface, d.outcome, d.coordinate, d.counterpartyGhii,
         d.calls, d.errors, d.refusals, d.tokensIn, d.tokensOut, d.costUsd,
-        d.unpricedCalls, d.chargedUnits, d.durationMsSum, d.durationMsMax, d.actorsSeen,
+        d.unpricedCalls, d.chargedUnits, d.durationMsSum, d.durationMsMax,
+        d.answerCharsSum ?? 0, d.answerCharsMax ?? 0, d.answersOverBudget ?? 0, d.actorsSeen,
         JSON.stringify(d.extra ?? {}), updatedAt,
       );
     }

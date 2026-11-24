@@ -23,6 +23,8 @@
  * @usage
  *   import { runUsageRollup } from './services/usage/rollup-engine.js';
  * @version-history
+ *   2026-11-24 — A call's `answerChars` folds into answerCharsSum, answerCharsMax and
+ *     answersOverBudget (an answer over TOOL_ANSWER_BUDGET_CHARS, models/answer-budget.ts).
  *   v1.1.0 — 2026-10-25 — The batch and the pass cap come from the config on each run (usage-settings.ts);
  *     they were read from process.env at import, out of the admin Config tab's reach.
  *   v1.0.0 — 2026-08-14 — Initial: incremental, transactional fold over the llm and call streams.
@@ -33,6 +35,7 @@ import type {
 import { logger } from '../../utils/logger.js';
 import { cutsForStream, type UsageCut, type UsageDim } from './rollup-cuts.js';
 import { usageSettings } from './usage-settings.js';
+import { TOOL_ANSWER_BUDGET_CHARS } from '../../models/answer-budget.js';
 
 /**
  * Raw rows per pass (usage.rollup_batch): small enough that one transaction stays short, large enough
@@ -72,6 +75,7 @@ interface Fact {
   unpricedCalls: number;
   chargedUnits: number;
   durationMs: number;
+  answerChars: number;
 }
 
 function factOfCall(r: UsageCallRecord): Fact {
@@ -94,6 +98,9 @@ function factOfCall(r: UsageCallRecord): Fact {
     tokensIn: 0, tokensOut: 0, costUsd: 0, unpricedCalls: 0,
     chargedUnits: r.chargedUnits,
     durationMs: r.durationMs,
+    // A row stored before the column existed, or a buffered call from a caller that measures
+    // nothing, has none: 0, which no sum and no maximum reads as an answer.
+    answerChars: r.answerChars ?? 0,
   };
 }
 
@@ -120,6 +127,7 @@ function factOfEvent(e: AgentUsageEvent): Fact {
     unpricedCalls: e.costUsd === null ? 1 : 0,
     chargedUnits: 0,
     durationMs: 0,
+    answerChars: 0,
   };
 }
 
@@ -164,7 +172,8 @@ function accumulate(facts: Fact[], stream: 'llm' | 'call'): UsageRollupDelta[] {
             delta: {
               cut: cut.name, grain, bucket, ...dims,
               calls: 0, errors: 0, refusals: 0, tokensIn: 0, tokensOut: 0, costUsd: 0,
-              unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0, actorsSeen: 0,
+              unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0,
+              answerCharsSum: 0, answerCharsMax: 0, answersOverBudget: 0, actorsSeen: 0,
             },
             actors: new Set<string>(),
           };
@@ -182,6 +191,9 @@ function accumulate(facts: Fact[], stream: 'llm' | 'call'): UsageRollupDelta[] {
         d.chargedUnits += fact.chargedUnits;
         d.durationMsSum += fact.durationMs;
         if (fact.durationMs > d.durationMsMax) d.durationMsMax = fact.durationMs;
+        d.answerCharsSum += fact.answerChars;
+        if (fact.answerChars > d.answerCharsMax) d.answerCharsMax = fact.answerChars;
+        if (fact.answerChars > TOOL_ANSWER_BUDGET_CHARS) d.answersOverBudget += 1;
         if (fact.actorGaii) entry.actors.add(fact.actorGaii);
       }
     }

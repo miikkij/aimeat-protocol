@@ -15,6 +15,7 @@
  *   Design: docs/internal/telemetria/02-design.md
  * @usage cd aimeat && pnpm exec vitest run test/unit/usage-read-grouping.test.ts
  * @version-history
+ *   2026-11-24 — A group's answer sizes: the average, the largest and the count over the budget.
  *   v1.1.0 — 2026-11-14 — A group's `last_bucket`: the day apps-used last saw each app.
  *   v1.0.0 — 2026-08-15 — Initial: the three grouping rules, after all three were found by eye.
  */
@@ -37,7 +38,8 @@ function delta(over: Partial<UsageRollupDelta> & { cut: string }): UsageRollupDe
     ownerGhii: '', actorGaii: '', appId: '', model: '', provider: '',
     surface: '', outcome: '', coordinate: '', counterpartyGhii: '',
     calls: 0, errors: 0, refusals: 0, tokensIn: 0, tokensOut: 0, costUsd: 0,
-    unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0, actorsSeen: 0,
+    unpricedCalls: 0, chargedUnits: 0, durationMsSum: 0, durationMsMax: 0,
+    answerCharsSum: 0, answerCharsMax: 0, answersOverBudget: 0, actorsSeen: 0,
     ...over,
   };
 }
@@ -72,6 +74,35 @@ describe('outcome qualifies a row, it does not identify one', () => {
     expect(report.groups[0].refusals).toBe(0);
     // The slowest call, not the sum of two maxima.
     expect(report.groups[0].duration_ms_max).toBe(1900);
+  });
+
+  it('says per tool how large its answers are and how many passed the budget', async () => {
+    // Two days of one tool, plus a tool whose answers are small. The report has to put a number on
+    // "which tool's answers grow" without anybody opening a raw call.
+    await seed([
+      delta({ cut: 'call.owner.tool', ownerGhii: OWNER, surface: 'mcp', coordinate: 'aimeat_workspace_read',
+              bucket: '2026-08-14', calls: 3, answerCharsSum: 90_000, answerCharsMax: 60_000, answersOverBudget: 1 }),
+      delta({ cut: 'call.owner.tool', ownerGhii: OWNER, surface: 'mcp', coordinate: 'aimeat_workspace_read',
+              bucket: '2026-08-15', calls: 1, answerCharsSum: 375_000, answerCharsMax: 375_000, answersOverBudget: 1 }),
+      delta({ cut: 'call.owner.tool', ownerGhii: OWNER, surface: 'mcp', coordinate: 'aimeat_memory_write',
+              bucket: '2026-08-15', calls: 10, answerCharsSum: 3_000, answerCharsMax: 400 }),
+    ]);
+
+    const report = await readUsageReport(storage, {
+      report: 'tool', scope: 'owner', ownerGhii: OWNER, ...window,
+    });
+    const read = report.groups.find(g => g.dims.coordinate === 'aimeat_workspace_read');
+    expect(read?.calls).toBe(4);
+    expect(read?.answer_chars_avg).toBe(Math.round(465_000 / 4));
+    // The largest single answer over the window, not the sum of the two days' maxima.
+    expect(read?.answer_chars_max).toBe(375_000);
+    expect(read?.answers_over_budget).toBe(2);
+
+    const write = report.groups.find(g => g.dims.coordinate === 'aimeat_memory_write');
+    expect(write?.answer_chars_avg).toBe(300);
+    expect(write?.answers_over_budget).toBe(0);
+    expect(report.totals.answers_over_budget).toBe(2);
+    expect(report.totals.answer_chars_max).toBe(375_000);
   });
 
   it('keeps refusals and errors apart inside that one row', async () => {
