@@ -15,6 +15,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.4.2 — 2026-11-24 — .card-grid--sections: a column is never wider than its container
+ *     (min(340px, 100%)). On a screen under about 370px, or inside a padded box on a phone, the
+ *     340px column stood past the right edge and its content was cut.
  *   v1.4.1 — 2026-09-26 — The door tile's focus ring reads var(--shape-frame) (2px in AIMEAT), not a
  *     literal (check:shape-tokens; fix pass).
  *   v1.5.0 — 2026-09-27 — .card-grid--strip (CardGrid cols 'strip'): tiles in one sideways line, for appcat; additive.
@@ -163,7 +166,7 @@
 .card-grid--one { grid-template-columns: minmax(0, 1fr); }
 .card-grid:has(> .card-tile--framed) { gap: .8rem; }
 /* Section cards side by side (an agent's tabs pair short groups); `wide` spans every column. */
-.card-grid--sections { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 2rem; align-items: stretch; }
+.card-grid--sections { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 0 2rem; align-items: stretch; }
 .card-grid.card-grid--sections > .card { margin-top: 0; margin-bottom: 0; min-width: 0; }
 .card-grid.card-grid--sections > .card-section--wide { grid-column: 1 / -1; }
 /* Figure doors in a line. */

@@ -9,6 +9,9 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-11-24 — Under 600px a row that opens puts its detail under its title, keeps its
+ *     arrow at the row's end and is at least 2.75rem high: the arrow stood past the right edge at
+ *     360px, and the row was 23px high under a finger.
  *   v1.4.0 — 2026-09-26 — .og-fold-sec--inner: a fold inside a part without its number (FoldSection
  *     inner; the Agents page's .agp-connect-folds rules moved in), page group G1a.
  *   v1.3.0 — 2026-09-26 — .og-fold-r--clip: a long detail cut with … (FoldSection clip; the MCP
@@ -48,6 +51,15 @@
 .og-fold-sec--inner > .og-fold--toggle { border-bottom: 1px solid var(--border); padding: .8rem 0; }
 .og-fold-sec--inner > .og-fold--toggle i { display: none; }
 .og-fold-sec--inner > .og-fold--toggle .og-fold-arrow { margin-left: auto; }
+/* A phone: a row's detail stands under its title and the arrow stays at the row's end. A long title
+   with a detail pushed the arrow past the right edge at 360px (the AI page's Fine-tuning rows). */
+@media (max-width: 600px) {
+  .og-fold--toggle { flex-wrap: wrap; row-gap: .15rem; column-gap: .6rem; min-height: 2.75rem; }
+  .og-fold--toggle > span:first-of-type { flex: 1 1 0; min-width: 0; }
+  .og-fold--toggle > .og-fold-r { order: 3; flex-basis: 100%; margin-left: 0; white-space: normal; padding-left: 2.6rem; }
+  .og-fold--toggle > .og-fold-arrow { margin-left: auto; }
+  .og-fold-sec--inner > .og-fold--toggle > .og-fold-r { padding-left: 0; }
+}
 .og-fold-sec--inner > .og-fold-body { padding: .2rem 0 1.2rem; }
 .og-fold-name { font-weight: 700; min-width: 0; }
 .og-fold-door { font-size: .72rem; flex: none; }
