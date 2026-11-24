@@ -20,6 +20,7 @@
  *            other credentials refused on it; wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema joins ANONYMOUS_OFF_SUITES (a row space's schema binds every writer;
  *            developer ruling 2026-11-07).
+ *   v1.12.0 -- 2026-11-24 -- AIMEAT_APP_OWED_ON_PUBLISH pinned to 'warn' (the owed-items refusal).
  *   v1.11.0 -- 2026-10-16 -- The shared server runs the page host at pages.localhost (AIMEAT_PAGE_HOST).
  *   v1.10.0 -- 2026-10-16 -- The production-settings lane (run-e2e-production-lane.ts): with
  *            --production-settings every suite's node runs test mode, dev mode and anonymous mode off,
@@ -359,6 +360,12 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // Outbound door daily limit kept small so e2e-outbound can actually reach the 429
         // without sending two hundred messages (default in prod code is 200).
         AIMEAT_OUTBOUND_DAILY_LIMIT: process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '8',
+        // An update of an app that owes its design spec, data map, skill, agent face or roadmap line
+        // is refused in production. Most suites publish a bare app twice to test something else, so
+        // the sweep runs with 'warn'; e2e-app-ai-path sets 'refuse' through the admin config and
+        // proves the refusal. Pinned here, not in .env.test.*, because those files are written once
+        // per worktree and a new line in the examples never reaches the existing ones.
+        AIMEAT_APP_OWED_ON_PUBLISH: process.env.AIMEAT_APP_OWED_ON_PUBLISH ?? 'warn',
 
         // ── Features that are opt-in in production and have to be ON to be provable ──
         // Capability publishing is 'disabled' by default in prod, so every capability assertion in
