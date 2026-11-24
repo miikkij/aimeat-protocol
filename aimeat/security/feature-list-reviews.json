@@ -106,7 +106,7 @@
       "digest": "sha256:4610951cc82a67fd257b52dc"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:4331980f0bcd97349d9b18a2"
+      "digest": "sha256:807750f7b7801e6a2ff3e9f3"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-22",
@@ -149,7 +149,7 @@
       "digest": "sha256:3fd4be9b502d6d98aef8572b"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/services/hooks.ts",
         "aimeat/src/mcp/agent-schedules.ts",
@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:97834c678330e981fd2b3964"
+      "digest": "sha256:2d11cd7c79b1ce2c068ec038"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-22",
@@ -638,7 +638,7 @@
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
-      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "83e9376c9dcd14ea",
+      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "b6d52a1355fc78d3",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "56d1206ca672b86d",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
       "aimeat/src/services/organism-join-requests/requests.ts": "7ff2859806cceb04",
@@ -695,7 +695,7 @@
     },
     "8. Automation: schedules, workflows and extensions": {
       "aimeat/src/services/hooks.ts": "aaec9808b811243b",
-      "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
+      "aimeat/src/mcp/agent-schedules.ts": "6859d64c0491fabf",
       "aimeat/src/services/schedule/actor.ts": "a7b8a82bf699cc9f",
       "aimeat/src/services/schedule/agent-task-input.ts": "27e4e9e7b7d8e304",
       "aimeat/src/services/schedule/agent-task.ts": "2316406f1c456468",
