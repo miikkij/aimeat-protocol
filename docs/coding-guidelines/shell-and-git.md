@@ -217,6 +217,10 @@ them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
 - **`AIMEAT_PROJECT=aimeat-protocol`** beside it. The same hook stamps `Project: <name>` when the
   variable is set and the message has no `Project:` line yet. A missing `AIMEAT_PROJECT` refuses
   nothing; the commit only goes without the trailer.
+- **`AIMEAT_WISH=<wish id>`**, the wish the session's claim names (2026-11-24). The same hook stamps
+  `Wish: <id>` the same way, and Lifecycle Central's `delivery_ingest` ties the commit on main to
+  that wish, so the wish's path from the ask to production can be read. A missing `AIMEAT_WISH`
+  refuses nothing.
 - **`check:imports-tracked`** (in `pnpm gate` and CI, not in the pre-commit hook since the hook
   was slimmed on 2026-09-05) refuses a tracked file whose relative import
   resolves to a file git does not track. It reads the index copy of a file with unstaged edits,

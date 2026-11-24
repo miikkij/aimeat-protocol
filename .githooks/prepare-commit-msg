@@ -27,6 +27,12 @@
 # CLAUDE.md paragraph gives (this repository: aimeat-protocol). It is stamped when set and never
 # refused when absent, because the claim on the node already carries the project and refuses to
 # exist without one; the trailer is for reading history, not for gating it.
+#
+# Since 2026-11-24 a third trailer names the WISH the commit serves: `Wish:` from AIMEAT_WISH, the
+# wish id the session's claim names (Lifecycle Central's claim_open requires one). Lifecycle
+# Central's delivery_ingest reads main's commits from GitHub and ties each one to its wish by this
+# trailer, so a wish's path from the ask to production can be read and its time measured. Stamped
+# when set and never refused when absent, like `Project:`.
 
 MSG="$1"
 SOURCE="$2"
@@ -55,4 +61,7 @@ fi
 git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Session: $AIMEAT_SESSION" "$MSG"
 if [ -n "$AIMEAT_PROJECT" ] && ! grep -qi '^Project:' "$MSG" 2>/dev/null; then
   git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Project: $AIMEAT_PROJECT" "$MSG"
+fi
+if [ -n "$AIMEAT_WISH" ] && ! grep -qi '^Wish:' "$MSG" 2>/dev/null; then
+  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Wish: $AIMEAT_WISH" "$MSG"
 fi

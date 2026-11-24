@@ -69,8 +69,8 @@ short:
 
 - Every session works in its own worktree, made by the `WorktreeCreate` hook in Claude Code or by
   `pnpm agent:worktree <name>` elsewhere. The main checkout belongs to the developer.
-- The session sets `AIMEAT_SESSION` and `AIMEAT_PROJECT`, which the hooks stamp on each commit as
-  `Session:` and `Project:` trailers.
+- The session sets `AIMEAT_SESSION`, `AIMEAT_PROJECT` and `AIMEAT_WISH` (the wish its claim names),
+  which the hooks stamp on each commit as `Session:`, `Project:` and `Wish:` trailers.
 - Before editing, the session reads the Lifecycle Central board and claims the paths and the E2E
   port it will use, and applies that port with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`.
 

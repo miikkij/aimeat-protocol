@@ -79,7 +79,7 @@ const OFFLINE = fixture('offline', { __offline: true });
 function env(fixtureFile: string, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
     const e: NodeJS.ProcessEnv = { ...process.env, AIMEAT_CI_API_FIXTURE: fixtureFile, AIMEAT_CI_REPO: SLUG,
         AIMEAT_CI_STATE_CACHE: join(scratch, `cache-${Math.random().toString(36).slice(2)}.json`), ...extra };
-    delete e.CLAUDECODE; delete e.AIMEAT_SESSION; delete e.AIMEAT_PROJECT; delete e.AIMEAT_RED_CI_REASON; delete e.AIMEAT_RED_CI_REFUSE; delete e.AIMEAT_CI_STATE;
+    delete e.CLAUDECODE; delete e.AIMEAT_SESSION; delete e.AIMEAT_PROJECT; delete e.AIMEAT_WISH; delete e.AIMEAT_RED_CI_REASON; delete e.AIMEAT_RED_CI_REFUSE; delete e.AIMEAT_CI_STATE;
     return { ...e, ...extra };
 }
 
@@ -169,6 +169,14 @@ describe('an agent other than Claude Code is a session when AIMEAT_SESSION is se
         expect(r.status).toBe(0);
         expect(r.text).toContain('Session: cx-alice-fix');
         expect(r.text).toContain('Project: aimeat-protocol');
+        expect(r.text).not.toContain('Wish:');
+    });
+
+    it.skipIf(NO_BASH)('the commit hook stamps the Wish: trailer from AIMEAT_WISH, once', () => {
+        const r = prepare({ AIMEAT_SESSION: 'cx-alice-fix', AIMEAT_PROJECT: 'aimeat-protocol', AIMEAT_WISH: 'wish-alice-calendar' });
+        expect(r.status).toBe(0);
+        expect(r.text).toContain('Wish: wish-alice-calendar');
+        expect(r.text.match(/^Wish:/gm)).toHaveLength(1);
     });
 
     it.skipIf(NO_BASH)('the developer\'s own commit is neither stamped nor refused', () => {

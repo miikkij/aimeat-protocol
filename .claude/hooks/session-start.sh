@@ -49,6 +49,12 @@ else
   printf 'Project: NOT SET. Export AIMEAT_PROJECT=aimeat-protocol: Lifecycle Central refuses a claim\n'
   printf '  without a project.\n'
 fi
+if [ -n "${AIMEAT_WISH:-}" ]; then
+  printf 'Wish: %s (stamped as a Wish: trailer, so the commit is tied to it)\n' "$AIMEAT_WISH"
+else
+  printf 'Wish: not set. Export AIMEAT_WISH=<wish id> once your claim names it: Lifecycle Central\n'
+  printf '  reads the Wish: trailer to follow a wish from the ask to production.\n'
+fi
 
 if [ -n "$session_id" ]; then
   printf 'Claude Code session id: %s\n' "$session_id"

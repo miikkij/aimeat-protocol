@@ -124,13 +124,14 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   hand: the examples name one port and one database, and the runner empties that database between
   suites, so two sessions testing at once wipe each other.
 - Coordination happens on aimeat.io, not in chat. Export the session and the project in the shell
-  that commits (`AIMEAT_SESSION=<tool>-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the
+  that commits (`AIMEAT_SESSION=<tool>-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`, and
+  `AIMEAT_WISH=<the wish id your claim names>`), read the
   Lifecycle Central board with your project (`board_read { project }`), and claim the paths and the
   E2E port before you edit (a free port in 40251-40499 that no active claim names). Apply that
   port with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` from `aimeat/`: the worktree
   already has its env files, and without `--force` the script keeps them and the old port. Skill
   `aimeat-dev-session` on the node has the ritual. With `AIMEAT_SESSION` set, the git hooks treat
-  you as a session: they stamp the `Session:` and `Project:` trailers and hold your commits and
+  you as a session: they stamp the `Session:`, `Project:` and `Wish:` trailers and hold your commits and
   pushes to the session rules below.
 - Look at a change on your own node: `pnpm sandbox` from `aimeat/`. Run the E2E suites the change
   can reach, one at a time with `--test=<suite>`. Never start the full sweep on your own: it takes
