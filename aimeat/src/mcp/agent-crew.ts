@@ -42,11 +42,11 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { MAX_WAIT_SECONDS } from '../tool-catalog/input-schemas.js';
 
 function refusalText(r: CrewRefusal): string {
-    return JSON.stringify({ error: { code: r.code, message: r.message, details: r.details } }, null, 2);
+    return JSON.stringify({ error: { code: r.code, message: r.message, details: r.details } });
 }
 
 function ok(data: unknown) {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 
 function refused(r: CrewRefusal) {

@@ -356,7 +356,7 @@ await test('21. The MCP answer does not carry the merged value back', async () =
     const r = await call(agent, { key: 'doc.big', patch: { note: 'small' } });
     assert(!r.error, r.text);
     assert(r.text.length < 2000, `the answer is ${r.text.length} characters`);
-    assert(r.text.includes('"patched": true') && !r.text.includes('xxxxxxxxxx'), r.text.slice(0, 200));
+    assert(r.text.includes('"patched":true') && !r.text.includes('xxxxxxxxxx'), r.text.slice(0, 200));
 });
 
 await test('22. The same patches through REST and MCP give the same record', async () => {

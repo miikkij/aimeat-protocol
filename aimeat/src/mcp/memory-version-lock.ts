@@ -55,7 +55,7 @@ export function versionConflict(
                 key,
                 current_version: current,
                 your_version: expected,
-            }, null, 2),
+            }),
         }],
         isError: true,
     };

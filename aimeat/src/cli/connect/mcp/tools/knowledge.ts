@@ -38,7 +38,7 @@ export function registerKnowledgeTools(mcp: McpServer, _registry: AgentRegistry)
   // the connector has no route to forward it to. The description says so before an agent spends a call.
   mcp.registerTool('aimeat_knowledge_contribute', { description: descriptionFor('aimeat_knowledge_contribute') + KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE, inputSchema: zodShapeFor('aimeat_knowledge_contribute'), annotations: annotationsFor('aimeat_knowledge_contribute') }, () => {
     const refusal = knowledgeContributeUnreachable();
-    return { content: [{ type: 'text' as const, text: JSON.stringify(refusal, null, 2) }], isError: true };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(refusal) }], isError: true };
   });
 
 }

@@ -52,7 +52,7 @@ import { readUsageSummary } from '../services/usage/usage-summary.js';
 import { USAGE_REPORT_PARAMS } from '../models/tool-input-vocabulary.js';
 import { toolError } from './tool-error.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;

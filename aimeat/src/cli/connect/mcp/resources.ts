@@ -31,7 +31,7 @@ export function registerResources(mcp: McpServer, registry: AgentRegistry): void
     { mimeType: 'application/json', description: 'Agent operating handbook' },
     async (uri) => {
       const resp = await client.get('/v1/agents/me/handbook');
-      return { contents: [{ uri: uri.toString(), text: JSON.stringify(resp.data, null, 2), mimeType: 'application/json' }] };
+      return { contents: [{ uri: uri.toString(), text: JSON.stringify(resp.data), mimeType: 'application/json' }] };
     },
   );
 
@@ -42,7 +42,7 @@ export function registerResources(mcp: McpServer, registry: AgentRegistry): void
       { mimeType: 'application/json', description: `Handbook module: ${mod}` },
       async (uri) => {
         const resp = await client.get(`/v1/agents/me/handbook/${mod}`);
-        return { contents: [{ uri: uri.toString(), text: JSON.stringify(resp.data, null, 2), mimeType: 'application/json' }] };
+        return { contents: [{ uri: uri.toString(), text: JSON.stringify(resp.data), mimeType: 'application/json' }] };
       },
     );
   }

@@ -23,7 +23,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { reactToMessage, reactionActor } from '../services/message/reactions.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerDmReactionTools(
   mcp: McpServer,

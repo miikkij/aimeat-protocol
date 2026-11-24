@@ -56,7 +56,7 @@ export function registerAiProviderTools(
   config: AimeatConfig,
   getAgentGaii: () => string,
 ): void {
-  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   const refusal = (e: unknown) => {
     if (e instanceof AiCompletionError) return toolError(e.code, e.message);
     throw e;

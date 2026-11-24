@@ -45,7 +45,7 @@ export function registerConnectionFileTools(
     scopes: string[],
     caller: () => CallerContext,
 ): void {
-    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
     const providers = buildOutboundProviders(config);
     const principal = (): string => getAgentGaii();
 

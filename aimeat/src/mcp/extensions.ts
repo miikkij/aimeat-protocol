@@ -223,7 +223,7 @@ export function registerExtensionsTools(
                         federation: ext.federation,
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
-                    }, null, 2),
+                    }),
                     mimeType: 'application/json',
                 }],
             };
@@ -263,7 +263,7 @@ export function registerExtensionsTools(
                         federation: ext.federation,
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -281,7 +281,7 @@ export function registerExtensionsTools(
             const result = defineAppIam({
                 appId: app_id, levels, commands, defaultRole: default_role, version, author, extName: ext_name,
             });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
         },
     );
 
@@ -321,9 +321,9 @@ export function registerExtensionsTools(
             }
             if (out.kind === 'refused') return { ...toolError(out.code, out.message) };
             // The person's own decision: nothing ran, one request waits for the person (services/extension/person-decision.ts).
-            if (out.kind === 'awaiting') return { content: [{ type: 'text' as const, text: JSON.stringify(out.body, null, 2) }] };
+            if (out.kind === 'awaiting') return { content: [{ type: 'text' as const, text: JSON.stringify(out.body) }] };
             emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(out.extName)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out.result, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.result) }] };
         },
     );
 
@@ -386,7 +386,7 @@ export function registerExtensionsTools(
                             expires_in_seconds: 3600,
                             zip_structure: 'manifest.yaml at root, scripts in scripts/ directory',
                             note: 'Create a ZIP with manifest.yaml and scripts/*.js, then PUT it to upload_url.',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -498,7 +498,7 @@ export function registerExtensionsTools(
                             ...(built.warnings?.length ? { warnings: built.warnings } : {}),
                             ...(emailAsk && 'approval_request' in emailAsk ? { approval_request: emailAsk.approval_request } : {}),
                             ...(emailAsk && 'warnings' in emailAsk ? { approval_warnings: emailAsk.warnings } : {}),
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {
@@ -562,7 +562,7 @@ export function registerExtensionsTools(
                             name,
                             status: updated?.status ?? 'active',
                             activated_at: updated?.activatedAt ?? null,
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {
@@ -600,7 +600,7 @@ export function registerExtensionsTools(
                 // The emailPolicy grant asked of the operators, pending until one answers (services/extension/email-policy-ask.ts).
                 ...(out.approval_request ? { approval_request: out.approval_request } : {}),
                 ...(out.warnings ? { warnings: out.warnings } : {}),
-            }, null, 2) }] };
+            }) }] };
         },
     );
 
@@ -624,7 +624,7 @@ export function registerExtensionsTools(
                 return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
             }
             const payload = readAuthorityPayload(name, found.view);
-            return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
         },
     );
 
@@ -664,7 +664,7 @@ export function registerExtensionsTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ name, status: 'inactive' }, null, 2),
+                        text: JSON.stringify({ name, status: 'inactive' }),
                     }],
                 };
             } catch (err) {
@@ -711,7 +711,7 @@ export function registerExtensionsTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ name, deleted: true }, null, 2),
+                        text: JSON.stringify({ name, deleted: true }),
                     }],
                 };
             } catch (err) {
@@ -782,7 +782,7 @@ export function registerExtensionsTools(
                         // (services/extension/manifest-export.ts): pass both to aimeat_extension_install
                         // with update: true and a new version to change it. A secret's value is not in it.
                         ...(include_source ? manifestOfRecord(ext) : {}),
-                    }, null, 2),
+                    }),
                 }],
             };
         },

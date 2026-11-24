@@ -50,7 +50,7 @@ function refusalMessage(refusal: { status: number; code: string; message: string
 }
 
 function ok(payload: unknown) {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
 }
 
 function fail(text: string) {

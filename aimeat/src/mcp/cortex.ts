@@ -158,13 +158,13 @@ export function registerCortexTools(
                 }
                 const detail = await cortexDetail(storage, config, agentCaller(), name);
                 if (!detail.ok) return { ...toolError(detail.code, detail.message) };
-                if (!include_source) return { content: [{ type: 'text' as const, text: JSON.stringify(detail.data, null, 2) }] };
+                if (!include_source) return { content: [{ type: 'text' as const, text: JSON.stringify(detail.data) }] };
                 if (!scopeIsCovered(scopes, 'cortex:write')) {
                     return { ...toolError('SCOPE_DENIED', 'Reading a cortex\x27s source needs the "cortex:write" permission, the same scope replacing it needs.') };
                 }
                 const source = await cortexSource(storage, agentCaller(), name);
                 if (!source.ok) return { ...toolError(source.code, source.message) };
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ ...detail.data, source: source.data }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ ...detail.data, source: source.data }) }] };
             }
             // The same fence GET /v1/cortex applies: public, the node's own bundled ones, and the
             // caller's own. This tool listed every owner's private cortex until 2026-09-05.
@@ -192,7 +192,7 @@ export function registerCortexTools(
                         author: ext.author,
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -226,7 +226,7 @@ export function registerCortexTools(
 
             // --- UPLOAD MODE: no manifest, the presigned offer POST /v1/cortex answers for mode presigned ---
             if (!manifest) {
-                return { content: [{ type: 'text' as const, text: JSON.stringify(await cortexUploadOffer(config, agentGaii), null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(await cortexUploadOffer(config, agentGaii)) }] };
             }
 
             // --- INLINE MODE: manifest provided, process immediately ---
@@ -262,7 +262,7 @@ export function registerCortexTools(
                             ...(done.action !== 'unchanged' ? { warnings: done.warnings } : {}),
                             ...(done.action === 'created' ? { visibility: done.record.visibility, ...cortexAskedFields(done.asked, done.warnings) } : {}),
                             lib_urls: cortexLibUrls(config.baseUrl, done.record),
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -296,7 +296,7 @@ export function registerCortexTools(
                         // The exact script src for each lib. The address follows the record's name,
                         // and an author who guessed the namespaced form got a 404 inside the app.
                         lib_urls: cortexLibUrls(config.baseUrl, record),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -327,7 +327,7 @@ export function registerCortexTools(
                             status: 'active',
                             activated_at: activatedAt,
                             message: 'Extension is already active',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -341,7 +341,7 @@ export function registerCortexTools(
                         name: extension.name,
                         status: 'active',
                         activated_at: activatedAt,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -371,7 +371,7 @@ export function registerCortexTools(
                             name: extension.name,
                             status: 'inactive',
                             message: 'Extension is already inactive',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -384,7 +384,7 @@ export function registerCortexTools(
                     text: JSON.stringify({
                         name: extension.name,
                         status: 'inactive',
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -413,7 +413,7 @@ export function registerCortexTools(
                     text: JSON.stringify({
                         deleted: true,
                         name,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

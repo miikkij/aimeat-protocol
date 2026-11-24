@@ -60,7 +60,7 @@ import { readNodePolicy } from '../services/classification/policy.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
-const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
 
 const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set', 'exception_set', 'pack_set']);
 

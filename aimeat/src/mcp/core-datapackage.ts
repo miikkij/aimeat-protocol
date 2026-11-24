@@ -111,7 +111,7 @@ function pandasDtypes(schema: TableSchema): Record<string, string> {
 }
 
 const jsonContent = (value: unknown) => ({
-    content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(value) }],
 });
 const errContent = (value: unknown) => ({ ...jsonContent(value), isError: true as const });
 

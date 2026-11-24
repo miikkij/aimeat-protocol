@@ -105,7 +105,7 @@ export function registerSharingGroupTools(
                         default_permissions: g.defaultPermissions,
                         created_at: g.createdAt,
                         updated_at: g.updatedAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -145,7 +145,7 @@ export function registerSharingGroupTools(
                         default_permissions: group.defaultPermissions,
                         created_at: group.createdAt,
                         updated_at: group.updatedAt,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -186,7 +186,7 @@ export function registerSharingGroupTools(
                             default_permissions: record.defaultPermissions,
                             created_at: record.createdAt,
                         },
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -229,7 +229,7 @@ export function registerSharingGroupTools(
                             identifier_type: newMember.identifierType,
                             permissions: newMember.permissions,
                         },
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -260,7 +260,7 @@ export function registerSharingGroupTools(
                         removed: true,
                         group_id,
                         identifier,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -307,7 +307,7 @@ export function registerSharingGroupTools(
             if (!created.ok) return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
             emitChange('groups');
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ share: shareJson(created.value) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ share: shareJson(created.value) }) }] };
         },
     );
 
@@ -326,7 +326,7 @@ export function registerSharingGroupTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ direction, shares: shares.map(shareJson), total: shares.length }, null, 2),
+                    text: JSON.stringify({ direction, shares: shares.map(shareJson), total: shares.length }),
                 }],
             };
         },
@@ -345,7 +345,7 @@ export function registerSharingGroupTools(
             if (!revoked.ok) return { content: [{ type: 'text' as const, text: `${revoked.code}: ${revoked.message}` }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(revoked.value.groupId)}`);
             emitChange('groups');
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, share: shareJson(revoked.value) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, share: shareJson(revoked.value) }) }] };
         },
     );
 }

@@ -51,7 +51,7 @@ import { removePeer } from '../services/federation/peer-remove.js';
 import { setPeerSettlementCeiling } from '../services/settlement-ceiling.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 export function registerAdminFederationTools(

@@ -48,7 +48,7 @@ import {
     listFlagsForReview, reviewFlag, appealFlag, listAppealsFor, reviewAppeal, pageOf,
 } from '../services/moderation/review.js';
 
-const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 
 /**
  * The moderation review: aimeat_admin_flags (GET /v1/flags), aimeat_admin_flag_review (PUT
@@ -158,7 +158,7 @@ export function registerFlagsTools(
                         target_type: out.flag.targetType,
                         target_id: out.flag.targetId,
                         reason: out.flag.reason,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

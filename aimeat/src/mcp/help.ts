@@ -41,7 +41,7 @@ function bodyOf(args: Record<string, unknown>, fields: readonly string[]): Recor
 export function registerHelpTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
     const deps = { storage, config };
     const answer = <T>(r: HelpResult<T>): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } => (r.ok
-        ? { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] }
+        ? { content: [{ type: 'text' as const, text: JSON.stringify(r.data) }] }
         : toolError(r.code, r.message));
     const meta = (name: string) => ({ description: descriptionFor(name), inputSchema: zodShapeFor(name), annotations: annotationsFor(name) });
 

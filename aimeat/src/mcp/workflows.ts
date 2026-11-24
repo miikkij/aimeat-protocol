@@ -91,7 +91,7 @@ export function registerWorkflowTools(
     return { roles: [...session.roles], scopes: [...session.scopes], principal: session.principal };
   };
 
-  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 
   // ── aimeat_workflow_save ──

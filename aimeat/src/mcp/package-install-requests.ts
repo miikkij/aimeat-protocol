@@ -58,15 +58,15 @@ export function registerPackageInstallRequestTools(
             if (!request_id) return { ...toolError('INVALID_INPUT', 'Name the request to decide with request_id. List them by calling this tool with no arguments.') };
             const out = await decideInstallRequest(deps, who, request_id, decision);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ decision: out.decision, request: out.request }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ decision: out.decision, request: out.request }) }] };
         }
         if (request_id) {
             const out = await readRequestFor(deps, who, request_id);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ request: out.request }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ request: out.request }) }] };
         }
         const out = await listRequestsFor(deps, who);
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ requests: out.requests, waiting: out.waiting }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ requests: out.requests, waiting: out.waiting }) }] };
     });
 }

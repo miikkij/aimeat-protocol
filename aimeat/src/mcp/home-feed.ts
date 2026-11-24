@@ -25,7 +25,7 @@ import { toolError } from './tool-error.js';
 import { homeFeedAnswer } from '../services/home/feed.js';
 import { accountEventReader } from '../services/account/event-task-keep.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerHomeFeedTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   mcp.registerTool('aimeat_home_feed', { description: descriptionFor('aimeat_home_feed'), inputSchema: zodShapeFor('aimeat_home_feed'), annotations: annotationsFor('aimeat_home_feed') },

@@ -55,7 +55,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 type ToolTextResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 function asText(value: unknown): ToolTextResult {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] };
 }
 
 function asError(message: string): ToolTextResult {

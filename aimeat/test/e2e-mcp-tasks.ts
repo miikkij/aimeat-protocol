@@ -138,7 +138,7 @@ await test('polling reaches completed with the tool\'s own result, and the write
     const t = await pollToEnd(agent.token, taskId);
     assert(t.status === 'completed', `status ${t.status}: ${JSON.stringify(t).slice(0, 300)}`);
     assert(t.result?.isError !== true, `the tool failed: ${JSON.stringify(t.result).slice(0, 300)}`);
-    assert(String(t.result?.content?.[0]?.text ?? '').includes('"written": true'), `result: ${JSON.stringify(t.result).slice(0, 300)}`);
+    assert(String(t.result?.content?.[0]?.text ?? '').includes('"written":true'), `result: ${JSON.stringify(t.result).slice(0, 300)}`);
     assert(t.tool === undefined, 'the record\'s own field stays off the wire');
     const read = await modern(agent.token, 'tools/call', { name: 'aimeat_memory_read', arguments: { key } }, false);
     assert(String(read.body?.result?.content?.[0]?.text ?? '').includes('e2e-mcp-tasks'), `read back: ${JSON.stringify(read.body).slice(0, 300)}`);

@@ -156,7 +156,7 @@ await test('The agent reads the setting over REST and over aimeat_ai_standing_ge
     assert(r.status === 200 && wordOf(r.body.data, 'ai:use')?.on === true, `REST: ${r.status} ${JSON.stringify(r.body?.error)}`);
     const session = await openSession(BASE, worker.token, 'ai-standing reader');
     const t = await callTool(session, 'aimeat_ai_standing_get', { lang: 'fi' });
-    assert(!t.isError && t.text.includes('"ai:use"') && t.text.includes('"on": true'), `MCP: ${t.text.slice(0, 300)}`);
+    assert(!t.isError && t.text.includes('"ai:use"') && t.text.includes('"on":true'), `MCP: ${t.text.slice(0, 300)}`);
 });
 
 let later!: McpAgent;

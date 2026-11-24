@@ -33,7 +33,7 @@ import { buildHooksOverview, setHookBinding } from '../services/hooks-overview.j
 import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 export function registerAdminHooksTools(

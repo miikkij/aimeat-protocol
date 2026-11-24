@@ -34,7 +34,7 @@ export function registerAiGenRulesTools(
   config: AimeatConfig,
   getAgentGaii: () => string,
 ): void {
-  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 
   mcp.registerTool(
     'aimeat_ai_gen_rules',

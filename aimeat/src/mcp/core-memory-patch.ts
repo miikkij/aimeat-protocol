@@ -55,5 +55,5 @@ export async function patchFromWriteTool(
         patched: true, ...rest,
         fields: Object.keys(args.patch as Record<string, unknown>),
         read_whole: 'aimeat_memory_read with this key, when you need the whole record',
-    }, null, 2) }] };
+    }) }] };
 }

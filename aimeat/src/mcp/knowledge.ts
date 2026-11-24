@@ -189,7 +189,7 @@ export function registerKnowledgeTools(
                         entry_count: entryList.length,
                         entries: entryList,
                         ...omittedNote(omitted),
-                    }, null, 2),
+                    }),
                     mimeType: 'application/json',
                 }],
             };
@@ -226,7 +226,7 @@ export function registerKnowledgeTools(
                 content: [
                     {
                         type: 'text' as const,
-                        text: JSON.stringify(packages, null, 2),
+                        text: JSON.stringify(packages),
                     },
                     // A second text part, so the list keeps its shape (a JSON array) for every
                     // client that parses it, and an agent reads why the list is shorter.
@@ -280,7 +280,7 @@ export function registerKnowledgeTools(
                         ...warningOf(manifest),
                         entries: entryDetails,
                         ...omittedNote(omitted),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -325,7 +325,7 @@ export function registerKnowledgeTools(
                         package_id, entry_key: out.entryKey, updated: true,
                         ...(out.manifestWarning ? { manifest_warning: out.manifestWarning } : {}),
                         ...(await writeProvenanceEcho(storage, config, out.record.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -364,7 +364,7 @@ export function registerKnowledgeTools(
                             linked_at: l.linked_at,
                         })),
                         count: links.length,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

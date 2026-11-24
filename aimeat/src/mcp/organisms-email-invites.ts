@@ -81,7 +81,7 @@ export function registerOrganismEmailInviteTools(
                     returnUrl: return_url, // allowlisted in createEmailInvitation, as on the REST route
                     locale, // validated in createEmailInvitation, as on the REST route
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, email_locale: emailLocale, accept_url: acceptUrl, return_url: invitation.returnUrl ?? null }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, email_locale: emailLocale, accept_url: acceptUrl, return_url: invitation.returnUrl ?? null }) }] };
             } catch (e) {
                 if (e instanceof InvitationError) return { content: [{ type: 'text' as const, text: e.message }], isError: true };
                 throw e;
@@ -103,7 +103,7 @@ export function registerOrganismEmailInviteTools(
             const out = await pendingEmailInvitationsFor(storage, organism_id, { owner: getOwnerName() });
             if (!out.ok) return { content: [{ type: 'text' as const, text: adminRefusal(out.code) }], isError: true };
             const invitations = out.invitations;
-            return { content: [{ type: 'text' as const, text: JSON.stringify(invitations, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(invitations) }] };
         },
     );
 
@@ -125,7 +125,7 @@ export function registerOrganismEmailInviteTools(
                 if (e instanceof InvitationError) return { content: [{ type: 'text' as const, text: e.message }], isError: true };
                 throw e;
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'cancelled', organism_id, invitation_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'cancelled', organism_id, invitation_id }) }] };
         },
     );
 }

@@ -64,7 +64,7 @@ export function registerAgentTelemetryTools(
             return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
         }
         const id = await appendAgentTelemetry({ storage, config }, target.agent, { type, data, session_id, task_id });
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ id }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ id }) }] };
     });
 
     // ── aimeat_usage_report ──
@@ -80,7 +80,7 @@ export function registerAgentTelemetryTools(
             const data = await readOwnerReport({ storage, config }, {
                 report, scope: 'owner', ownerGhii, from, to, grain, limit, series: true,
             });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
         } catch (err) {
             if (err instanceof UnknownReportError) {
                 return { content: [{ type: 'text' as const, text: err.message }], isError: true };

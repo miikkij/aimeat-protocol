@@ -65,7 +65,7 @@ export function registerContentTools(
   caller: () => CallerContext,
 ): void {
   const deps = { storage, config };
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
   const fail = (err: unknown, tool: string) => {
     // A permission an agent's person can allow: the answer every tool's SCOPE_DENIED gives
     // (mcp/scope-denied-answer.ts), with the address the person allows it at.

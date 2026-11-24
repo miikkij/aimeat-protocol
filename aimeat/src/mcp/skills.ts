@@ -130,7 +130,7 @@ export function registerSkillsTools(
     });
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
-    const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+    const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 
     // ── aimeat_skill_publish ──
     mcp.registerTool(

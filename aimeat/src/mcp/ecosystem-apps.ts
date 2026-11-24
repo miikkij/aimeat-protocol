@@ -25,7 +25,7 @@ import { listOwnerEcosystemApps, revokeOwnerEcosystemApp } from '../services/eco
 import { nodeContext } from '../services/node/context.js';
 import { emitChange } from '../services/event-bus.js';
 
-const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const NOT_OWN = 'This is for the account holder and their own agents.';
 
 export function registerEcosystemAppTools(

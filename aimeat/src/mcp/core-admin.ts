@@ -129,7 +129,7 @@ export function registerCoreAdminTools(
                         uptime_seconds: Math.floor(process.uptime()),
                         counts: { agents: agents.length, active_agents_24h: activeAgents, actions: actions.length, boards: boards.length, work_items: allWork.length },
                         economy: { total_morsels_in_circulation: totalMorsels },
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -160,7 +160,7 @@ export function registerCoreAdminTools(
                 trust_score: a.trustScore, morsel_balance: ownerBalances.get(a.owner) ?? 0,
                 last_seen: a.lastSeen, created_at: a.createdAt,
             }));
-            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
         },
     );
 
@@ -195,7 +195,7 @@ export function registerCoreAdminTools(
                         // change in the classification audit log.
                         classification_mode_note: 'Set it with aimeat_classification { action: "switch_set", mode }. Turning it off, or from all to owner, is the operator\'s to do on the admin Config page.',
                         how_to_change: 'aimeat_admin_config_set { changes: [{ path, value }] }. A row with appliesAt "restart" takes effect when the node next starts. A secret shows only whether it is set; set it on its set_path.',
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -215,7 +215,7 @@ export function registerCoreAdminTools(
             // before anything is applied, and the change is written to the operator trail.
             const r = await changeNodeSettings({ config, storage, provenance: provenanceOf(config) }, caller().auth, changes);
             if (!r.ok) return toolError(r.code, `${r.message}${r.details ? ` ${JSON.stringify(r.details)}` : ''}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ applied: r.applied, errors: r.errors, note: r.note }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ applied: r.applied, errors: r.errors, note: r.note }) }] };
         },
     );
 
@@ -237,7 +237,7 @@ export function registerCoreAdminTools(
                 return { content: [{ type: 'text' as const, text: `${minted.code}: ${minted.message}` }], isError: true };
             }
             emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: minted.minted, new_balance: minted.newBalance }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: minted.minted, new_balance: minted.newBalance }) }] };
         },
     );
 
@@ -256,7 +256,7 @@ export function registerCoreAdminTools(
             const owner = await resolveOperatorAgentName(storage, agentGaii, scopes);
             if (!owner) return notOperator;
             const view = await nodeTeamsView(storage, { now: Date.now(), reader: owner });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view) }] };
         },
     );
 
@@ -274,7 +274,7 @@ export function registerCoreAdminTools(
             // GET /v1/admin/organisms/:id/ownership reads too, behind the same operator question.
             const view = await organismOwnershipView(storage, organism_id);
             if (!view) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view) }] };
         },
     );
 
@@ -310,7 +310,7 @@ export function registerCoreAdminTools(
                     text: JSON.stringify({
                         organism: organism_id, added: outcome.added, owners: outcome.owners,
                         membership_created: outcome.membershipCreated,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

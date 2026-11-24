@@ -477,7 +477,7 @@ await test('report: a NEW entry close to an own one is refused with the match; c
     const text = reportText(refused);
     assert(refused.result?.isError === true && /^SIMILAR_ENTRY:/.test(text), `expected SIMILAR_ENTRY, got: ${text.slice(0, 300)}`);
     assert(text.includes('packages/appdev-pitfalls/mobile/keyboard-gap'), `the match is not named: ${text.slice(0, 400)}`);
-    assert(/"open": "aimeat_memory_read /.test(text), `the match carries no open call: ${text.slice(0, 600)}`);
+    assert(/"open":"aimeat_memory_read /.test(text), `the match carries no open call: ${text.slice(0, 600)}`);
     // Nothing was written by the refusal.
     const own = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
     assert(!own.pitfalls.some((p: any) => p.slug === 'keyboard-gap-again'), 'a refused report was written');

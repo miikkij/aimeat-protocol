@@ -45,7 +45,7 @@ export function registerMemoryHistoryTool(
                 ...(limit !== undefined ? { limit } : {}),
             });
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         },
     );
 
@@ -59,7 +59,7 @@ export function registerMemoryHistoryTool(
         async ({ context }) => {
             const out = await checkContext(deps, caller(), readerForAgent(deps, agentGaii), context);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         },
     );
 }

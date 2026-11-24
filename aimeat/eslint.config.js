@@ -9,6 +9,7 @@
  *   pnpm lint
  *
  * @version-history
+ *   2026-11-24 — The MCP tool files refuse an indented JSON.stringify: a tool answer is compact JSON.
  *   2026-11-22 — The src/static/app-catalog/** ignore goes with the removed old app catalogue.
  *   2026-11-21 — src/ refuses req.on('close') (Express 5 fires it when the body is read); test/
  *     refuses a Host header in a fetch (aimeat/no-fetch-host-header).
@@ -25,6 +26,22 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import aimeatPlugin from './eslint-rules/index.js';
 import vitestPlugin from '@vitest/eslint-plugin';
+
+/** What `no-restricted-syntax` refuses in every file under src/. */
+const SRC_RESTRICTED_SYNTAX = [{
+  // A worker thread's resourceLimits do not contain an out-of-memory: a worker that reaches its
+  // heap limit can abort the whole process (Node 24.22, measured 2026-11-14). A memory-limited
+  // worker is a ContainedWorker, which runs it in a child process of its own.
+  selector: "Property[key.name='resourceLimits']",
+  message: 'A worker that reaches resourceLimits can abort the whole node. Use ContainedWorker (src/services/isolation/contained-worker.ts), which runs the worker in a child process.',
+}, {
+  // On Express 5 a request emits `close` once its body has been read, which is usually before the
+  // handler's first await returns, so a listener on it never hears the client leave. A streamed
+  // model answer kept running to nobody this way (routes/chat.ts, 2026-09-08; agui.ts and
+  // llm-proxy.ts until 2026-11-21). The response's close is the event that means the connection went.
+  selector: "CallExpression[callee.type='MemberExpression'][callee.object.name=/^req(uest)?$/][callee.property.name=/^(on|once|addListener|prependListener|prependOnceListener)$/][arguments.0.value=/^(close|aborted)$/]",
+  message: "On Express 5 the request's `close` fires when its body has been read, often before this listener exists, so it never hears the client leave. Listen on the response: res.on('close', () => { if (!res.writableEnded) controller.abort(); }), registered before the first await when the work before it can take time.",
+}];
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -125,19 +142,19 @@ export default tseslint.config(
       // calls had lost their reason that way (QA audit E1-04). Straight to 'error': the 33 were
       // converted in the same change.
       'aimeat/no-error-object-log-field': 'error',
-      // A worker thread's resourceLimits do not contain an out-of-memory: a worker that reaches its
-      // heap limit can abort the whole process (Node 24.22, measured 2026-11-14). A memory-limited
-      // worker is a ContainedWorker, which runs it in a child process of its own.
-      'no-restricted-syntax': ['error', {
-        selector: "Property[key.name='resourceLimits']",
-        message: 'A worker that reaches resourceLimits can abort the whole node. Use ContainedWorker (src/services/isolation/contained-worker.ts), which runs the worker in a child process.',
-      }, {
-        // On Express 5 a request emits `close` once its body has been read, which is usually before the
-        // handler's first await returns, so a listener on it never hears the client leave. A streamed
-        // model answer kept running to nobody this way (routes/chat.ts, 2026-09-08; agui.ts and
-        // llm-proxy.ts until 2026-11-21). The response's close is the event that means the connection went.
-        selector: "CallExpression[callee.type='MemberExpression'][callee.object.name=/^req(uest)?$/][callee.property.name=/^(on|once|addListener|prependListener|prependOnceListener)$/][arguments.0.value=/^(close|aborted)$/]",
-        message: "On Express 5 the request's `close` fires when its body has been read, often before this listener exists, so it never hears the client leave. Listen on the response: res.on('close', () => { if (!res.writableEnded) controller.abort(); }), registered before the first await when the work before it can take time.",
+      'no-restricted-syntax': ['error', ...SRC_RESTRICTED_SYNTAX],
+    },
+  },
+  {
+    // A tool answer is read by a model, and a client counts every character of it against the limit
+    // of one answer (src/models/answer-budget.ts). Indentation was 19 to 36 % of the answers measured
+    // on 2026-11-24, in 350 serializations that each wrote `null, 2`. A later block replaces the
+    // rule's options for its files, so the two selectors of src/ are repeated here.
+    files: ['src/mcp/**/*.ts', 'src/cli/connect/mcp/tools/**/*.ts', 'src/cli/connect/mcp/resources.ts', 'src/tool-dispatch/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...SRC_RESTRICTED_SYNTAX, {
+        selector: "CallExpression[callee.object.name='JSON'][callee.property.name='stringify'][arguments.2]",
+        message: 'A tool answer is written as compact JSON: JSON.stringify(value). Indentation is characters the model pays for and the client counts against the limit of one answer (src/models/answer-budget.ts).',
       }],
     },
   },

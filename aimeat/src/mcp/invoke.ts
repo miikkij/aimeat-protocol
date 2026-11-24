@@ -55,12 +55,12 @@ export function registerInvokeTool(
                 // The refusal text plus its code, because a model reading this has to be able to
                 // tell "you named nothing that exists" from "that capability said no".
                 return {
-                    content: [{ type: 'text' as const, text: JSON.stringify({ code: out.code, message: out.message, details: out.details }, null, 2) }],
+                    content: [{ type: 'text' as const, text: JSON.stringify({ code: out.code, message: out.message, details: out.details }) }],
                     isError: true,
                 };
             }
             const status = out.status !== undefined ? { status: out.status } : {};
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ capability: out.capability, ...status, result: out.result }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ capability: out.capability, ...status, result: out.result }) }] };
         },
     );
 }

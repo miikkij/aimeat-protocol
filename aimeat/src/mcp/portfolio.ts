@@ -68,7 +68,7 @@ import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anony
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
 const out = (payload: unknown, isError = false): TextResult => ({
-    content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
     ...(isError ? { isError: true } : {}),
 });
 

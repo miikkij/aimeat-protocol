@@ -44,7 +44,7 @@ import { appToll } from '../services/app/pacing.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 
-const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
 
 export function registerAppTemplateProposalTools(

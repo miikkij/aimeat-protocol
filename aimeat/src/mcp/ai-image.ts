@@ -133,7 +133,7 @@ export function registerAiImageTool(
                                 : r.publishRequest
                                     ? 'Stored privately until your owner approves making it public; the URL loads for anyone once they do. publish_request.next_step says what to tell them.'
                                     : 'Stored privately. Pass public: true if a model or a page has to fetch it by URL.',
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (e) {

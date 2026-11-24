@@ -25,7 +25,7 @@ import { readOwnTrail, TrailError } from '../services/place-trail.js';
 
 export function registerBuildWithYouTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   const deps = { storage, config };
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
   // Each handler calls its operation in its own body, as the REST route does: the field-reach
   // measurement pairs the two by the function both call.
   const fail = (err: unknown) => {

@@ -25,7 +25,7 @@ import { OPERATOR_AGENT_REFUSAL } from '../services/operator/principal.js';
 import { nodeSiteService } from '../services/site.js';
 import { readTemplateOp, storeTemplateOp, removeTemplateOp } from '../services/site/template-ops.js';
 
-const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerSiteTemplateTools(
     mcp: McpServer,

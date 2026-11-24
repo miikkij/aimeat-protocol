@@ -40,7 +40,7 @@ export function registerReceiverTools(
     const pick = (a: Record<string, unknown>, fields: readonly string[]) => Object.fromEntries(fields.filter(f => a[f] !== undefined).map(f => [f, a[f]]));
     const run = async (tool: string, word: string, fn: () => Promise<Record<string, unknown>>) => {
         try {
-            return { content: [{ type: 'text' as const, text: JSON.stringify(await fn(), null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(await fn()) }] };
         } catch (err) {
             if (!(err instanceof ReceiverError)) throw err;
             if (err.code === 'SCOPE_DENIED') {

@@ -112,7 +112,7 @@ export function registerMemoryExtendedTools(
                             error: wantedTypes.length > 1
                                 ? 'Give a query as well: searching several types at once needs something to search for.'
                                 : 'Give a query, or a single type to list.',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -150,7 +150,7 @@ export function registerMemoryExtendedTools(
                         hint: hits.length > 0
                             ? 'Snippets only. Read a full value with aimeat_memory_read(key).'
                             : `Nothing matches "${q}". This searched the keys and values of every record you hold as this agent. It does not cover what the person or their other agents hold: aimeat_memory_list with owner_scope: true lists those, and its \`prefix\` narrows by key. When that shows nothing either, the record does not exist, and saying so to the person is the answer.`,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -217,7 +217,7 @@ export function registerMemoryExtendedTools(
                         // it: the item is public, so its record resolves for anyone (aiprov E14).
                         ai_provenance_id: record.aiProvenanceId ?? null,
                         ...(await readProvenance(storage, config, record.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },

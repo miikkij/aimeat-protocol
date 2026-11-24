@@ -28,7 +28,7 @@ import { createExposureContext } from '../services/exposure/exposure-types.js';
 import { buildExposureReport, exposureUnreadable, EXPOSURE_UNREADABLE_MESSAGE } from '../services/exposure/exposure-report.js';
 import { readerForAgent } from '../services/classification/reader.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerExposureTools(
   mcp: McpServer,

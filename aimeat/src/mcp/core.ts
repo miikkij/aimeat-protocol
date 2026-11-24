@@ -521,7 +521,7 @@ export function registerCoreTools(
                     return {
                         content: [{
                             type: 'text' as const,
-                            text: JSON.stringify(notInYourNamespace(key, agentGaii, elsewhere.ownerGaii), null, 2),
+                            text: JSON.stringify(notInYourNamespace(key, agentGaii, elsewhere.ownerGaii)),
                         }],
                         isError: true,
                     };
@@ -595,7 +595,7 @@ export function registerCoreTools(
                 scopes: sessionScopes, key, ownerScope: owner_scope === true,
             });
             if ('deny' in target) {
-                return { content: [{ type: 'text' as const, text: JSON.stringify(target.deny, null, 2) }], isError: true };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(target.deny) }], isError: true };
             }
             const writeGaii = target.gaii;
 
@@ -627,7 +627,7 @@ export function registerCoreTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ error: written.code, message: written.message, ...(written.details as object ?? {}) }, null, 2),
+                        text: JSON.stringify({ error: written.code, message: written.message, ...(written.details as object ?? {}) }),
                     }],
                     isError: true,
                 };
@@ -657,7 +657,7 @@ export function registerCoreTools(
                         ...(warnings.length ? { warnings } : {}),
                         // Stored, not public yet: the owner approves (its next_step says what to tell them).
                         ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -675,7 +675,7 @@ export function registerCoreTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ error: 'Invalid agent GAII', gaii: agentGaii }, null, 2),
+                        text: JSON.stringify({ error: 'Invalid agent GAII', gaii: agentGaii }),
                     }],
                 };
             }
@@ -772,7 +772,7 @@ export function registerCoreTools(
             if (!work) {
                 // A cross-node commission that was forwarded: the provider's node owns the row, and
                 // this node has nothing local to report. The HTTP door answers the same way.
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ forwarded: true, note: 'The request was routed to the provider node that holds this agent.' }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ forwarded: true, note: 'The request was routed to the provider node that holds this agent.' }) }] };
             }
             return {
                 content: [{
@@ -781,7 +781,7 @@ export function registerCoreTools(
                         tracking_code: work.trackingCode,
                         status: work.status,
                         cost: presentWorkCost(work.cost, 'snake'),
-                    }, null, 2),
+                    }),
                 }],
             };
         },

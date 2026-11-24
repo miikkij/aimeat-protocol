@@ -29,7 +29,7 @@ import {
   type GroupFailure,
 } from '../services/conversation/group-manage.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const failed = (f: Pick<GroupFailure, 'message' | 'members'> & { code: string }) => toolError(f.code,
   f.members ? `${f.message} ${JSON.stringify({ members: f.members })}` : f.message);
 

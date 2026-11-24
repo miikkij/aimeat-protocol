@@ -216,7 +216,7 @@ export function registerBoardsTools(
                         reactions: p.reactions,
                         reply_to: p.replyTo,
                         created_at: p.createdAt,
-                    })), null, 2),
+                    }))),
                     mimeType: 'application/json',
                 }],
             };
@@ -243,7 +243,7 @@ export function registerBoardsTools(
                         visibility: b.visibility,
                         ...(anonymous ? {} : { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis }),
                         created_at: b.createdAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -289,7 +289,7 @@ export function registerBoardsTools(
                         created_at: board.createdAt,
                         ...(out.publishRequest ? { publish_request: out.publishRequest } : {}),
                         ...(out.warnings ? { warnings: out.warnings } : {}),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -319,7 +319,7 @@ export function registerBoardsTools(
                         rules: boardRulesBlock(out.board) ?? null,
                         effective_rules: effective,
                         note: lifetimeNote(effective),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -348,7 +348,7 @@ export function registerBoardsTools(
                     text: JSON.stringify({
                         subscription_id: sub.id,
                         board_id: sub.boardId,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -378,7 +378,7 @@ export function registerBoardsTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ success: true }, null, 2),
+                    text: JSON.stringify({ success: true }),
                 }],
             };
         },
@@ -420,7 +420,7 @@ export function registerBoardsTools(
                         title: reply.title,
                         created_at: reply.createdAt,
                         ...(await writeProvenanceEcho(storage, config, reply.aiProvenanceId ?? undefined)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -450,7 +450,7 @@ export function registerBoardsTools(
                     text: JSON.stringify({
                         board_id: updated.id,
                         allowed_gaiis: updated.allowedGaiis,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -475,7 +475,7 @@ export function registerBoardsTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ deleted: true }, null, 2),
+                    text: JSON.stringify({ deleted: true }),
                 }],
             };
         },

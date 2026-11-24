@@ -304,11 +304,11 @@ async function main() {
             const refusedTrust = await callTool(ownSession, 'aimeat_admin_internet_opener_set', { owner: A.name, allowed: true, reason: 'Trusting myself' });
             assert(refusedTrust.isError, 'an owner\'s agent trusted its owner');
             const decided = await callTool(opSession, 'aimeat_admin_internet_opening_decide', { owner: A.name, app: file, decision: 'decline', note: 'Not this week' });
-            assert(!decided.isError && decided.text.includes('"state": "declined"'), decided.text.slice(0, 300));
+            assert(!decided.isError && decided.text.includes('"state":"declined"'), decided.text.slice(0, 300));
             const trusted = await callTool(opSession, 'aimeat_admin_internet_opener_set', { owner: B.name, allowed: true, reason: 'Runs the partner pages' });
             assert(!trusted.isError && trusted.text.includes(B.name), trusted.text.slice(0, 300));
             const removed = await callTool(opSession, 'aimeat_admin_internet_opener_set', { owner: B.name, allowed: false });
-            assert(!removed.isError && !removed.text.includes(`"owner": "${B.name}"`), removed.text.slice(0, 300));
+            assert(!removed.isError && !removed.text.includes(`"owner":"${B.name}"`), removed.text.slice(0, 300));
         });
 
         await test('an owner the operator trusts opens at once; once the trust is gone, the extension waits', async () => {
@@ -330,9 +330,9 @@ async function main() {
             const agent = await makeAgent(BASE, A, ['app:write', 'memory:read']);
             const session = await openSession(BASE, agent.token);
             const g = await callTool(session, 'aimeat_app_internet_opening_get', { app: file });
-            assert(!g.isError && g.text.includes('"mode": "operator"'), g.text.slice(0, 300));
+            assert(!g.isError && g.text.includes('"mode":"operator"'), g.text.slice(0, 300));
             const o = await callTool(session, 'aimeat_app_internet_open', { app: file, reason: 'Asked by the agent for the event' });
-            assert(!o.isError && o.text.includes('"outcome": "requested"'), o.text.slice(0, 300));
+            assert(!o.isError && o.text.includes('"outcome":"requested"'), o.text.slice(0, 300));
             const w = await callTool(session, 'aimeat_admin_internet_openings', {});
             assert(w.isError, 'an owner\'s agent read the operators\' list');
             const c = await callTool(session, 'aimeat_app_internet_close', { app: file, reason: 'Withdrawn' });

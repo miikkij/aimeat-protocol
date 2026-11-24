@@ -96,7 +96,7 @@ export function registerCatalogueTools(
                         capabilities: a.capabilities,
                         trust_score: a.trustScore,
                         last_seen: a.lastSeen,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -121,7 +121,7 @@ export function registerCatalogueTools(
                         name: b.name,
                         description: b.description,
                         created_at: b.createdAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -165,7 +165,7 @@ export function registerCatalogueTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify(entries, null, 2),
+                    text: JSON.stringify(entries),
                 }],
             };
         },

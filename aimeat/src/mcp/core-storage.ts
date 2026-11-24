@@ -164,7 +164,7 @@ export function registerCoreStorageTools(
                             note: minted.direct
                                 ? 'PUT the raw file to upload_url with upload_headers, then POST complete_url. The complete answer is the result as JSON.'
                                 : 'PUT the raw file to upload_url. The response contains the result as JSON.',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -226,7 +226,7 @@ export function registerCoreStorageTools(
                     // For an app or a page, not a document: the same address with ?v=<this write>,
                     // so a re-upload under this key is not served from a browser's five-minute copy.
                     versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
-                }, null, 2) }],
+                }) }],
             };
         },
     );
@@ -261,7 +261,7 @@ export function registerCoreStorageTools(
                     : resolved.access === 'denied'
                         ? `You may not read ${resolved.ref} (${resolved.reason}). The owner can make it readable by their own agents by uploading it with visibility:'owner', or grant you consent for storage:${resolved.key}.`
                         : `No such file: ${resolved.ref}`;
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ access: resolved.access, ref: resolved.ref, reason: resolved.reason, hint }, null, 2) }], isError: true };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ access: resolved.access, ref: resolved.ref, reason: resolved.reason, hint }) }], isError: true };
             }
 
             const file = resolved.file;
@@ -306,7 +306,7 @@ export function registerCoreStorageTools(
                                 ? 'inline refused (file too large or not text) — returning a handle instead'
                                 : 'Binary content is not inlined. GET download_url to fetch the bytes out-of-band.',
                             ...(risk ? { content_risk: risk } : {}),
-                        }, null, 2),
+                        }),
                     },
                 ],
             };

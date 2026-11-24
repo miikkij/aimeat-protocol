@@ -131,7 +131,7 @@ mcp.registerTool(
             content: [{ type: 'text' as const, text: JSON.stringify({
                 id: post.id, board_id, title, posted: true,
                 ...(await writeProvenanceEcho(storage, config, provenanceId)),
-            }, null, 2) }],
+            }) }],
         };
     },
 );

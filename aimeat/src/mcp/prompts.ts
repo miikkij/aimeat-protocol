@@ -273,7 +273,7 @@ export function registerPromptsTools(
                             content: fill(fallback.content),
                             group: fallback.group,
                             variables: fallback.variables,
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -288,7 +288,7 @@ export function registerPromptsTools(
                         content: fill(record.content),
                         group: record.group,
                         variables: record.variables,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

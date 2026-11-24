@@ -137,7 +137,7 @@ export function registerAgentManagementTools(
                         gaii: outcome.agent.gaii,
                         name: outcome.agent.name,
                         tags: outcome.agent.tags ?? [],
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -158,7 +158,7 @@ export function registerAgentManagementTools(
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             const outcome = await setAgentDescription({ storage, config }, localAccountName(agentGaii), target_agent_name, description);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '' }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '' }) }] };
         },
     );
 
@@ -180,7 +180,7 @@ export function registerAgentManagementTools(
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             const outcome = await setAgentRunMode({ storage, config }, localAccountName(agentGaii), target_agent_name, run_mode);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null }) }] };
         },
     );
 
@@ -207,7 +207,7 @@ export function registerAgentManagementTools(
             }
             const outcome = await setAgentRuntimeSource({ storage, config }, localAccountName(agentGaii), target_agent_name, src);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }) }] };
         },
     );
 
@@ -239,7 +239,7 @@ export function registerAgentManagementTools(
                         gaii: outcome.agent.gaii,
                         name: outcome.agent.name,
                         mode: outcome.agent.mode ?? 'interactive',
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -264,7 +264,7 @@ export function registerAgentManagementTools(
             }
             // Same function the HTTP route calls, so the two surfaces cannot answer differently.
             const view = await describeBasicAgents(config, storage, localAccountName(agentGaii));
-            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view) }] };
         },
     );
 
@@ -287,7 +287,7 @@ export function registerAgentManagementTools(
             if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
             const data: Record<string, unknown> = { ...out };
             delete data.ok;
-            return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
         },
     );
 
@@ -322,7 +322,7 @@ export function registerAgentManagementTools(
                         already_waiting: out.alreadyWaiting ?? false,
                         approval_url: approvalUrl,
                         next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false, out.proposal.scopes),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -339,7 +339,7 @@ export function registerAgentManagementTools(
         },
         async () => {
             const answer = await connectorListAnswer({ config, storage }, caller().owner);
-            return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer) }] };
         },
     );
 
@@ -361,7 +361,7 @@ export function registerAgentManagementTools(
             if (!who.has('agent:write')) return refused('SCOPE_DENIED', 'Scope "agent:write" is required to name a connector.');
             const out = await renameConnector({ config, storage }, who.owner, String(connector ?? ''), name);
             if (!out.ok) return refused(out.code, out.message);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ connector: out.connector }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ connector: out.connector }) }] };
         },
     );
 
@@ -380,7 +380,7 @@ export function registerAgentManagementTools(
             // The failure in the result shape the success uses, code first as toolError writes it,
             // so the handler has one return type (as aimeat_connector_rename).
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ programs: out.programs }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ programs: out.programs }) }] };
         },
     );
 
@@ -412,7 +412,7 @@ export function registerAgentManagementTools(
                         gaii: outcome.agent.gaii,
                         name: outcome.agent.name,
                         console_url: outcome.agent.consoleUrl ?? null,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

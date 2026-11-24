@@ -67,7 +67,7 @@ export function registerWalletExtendedTools(
                         counterparty_gaii: tx.counterpartyGaii,
                         tracking_code: tx.trackingCode,
                         timestamp: tx.timestamp,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },

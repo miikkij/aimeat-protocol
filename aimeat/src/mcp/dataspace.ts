@@ -33,7 +33,7 @@ export function registerDataspaceTool(
     caller: () => CallerContext,
 ): void {
     const answer = <T>(out: DataspaceAnswer<T>) => {
-        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         if (out.code === 'SCOPE_DENIED') {
             return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_dataspace', [PARTY_MANAGE_SCOPE], { baseUrl: config.baseUrl, agentGaii: caller().principal }) }], isError: true as const };
         }

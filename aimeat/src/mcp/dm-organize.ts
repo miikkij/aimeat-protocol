@@ -31,7 +31,7 @@ import { archiveConversations, organizeView, readInboxOrganizeStrict, updateInbo
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const refusal = (message: string, code: string) => ({ isError: true, ...text({ error: message, code }) });
 
 export function registerDmOrganizeTools(

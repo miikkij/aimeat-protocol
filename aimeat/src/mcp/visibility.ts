@@ -35,7 +35,7 @@ import { readBehaviour } from '../services/visibility/behaviour-report.js';
 import { setBehaviourSettings, BehaviourSettingsError } from '../services/visibility/behaviour-settings.js';
 import { runBehaviourFix, behaviourSettingsView, BehaviourFixError } from '../services/visibility/behaviour-fixer.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerVisibilityTools(
   mcp: McpServer,

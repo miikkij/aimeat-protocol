@@ -58,7 +58,7 @@ export function registerWorkspaceDocumentTools(
                 ...(r.seededFromPublished ? { seeded_from_published: true } : {}),
                 ...(r.attempts > 1 ? { attempts: r.attempts } : {}),
                 note: 'The DRAFT changed. Publish it with aimeat_workspace_publish when it is ready.',
-            }, null, 2),
+            }),
         }],
     });
     const editFail = (err: unknown): TextResult => {

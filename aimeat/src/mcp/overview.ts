@@ -29,7 +29,7 @@ import type { OverviewRange } from '../services/overview/overview-types.js';
 /** The lane size an AI gets when it names neither `focus` nor `limit`. */
 const DEFAULT_LIMIT = 10;
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerOverviewTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   mcp.registerTool('aimeat_overview', { description: descriptionFor('aimeat_overview'), inputSchema: zodShapeFor('aimeat_overview'), annotations: annotationsFor('aimeat_overview') },

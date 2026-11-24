@@ -103,7 +103,7 @@ export function registerChatInstancesTools(
                         created_at: inst.createdAt,
                         last_seen: inst.lastSeen,
                         agent_gaii: inst.agentGaii ?? null,
-                    }, null, 2),
+                    }),
                     mimeType: 'application/json',
                 }],
             };
@@ -134,7 +134,7 @@ export function registerChatInstancesTools(
                         created_at: inst.createdAt,
                         last_seen: inst.lastSeen,
                         agent_gaii: inst.agentGaii ?? null,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -173,7 +173,7 @@ export function registerChatInstancesTools(
                         platform: inst.platform,
                         status: created ? 'created' : 'existing',
                         created_at: inst.createdAt,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -211,7 +211,7 @@ export function registerChatInstancesTools(
                         last_seen: inst.lastSeen,
                         agent_gaii: inst.agentGaii ?? null,
                         node_id: inst.nodeId,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

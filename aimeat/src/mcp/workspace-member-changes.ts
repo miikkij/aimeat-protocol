@@ -56,7 +56,7 @@ export function registerWorkspaceMemberChangeTools(
     const { storage, config } = deps;
     const svc = { storage, config };
     const changeCaller = (): ChangeCaller => caller().principalView;
-    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
 
     mcp.registerTool('aimeat_workspace_space_add', { description: descriptionFor('aimeat_workspace_space_add'),
         inputSchema: zodShapeFor('aimeat_workspace_space_add'),

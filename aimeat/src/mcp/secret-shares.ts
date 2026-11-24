@@ -42,7 +42,7 @@ function bodyOf(args: Record<string, unknown>, fields: readonly string[]): Recor
 export function registerSecretShareTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
     const deps = { storage, config };
     const answer = <T>(r: ShareResult<T>): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } => (r.ok
-        ? { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] }
+        ? { content: [{ type: 'text' as const, text: JSON.stringify(r.data) }] }
         : toolError(r.code, r.message));
 
     mcp.registerTool('aimeat_secret_share_create', { description: descriptionFor('aimeat_secret_share_create'), inputSchema: zodShapeFor('aimeat_secret_share_create'), annotations: annotationsFor('aimeat_secret_share_create') },

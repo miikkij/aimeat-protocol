@@ -256,7 +256,7 @@ export function registerOrganismsTools(
                         })),
                         created_at: organism.createdAt,
                         updated_at: organism.updatedAt,
-                    }, null, 2),
+                    }),
                     mimeType: 'application/json',
                 }],
             };
@@ -304,7 +304,7 @@ export function registerOrganismsTools(
                         interests: o.interests,
                         location: o.location,
                         created_at: o.createdAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -364,7 +364,7 @@ export function registerOrganismsTools(
                         ...await perMemberFields({ storage, config }, getOwnerName(), organism.id),
                         // The organism's own objectives, for a member (services/structure/organism-objectives.ts).
                         ...await objectiveFields({ storage, config }, getOwnerName(), organism.id, caller().ownerGhii, readerForAgent({ storage, config }, agentGaii)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -399,9 +399,9 @@ export function registerOrganismsTools(
             }
             if (result.outcome === 'joined') {
                 emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id }) }] };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'pending_approval', organism_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'pending_approval', organism_id }) }] };
         },
     );
 
@@ -420,7 +420,7 @@ export function registerOrganismsTools(
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
 
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ left: true, organism_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ left: true, organism_id }) }] };
         },
     );
 
@@ -467,7 +467,7 @@ export function registerOrganismsTools(
                         joined_at: m.joinedAt,
                         invited_by: m.invitedBy,
                         ...(canSeeAgents ? { agents: agentsByOwner.get(localAccountName(m.ghii)) ?? [] } : {}),
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -508,7 +508,7 @@ export function registerOrganismsTools(
             // Caller identity for the workspace read gate: the full GAII (agent) resolves via same-owner.
             const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws,
                 { archived, reader: readerForAgent({ storage, config }, agentGaii) });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated, archived: archived ?? 'exclude' }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated, archived: archived ?? 'exclude' }) }] };
         },
     );
 
@@ -530,7 +530,7 @@ export function registerOrganismsTools(
                 { principal: session.principal, ownerName: getOwnerName(), roles: session.roles, scopes: session.scopes },
                 organism_id, action, { level, ws, namespace, key });
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: out.level, [action === 'archive' ? 'archived' : 'restored']: out.count, root: out.root }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: out.level, [action === 'archive' ? 'archived' : 'restored']: out.count, root: out.root }) }] };
         },
     );
 
@@ -568,7 +568,7 @@ export function registerOrganismsTools(
                 enabled: config.aiProvenance,
             });
             const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId }, config);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ comment, ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ comment, ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) }) }] };
         },
     );
 
@@ -590,7 +590,7 @@ export function registerOrganismsTools(
             // (services/content/risk-read.ts).
             const rr = await riskForRead({ storage, config }, caller(), commentRiskItems(organism_id, ws, commentPrefix(organism_id, ws, space, instance_id), listed));
             const comments = listed.map((c, i) => withRisk(c as unknown as Record<string, unknown>, rr.items[i] ?? null, ['body']));
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ ...(rr.warning ? { content_risk_warning: rr.warning } : {}), comments, total: comments.length }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ ...(rr.warning ? { content_risk_warning: rr.warning } : {}), comments, total: comments.length }) }] };
         },
     );
 
@@ -611,7 +611,7 @@ export function registerOrganismsTools(
                 { ws, space, instanceId: instance_id, commentId: comment_id });
             if (!result.ok) return { ...toolError(result.code, result.message) };
             emitChange('organisms');
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: comment_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: comment_id }) }] };
         },
     );
 
@@ -647,7 +647,7 @@ export function registerOrganismsTools(
                         ...(result.workspaces ? { workspaces: result.workspaces, workspaces_not_created: result.workspacesNotCreated ?? [] } : {}),
                         ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
                         ...(result.warnings ? { warnings: result.warnings } : {}),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -691,7 +691,7 @@ export function registerOrganismsTools(
                 updated: true, organism_id, name: result.organism.name, visibility: result.organism.visibility, readme_set: result.readmeSet,
                 ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
                 ...(result.warnings ? { warnings: result.warnings } : {}),
-            }, null, 2) }] };
+            }) }] };
         },
     );
 
@@ -713,7 +713,7 @@ export function registerOrganismsTools(
                 reader: readerForAgent({ storage, config }, agentGaii),
             });
             if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}), ...(truncated.length ? { truncated } : {}) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}), ...(truncated.length ? { truncated } : {}) }) }] };
         });
 
     // ── Tool 8: aimeat_organism_import ──
@@ -728,7 +728,7 @@ export function registerOrganismsTools(
             const options = parseTransferOptions({ people, team });
             try {
                 if (preview === true) {
-                    return { content: [{ type: 'text' as const, text: JSON.stringify(await previewOrganismImport(config, buf, options), null, 2) }] };
+                    return { content: [{ type: 'text' as const, text: JSON.stringify(await previewOrganismImport(config, buf, options)) }] };
                 }
                 const session = caller();
                 const result = await importOrganism(storage, config, {
@@ -742,7 +742,7 @@ export function registerOrganismsTools(
                     zip: buf, options,
                 });
                 emitResourceListChanged(agentGaii);
-                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
             } catch (e) {
                 if (e instanceof ZipSecurityError) {
                     const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: `${ownerName}@${config.nodeId}`, actorName: ownerName, detail: e.message, source: 'organism_import_mcp', blob: buf });

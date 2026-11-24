@@ -256,7 +256,7 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: JSON.stringify({
                     deduplicated: true, task_id: result.task.id, status: result.task.status,
                     note: 'An identical commission is already live for this agent; the existing one is returned instead of queueing a second.',
-                }, null, 2) }] };
+                }) }] };
             }
 
             const created = result.task;
@@ -274,7 +274,7 @@ export function registerAgentTaskTools(
                         start: startAnswer(targetAgent.displayName || target_agent, result.decision, created.status),
                         files: created.resources?.files?.length ?? 0,
                         created_at: created.createdAt,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -330,7 +330,7 @@ export function registerAgentTaskTools(
                         total: result.total,
                         page: pageNum,
                         per_page: perPage,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -394,7 +394,7 @@ export function registerAgentTaskTools(
                         created_at: task.createdAt,
                         updated_at: task.updatedAt,
                         completed_at: task.completedAt,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -453,7 +453,7 @@ export function registerAgentTaskTools(
                             title: todo.title,
                             status: todo.status,
                         })),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -474,7 +474,7 @@ export function registerAgentTaskTools(
             const out = await startWaitingTask({ storage, config }, startCaller, localAccountName(agentGaii), task_id);
             if (!out.ok) return { ...toolError(out.code, out.message) };
             emitResourceUpdated(out.task.agentGaii, `aimeat://agents/${out.task.agentGaii.split('#')[0]}/tasks`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ started: true, task_id: out.task.id, status: out.task.status }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ started: true, task_id: out.task.id, status: out.task.status }) }] };
         },
     );
 
@@ -497,7 +497,7 @@ export function registerAgentTaskTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({
                 deleted: true, task_id: out.task.id, title: out.task.title, agent: out.task.agentGaii.split('#')[0], status_was: out.task.status,
-            }, null, 2) }] };
+            }) }] };
         },
     );
 
@@ -516,7 +516,7 @@ export function registerAgentTaskTools(
             const out = await removeAgent({ storage, config, closeMcpSessions: closeMcpSessionsForGaii },
                 { owner: localAccountName(agentGaii), principal: agentGaii, ownerInPerson: false }, target_agent_name);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         },
     );
 
@@ -537,7 +537,7 @@ export function registerAgentTaskTools(
                 : await setAgentTaskStartSettings({ storage, config }, { owner: localAccountName(agentGaii), principal: agentGaii, isApp: false },
                     target_agent_name, { taskStart: task_start, appWaits: task_start_app_waits });
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }) }] };
         },
     );
 
@@ -558,7 +558,7 @@ export function registerAgentTaskTools(
                 if (!out.ok) return { ...toolError(out.code, out.message) };
                 return { content: [{ type: 'text' as const, text: JSON.stringify({
                     name: out.agent.name, ...stoppedView(out.agent), changed: out.changed, released: out.released,
-                }, null, 2) }] };
+                }) }] };
             },
         );
     }
@@ -585,7 +585,7 @@ export function registerAgentTaskTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({
                 agent: target_agent_name, workplace: workplaceView(out.workplace),
-            }, null, 2) }] };
+            }) }] };
         },
     );
 
@@ -604,7 +604,7 @@ export function registerAgentTaskTools(
             // services/agent/narrow-own-agent.ts, which POST /v1/agents/:name/scope-narrowing calls too.
             const out = await narrowOwnAgent(storage, config.nodeId, localAccountName(agentGaii), target_agent_name);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used }) }] };
         },
     );
 
@@ -646,7 +646,7 @@ export function registerAgentTaskTools(
                         event_id: result.event.id,
                         task_id,
                         type: result.event.type,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -684,7 +684,7 @@ export function registerAgentTaskTools(
                         todo_id,
                         status,
                         todo_title: result.todo.title,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -741,7 +741,7 @@ export function registerAgentTaskTools(
                         // node actually stored: it is trimmed and capped at 256 characters.
                         ...(done.task.deliverableKey ? { deliverable_key: done.task.deliverableKey } : {}),
                         ...(await writeProvenanceEcho(storage, config, done.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -781,7 +781,7 @@ export function registerAgentTaskTools(
                         status: updated?.status ?? 'failed',
                         reason,
                         completed_at: now,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -817,7 +817,7 @@ export function registerAgentTaskTools(
                         status: updated.status,
                         reason: reason.trim(),
                         completed_at: updated.completedAt ?? new Date().toISOString(),
-                    }, null, 2),
+                    }),
                 }],
             };
         },

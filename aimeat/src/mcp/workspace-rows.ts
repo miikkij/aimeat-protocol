@@ -64,7 +64,7 @@ export function registerWorkspaceRowTools(
     const { storage, config, agentGaii, writerGaii, scopes } = deps;
     const rowDeps = { storage, config };
 
-    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
 
     // `principal` is what the shared access rule decides on (it matches an organism agent by GAII);

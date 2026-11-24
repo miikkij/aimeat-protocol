@@ -27,7 +27,7 @@ import {
 } from '../services/organism-join-requests/requests.js';
 import { accessTargetOf } from '../services/organism-join-requests/access-targets.js';
 
-const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerOrganismJoinRequestTools(
     mcp: McpServer,

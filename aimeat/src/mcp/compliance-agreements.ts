@@ -30,7 +30,7 @@ import { agreementGaps } from '../services/compliance/agreements-gaps.js';
 
 export function registerComplianceAgreementTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   const deps = { storage, config };
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
 
   mcp.registerTool('aimeat_compliance_agreement', {
     description: descriptionFor('aimeat_compliance_agreement'),

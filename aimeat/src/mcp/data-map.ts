@@ -53,7 +53,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
-const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
 const fail = (msg: string) => ({ isError: true, content: [{ type: 'text' as const, text: msg }] });
 
 export function registerDataMapTools(

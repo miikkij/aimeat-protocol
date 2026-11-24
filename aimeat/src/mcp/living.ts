@@ -39,7 +39,7 @@ export function registerLivingTools(
     }, async ({ need, catalogue }) => {
         try {
             const result = await authorLivingTemplate(storage, config, { caller: caller(), need, catalogue });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
         } catch (e) {
             // The route's two answers: the service's stable code, or AUTHOR_FAILED.
             if (e instanceof NotebookAiError) return { ...toolError(e.code, e.message) };

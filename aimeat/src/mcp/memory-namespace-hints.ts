@@ -14,7 +14,7 @@
  * @structure notInYourNamespace · OWNER_SCOPE_LIST_NOTE
  * @usage
  *   import { notInYourNamespace } from './memory-namespace-hints.js';
- *   return { content: [{ type: 'text', text: JSON.stringify(notInYourNamespace(...), null, 2) }], isError: true };
+ *   return { content: [{ type: 'text', text: JSON.stringify(notInYourNamespace(...)) }], isError: true };
  * @version-history
  *   v1.1.0 — 2026-09-13 — shadowedByOwnerCopy removed: the shadow warning is written once, by
  *     services/memory-write.ts, for every door, and this copy had no caller left. Its advice to use

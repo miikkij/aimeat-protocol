@@ -41,7 +41,7 @@ import { readCatalogue, readRequests, setCatalogueEntry } from '../services/pack
 import { decideSaleRequest, reviewSale } from '../services/packages/sale/package-sale-checkout.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 
 export function registerAdminInstallSetTools(
     mcp: McpServer,

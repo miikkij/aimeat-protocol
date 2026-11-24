@@ -26,7 +26,7 @@ import { readAdult, NOT_VERIFIED } from '../services/adult-assurance.js';
 import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
 import { embedProvenance, EmbedError } from '../services/provenance-embed/index.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerAccountRightsTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   mcp.registerTool('aimeat_adult_status', { description: descriptionFor('aimeat_adult_status'), inputSchema: zodShapeFor('aimeat_adult_status'), annotations: annotationsFor('aimeat_adult_status') },

@@ -204,7 +204,7 @@ export function registerAppsTools(
      */
     function refusalText(refusal: { message: string; details?: Record<string, unknown> }): string {
         if (!refusal.details) return refusal.message;
-        return `${refusal.message}\n\n${JSON.stringify(refusal.details, null, 2)}`;
+        return `${refusal.message}\n\n${JSON.stringify(refusal.details)}`;
     }
 
     /**
@@ -323,7 +323,7 @@ export function registerAppsTools(
                             max_size_bytes: MAX_APP_SIZE,
                             expires_in_seconds: 3600,
                             note: 'PUT the raw HTML file to upload_url. The response contains the publish result as JSON.',
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -398,7 +398,7 @@ export function registerAppsTools(
                             next_steps: out.nextSteps,
                             // Published unlisted, not public yet: the owner approves (its next_step says what to tell them).
                             ...publishAskedFields(out.publishAsked),
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {
@@ -465,7 +465,7 @@ export function registerAppsTools(
                             preview_expires_in_seconds: preview.expires_in_seconds,
                             note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
                             ...servedMarksResponse(staged),
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {
@@ -544,7 +544,7 @@ export function registerAppsTools(
                             ...servedMarksResponse(out),
                             next_steps: out.nextSteps,
                             ...publishAskedFields(out.publishAsked),
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {
@@ -571,7 +571,7 @@ export function registerAppsTools(
             if (!discarded) {
                 return { content: [{ type: 'text' as const, text: `No draft to discard for "${filename}".` }], isError: true };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, discarded: true }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, discarded: true }) }] };
         },
     );
 
@@ -682,7 +682,7 @@ export function registerAppsTools(
                         limit: take,
                         offset: skip,
                         has_more: skip + result.length < total,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -752,7 +752,7 @@ export function registerAppsTools(
                         // What the app loads and calls, read from its bytes at publish (the dependency map).
                         requires: await requirementsOf(storage, 'app', depAppRef(app.ownerName, app.filename)),
                         news,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -799,7 +799,7 @@ export function registerAppsTools(
                             filename,
                             version_deleted: out.versionDeleted,
                             note: version ? `Version ${version} deleted.` : 'App deleted (all versions).',
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {

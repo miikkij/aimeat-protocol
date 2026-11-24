@@ -86,7 +86,7 @@ export function registerAgentCapabilityTools(
                         technical_capabilities: updated.technicalCapabilities ?? [],
                         domain_capabilities: updated.domainCapabilities ?? [],
                         languages: updated.languages ?? [],
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -119,7 +119,7 @@ export function registerAgentCapabilityTools(
                     text: JSON.stringify({
                         stats: agent.activityStats ?? null,
                         history,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

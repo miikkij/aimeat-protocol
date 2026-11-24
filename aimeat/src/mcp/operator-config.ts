@@ -144,7 +144,7 @@ export function registerOperatorConfigTools(
     const callerOwner = localAccountName(agentGaii) || null;
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
-    const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+    const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 
     mcp.registerTool(
         'aimeat_operator_agent_configure',

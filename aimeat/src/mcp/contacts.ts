@@ -103,7 +103,7 @@ export function registerContactTools(
         },
         async ({ q, state, include }) => {
             const answer = await listContactsFor(storage, config, session(), { q, state, include });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer) }] };
         },
     );
 
@@ -119,7 +119,7 @@ export function registerContactTools(
             try {
                 const inviterName = localAccountName(getAgentGaii());
                 const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message: message ?? null });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }) }] };
             } catch (e) {
                 // With its code, as the REST door answers: an invitation counts as an address lookup
                 // and can be RATE_LIMITED, which an agent has to tell apart from a refused address.
@@ -153,7 +153,7 @@ export function registerContactTools(
             }
             try {
                 const saved = await addContact(storage, config, ownerGhii(), input);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'saved', ...saved }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'saved', ...saved }) }] };
             } catch (e) {
                 // With its code, as the REST door answers: a save by email can be RATE_LIMITED, which
                 // an agent has to tell apart from a bad address to know that waiting is the fix.
@@ -174,7 +174,7 @@ export function registerContactTools(
         async ({ contact_id }) => {
             try {
                 await removeContact(storage, ownerGhii(), contact_id);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'removed', contact_id }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'removed', contact_id }) }] };
             } catch (e) {
                 return withCaughtError({ content: [{ type: 'text' as const, text: errText(e) }], isError: true }, e);
             }
@@ -200,7 +200,7 @@ export function registerContactTools(
         async ({ email }) => {
             try {
                 const result = await resolveContactEmail(storage, getAgentGaii(), String(email ?? ''));
-                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
             } catch (e) {
                 if (e instanceof ContactsError) return { ...toolError(e.code, e.message) };
                 throw e;

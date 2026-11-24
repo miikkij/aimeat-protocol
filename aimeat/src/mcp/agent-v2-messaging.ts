@@ -40,11 +40,11 @@ import { agentSessionCaller, type CallerContext } from '../services/caller-conte
 function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
   if (!out.ok) {
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify({ code: out.code, message: out.message, details: out.details }, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ code: out.code, message: out.message, details: out.details }) }],
       isError: true,
     };
   }
-  return { content: [{ type: 'text' as const, text: JSON.stringify(shape(out.value), null, 2) }] };
+  return { content: [{ type: 'text' as const, text: JSON.stringify(shape(out.value)) }] };
 }
 
 export function registerAgentV2MessagingTools(

@@ -74,7 +74,7 @@ export function registerSeoTools(
         return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
       }
       const status = await buildSeoStatus(config, storage);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(status, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(status) }] };
     },
   );
 
@@ -97,7 +97,7 @@ export function registerSeoTools(
         const plan = await planAnnouncement(config, storage, scope);
         return { content: [{ type: 'text' as const, text: JSON.stringify({
           scope, url_count: plan.urls.length, host_count: plan.hosts.length, hosts: plan.hosts, urls: plan.urls,
-        }, null, 2) }] };
+        }) }] };
       }
       const out = await announceEverything(config, storage, { scope, by: operator });
       if (!out.sent) {
@@ -114,7 +114,7 @@ export function registerSeoTools(
         content: [{ type: 'text' as const, text: JSON.stringify({
           scope, url_count: run.urlCount, host_count: run.hosts, run,
           note: announceNote(scope, run.urlCount, run.hosts, run.failed),
-        }, null, 2) }],
+        }) }],
         ...(run.failed.length === run.hosts ? { isError: true } : {}),
       };
     },

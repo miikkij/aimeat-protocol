@@ -97,7 +97,7 @@ export function registerConnectionTools(
     getAgentGaii: () => string,
     scopes: string[],
 ): void {
-    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
 
     const providers = buildOutboundProviders(config);
@@ -383,7 +383,7 @@ export function registerConnectionTools(
                         return {
                             content: [{
                                 type: 'text',
-                                text: JSON.stringify({ code: err.code, ...details, note: err.message }, null, 2),
+                                text: JSON.stringify({ code: err.code, ...details, note: err.message }),
                             }],
                             isError: true,
                         };

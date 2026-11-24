@@ -61,11 +61,11 @@ export function registerNotifyTools(
                 // only tool of 318 on this surface that reached broken storage and said nothing.
                 if (!r.created) {
                     return {
-                        content: [{ type: 'text' as const, text: JSON.stringify({ status: 'not_delivered', reason: 'The node could not store the notification, so the owner was not told.', retry: 'Try again; if it keeps failing, send them a message instead.' }, null, 2) }],
+                        content: [{ type: 'text' as const, text: JSON.stringify({ status: 'not_delivered', reason: 'The node could not store the notification, so the owner was not told.', retry: 'Try again; if it keeps failing, send them a message instead.' }) }],
                         isError: true,
                     };
                 }
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'notified', link: r.link, ...(email !== undefined ? { emailed: r.emailed } : {}) }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'notified', link: r.link, ...(email !== undefined ? { emailed: r.emailed } : {}) }) }] };
             } catch (e) {
                 const text = e instanceof NotificationCreateError ? e.message : ((e as Error)?.message || 'Notification failed');
                 return { content: [{ type: 'text' as const, text }], isError: true };

@@ -44,7 +44,7 @@ export function registerDataProductTool(
     caller: () => CallerContext,
 ): void {
     const answer = <T>(out: DataProductAnswer<T>) => {
-        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         if (out.code === 'SCOPE_DENIED' && !out.source) {
             const words = [...out.message.matchAll(/"([a-z]+:[a-z-]+)"/g)].map(m => m[1]!);
             if (words.length) return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_dataproduct', words, { baseUrl: config.baseUrl, agentGaii: caller().principal }) }], isError: true as const };
@@ -64,7 +64,7 @@ export function registerDataProductTool(
         // /v1/datapackages/shared answers with the same service function (WP11).
         if (action === 'shared') {
             const out = await sharedDataForCaller({ storage, config }, caller());
-            return out.ok ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] } : toolError(out.code, out.message);
+            return out.ok ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] } : toolError(out.code, out.message);
         }
         if (action !== 'list' && !name) return toolError('INVALID_INPUT', `action "${action}" needs name, the product (and package) name.`);
         const body = Object.fromEntries(DEFINITION_FIELDS.filter(f => a[f] !== undefined).map(f => [f, a[f]]));

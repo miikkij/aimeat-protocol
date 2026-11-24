@@ -25,7 +25,7 @@ import { teamSetupForCaller, teamStatusForCaller, teamWaitingForCaller } from '.
 import { shareTeamDecision } from '../services/team/share-decision.js';
 import { recordTeamOnboarding } from '../services/team/onboarding.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerTeamTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
     mcp.registerTool(

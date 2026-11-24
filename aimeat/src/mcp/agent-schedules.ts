@@ -88,7 +88,7 @@ export function registerAgentScheduleTools(
   const ownerScope = `${owner}@${config.nodeId}`;
   const selfName = agentGaii.split('#')[0];
 
-  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 
   /**

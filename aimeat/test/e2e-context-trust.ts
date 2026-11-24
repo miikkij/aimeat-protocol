@@ -178,7 +178,7 @@ await test('A key outside contexts and ontologies keeps no history', async () =>
 
 await test('The agent that reads as the owner reads the history over MCP', async () => {
     const r = await call(asOwner, 'aimeat_memory_history', { key: 'context.trip', owner_scope: true });
-    assert(!r.error && r.text.includes('"keeps_history": true') && r.text.includes('references[ref=memory:trip.hotel]'), `MCP history: ${r.text.slice(0, 300)}`);
+    assert(!r.error && r.text.includes('"keeps_history":true') && r.text.includes('references[ref=memory:trip.hotel]'), `MCP history: ${r.text.slice(0, 300)}`);
     const one = await call(asOwner, 'aimeat_memory_history', { key: 'context.trip', owner_scope: true, version: v1 });
     assert(!one.error && one.text.includes('Flights booked.'), `MCP one version: ${one.text.slice(0, 200)}`);
 });
@@ -254,7 +254,7 @@ await test('The check names a dead reference, a lost quote, a dangling id and a 
 
 await test('The agent runs the check over MCP', async () => {
     const r = await call(plain, 'aimeat_context_check', { context: 'context.trip' });
-    assert(!r.error && r.text.includes('"healthy": true'), `MCP check: ${r.text.slice(0, 300)}`);
+    assert(!r.error && r.text.includes('"healthy":true'), `MCP check: ${r.text.slice(0, 300)}`);
 });
 
 console.log(`\n=== Context trust: ${passed} passed, ${failed} failed ===\n`);

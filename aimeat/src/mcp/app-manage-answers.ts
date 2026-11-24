@@ -18,7 +18,7 @@ import type { AppOpOutcome } from '../services/app/op-outcome.js';
 export type ToolAnswer = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 export function answer(data: unknown): ToolAnswer {
-    return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
 
 /**

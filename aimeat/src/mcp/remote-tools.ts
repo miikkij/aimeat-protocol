@@ -199,7 +199,7 @@ export async function registerRemoteTools(
             return { content: [{ type: 'text' as const, text: result.message }], isError: true };
           }
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result.content, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify(result.content) }],
             ...(result.isError ? { isError: true } : {}),
           };
         },

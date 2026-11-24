@@ -25,7 +25,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { buildCorsOverview, setCorsList } from '../services/cors-overview.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 export function registerAdminCorsTools(

@@ -253,7 +253,7 @@ export function registerDmMessageTools(
                             note: soleParticipantNote(group.conversation, sent.delivered),
                             reply_with: 'aimeat_dm_send with conversation_id set to the value above',
                             ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
-                        }, null, 2),
+                        }),
                     }],
                 };
             }
@@ -296,7 +296,7 @@ export function registerDmMessageTools(
                             reply_with: 'aimeat_dm_send with conversation_id set to the value above',
                         } : {}),
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -364,7 +364,7 @@ export function registerDmMessageTools(
                             : `Delivered to ${result.sent}. Each recipient has their own thread and can reply to you in it.`,
                         read_results_with: `GET /v1/messages/broadcast/${result.broadcastId}`,
                         ...(await writeProvenanceEcho(storage, config, result.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -383,7 +383,7 @@ export function registerDmMessageTools(
         async ({ broadcast_id }) => {
             const summary = await broadcastSummary(storage, getAgentGaii(), broadcast_id);
             if (!summary) return { ...toolError('NOT_FOUND', 'No such broadcast among the ones you sent.') };
-            return { content: [{ type: 'text' as const, text: JSON.stringify(summary, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(summary) }] };
         },
     );
 
@@ -433,7 +433,7 @@ export function registerDmMessageTools(
                             delivery_note: 'This is the owner\'s first message to them, so it is in their contact requests rather than their inbox. They accept once, and this message and everything after it arrive normally.',
                         } : {}),
                         ...(await writeProvenanceEcho(storage, config, result.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -464,7 +464,7 @@ export function registerDmMessageTools(
             // Audit: an agent removed something from a person's mailbox, and there is no undo. The log
             // is the only durable record of which agent did it.
             logger.info('dm deleted as owner (delegated)', { agent: agentGaii, owner: `${localAccountName(agentGaii)}@${config.nodeId}`, messageId: message_id });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, message_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, message_id }) }] };
         },
     );
 
@@ -513,7 +513,7 @@ export function registerDmMessageTools(
                         })),
                         important_message_ids: data.important,
                         note: 'Read one conversation with aimeat_dm_thread_as_owner. Reading marks nothing as read.',
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -558,7 +558,7 @@ export function registerDmMessageTools(
                             ...provFor(m.aiProvenanceId),
                         })),
                         total: result.total,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -627,7 +627,7 @@ export function registerDmMessageTools(
                             delivery_note: 'This is your first message to them, so the question is in their contact requests rather than their inbox. They accept you once, and it reaches them.',
                         } : {}),
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -666,7 +666,7 @@ export function registerDmMessageTools(
                             created_at: m.createdAt,
                         } as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive'])),
                         total,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -714,7 +714,7 @@ export function registerDmMessageTools(
                         } as Record<string, unknown>, rr.items[i] ?? null, ['subject', 'body', 'attachments', 'interactive'])),
                         total,
                         ...withheldOwnerMessagesFields(config.baseUrl, agentGaii, 'aimeat_dm_thread', ownerMessagesWithheld),
-                    }, null, 2),
+                    }),
                 }],
             };
         },

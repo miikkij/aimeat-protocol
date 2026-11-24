@@ -73,7 +73,7 @@ export function registerAppdevProofTools(
                     text: JSON.stringify({
                         attached: true, subject_type, subject_id: attached.subjectId,
                         proofs_total: attached.proofsTotal, self_reported: true,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

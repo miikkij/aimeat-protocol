@@ -26,7 +26,7 @@ import {
 } from '../services/disputes/operator.js';
 
 const OPERATOR_ONLY = OPERATOR_AGENT_REFUSAL;
-const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 
 export function registerDisputeTools(mcp: McpServer, _config: AimeatConfig, storage: Storage, caller: () => CallerContext): void {
   mcp.registerTool('aimeat_admin_disputes', {

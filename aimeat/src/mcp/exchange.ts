@@ -123,7 +123,7 @@ export function registerExchangeTools(
     // can only accept/post/off/bid on their own behalf — the same guarantee resolveIdentity gives REST.
     const consumerGaii = agentGaii;
 
-    const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+    const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
     const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
 
     // ── Browse offerings (supply) ──────────────────────────────────────────────

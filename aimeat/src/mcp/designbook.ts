@@ -77,7 +77,7 @@ import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anony
 
 /** One text block per answer; refusals carry the service's words verbatim. */
 function text(payload: unknown, isError = false) {
-    return { content: [{ type: 'text' as const, text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2) }], ...(isError ? { isError: true } : {}) };
+    return { content: [{ type: 'text' as const, text: typeof payload === 'string' ? payload : JSON.stringify(payload) }], ...(isError ? { isError: true } : {}) };
 }
 
 export function registerDesignbookTools(

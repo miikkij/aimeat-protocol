@@ -110,7 +110,7 @@ export function registerAppdevPitfallTools(
                 });
             if (!r.ok) {
                 // A refusal over close matches carries them, with the call that opens each.
-                const details = r.details ? `\n${JSON.stringify(r.details, null, 2)}` : '';
+                const details = r.details ? `\n${JSON.stringify(r.details)}` : '';
                 return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}${details}` }], isError: true };
             }
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
@@ -120,7 +120,7 @@ export function registerAppdevPitfallTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ ...answer, shared: r.visibility === 'public' }, null, 2),
+                    text: JSON.stringify({ ...answer, shared: r.visibility === 'public' }),
                 }],
             };
         },
@@ -143,7 +143,7 @@ export function registerAppdevPitfallTools(
             const c = caller();
             const index = await pitfallIndex(storage, config, readerForAgent({ storage, config }, agentGaii, sessionScopes), query,
                 { principal: c.principal, readsAll: readsAsOwner(c) });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(index, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(index) }] };
         },
     );
 
@@ -165,7 +165,7 @@ export function registerAppdevPitfallTools(
                 return { content: [{ type: 'text' as const, text: `Pitfall entry not found: ${key}` }], isError: true };
             }
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, key }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, key }) }] };
         },
     );
 }

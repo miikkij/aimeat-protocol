@@ -152,7 +152,7 @@ function registerPackageSaleTools(
     mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string, ownerOf: () => string,
     peers: Map<string, PeerInfo>,
 ): void {
-    const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+    const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
 
     mcp.registerTool('aimeat_package_offer', { description: descriptionFor('aimeat_package_offer'), inputSchema: zodShapeFor('aimeat_package_offer'), annotations: annotationsFor('aimeat_package_offer') }, async ({ group_id, action, terms, state }) => {
         if (action === 'get') {
@@ -276,7 +276,7 @@ export function registerPackageTools(
         // `category` filters both lists, as on the route (unit 3b).
         if (for_sale === true) {
             const sold = await listForSale(storage, { search, author, category });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ total: sold.total, packages: sold.packages }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ total: sold.total, packages: sold.packages }) }] };
         }
         const result = await listPackagesFor(storage, ownerOf(), { search, author, status, category });
         return {
@@ -285,7 +285,7 @@ export function registerPackageTools(
                 text: JSON.stringify({
                     total: result.total,
                     packages: result.packages.map(packageSummary),
-                }, null, 2),
+                }),
             }],
         };
     });
@@ -298,14 +298,14 @@ export function registerPackageTools(
         const sale = await readAccountSale(storage, group_id);
         if (!pkg) {
             const listed = await listingFor(storage, group_id);
-            if (listed) return { content: [{ type: 'text' as const, text: JSON.stringify(listed.listing, null, 2) }] };
+            if (listed) return { content: [{ type: 'text' as const, text: JSON.stringify(listed.listing) }] };
             return {
                 content: [{ type: 'text' as const, text: `NOT_FOUND: Package not found: ${group_id}` }],
                 isError: true,
             };
         }
         // The "what you get" sheet, the same one GET /v1/packages/:groupId answers (services/packages/compose/package-sheet.ts).
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config), ...(sale ? { sale: saleView(sale), entitled: true } : {}) }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config), ...(sale ? { sale: saleView(sale), entitled: true } : {}) }) }] };
     });
 
     mcp.registerTool('aimeat_package_compose', { description: descriptionFor('aimeat_package_compose'), inputSchema: zodShapeFor('aimeat_package_compose'), annotations: annotationsFor('aimeat_package_compose') }, async (args) => {
@@ -335,7 +335,7 @@ export function registerPackageTools(
                     new_version: out.newVersion === true,
                     // Created, not public yet: the owner approves (its next_step says what to tell them).
                     ...out.asked,
-                }, null, 2),
+                }),
             }],
         };
     });
@@ -352,7 +352,7 @@ export function registerPackageTools(
         if (!out.ok) return { ...toolError(out.code, out.problems ? `${out.message} ${out.problems.join(' | ')}` : out.message) };
         const { ok, asked, ...answer } = out;
         void ok;
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...answer, ...asked }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...answer, ...asked }) }] };
     });
 
     mcp.registerTool('aimeat_package_pull', { description: descriptionFor('aimeat_package_pull'), inputSchema: zodShapeFor('aimeat_package_pull'), annotations: annotationsFor('aimeat_package_pull') }, async (args) => {
@@ -376,7 +376,7 @@ export function registerPackageTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ applied: false, reason: out.reason, upstream: out.upstream }, null, 2),
+                    text: JSON.stringify({ applied: false, reason: out.reason, upstream: out.upstream }),
                 }],
             };
         }
@@ -385,7 +385,7 @@ export function registerPackageTools(
                 type: 'text' as const,
                 text: JSON.stringify({
                     applied: true, ...packageSummary(out.package), upstream: out.upstream,
-                }, null, 2),
+                }),
             }],
         };
     });
@@ -403,15 +403,15 @@ export function registerPackageTools(
             };
         }
         // Not a failure: the update waits for the owner, and the answer says how it goes on.
-        if ('kind' in out) return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out), null, 2) }] };
-        return { content: [{ type: 'text' as const, text: JSON.stringify(out.answer, null, 2) }] };
+        if ('kind' in out) return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out)) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(out.answer) }] };
     });
 
     // Taking a bad version back: the same service POST /v1/packages/:groupId/versions/:version/withdraw calls.
     mcp.registerTool('aimeat_package_withdraw', { description: descriptionFor('aimeat_package_withdraw'), inputSchema: zodShapeFor('aimeat_package_withdraw'), annotations: annotationsFor('aimeat_package_withdraw') }, async ({ group_id, version, reason }) => {
         const out = await withdrawVersion({ storage, config, scheduler: nodeContext().scheduler }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }) }] };
     });
 
     mcp.registerTool('aimeat_package_status_set', { description: descriptionFor('aimeat_package_status_set'), inputSchema: zodShapeFor('aimeat_package_status_set'), annotations: annotationsFor('aimeat_package_status_set') }, async ({ group_id, version, status }) => {
@@ -424,7 +424,7 @@ export function registerPackageTools(
                 isError: true,
             };
         }
-        return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(out.package), null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(out.package)) }] };
     });
     mcp.registerTool('aimeat_package_install', { description: descriptionFor('aimeat_package_install'), inputSchema: zodShapeFor('aimeat_package_install'), annotations: annotationsFor('aimeat_package_install') }, async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
@@ -442,7 +442,7 @@ export function registerPackageTools(
             if (!set.ok) return { ...toolError(set.code, set.problems ? `${set.message} ${set.problems.join(' | ')}` : set.message) };
             const { ok, ...shown } = set;
             void ok;
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ set: true, ...shown }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ set: true, ...shown }) }] };
         }
 
         const out = await installOrRequest(
@@ -459,12 +459,12 @@ export function registerPackageTools(
         }
 
         if (out.kind === 'dry-run') {
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out.preview, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.preview) }] };
         }
 
         // Not a failure: the install waits for the owner, the same 202 the HTTP door answers.
         if (out.kind === 'requested') {
-            return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out), null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out)) }] };
         }
 
         // The registered names are the addresses that matter afterwards: an app component installs
@@ -488,7 +488,7 @@ export function registerPackageTools(
                     ...(out.appGrants ? { app_grants: out.appGrants } : {}),
                     // Extension components installed switched off, each waiting for an operator's one press.
                     ...(out.awaitingOperator ? { extension_code_awaiting_operator: out.awaitingOperator } : {}),
-                }, null, 2),
+                }),
             }],
         };
     });
@@ -515,7 +515,7 @@ export function registerPackageTools(
                             component_id: c.componentId, type: c.type, registered_as: c.registeredAs,
                         })),
                     })),
-                }, null, 2),
+                }),
             }],
         };
     });
@@ -525,7 +525,7 @@ export function registerPackageTools(
         // A session is always an agent: auto-update on takes packages:install-code (PKG-12).
         const out = await setPackageInstance(storage, { owner: ownerOf(), mayInstallCode: scopeIsCovered(sessionScopes, INSTALL_CODE_SCOPE) }, instance_id, { label, autoUpdate: auto_update });
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ instance_id: out.instance.id, label: out.instance.label, auto_update: out.instance.autoUpdate === true }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ instance_id: out.instance.id, label: out.instance.label, auto_update: out.instance.autoUpdate === true }) }] };
     });
 
     // What POST /v1/instances/check-updates does, for this owner's installs.
@@ -536,14 +536,14 @@ export function registerPackageTools(
                 return { ...toolError('PACKAGE_FEDERATION_DISABLED', 'This node does not exchange packages with other nodes, so there is no source to check.') };
             }
             const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner: ownerOf() }, { notify: false });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ checked: outcomes.length, outcomes }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ checked: outcomes.length, outcomes }) }] };
         });
 
     // What a repository peer serves this node, before pulling one of them.
     mcp.registerTool('aimeat_package_repository', { description: descriptionFor('aimeat_package_repository'), inputSchema: zodShapeFor('aimeat_package_repository'), annotations: annotationsFor('aimeat_package_repository') }, async ({ node_id }) => {
         const out = await listRepositoryPackages({ storage, config, peers }, node_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ node: out.node, packages: out.packages }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ node: out.node, packages: out.packages }) }] };
     });
 
     // On a repository: which nodes a private package is served to, and up to when.
@@ -552,23 +552,23 @@ export function registerPackageTools(
         if (action === 'list') {
             const out = await listEntitlements(storage, caller, group_id);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlements: out.entitlements, repository_role: config.packageRepository }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlements: out.entitlements, repository_role: config.packageRepository }) }] };
         }
         if (!node_id) return { ...toolError('INVALID_INPUT', `action "${action}" needs node_id.`) };
         if (action === 'revoke') {
             const out = await revokeEntitlement(storage, caller, group_id, node_id);
             if (!out.ok) return { ...toolError(out.code, out.message) };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }) }] };
         }
         const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository, securityProfile: config.securityProfile });
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true, repository_role: config.packageRepository }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true, repository_role: config.packageRepository }) }] };
     });
 
     // The nodes that sell this author's packages with no token: the same service /v1/package-sellers calls.
     mcp.registerTool('aimeat_package_sellers', { description: descriptionFor('aimeat_package_sellers'), inputSchema: zodShapeFor('aimeat_package_sellers'), annotations: annotationsFor('aimeat_package_sellers') }, async ({ action, node_id, node, note }) => {
         const owner = ownerOf();
-        const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+        const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
         if (action === 'list') return text({ sellers: await listSellers(storage, owner), repository_role: config.packageRepository });
         if (!node_id) return { ...toolError('INVALID_INPUT', `action "${action}" needs node_id.`) };
         if (action === 'remove') {
@@ -586,7 +586,7 @@ export function registerPackageTools(
         const out = await packageConfigNeeds(storage, config, { owner: ownerOf(), isOperator: false }, group_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         const { group_id: g, version, bundle, name, questions, defaults, problems } = out;
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ group_id: g, version, bundle, name, questions, defaults, problems }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ group_id: g, version, bundle, name, questions, defaults, problems }) }] };
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.
@@ -603,7 +603,7 @@ export function registerPackageTools(
                     version: out.instance.packageVersion,
                     mode: out.instance.mode,
                     forked_at: out.instance.forkedAt,
-                }, null, 2),
+                }),
             }],
         };
     });

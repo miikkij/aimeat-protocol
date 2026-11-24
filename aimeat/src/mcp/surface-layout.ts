@@ -54,7 +54,7 @@ interface TextResult {
 }
 
 const out = (payload: unknown, isError = false): TextResult => ({
-    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(payload) }],
     ...(isError ? { isError: true } : {}),
 });
 

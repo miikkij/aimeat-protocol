@@ -522,7 +522,7 @@ export async function provenanceEchoedResult(
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify(withProvenanceEcho(resp.data ?? resp, echo), null, 2),
+      text: JSON.stringify(withProvenanceEcho(resp.data ?? resp, echo)),
     }],
     // The same flag `envelopeResult` sets, for the same reason: this is the return path of 23 tools
     // -- `aimeat_dm_send` and `aimeat_memory_write` among them -- and without it every one of them

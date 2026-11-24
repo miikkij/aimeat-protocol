@@ -73,11 +73,11 @@ export function registerDecideTools(
   const owner = localAccountName(agentGaii);
   const ownerGhii = `${owner}@${config.nodeId}`;
 
-  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
   const failed = (e: unknown) => {
     if (e instanceof DecideError) {
-      return err(`${e.code}: ${e.message}${e.details ? `\n${JSON.stringify(e.details, null, 2)}` : ''}`);
+      return err(`${e.code}: ${e.message}${e.details ? `\n${JSON.stringify(e.details)}` : ''}`);
     }
     if (e instanceof AiCompletionError) return err(`${e.code}: ${e.message}`);
     return withCaughtError(err(String((e as Error).message ?? e)), e);

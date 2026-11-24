@@ -81,7 +81,7 @@ export function registerAiJobTools(
     // owner, and an agent holding memory:read-as-owner; everybody else sees what they started.
     const viewer: AiJobViewer = { principal: session.principal, all: readsAsOwner(session) };
 
-    const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+    const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
     const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
     const failed = (e: unknown) => withCaughtError(err(e instanceof AiJobError ? `${e.code}: ${e.message}` : String((e as Error).message ?? e)), e);
 

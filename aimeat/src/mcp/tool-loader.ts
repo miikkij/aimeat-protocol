@@ -150,7 +150,7 @@ export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean }
                     content: [{ type: 'text' as const, text: JSON.stringify({
                         added: [], tools: [],
                         next_step: 'Nothing fits those words. Try other plain words for the action and the thing, or look with aimeat_discover.',
-                    }, null, 2) }],
+                    }) }],
                 };
             }
             const named = found.map((f) => ({ name: f.name, what: firstSentence(f.description), ...needsOf(f.name) }));
@@ -159,7 +159,7 @@ export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean }
                     content: [{ type: 'text' as const, text: JSON.stringify({
                         tools: named,
                         next_step: 'Run one now with aimeat_invoke: its name as `capability`, its inputs as `input`. That works in every client. A client that calls tools its list does not show can also call one by name.',
-                    }, null, 2) }],
+                    }) }],
                 };
             }
             const added: string[] = [];
@@ -173,7 +173,7 @@ export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean }
                     added,
                     tools: named,
                     next_step: 'Run one now with aimeat_invoke: its name as `capability`, its inputs as `input`. A call by name is refused until your client reads its tool list again, which some do only on the next message. From then on these are in your list for the rest of this conversation.',
-                }, null, 2) }],
+                }) }],
             };
         },
     );

@@ -147,7 +147,7 @@ export function registerConsentTools(
                         granted_at: consent.grantedAt,
                         revoked_at: consent.revokedAt,
                         metadata: consent.metadata,
-                    }, null, 2),
+                    }),
                     mimeType: 'application/json',
                 }],
             };
@@ -186,7 +186,7 @@ export function registerConsentTools(
             if (!granted.ok) {
                 // Nothing was granted, and the owner was asked: the answer carries the request so the
                 // agent can name it to them (services/consent/write.ts, recipient '*' publish gate).
-                const asked = granted.publishRequest ? `\n${JSON.stringify({ publish_request: granted.publishRequest }, null, 2)}` : '';
+                const asked = granted.publishRequest ? `\n${JSON.stringify({ publish_request: granted.publishRequest })}` : '';
                 return { content: [{ type: 'text' as const, text: `${granted.code}: ${granted.message}${asked}` }], isError: true };
             }
             const consent = granted.value;
@@ -204,7 +204,7 @@ export function registerConsentTools(
                         // A named share: the party reads it with its key; its connection file is at
                         // /v1/parties/me/shares/{id}/connection, and aimeat_party "get" lists it.
                         ...(consent.recipient.startsWith('party:') ? { share: shareView(consent) } : {}),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -236,7 +236,7 @@ export function registerConsentTools(
                         status: c.status,
                         granted_at: c.grantedAt,
                         revoked_at: c.revokedAt,
-                    })), null, 2),
+                    }))),
                 }],
             };
         },
@@ -264,7 +264,7 @@ export function registerConsentTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ revoked: true, consent_id, revoked_at: now }, null, 2),
+                    text: JSON.stringify({ revoked: true, consent_id, revoked_at: now }),
                 }],
             };
         },

@@ -128,7 +128,7 @@ export function registerCapabilitiesTools(
                 callable: c.callable, authRequired: c.authRequired,
                 cost: c.cost, tags: c.tags, source: c.source.type,
             }));
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ capabilities: summary, total: result.total }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ capabilities: summary, total: result.total }) }] };
         },
     );
 
@@ -145,7 +145,7 @@ export function registerCapabilitiesTools(
             const found = await capabilityForSession(id, 'read');
             if (!found.ok) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
             const cap = found.capability;
-            return { content: [{ type: 'text' as const, text: JSON.stringify(cap, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(cap) }] };
         },
     );
 
@@ -189,7 +189,7 @@ export function registerCapabilitiesTools(
                 // invocation an agent made.
                 await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: true, durationMs: result.duration_ms });
 
-                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: false, message });
@@ -226,7 +226,7 @@ export function registerCapabilitiesTools(
                 if (!created.ok) {
                     return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
                 }
-                return { content: [{ type: 'text' as const, text: JSON.stringify(created.value, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(created.value) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 return withCaughtError({ content: [{ type: 'text' as const, text: `Create failed: ${message}` }], isError: true }, err);
@@ -264,7 +264,7 @@ export function registerCapabilitiesTools(
             if (!updated.ok) {
                 return { content: [{ type: 'text' as const, text: `${updated.code}: ${updated.message}` }], isError: true };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify(updated.value, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(updated.value) }] };
         },
     );
 
@@ -280,7 +280,7 @@ export function registerCapabilitiesTools(
             if (!removed.ok) {
                 return { content: [{ type: 'text' as const, text: `${removed.code}: ${removed.message}` }], isError: true };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, id }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, id }) }] };
         },
     );
 
@@ -298,7 +298,7 @@ export function registerCapabilitiesTools(
             if (!vouched.ok) {
                 return { content: [{ type: 'text' as const, text: `${vouched.code}: ${vouched.message}` }], isError: true };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify(vouched.value, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(vouched.value) }] };
         },
     );
 }

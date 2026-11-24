@@ -82,7 +82,7 @@ export function flagged(result: { content: { type: 'text'; text: string }[] }, r
 
 export function payloadResult(payload: unknown, resp: Pick<ApiResponse, 'ok'>): ToolResult {
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
     ...(resp.ok === false ? { isError: true as const } : {}),
   };
 }

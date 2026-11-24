@@ -95,7 +95,7 @@ export function registerMcpProxyTools(
    *  the registry pair asks operator:admin of it at call time. */
   scopes: string[],
 ): void {
-  const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
   const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
 
   /** The human behind this session. An agent's servers are its owner's — see the file header. */
@@ -157,7 +157,7 @@ export function registerMcpProxyTools(
       // isError is carried through rather than flattened: the far side's tool said no, and the
       // caller needs to see that as a refusal from the tool and not as a broken proxy.
       return {
-        content: [{ type: 'text', text: JSON.stringify(result.content, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(result.content) }],
         ...(result.isError ? { isError: true } : {}),
       };
     });

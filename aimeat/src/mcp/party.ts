@@ -47,7 +47,7 @@ export function registerPartyTool(
     caller: () => CallerContext,
 ): void {
     const answer = <T>(out: PartyAnswer<T>) => {
-        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
+        if (out.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         if (out.code === 'SCOPE_DENIED') {
             return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_party', [PARTY_MANAGE_SCOPE], { baseUrl: config.baseUrl, agentGaii: caller().principal }) }], isError: true as const };
         }
@@ -102,7 +102,7 @@ export function registerPartyTool(
         if (!(await c.operator('operator:admin'))) return toolError('FORBIDDEN', 'Deciding which apps may let people register is for the operator of this node, with operator:admin.');
         const a = args as Record<string, unknown>;
         const appAnswer = (out: AppOpOutcome) => (out.ok
-            ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] }
+            ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] }
             : toolError(out.code, out.message));
         if (a.action === 'decide') {
             const owner = typeof a.owner === 'string' ? a.owner.trim() : '';

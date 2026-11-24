@@ -71,7 +71,7 @@ import type { CallerContext } from '../services/caller-context.js';
 /** The parts that are the operator's AI Act register; every other part is a scoped document. */
 const OPERATOR_PARTS = new Set(['draft', 'usecases', 'questionnaire']);
 
-const text =(value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text =(value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 export function registerComplianceTools(

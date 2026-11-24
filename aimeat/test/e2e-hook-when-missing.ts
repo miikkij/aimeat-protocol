@@ -137,7 +137,7 @@ await test('over MCP, when_missing alone sets the hook back to letting events th
     const opAgent = await makeAgent(BASE, OP, ['operator:admin']);
     const s = await openSession(BASE, opAgent.token, 'hook-when-missing');
     const out = await callTool(s, 'aimeat_admin_hook_set', { hook: 'pre_owner_registration', when_missing: 'pass' });
-    assert(!out.isError && out.text.includes('"when_missing": "pass"'), `tool: ${out.text.slice(0, 300)}`);
+    assert(!out.isError && out.text.includes('"when_missing":"pass"'), `tool: ${out.text.slice(0, 300)}`);
     const r = await register();
     assert(r.status === 201, `the registration goes through again: ${show(r)}`);
     const wrong = await callTool(s, 'aimeat_admin_hook_set', { hook: 'post_settlement', when_missing: 'refuse' });

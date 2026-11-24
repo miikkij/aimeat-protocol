@@ -50,6 +50,6 @@ export function registerAccessTools(
         // No session id: a tool call is not one of the person's browser sessions, so nothing is
         // marked "current". The list still says how many are open and on which devices.
         const data = await accessDb.overview(ownerName, ownerGhii, undefined);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
     });
 }

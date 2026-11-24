@@ -193,7 +193,7 @@ describe('workspace records deleted over REST go to the bin, and come back over 
         const session = await mcpSession(deleterToken);
         const restored = await callTool(deleterToken, session, 'aimeat_memory_restore', { key: `${ROOT}.${NS}.n1.latest` });
         expect(restored.isError, restored.text).toBe(false);
-        expect(restored.text).toContain('"restored": true');
+        expect(restored.text).toContain('"restored":true');
         expect((await storage.getMemory(DELETER, `${ROOT}.${NS}.n1.latest`))?.value).toEqual({ id: 'n1', body: 'note n1' });
         expect((await storage.listDeletedMemory(DELETER)).map(m => m.key)).not.toContain(`${ROOT}.${NS}.n1.latest`);
     });

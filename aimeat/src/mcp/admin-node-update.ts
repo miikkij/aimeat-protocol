@@ -27,7 +27,7 @@ import { getNodeUpdateStatus } from '../services/node/update-check.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 
 export function registerAdminNodeUpdateTools(
   mcp: McpServer,

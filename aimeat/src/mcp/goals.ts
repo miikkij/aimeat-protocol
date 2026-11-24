@@ -29,7 +29,7 @@ import {
 
 export function registerGoalTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   const deps = { storage, config };
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
   const guard = async (fn: () => Promise<unknown>) => {
     try {
       return ok(await fn());

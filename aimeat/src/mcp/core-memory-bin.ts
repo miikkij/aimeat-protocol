@@ -66,12 +66,12 @@ mcp.registerTool(
             ownerScope: owner_scope === true,
         });
         if (!out.ok) {
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }) }], isError: true };
         }
         return { content: [{ type: 'text' as const, text: JSON.stringify({
             deleted: true, key: out.key,
             restorable_until: out.restorableUntil, grace_days: out.graceDays,
-        }, null, 2) }] };
+        }) }] };
     },
 );
 
@@ -90,9 +90,9 @@ mcp.registerTool(
             ownerScope: owner_scope === true,
         });
         if (!out.ok) {
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }) }], isError: true };
         }
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ restored: true, key: out.key }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ restored: true, key: out.key }) }] };
     },
 );
 }

@@ -52,7 +52,7 @@ export function registerSecretTools(
 
     mcp.registerTool('aimeat_secret_list', { description: descriptionFor('aimeat_secret_list'), inputSchema: zodShapeFor('aimeat_secret_list'), annotations: annotationsFor('aimeat_secret_list') }, async () => {
         const secrets = await listOwnerSecretsWithUses(storage, vaultOf());
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ secrets, count: secrets.length }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ secrets, count: secrets.length }) }] };
     });
 
     mcp.registerTool('aimeat_secret_set', { description: descriptionFor('aimeat_secret_set'), inputSchema: zodShapeFor('aimeat_secret_set'), annotations: annotationsFor('aimeat_secret_set') }, async ({ name, value, host }) => {
@@ -63,7 +63,7 @@ export function registerSecretTools(
             return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
         }
         emitChange('secrets', ownerGhii);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(r.data) }] };
     });
 
     mcp.registerTool('aimeat_secret_host_set', { description: descriptionFor('aimeat_secret_host_set'), inputSchema: zodShapeFor('aimeat_secret_host_set'), annotations: annotationsFor('aimeat_secret_host_set') }, async ({ name, host }) => {
@@ -76,7 +76,7 @@ export function registerSecretTools(
             return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
         }
         emitChange('secrets', ownerGhii);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(r.data) }] };
     });
 
     mcp.registerTool('aimeat_secret_approval_withdraw', { description: descriptionFor('aimeat_secret_approval_withdraw'), inputSchema: zodShapeFor('aimeat_secret_approval_withdraw'), annotations: annotationsFor('aimeat_secret_approval_withdraw') }, async ({ name, extension, installer, host }) => {
@@ -84,7 +84,7 @@ export function registerSecretTools(
         if (!withdrawn) {
             return { content: [{ type: 'text' as const, text: 'APPROVAL_NOT_FOUND: No approval for that extension, installer and host on this secret.' }], isError: true };
         }
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ name, extension, installer, host, withdrawn: true }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ name, extension, installer, host, withdrawn: true }) }] };
     });
 
     mcp.registerTool('aimeat_secret_delete', { description: descriptionFor('aimeat_secret_delete'), inputSchema: zodShapeFor('aimeat_secret_delete'), annotations: annotationsFor('aimeat_secret_delete') }, async ({ name }) => {
@@ -94,6 +94,6 @@ export function registerSecretTools(
             return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
         }
         emitChange('secrets', ownerGhii);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ name, deleted: true }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ name, deleted: true }) }] };
     });
 }

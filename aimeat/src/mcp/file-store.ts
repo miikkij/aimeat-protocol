@@ -31,7 +31,7 @@ import {
 } from '../services/file-store/owner-file-store-actions.js';
 import { removeNodeFileStore, setNodeFileStore } from '../services/file-store/node-file-store-actions.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const answer = <T>(r: FileStoreResult<T>) => (r.ok ? text(r.data) : toolError(r.code, r.message));
 
 export function registerFileStoreTools(

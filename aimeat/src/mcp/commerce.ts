@@ -141,7 +141,7 @@ import type { CallerContext } from '../services/caller-context.js';
 const PSP_KEY = 'commerce.psp';
 
 function ok(data: unknown) {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 function fail(message: string) {
     return { content: [{ type: 'text' as const, text: message }], isError: true as const };

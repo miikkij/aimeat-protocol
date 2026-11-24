@@ -29,7 +29,7 @@ export function registerKeyReencryptTool(mcp: McpServer, config: AimeatConfig, s
     }, async (args) => {
         const c = caller();
         if (!(await c.operator('operator:admin'))) return toolError('FORBIDDEN', 'The data key and its re-encrypt job are for the operator of this node, with operator:admin.');
-        const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+        const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
         if ((args as { action?: unknown }).action !== 'start') return text(await reencryptStatus(storage, config));
         const out = await startReencrypt(storage, config, c.principal);
         if (!out.ok) return toolError(out.code, out.message);

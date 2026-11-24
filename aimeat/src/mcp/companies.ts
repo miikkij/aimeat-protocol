@@ -115,7 +115,7 @@ export function registerCompanyTools(
         isError: true as const,
     }, e);
     const ok = (payload: unknown): { content: { type: 'text'; text: string }[] } => ({
-        content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
     });
 
     // ── aimeat_company_list ──

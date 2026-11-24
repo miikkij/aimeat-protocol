@@ -51,7 +51,7 @@ export function registerRefineryTools(
   /** The session's caller (services/caller-context.ts): the agent, its owner's GHII and its scopes. */
   caller: () => CallerContext,
 ): void {
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
 
   /** The batch's caller, from the session caller. Never the owner in person: an MCP session is an agent. */
   const refineryCaller = (): RefineryCaller | null => {

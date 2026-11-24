@@ -51,7 +51,7 @@ export function registerDocsignTools(
   caller: () => CallerContext,
 ): void {
   const ctx = { storage, config };
-  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
+  const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj) }] });
   const fail = (err: unknown) => {
     if (err instanceof DocsignError || err instanceof ValidationInputError) return toolError(err.code, err.message);
     return withCaughtError(toolError('DOCSIGN_ERROR', err instanceof Error ? err.message : String(err)), err);

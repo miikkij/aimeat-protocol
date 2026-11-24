@@ -57,7 +57,7 @@ export function registerAppdevResearchTools(
             const c = caller();
             const view = { principal: c.principal, readsAll: readsAsOwner(c) };
             const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections, view, areas });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(overview, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(overview) }] };
         },
     );
 }

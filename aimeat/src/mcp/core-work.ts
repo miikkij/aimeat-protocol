@@ -67,7 +67,7 @@ export function registerCoreWorkTools(mcp: McpServer, deps: CoreWorkToolDeps): v
             if (!accepted.ok) {
                 return { content: [{ type: 'text' as const, text: `${accepted.code}: ${accepted.message}` }], isError: true };
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: accepted.work.status }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: accepted.work.status }) }] };
         },
     );
 
@@ -93,7 +93,7 @@ export function registerCoreWorkTools(mcp: McpServer, deps: CoreWorkToolDeps): v
             emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
             emitResourceUpdated(delivered.work.requesterGaii, `aimeat://wallet/${encodeURIComponent(delivered.work.requesterGaii)}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: delivered.work.status,
-                ...(await writeProvenanceEcho(storage, config, delivered.work.aiProvenanceId)) }, null, 2) }] };
+                ...(await writeProvenanceEcho(storage, config, delivered.work.aiProvenanceId)) }) }] };
         },
     );
 }

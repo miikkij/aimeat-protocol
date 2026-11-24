@@ -24,7 +24,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { readSecretHostAsk, changeSecretHostAsk } from '../services/secret/host-ask-setting.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerSecretHostAskTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   mcp.registerTool('aimeat_secret_host_ask', {

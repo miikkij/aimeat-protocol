@@ -133,7 +133,7 @@ export function registerAppForkTool(
                             note: `Forked "${filename}" into your catalogue as "${new_filename}".`,
                             // Stored unlisted, not public yet: the owner approves (its next_step says what to tell them).
                             ...publishAskedFields(out.publishAsked),
-                        }, null, 2),
+                        }),
                     }],
                 };
             } catch (err) {

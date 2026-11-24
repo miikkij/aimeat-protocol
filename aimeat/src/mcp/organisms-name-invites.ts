@@ -90,7 +90,7 @@ export function registerOrganismNameInviteTools(
                 const membership = await createNameInvitation(storage, config, {
                     organism: gate.organism, inviterGhii: gate.ownerName, inviteeRaw: invitee, role, workspaces,
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', organism_id, invitee: membership.ghii, role: membership.role, workspaces: membership.invitedWorkspaces ?? [] }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', organism_id, invitee: membership.ghii, role: membership.role, workspaces: membership.invitedWorkspaces ?? [] }) }] };
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
             }
@@ -114,7 +114,7 @@ export function registerOrganismNameInviteTools(
                 const { membership, grantedWorkspaces } = await addOrganismMember(storage, config, {
                     organism: gate.organism, inviterGhii: gate.ownerName, inviteeRaw: ghii, role, workspaces,
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'added', organism_id, member: membership.ghii, role: membership.role, workspaces: grantedWorkspaces }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'added', organism_id, member: membership.ghii, role: membership.role, workspaces: grantedWorkspaces }) }] };
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
             }
@@ -138,7 +138,7 @@ export function registerOrganismNameInviteTools(
                 const out = await removeOrganismMember(storage, config, {
                     organism: gate.organism, callerOwner: gate.ownerName, targetRaw: ghii, ban,
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: out.banned ? 'banned' : 'removed', organism_id, ...out }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: out.banned ? 'banned' : 'removed', organism_id, ...out }) }] };
             } catch (e) {
                 if (e instanceof MemberRemoveError) return { content: [{ type: 'text' as const, text: `${e.code}: ${e.message}` }], isError: true };
                 throw e;
@@ -168,7 +168,7 @@ export function registerOrganismNameInviteTools(
                     mayActAsPerson: !!caller && isOwnerPrincipal(caller().auth), agentGaii: agent_gaii,
                 });
                 emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }) }] };
             } catch (e) { return agentListFail(e); }
         },
     );
@@ -183,7 +183,7 @@ export function registerOrganismNameInviteTools(
             try {
                 const out = await detachOrganismAgent(storage, { organismId: organism_id, callerOwner: getOwnerName(), agentGaii: agent_gaii });
                 emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }) }] };
             } catch (e) { return agentListFail(e); }
         },
     );
@@ -207,7 +207,7 @@ export function registerOrganismNameInviteTools(
             }
             const out = await addOrganismOwner(storage, config, gate.organism, ghii, { performedBy: ownerName });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, added: out.added, owners: out.owners }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, added: out.added, owners: out.owners }) }] };
         },
     );
 
@@ -230,7 +230,7 @@ export function registerOrganismNameInviteTools(
             }
             const out = await removeOrganismOwner(storage, config, gate.organism, ghii, { performedBy: ownerName });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, removed: out.removed, owners: out.owners }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, removed: out.removed, owners: out.owners }) }] };
         },
     );
 
@@ -253,7 +253,7 @@ export function registerOrganismNameInviteTools(
                 const membership = await updateNameInvitation(storage, config, {
                     organism: gate.organism, inviteeRaw: invitee, role, workspaces,
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'updated', organism_id, invitee: membership.ghii, role: membership.role, workspaces: membership.invitedWorkspaces ?? [] }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'updated', organism_id, invitee: membership.ghii, role: membership.role, workspaces: membership.invitedWorkspaces ?? [] }) }] };
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
             }
@@ -276,7 +276,7 @@ export function registerOrganismNameInviteTools(
                 await cancelNameInvitation(storage, config, {
                     organism: gate.organism, cancellerGhii: gate.ownerName, inviteeRaw: invitee,
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'cancelled', organism_id, invitee }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'cancelled', organism_id, invitee }) }] };
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
             }
@@ -295,7 +295,7 @@ export function registerOrganismNameInviteTools(
             // services/organism-read/name-invitations.ts, which GET /v1/organisms/invitations/mine asks too.
             const out = (await nameInvitationsOf(storage, { owner: getOwnerName() })).map(({ membership: m, organism: org }) =>
                 ({ organism_id: org.id, name: org.name, type: org.type, invited_by: m.invitedBy, role: m.role, workspaces: m.invitedWorkspaces ?? [] }));
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out) }] };
         },
     );
 
@@ -323,7 +323,7 @@ export function registerOrganismNameInviteTools(
                 } catch (e) {
                     return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
                 }
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }) }] };
             }
             // THE PERSON ACCEPTS IN PERSON, as on POST /:id/invitations/accept and the emailed link
             // (routes/invite-accept.ts): joining an organism is the account holder's own decision. An
@@ -334,7 +334,7 @@ export function registerOrganismNameInviteTools(
             // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.
             const workspaces = await acceptNameInvitation(storage, config, { organism, membership });
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id, role: membership.role, workspaces }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id, role: membership.role, workspaces }) }] };
         },
     );
 }

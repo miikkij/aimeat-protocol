@@ -291,14 +291,14 @@ export function registerWorkspaceTools(
     };
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
-    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
+    const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
     /** A refusal from the shared services. The UNDECLARED_SPACE refusal is rendered with its code and
      *  fields, as aimeat_memory_write renders it, so an agent reads the same answer on every door;
      *  every other refusal keeps the plain sentence these tools have always answered with. */
     const failRefusal = (r: { code: string; message: string; details?: Record<string, unknown> }): TextResult =>
         r.code === 'UNDECLARED_SPACE'
-            ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
+            ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }))
             // A scope refusal is new on these tools (F2), so it takes the toolError shape the REST
             // door's code reads in: `SCOPE_DENIED: what happened`. The two refusals of the
             // fenced-space rule (services/fenced-space.ts) are new too and take the same shape, and

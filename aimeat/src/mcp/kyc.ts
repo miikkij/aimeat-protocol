@@ -36,7 +36,7 @@ import { createLink } from '../services/kyc/identify.js';
 import { markSuspicion } from '../services/kyc/reports.js';
 import { dpiaDraft, riskAssessmentDraft } from '../services/kyc/assessment.js';
 
-const ok = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const ok = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
 

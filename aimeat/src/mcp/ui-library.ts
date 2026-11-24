@@ -28,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import { ThemeService } from '../services/themes/service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
-const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
+const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload) }] });
 
 export function registerUiLibraryTools(mcp: McpServer, storage: Storage, config: AimeatConfig): void {
     const themes = new ThemeService(config, storage);

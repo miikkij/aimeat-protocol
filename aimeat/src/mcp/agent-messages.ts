@@ -101,7 +101,7 @@ export function registerAgentMessageTools(
                             ...provFor(m.aiProvenanceId),
                         } as Record<string, unknown>, rr.items[i] ?? null, ['content'])),
                         count: messages.length,
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -149,7 +149,7 @@ export function registerAgentMessageTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ error: result.code, message: result.message }, null, 2),
+                        text: JSON.stringify({ error: result.code, message: result.message }),
                     }],
                     isError: true,
                 };
@@ -165,7 +165,7 @@ export function registerAgentMessageTools(
                         status: record.status,
                         created_at: record.createdAt,
                         ...(await writeProvenanceEcho(storage, config, record.aiProvenanceId)),
-                    }, null, 2),
+                    }),
                 }],
             };
         },
@@ -212,7 +212,7 @@ export function registerAgentMessageTools(
                             ...provFor(m.aiProvenanceId),
                         })),
                         total: result.total,
-                    }, null, 2),
+                    }),
                 }],
             };
         },

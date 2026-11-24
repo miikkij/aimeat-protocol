@@ -30,7 +30,7 @@ import {
     createCsmAs, updateCsmAs, setCsmVisibilityAs, deleteCsmAs, draftCsmFromSample, type CsmAnswer,
 } from '../services/csm-service.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerCsmTool(
     mcp: McpServer, config: AimeatConfig, storage: Storage,

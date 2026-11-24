@@ -38,7 +38,7 @@ export function registerCalibratorTools(
 ): void {
     const deps = { storage, config };
     const answer = <T>(out: CalResult<T>) => out.ok
-        ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] }
+        ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] }
         : { ...toolError(out.code, out.message) };
 
     mcp.registerTool('aimeat_calibrator', {

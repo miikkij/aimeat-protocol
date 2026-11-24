@@ -26,7 +26,7 @@ import { closeOpening, decideOpening, setTrustedOpener } from '../services/inter
 import { operatorOpeningsList, ownerOpeningView, openingToApi } from '../services/internet-opening/opening-view.js';
 import { OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
 
 export function registerInternetOpeningTools(
   mcp: McpServer,
