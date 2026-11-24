@@ -22,6 +22,8 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-11-24 — build-ai-stocks (by name): outside data updated daily and per-person choices, with
+ *     answers that never name the owed items, to see which of them a build leaves out.
  *   2026-11-08 — build-proto-timer and build-family-list (by name): the two jobs two real builds on
  *     aimeat.io did, with the person's answers as the next turns, to measure a change to the
  *     app-building instructions before and after; the note says what the build took.
@@ -394,6 +396,52 @@ export const TASKS: Task[] = [
                 ok: failed.length === 0,
                 detail: failed.length ? `published, and ${failed.join('; ')}` : 'a prototype on the Atelier track, published',
                 note: `${buildCost(ctx)}; parts read ${q.atelierPartsRead.join(',') || '-'}; ${describeQuality(q)}`,
+            };
+        },
+    },
+    {
+        // The developer's own kind of request (2026-11-24): an app with data from outside, updated
+        // every day, and per-person choices. The answers are what a person writes, and NONE of them
+        // names the owed items: builds on another node shipped without a data map, a design spec
+        // and a roadmap line, and build-family-list could not see it, because its last turn asks
+        // for "everything the publish says is still owed".
+        id: 'build-ai-stocks',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Tee pörssiseurantasovellus nimeltä "{marker}". Jokainen käyttäjä voi seurata omia osakkeitaan. '
+            + 'Sovellus päivittää joka päivä kymmenen suosituimman tekoälyyhtiön pörssikurssit ja näyttää, miten niiden arvo kehittyy.',
+        goodTools: ['aimeat_handbook_get', 'aimeat_skill_get', 'aimeat_app_template_get', 'aimeat_app_publish', 'aimeat_datamap_set', 'aimeat_app_manage', 'aimeat_skill_publish'],
+        followUps: [
+            { prompt: 'Suomi ja englanti. Kuka tahansa kirjautunut voi käyttää, jokainen seuraa omia osakkeitaan, ja kymmenen yhtiön kurssit ovat kaikille samat. Tee niin kuin suosittelet.' },
+            { prompt: 'Kyllä, tee se ja julkaise.' },
+            { prompt: 'Onko se nyt valmis?' },
+        ],
+        verify: async (ctx) => {
+            const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
+            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
+            if (!hit?.filename) return { ok: false, detail: 'no published app carries the name', note: buildCost(ctx) };
+            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
+            const called = (name: string, has?: string) => ctx.metrics.toolCalls.some(c => c.name.endsWith(name) && !c.isError && (!has || JSON.stringify(c.input ?? {}).includes(has)));
+            // The roadmap is read from the app: a draft's notice becomes the line when the publish names
+            // none (services/app/draft-to-publish.ts), so the publish call's input does not show it.
+            const road = await api<{ roadmap?: { entries?: unknown[] } }>(ctx.baseUrl, `/v1/apps/${ctx.ownerName}/${hit.filename}/roadmap`, ctx.ownerToken);
+            const owed: Array<[string, boolean]> = [
+                ['agent face', called('aimeat_memory_write', '.agentface') || called('aimeat_invoke', 'agentface')],
+                ['bound skill', called('aimeat_skill_publish', `app:${ctx.ownerName}/`)],
+                ['data map', called('aimeat_datamap_set')],
+                ['design spec', called('aimeat_app_manage', 'spec_set')],
+                ['roadmap line', (road.data?.roadmap?.entries ?? []).length > 0],
+                ['daily update', called('aimeat_schedule_create') || called('aimeat_extension_install') || called('aimeat_agent_propose')],
+            ];
+            const failed = [
+                ...(onAtelier(q) ? [] : ['not an Atelier app with a register']),
+                ...(q.blocking.length ? [`blocking ${q.blocking.join(', ')}`] : []),
+                ...owed.filter(([, ok]) => !ok).map(([n]) => `no ${n}`),
+            ];
+            return {
+                ok: failed.length === 0,
+                detail: failed.length ? `published, and ${failed.join('; ')}` : 'a finished app with every owed item and a daily update',
+                note: `${buildCost(ctx)}; level ${q.level ?? '-'}; register ${q.register ?? '-'}; parts read ${q.atelierPartsRead.join(',') || '-'}; ${describeQuality(q)}`,
             };
         },
     },

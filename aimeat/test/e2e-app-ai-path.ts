@@ -8,10 +8,12 @@
  *   prototype get no line. A recommendation: every publish here answers 201.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ai-path
  * @version-history
+ *   v1.1.0 — 2026-11-24 — Section server-side sends an MCP build to the extension skill, which answers.
  *   v1.0.0 — 2026-11-20 — Initial (wish-atelier-ohjaa-teko-lykiihdytykseen-skilli-suora-kirjoitus-ja).
  */
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 import { BASE, assert, expectRefusal, finish, json as request, test } from './helpers/harness.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 /** The harness request, signed in with `token`. */
 function json(path: string, token: string, opts: RequestInit = {}) {
@@ -70,6 +72,18 @@ await test('a declared presentation and a quick prototype get no ai_path line, a
     assert(shown.ai_path === undefined && shown.ai_path_tools_count === undefined, `a presentation: ${JSON.stringify(shown.ai_path)}`);
     const proto = await publish(page(file, '<meta name="aimeat-level" content="proto">'));
     assert(proto.ai_path === undefined, `a quick prototype: ${JSON.stringify(proto.ai_path)}`);
+});
+
+// An app tool needs an extension, and section server-side names the extension specification. A cold
+// build read the address as a handbook tier over MCP and was told "not found" (2026-11-24): the text
+// says the skill is the specification over MCP, and the skill it names is there.
+await test('section server-side sends an MCP build to the extension skill, which exists', async () => {
+    const agent = await makeAgent(BASE, { name: ownerName, token: owner }, ['memory:read']);
+    const session = await openSession(BASE, agent.token, 'ai-path');
+    const section = await callTool(session, 'aimeat_handbook_get', { tier: 'build-app-atelier/server-side' });
+    assert(!section.isError && /over MCP the skill is the specification/.test(section.text), `the section says it: ${section.text.slice(0, 300)}`);
+    const skill = await callTool(session, 'aimeat_skill_get', { ref: 'node:aimeat-extension-builder', body_only: true });
+    assert(!skill.isError && skill.text.length > 1000, `the skill it names answers: ${skill.text.slice(0, 200)}`);
 });
 
 // The skill and the publish answer send an AI to the data map to find where the data lives, so

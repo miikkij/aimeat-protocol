@@ -24,6 +24,8 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.4.1 — 2026-11-24 — `server-side`: over MCP the extension skill is the specification; the HTTP
+ *     address carries the whole text, longer than one tool result.
  *   v1.4.0 — 2026-11-21 — The section `verify` (builtin-skills.app-builder-common.ts VERIFY_SECTION):
  *     one checklist for checking an app in a browser, folded from six learned pitfalls. `from-classic`
  *     carries the five migration traps itself instead of sending every builder to a private entry.
@@ -130,7 +132,8 @@ export const SERVER_SIDE_SECTION = '## Server-side work: an extension, and when 
   + 'from the signed-in person\'s secret store. The page never holds the key and never asks for one: it tells the person the name and the host to store it for.\n\n'
   + 'The page does not call the extension\'s address itself. It calls the cortex library that wraps the extension, or the kit block that already does, and the cortex calls the extension. '
   + 'Before you write one, look for one: `aimeat_appdev_overview` lists the person\'s extensions, `aimeat_extension_list` what is installed, and the exchange what somebody already offers. '
-  + 'Build it with skill `node:aimeat-extension-builder` (`aimeat_skill_get`), which covers the manifest, the scripts, the install and the checks; its canonical specification is `GET /v1/prompts/build-extension`.\n\n'
+  + 'Build it with skill `node:aimeat-extension-builder` (`aimeat_skill_get`), which covers the manifest, the scripts, the install and the checks; over MCP the skill is the specification. '
+  + 'Over HTTP the whole specification is `GET /v1/prompts/build-extension?format=txt`, which is longer than one tool result.\n\n'
   + 'When even an extension is not enough (a run longer than its time limit, a connection that stays open, Python or a native library, a database of its own), the work goes to a service on a Microservices Central. '
   + '`aimeat_appdev_overview` answers `microservices` with the Central this person may use, if any, and the criteria; section 11 of `node:aimeat-extension-builder` says how. '
   + 'The app still calls the cortex, the cortex the extension, and the extension the service. Suggest a service in one sentence with the reason, and build it only on the person\'s yes.\n';
