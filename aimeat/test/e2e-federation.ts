@@ -4,6 +4,7 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   2026-11-15 — 18c registers and key-exchanges a generated Ed25519 key (kxPub) instead of the text
  *     'deadbeef1234567890abcdef'. Its assertion that this text was accepted as a peer key encoded the
  *     hole audit 2026-11 L056 names, so that one input changes; the assertions stay. The refusals and
@@ -313,7 +314,9 @@ await test('10. Update peer info', async () => {
     const { body } = await json(`/v1/federation/peers/${directPeerNodeId}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ url: 'http://localhost:9997', status: 'active' }),
+        // allow_federated_auth: this node acts for its people (replicate, sign-in check) only for a
+        // peer the operator allowed it for (Core FED-16, 2026-11-24).
+        body: JSON.stringify({ url: 'http://localhost:9997', status: 'active', allow_federated_auth: true }),
     });
     assert(body.ok === true, `update: ${JSON.stringify(body.error)}`);
     assert(body.data.updated === true, 'updated flag');
@@ -754,7 +757,7 @@ await test('Setup: a peer that never sends the proof (an older node)', async () 
     });
     assert(add.status === 201, `add: ${add.status} ${JSON.stringify(add.body.error)}`);
     const act = await json(`/v1/federation/peers/${legacyPeerNodeId}`, {
-        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ status: 'active' }),
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ status: 'active', allow_federated_auth: true }),
     });
     assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body.error)}`);
 });

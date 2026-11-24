@@ -2932,13 +2932,15 @@
           "workspace_write_role": "Restricted spaces that members have written in",
           "subdomain_site_origin": "Other people's apps at addresses on your own domain",
           "platform_fee_records": "Money fee records whose writer is not known",
-          "federation_settlement": "Settlements a peer sent past the daily ceiling"
+          "federation_settlement": "Settlements a peer sent past the daily ceiling",
+          "federated_signin_closed": "Peers where your people can no longer sign in"
         },
         "detail": {
           "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose.",
           "platform_fee_records": "These money fee records ({count}) look like the ones a sale writes, but nothing shows whether a sale or the account itself wrote them. They count in your money fees as before until you choose.",
           "workspace_write_role": "These spaces ({count}) let only the workspace's creator and the organism's admins, or only the admins, write in them, but members have written there. They work as before until you choose.",
-          "federation_settlement": "{node} sent {count} settlements on {day} ({morsels} morsels in all) that would have passed the daily ceiling of {limit} morsels. Nothing was added. If you trust this server, raise its ceiling on the Federation page."
+          "federation_settlement": "{node} sent {count} settlements on {day} ({morsels} morsels in all) that would have passed the daily ceiling of {limit} morsels. Nothing was added. If you trust this server, raise its ceiling on the Federation page.",
+          "federated_signin_closed": "Your people can no longer sign in on these peer servers ({count}) with their account here: {nodes}. This server now checks such a sign-in only for a peer you allowed it for, not for every peer whose tier permits it. To allow one again, turn on Allow Federated Login for it on the Federation page."
         },
         "caps": {
           "line": "{label}: {cap}",

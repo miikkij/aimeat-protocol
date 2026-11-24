@@ -38,6 +38,7 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   2026-11-15 — V2: the operator's notice is read for the node id, its address and the key, not for
  *     the words "different key", which the plain-words rewrite of 2026-11-14 removed (nightly
  *     43656769268).
@@ -202,7 +203,8 @@ try {
         assert(H.nodeKey.publicKey !== P.nodeKey.publicKey, 'H and P hold the same node key; no signature below would mean anything');
         await setupOperator(H, `bndh${stamp}`);
         await setupOperator(P, `bndp${stamp}`);
-        await addPeer(H, P_ID, P.baseUrl, P.nodeKey.publicKey, { tier: 'member', replicate_memory: true });
+        // allow_federated_auth: H acts for its people toward P only with the operator's permission (Core FED-16).
+        await addPeer(H, P_ID, P.baseUrl, P.nodeKey.publicKey, { tier: 'member', replicate_memory: true, allow_federated_auth: true });
         await addPeer(P, H_ID, H.baseUrl, H.nodeKey.publicKey, { tier: 'member', replicate_memory: true });
         fake = await startCountingPeer();
         servers.push(fake.server);

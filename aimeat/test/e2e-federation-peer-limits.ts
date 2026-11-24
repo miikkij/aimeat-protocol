@@ -20,6 +20,7 @@
  *   summary and resolve · 5 package repository doors
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-limits
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   2026-11-15 — M's node card answers at M's address (startMCard), naming M's operators. B3: a
  *     broadcast from a person of M who is not its operator lands as a request; B4: one from an agent
  *     of M's operator lands in the inbox; B5: a block on a person of M holds back that person's agent
@@ -130,7 +131,8 @@ await test('Boot V (package repository on), an operator with an agent, member pe
     assert(agent.status === 201, `create agent: ${agent.status} ${JSON.stringify(agent.body)}`);
     mKeys = await generateKeyPair();
     mCard = await startMCard();
-    await addPeer(V, M_NODE, 'http://localhost:49981', mKeys.publicKey);
+    // allow_federated_auth: V stores a push-home replicate from M only with the operator's permission (Core FED-16).
+    await addPeer(V, M_NODE, 'http://localhost:49981', mKeys.publicKey, { allow_federated_auth: true });
     const pKeys = await generateKeyPair();
     await addPeer(V, P_NODE, 'http://localhost:49982', pKeys.publicKey, { tier: 'contact' });
     const rows = (await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) })).body.data.peers as any[];

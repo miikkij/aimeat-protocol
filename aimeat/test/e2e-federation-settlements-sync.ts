@@ -44,6 +44,7 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   2026-10-22 — The positive memory-inventory request comes after B's operator gives A the sign-in
  *     consent; a new case before it shows the same signed request without the consent is 403
  *     CONSENT_REQUIRED with no entries (secaudit 2026-10 wave 3, v70; test change approved by the
@@ -241,7 +242,8 @@ async function run(): Promise<void> {
     });
 
     await test('B knows A, and a peer B refuses memory replication to', async () => {
-        await addPeer(B, A_ID, A.baseUrl, A.nodeKey.publicKey);
+        // allow_federated_auth: B lists its people's records for A only with the operator's permission (Core FED-16).
+        await addPeer(B, A_ID, A.baseUrl, A.nodeKey.publicKey, { allow_federated_auth: true });
         await addPeer(B, HOP1_ID, DEAD_URL, hop1.publicKey, { replicate_memory: false });
         const list = await B.json('/v1/federation/peers', { headers: auth(B.ownerToken) });
         const a = list.body.data.peers.find((p: any) => p.node_id === A_ID);

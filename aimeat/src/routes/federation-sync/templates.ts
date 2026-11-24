@@ -5,6 +5,7 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-24 — The memory list asks the peer's own sign-in permission too (Core FED-16), and its refusal names the cause (peerActRefusal in services/federation/auth-consent.ts).
  *   2026-11-05 — The template listing and the memory-list request declare the 'federation-peer' credential strategy, which verifies the peer, the time window and the signature in the same order with the same refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed memory-list request is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.2 — 2026-10-27 — POST /v1/federation/memory/list refuses a person whose account is
@@ -52,7 +53,7 @@ import {
 } from '../../services/signed-node-request.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-node.js';
-import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
+import { peerActRefusal } from '../../services/federation/auth-consent.js';
 import { parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
@@ -86,8 +87,7 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         }
         const person = `${account.toLowerCase()}@${config.nodeId}`;
         // A deactivated account is listed for nobody, asked after the consent (secaudit2026oct26).
-        if (await peerMayActFor(storage, { tier: peer.tier, nodeId: requestingNode }, person)) return await accountDisabledRefusal(storage, person, config.nodeId);
-        return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, requestingNode, config.nodeId) };
+        return peerActRefusal(storage, { tier: peer.tier, nodeId: requestingNode, allowFederatedAuth: peer.allowFederatedAuth }, person, config.nodeId);
     };
 
     // ── Federation Template Sharing ──

@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-24 -- nameClosedSignInPeersOnce, after the anonymous-records report: the peers whose sign-in
+ *     checks stopped under Core FED-16 are named on the Security page.
  *   2026-11-21 -- holdMemberWrittenSpacesOnce, after the accountant grant step: the workspace spaces whose
  *     writeRole members already wrote past keep working until the operator decides (ruling 2026-11-21).
  *   2026-11-15 -- moveAppPartiesToTablesOnce, after moveCsmLockHoldersOnce: the people registered to apps
@@ -111,6 +113,7 @@ import { markExistingPortfolioPagesOnce } from '../services/portfolio/read-hold-
 import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem/subscriptions-by-owner.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account/event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capabilities/extension-ref.js';
+import { nameClosedSignInPeersOnce } from '../services/federation/signin-permission-step.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain/site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share/search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
@@ -238,6 +241,10 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // named on the Security page, one entry per record, nothing changed (services/anonymous-principal-records.ts).
   await reportAnonymousPrincipalRecordsOnce(storage, config)
     .catch(err => logger.error('Failed to look for the records the shared anonymous agent wrote; the next boot tries again', { error: String(err) }));
+  // The peers whose sign-in checks stopped under Core FED-16 are named on the Security page, nothing
+  // granted (services/federation/signin-permission-step.ts).
+  await nameClosedSignInPeersOnce(storage, config)
+    .catch(err => logger.error('Failed to name the peers whose sign-in checks stopped; the next boot tries again', { error: String(err) }));
   // The schedules account erasures before 2026-10-25 left are named on the Security page, one entry
   // per schedule, nothing changed (services/erasure-leftover-schedules.ts).
   await reportErasureLeftoverSchedulesOnce(storage, config)

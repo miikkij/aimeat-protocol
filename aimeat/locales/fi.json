@@ -2976,13 +2976,15 @@
           "workspace_write_role": "Rajatut tilat, joihin jäsenet ovat kirjoittaneet",
           "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
           "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä",
-          "federation_settlement": "Vertaisen selvitykset, jotka ylittivät päivärajan"
+          "federation_settlement": "Vertaisen selvitykset, jotka ylittivät päivärajan",
+          "federated_signin_closed": "Vertaiset, joille ihmisesi eivät enää voi kirjautua"
         },
         "detail": {
           "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset.",
           "platform_fee_records": "Nämä rahamaksujen tietueet ({count}) näyttävät samalta kuin ne, jotka kauppa kirjoittaa, mutta mikään ei kerro, kirjoittiko ne kauppa vai tili itse. Ne lasketaan rahamaksuihisi kuten ennenkin, kunnes valitset.",
           "workspace_write_role": "Näihin tiloihin ({count}) saavat kirjoittaa vain työtilan luoja ja organismin ylläpitäjät tai pelkät ylläpitäjät, mutta jäsenet ovat kirjoittaneet niihin. Tilat toimivat kuten ennen, kunnes valitset.",
-          "federation_settlement": "{node} lähetti {day} selvityksiä, jotka olisivat ylittäneet päivärajan ({limit} murusta). Selvityksiä oli {count}, ja niissä oli yhteensä {morsels} murusta. Mitään ei lisätty. Jos luotat tähän palvelimeen, nosta sen rajaa Federaatio-sivulla."
+          "federation_settlement": "{node} lähetti {day} selvityksiä, jotka olisivat ylittäneet päivärajan ({limit} murusta). Selvityksiä oli {count}, ja niissä oli yhteensä {morsels} murusta. Mitään ei lisätty. Jos luotat tähän palvelimeen, nosta sen rajaa Federaatio-sivulla.",
+          "federated_signin_closed": "Ihmisesi eivät enää voi kirjautua näille vertaispalvelimille ({count}) täkäläisellä tilillään: {nodes}. Tämä palvelin tarkistaa nyt kirjautumisen vain vertaiselle, jolle olet sen sallinut. Pelkkä vertaisen taso ei enää riitä. Jos haluat sallia sen jollekin uudelleen, laita sille päälle Salli federaatiokirjautuminen Federaatio-sivulla."
         },
         "caps": {
           "line": "{label}: {cap}",

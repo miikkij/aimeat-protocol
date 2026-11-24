@@ -17,6 +17,11 @@
  *   peerMayActFor · accountDisabledRefusal · signInConsentRefusal
  * @usage if (!await peerMayActFor(storage, peer, ghii)) refuse(signInConsentRefusal(ghii, peer.nodeId, config.nodeId));
  * @version-history
+ *   v1.2.0 — 2026-11-24 — Core FED-16: linkCarriesSignIn asks the peer's allowFederatedAuth as well as
+ *     its tier, so a sign-in check, a memory list and a replicate need the operator's permission for
+ *     that peer. No permission was given on upgrade: the same word decides which peers' visitors a
+ *     `specific_peers` node lets in (auth/visitor-peer.ts), so granting it would have widened that.
+ *     The peers that lost the check are named once on the Security page (./signin-permission-step.ts).
  *   v1.1.0 — 2026-10-27 — accountDisabledRefusal: the memory list and the replicate refuse a person
  *     whose account is deactivated (403 ACCOUNT_DISABLED), as the sign-in verify does; the consent
  *     stays, so reactivation brings both back (secaudit2026oct26).
@@ -53,9 +58,11 @@ export function isNodeAuthConsent(
     return c.recipient === `node:${nodeId}` || c.recipient === '*' || c.recipient === 'domain:*';
 }
 
-/** May the link to this peer carry a sign-in at all? The tier's ceiling decides (federation-tiers.ts). */
-export function linkCarriesSignIn(peer: Pick<PeerInfo, 'tier'>): boolean {
-    return tierCeiling(coerceTier(peer.tier)).allowFederatedAuth;
+/** May the link to this peer carry a sign-in at all? The operator's permission for the peer, within its tier's ceiling (tiers.ts). */
+export function linkCarriesSignIn(peer: Pick<PeerInfo, 'tier' | 'allowFederatedAuth'>): boolean {
+    // Core FED-16: the peer's own permission word AND its tier. The tier alone let every member or
+    // genesis peer ask a sign-in check, whatever the operator had set for that peer (2026-11-24).
+    return peer.allowFederatedAuth === true && tierCeiling(coerceTier(peer.tier)).allowFederatedAuth;
 }
 
 /**
@@ -72,7 +79,7 @@ export async function hasNodeAuthConsent(storage: Storage, ghii: string, nodeId:
  * May `peer` act for the person `ghii` of this node: the link may carry a sign-in, and the person
  * holds a sign-in consent for the peer. Every visitor the peer could sign in already meets this.
  */
-export async function peerMayActFor(storage: Storage, peer: Pick<PeerInfo, 'tier' | 'nodeId'>, ghii: string, now: Date = new Date()): Promise<boolean> {
+export async function peerMayActFor(storage: Storage, peer: Pick<PeerInfo, 'tier' | 'nodeId' | 'allowFederatedAuth'>, ghii: string, now: Date = new Date()): Promise<boolean> {
     return linkCarriesSignIn(peer) && hasNodeAuthConsent(storage, ghii, peer.nodeId, now);
 }
 
@@ -97,4 +104,23 @@ export async function accountDisabledRefusal(
 export function signInConsentRefusal(ghii: string, peerNodeId: string, thisNodeId: string): string {
     return `${ghii} has not let ${peerNodeId} sign them in, so ${peerNodeId} cannot read or save their records on ${thisNodeId}. `
         + `To allow it, the person adds ${peerNodeId} under "Sign-in from other AIMEAT servers" on the Access tab of their profile on ${thisNodeId}.`;
+}
+
+/**
+ * Why `peer` may not act for the person `ghii` of this node, or null when it may. The memory list and
+ * the replicate ask this, so each refusal names the control that answers it: the operator's permission
+ * for the peer (FEDERATION_AUTH_NOT_ALLOWED, the same code the sign-in verify answers), the person's
+ * sign-in consent (CONSENT_REQUIRED), or a deactivated account (ACCOUNT_DISABLED, asked last, so a peer
+ * without a consent learns nothing about the account).
+ */
+export async function peerActRefusal(
+    storage: Storage, peer: Pick<PeerInfo, 'tier' | 'nodeId' | 'allowFederatedAuth'>, ghii: string, thisNodeId: string, now: Date = new Date(),
+): Promise<{ code: string; message: string } | null> {
+    if (!linkCarriesSignIn(peer)) {
+        return { code: 'FEDERATION_AUTH_NOT_ALLOWED', message: `${thisNodeId} does not allow sign-ins from ${peer.nodeId}, so ${peer.nodeId} cannot read or save its people's records here. The operator of ${thisNodeId} turns on "Allow Federated Login" for ${peer.nodeId} on the Federation page.` };
+    }
+    if (!await hasNodeAuthConsent(storage, ghii, peer.nodeId, now)) {
+        return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(ghii, peer.nodeId, thisNodeId) };
+    }
+    return accountDisabledRefusal(storage, ghii, thisNodeId);
 }

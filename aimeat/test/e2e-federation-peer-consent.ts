@@ -40,6 +40,7 @@
  * @structure Setup · 1 refused without the consent · 2 the uses with the consent · 3 the consent ends
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-consent
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   v1.1.0 — 2026-10-22 — A replicate into a person's agent needs the owner's consent (R2, and the
  *     owner's-consent case); the suite joins the purpose tier (the developer's ruling of 2026-10-22).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10 wave 3, v70 and v71).
@@ -139,7 +140,8 @@ try {
         await setupOperator(B, `conb${stamp}`);
         // A visitor from B may read and write here, so the visitor can pull a record and push it home.
         await addPeer(A, B_ID, B.baseUrl, B.nodeKey.publicKey, { tier: 'member', replicate_memory: true, federation_auth_scopes: ['memory:read', 'memory:write', 'catalogue:read'] });
-        await addPeer(B, A_ID, A.baseUrl, A.nodeKey.publicKey, { tier: 'member', replicate_memory: true });
+        // allow_federated_auth: B, the people's home, answers A's sign-in checks only with the operator's permission (Core FED-16).
+        await addPeer(B, A_ID, A.baseUrl, A.nodeKey.publicKey, { tier: 'member', replicate_memory: true, allow_federated_auth: true });
     });
 
     await test('two persons on B, each with a private record and an agent; neither holds a consent', async () => {

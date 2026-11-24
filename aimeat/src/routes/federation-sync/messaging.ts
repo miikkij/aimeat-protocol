@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-24 — The replicate's refusal names its cause through peerActRefusal: the operator's
+ *     permission for the peer (Core FED-16), the person's consent, or a deactivated account.
  *   2026-11-21 — An inbound message from another node gets its content risk marks at the intake point.
  *   2026-11-15 — The broadcast opens a new contact as accepted only for a sender the peer names as
  *     its operator on its node card (federation-book.ts readPeerOperators), or an agent of one; any
@@ -128,7 +130,7 @@ import { duplicateMessageAttachments, sameAccount, isSentVersion, FILE_CHANGED_R
 import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
-import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation/auth-consent.js';
+import { peerActRefusal } from '../../services/federation/auth-consent.js';
 import { NONCE_WINDOW_MS } from '../../services/request/nonce.js';
 import { boundInboundConversationId } from '../../services/message/thread-binding.js';
 import { normalizeInboundAttachments } from './inbound-attachments.js';
@@ -213,8 +215,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const person = `${account.toLowerCase()}@${config.nodeId}`;
         // A deactivated account is acted for by nobody, as the sign-in verify refuses it; asked after
         // the consent, so a peer without one learns nothing about the account (secaudit2026oct26).
-        if (await peerMayActFor(storage, peer, person)) return await accountDisabledRefusal(storage, person, config.nodeId);
-        return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, sourceNode, config.nodeId) };
+        return peerActRefusal(storage, { ...peer, nodeId: sourceNode }, person, config.nodeId);
     };
 
     // POST /v1/federation/replicate — Receive replicated memory from a peer node

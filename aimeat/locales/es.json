@@ -2071,13 +2071,15 @@
           "workspace_write_role": "Espacios restringidos en los que han escrito miembros",
           "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio",
           "platform_fee_records": "Registros de comisiones en dinero sin autor conocido",
-          "federation_settlement": "Liquidaciones de un par que pasaban el límite diario"
+          "federation_settlement": "Liquidaciones de un par que pasaban el límite diario",
+          "federated_signin_closed": "Pares donde tu gente ya no puede entrar"
         },
         "detail": {
           "subdomain_site_origin": "Estas direcciones ({count}) muestran una aplicación que publicó otra persona y también funcionan en tu dominio: {labels}. Funcionan como antes hasta que elijas.",
           "platform_fee_records": "Estos registros de comisiones en dinero ({count}) se parecen a los que escribe una venta, pero nada indica si los escribió una venta o la propia cuenta. Se cuentan en tus comisiones como antes hasta que elijas.",
           "workspace_write_role": "En estos espacios ({count}) solo pueden escribir el creador del espacio de trabajo y los administradores del organismo, o solo los administradores, pero han escrito miembros. Funcionan como antes hasta que elijas.",
-          "federation_settlement": "{node} mandó {count} liquidaciones el {day} ({morsels} morsels en total) que habrían pasado el límite diario de {limit} morsels. No se sumó nada. Si confías en este servidor, sube su límite en la página Federación."
+          "federation_settlement": "{node} mandó {count} liquidaciones el {day} ({morsels} morsels en total) que habrían pasado el límite diario de {limit} morsels. No se sumó nada. Si confías en este servidor, sube su límite en la página Federación.",
+          "federated_signin_closed": "Tu gente ya no puede entrar en estos servidores pares ({count}) con su cuenta de aquí: {nodes}. Ahora este servidor comprueba esa entrada solo para un par al que se la hayas permitido, no para todo par cuyo nivel la permite. Para permitirla otra vez, activa Permitir entrar desde la federación para ese par en la página Federación."
         },
         "caps": {
           "line": "{label}: {cap}",

@@ -16,6 +16,7 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   v1.1.0 -- 2026-10-25 -- A schedule of the account is skipped while it is deactivated, with a run-log
  *     line naming the deactivation, is kept, and runs again after reactivation (secaudit2026oct22,
  *     owner-deactivation:background-work-keeps-acting).
@@ -206,7 +207,8 @@ async function run() {
         const add = await json('/v1/federation/peers', { method: 'POST', headers: bearer(op.ownerToken),
             body: JSON.stringify({ node_id: fedPeerId, url: 'http://localhost:9999', public_key: Buffer.from(await ed.getPublicKeyAsync(fedSecret)).toString('base64') }) });
         assert(add.status === 201, `add peer ${add.status} ${JSON.stringify(add.body?.error)}`);
-        const act = await json(`/v1/federation/peers/${fedPeerId}`, { method: 'PUT', headers: bearer(op.ownerToken), body: JSON.stringify({ status: 'active' }) });
+        // allow_federated_auth: a sign-in check is answered only for a peer the operator allowed (Core FED-16).
+        const act = await json(`/v1/federation/peers/${fedPeerId}`, { method: 'PUT', headers: bearer(op.ownerToken), body: JSON.stringify({ status: 'active', allow_federated_auth: true }) });
         assert(act.status === 200, `activate peer ${act.status} ${JSON.stringify(act.body?.error)}`);
         const consent = await json('/v1/consent', { method: 'POST', headers: bearer(victim.ownerToken),
             body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${fedPeerId}`, scope: 'auth', purpose: 'federation_login' }) });

@@ -249,7 +249,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | FED-13 | met (4.0.0) | `PEER_HTTPS_REQUIRED_IN` and `peerUrlRefusal` in `aimeat/src/services/peer/url-policy.ts`, asked by the introduction, the peering request, the readiness test, adding and editing a peer, a re-admission, a genesis peering and the key exchange (`aimeat/src/services/federation/helpers.ts`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | A public node refuses a plain-http peer address from 4.0.0 (400 `PEER_HTTPS_REQUIRED`); a local node keeps plain http (ruling Q16). A peer row stored with an http address before 4.0.0 is not rewritten; the key exchange refuses it, and other outbound calls to such a row are not checked one by one. |
 | FED-14 | met | `aimeat/src/routes/federation-peer/peers.ts:210-279` (`KEY_ROTATION_DENIED`) | |
 | FED-15 | met | `aimeat/src/services/federation/peer-remove.ts:127-192` | |
-| FED-16 | **gap** | `aimeat/src/routes/federation-auth.ts:83-222` | The home node checks the tier ceiling for federated sign-in, not the peer's own permission word (`federation-auth.ts:101`). |
+| FED-16 | met | `aimeat/src/routes/federation-auth.ts:83-222`; `aimeat/src/services/federation/auth-consent.ts` (`linkCarriesSignIn`) | Since 2026-11-24 the home node answers a sign-in check, a memory list and a replicate only for a peer whose tier allows it AND whose own permission (`allow_federated_auth`) the operator turned on. Before, the tier alone decided. Nothing was granted on upgrade; the peers that lost the check are named once on the Security page (`aimeat/src/services/federation/signin-permission-step.ts`). |
 | FED-17 | met | `aimeat/src/auth/account-security.ts:95-101`; `aimeat/src/auth/jwt.ts:250-254` | |
 | FED-18 | met | Same read decision path (`aimeat/src/services/access-guard.ts:134-238`) | |
 | FED-19 | met | `aimeat/src/services/a2a/foreign.ts:5-35` | |
@@ -331,7 +331,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 ## The 31 gaps in one list, with their wishes
 
-The list was written as the work for node 4.0.0; a gap still open in the released node stays open under its wish. The wish column names the record in the Lifecycle Central wish bucket that tracks the fix. Items 1 to 9, 12 to 14, 16, 17, 20 to 23, 25 and 28 to 31 are closed in code (see the updates under "Answer first"); they stay in the list so the numbering holds. The open ones are listed here: ID-11, AUTH-06, DATA-06, PACE-05, PACE-11, FED-16, HTTP-01, HTTP-02.
+The list was written as the work for node 4.0.0; a gap still open in the released node stays open under its wish. The wish column names the record in the Lifecycle Central wish bucket that tracks the fix. Items 1 to 9, 12 to 14, 16, 17, 20 to 25 and 28 to 31 are closed in code (see the updates under "Answer first"); they stay in the list so the numbering holds. The open ones are listed here: ID-11, AUTH-06, DATA-06, PACE-05, PACE-11, HTTP-01, HTTP-02.
 
 | # | ID | What is missing | Kind | Wish |
 |---|---|---|---|---|

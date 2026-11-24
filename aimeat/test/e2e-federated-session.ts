@@ -41,6 +41,7 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   2026-11-24 — Core FED-16: the peer that asks this node to act for its people gets allow_federated_auth, which the node now needs as well as the tier.
  *   v1.6.0 — 2026-10-21 — Two uses that worked before the 2026-10-20 round keep working: a sign-in
  *     consent whose end time does not parse still signs the person in (8b, SQLite only: the Postgres
  *     column is a timestamp and cannot hold one), and pull, push-home and list-home still reach a home
@@ -939,6 +940,18 @@ async function run() {
             body: JSON.stringify({ username: localPerson.name, password: localPerson.password, requesting_node: homeNodeId, timestamp, signature, ...proof }),
         });
     };
+    // Core FED-16 (2026-11-24): this node answers a sign-in check only for a peer the operator allowed
+    // sign-ins for, not for every peer whose tier permits it.
+    await test('FED-16: without the operator\'s permission for the peer, verify answers 403 FEDERATION_AUTH_NOT_ALLOWED', async () => {
+        const { status, body } = await verifyAsPeer();
+        assert(status === 403 && (body.error?.code ?? body.code) === 'FEDERATION_AUTH_NOT_ALLOWED', `expected 403 FEDERATION_AUTH_NOT_ALLOWED, got ${status} ${JSON.stringify(body)}`);
+        const put = await json(`/v1/federation/peers/${homeNodeId}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ allow_federated_auth: true }),
+        });
+        assert(put.status === 200, `allow sign-ins from the peer: ${put.status} ${JSON.stringify(put.body)}`);
+    });
     const grantAuthConsent = async (expires: string) => {
         const r = await json('/v1/consent', {
             method: 'POST',

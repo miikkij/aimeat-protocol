@@ -5,6 +5,7 @@
  *   which links may carry a sign-in, and that the moved authConsentEnded is the one the sign-in
  *   route still exports.
  * @version-history
+ *   v1.1.0 — 2026-11-24 — Core FED-16: a link carries a sign-in only with the peer's own permission.
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10 wave 3, v70 and v71).
  */
 import { describe, it, expect } from 'vitest';
@@ -32,17 +33,23 @@ describe('isNodeAuthConsent', () => {
 describe('linkCarriesSignIn and peerMayActFor', () => {
     const storage = (rows: unknown[]) => ({ listConsents: async () => rows }) as unknown as Storage;
     const consent = { scope: 'auth', recipient: `node:${NODE}`, expires: null, status: 'active' };
-    it('member and genesis links may carry a sign-in, contact and visiting links may not', () => {
-        expect(linkCarriesSignIn({ tier: 'member' })).toBe(true);
-        expect(linkCarriesSignIn({ tier: 'genesis' })).toBe(true);
-        expect(linkCarriesSignIn({ tier: undefined })).toBe(true);
-        expect(linkCarriesSignIn({ tier: 'visiting' })).toBe(false);
-        expect(linkCarriesSignIn({ tier: 'contact' })).toBe(false);
+    it('a member or genesis link with the operator\'s permission may carry a sign-in; contact and visiting links never', () => {
+        expect(linkCarriesSignIn({ tier: 'member', allowFederatedAuth: true })).toBe(true);
+        expect(linkCarriesSignIn({ tier: 'genesis', allowFederatedAuth: true })).toBe(true);
+        expect(linkCarriesSignIn({ tier: undefined, allowFederatedAuth: true })).toBe(true);
+        expect(linkCarriesSignIn({ tier: 'visiting', allowFederatedAuth: true })).toBe(false);
+        expect(linkCarriesSignIn({ tier: 'contact', allowFederatedAuth: true })).toBe(false);
+    });
+    it('Core FED-16: the tier alone does not carry a sign-in; the peer\'s own permission is needed too', () => {
+        expect(linkCarriesSignIn({ tier: 'member', allowFederatedAuth: false })).toBe(false);
+        expect(linkCarriesSignIn({ tier: 'genesis', allowFederatedAuth: false })).toBe(false);
     });
     it('a peer acts for a person only with the consent and on a link that may carry a sign-in', async () => {
-        expect(await peerMayActFor(storage([consent]), { tier: 'member', nodeId: NODE }, 'alice@here', now)).toBe(true);
-        expect(await peerMayActFor(storage([]), { tier: 'member', nodeId: NODE }, 'alice@here', now)).toBe(false);
-        expect(await peerMayActFor(storage([consent]), { tier: 'visiting', nodeId: NODE }, 'alice@here', now)).toBe(false);
+        const allowed = { tier: 'member' as const, nodeId: NODE, allowFederatedAuth: true };
+        expect(await peerMayActFor(storage([consent]), allowed, 'alice@here', now)).toBe(true);
+        expect(await peerMayActFor(storage([]), allowed, 'alice@here', now)).toBe(false);
+        expect(await peerMayActFor(storage([consent]), { ...allowed, tier: 'visiting' }, 'alice@here', now)).toBe(false);
+        expect(await peerMayActFor(storage([consent]), { ...allowed, allowFederatedAuth: false }, 'alice@here', now)).toBe(false);
     });
     it('the sign-in route exports the same authConsentEnded', () => {
         expect(fromRoute).toBe(authConsentEnded);
