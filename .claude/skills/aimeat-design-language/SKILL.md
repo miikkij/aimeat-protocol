@@ -75,6 +75,15 @@ at 20 px. It sets `--font-poster`, `--font-showroom` and `--font-display` to the
 small size stays readable in it. A component that reads `--font-headline` directly at a small size
 goes on the list in that file.
 
+**A third theme ships with the node: Selkeä** (`src/services/themes/selkea.ts`), optional and read
+only, and not offered until the operator lists it in `themes.offered` (the operator may also make it
+the default). It is a businesslike look for Settings & Controls and every inner page, light only: a
+paper ground, white boxes with an ink frame, corners of 3 to 4 px, and the sun as a solid colour on a
+number tile, a label and the chosen item. Every button and field is 40 px high, and an action is an
+outlined or a filled button, never an underlined word. Its rules go through the theme system like
+Tiilitaivas, so no component carries a Selkeä value, and the order of its theme CSS is deliberate:
+later rules override earlier ones.
+
 **A face can also be added to the running node, with no commit and no deploy** (the font manager,
 since 2026-10-03): the operator adds it on Admin → Themes & Styles → Fonts, or an AI does with
 `aimeat_theme_font_save` (its woff2 files, the weight and style of each, its licence, copyright

@@ -2,11 +2,11 @@
   "about": "The digest of .claude/skills/aimeat-design-language/ (SKILL.md and references/) as last published to the node as node:aimeat-design-language, and the version the node gave it. The repository copy is the source (decision P7, 2026-11-14). pnpm check:design-language-publish fails when the folder changes without a publish recorded here. Reasoning: aimeat/scripts/check-design-language-publish.ts.",
   "skill": "aimeat-design-language",
   "nodeRef": "node:aimeat-design-language",
-  "publishedVersion": "1.0.15",
-  "publishedOn": "2026-11-23",
-  "digest": "sha256:8ce66d410d2d2f59a91b2232",
+  "publishedVersion": "1.0.16",
+  "publishedOn": "2026-11-24",
+  "digest": "sha256:db631ee357299212bbe9baca",
   "files": {
-    "SKILL.md": "82ac81aa35f590ff",
+    "SKILL.md": "e7ba1ccbb1a8915c",
     "references/shapes.md": "e6ee3788de052a98",
     "references/token-map.md": "b1060858dc401a9c"
   }

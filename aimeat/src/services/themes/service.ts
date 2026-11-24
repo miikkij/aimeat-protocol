@@ -29,6 +29,9 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.7.0 — 2026-11-25 — The shipped theme Selkeä (selkea.ts): read only, reserved as an id, served,
+ *     copyable, and not in the default offered list, so an operator offers it with themes.offered. The
+ *     shipped themes are one list (SHIPPED); Tiilitaivas behaves as before.
  *   v2.6.0 — 2026-11-04 — The shipped theme Tiilitaivas (tiilitaivas.ts) beside the AIMEAT theme: read
  *     only, offered with it on a node with an empty themes.offered, AIMEAT stays the default. Only
  *     the AIMEAT theme has no sheet; only the two together are written as an empty list.
@@ -63,6 +66,7 @@ import { builtinStyles, prepareStyle, swatchOf, STYLE_ID_RE, type Style, type St
 import { themeSheet, componentCssState, catalogueHooks, servedFaces, type ComponentCssState } from './sheet.js';
 import { SHAPE_TOKENS, builtinShapes, checkShape } from './shapes.js';
 import { tiilitaivasTheme, TIILITAIVAS_ID } from './tiilitaivas.js';
+import { selkeaTheme, SELKEA_ID } from './selkea.js';
 import type { ContrastResult } from './contrast.js';
 import type { ConfigProvenance } from '../config/provenance.js';
 import { applyConfigChanges } from '../config/apply.js';
@@ -75,6 +79,14 @@ export const THEME_CHOICE_KEY = 'settings.theme';
 export const BUILTIN_THEME = 'aimeat';
 /** What people may choose from on a node whose themes.offered is empty; the first is the default. */
 const DEFAULT_OFFERED: readonly string[] = [BUILTIN_THEME, TIILITAIVAS_ID];
+/**
+ * The read-only themes that ship with the node beside AIMEAT, in the order they are listed. A shipped
+ * theme not in DEFAULT_OFFERED (Selkeä) is offered only when the operator's themes.offered names it.
+ */
+const SHIPPED: ReadonlyArray<{ id: string; theme: () => Theme }> = [
+    { id: TIILITAIVAS_ID, theme: tiilitaivasTheme },
+    { id: SELKEA_ID, theme: selkeaTheme },
+];
 /**
  * AIMEAT's own interface: the pages a theme reaches. Everything else the shell serves (the front
  * page, help, members, the change log, the showroom pages) keeps behaving as it did before themes
@@ -129,7 +141,7 @@ export const themeSnapshot = (): ThemeSnapshot | null => snapshotCache;
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 /** Words a /v1/themes/<word> route answers itself, so no theme takes one as its id. */
-const RESERVED_IDS = new Set([BUILTIN_THEME, TIILITAIVAS_ID, 'all', 'choice', 'policy', 'preview', 'fonts']);
+const RESERVED_IDS = new Set([BUILTIN_THEME, ...SHIPPED.map((s) => s.id), 'all', 'choice', 'policy', 'preview', 'fonts']);
 const hash = (s: string, n = 12) => createHash('sha1').update(s).digest('hex').slice(0, n);
 
 function builtinTheme(): Theme {
@@ -198,7 +210,8 @@ export class ThemeService {
 
     /**
      * Every theme: the built-in ones first, then the node's own by name. A record a node saved under
-     * the id `tiilitaivas` before this theme shipped stays as it is and takes the shipped one's place.
+     * the id of a shipped theme (`tiilitaivas`, `selkea`) before that theme shipped stays as it is and
+     * takes the shipped one's place.
      */
     async listAll(): Promise<Theme[]> {
         const { items } = await this.storage.listAllMemoryMeta({ ownerPrefix: this.systemGhii, prefix: THEME_KEY_PREFIX, limit: 500, excludeVersionRows: true });
@@ -209,7 +222,7 @@ export class ThemeService {
             if (v && typeof v === 'object' && Array.isArray(v.styles)) custom.push(v);
         }
         custom.sort((a, b) => a.name.localeCompare(b.name));
-        const shipped = custom.some((t) => t.id === TIILITAIVAS_ID) ? [] : [tiilitaivasTheme()];
+        const shipped = SHIPPED.filter((s) => !custom.some((t) => t.id === s.id)).map((s) => s.theme());
         return [builtinTheme(), ...shipped, ...custom];
     }
 
@@ -219,7 +232,7 @@ export class ThemeService {
         const rec = await this.storage.getMemory(this.systemGhii, THEME_KEY_PREFIX + id);
         const v = rec?.value as Theme | undefined;
         if (v && typeof v === 'object' && Array.isArray(v.styles)) return v;
-        return id === TIILITAIVAS_ID ? tiilitaivasTheme() : null;
+        return SHIPPED.find((s) => s.id === id)?.theme() ?? null;
     }
 
     private async must(id: string): Promise<Theme> {

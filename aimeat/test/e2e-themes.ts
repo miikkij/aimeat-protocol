@@ -6,12 +6,15 @@
  *   as a warning and still saved, CSS that does not parse refused with its line, contrast as a
  *   warning, the built-in theme read only, an ordinary owner refused, versions and restore, what the
  *   page shell carries before its first paint, the component catalogue naming the theme, and a
- *   person's own choice, and the shipped optional theme Tiilitaivas.
+ *   person's own choice, and the shipped optional themes Tiilitaivas and Selkeä.
  *
  *   The ones that matter most: the operator's CSS is refused ONLY when it does not parse (Jouni,
  *   Q2), and nobody but the operator writes a theme.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=themes
  * @version-history
+ *   v1.4.0 — 2026-11-25 — Selkeä: not offered until the operator lists it, yet listed as built in and
+ *     its sheet served; offered with the policy and chosen; a choice while not offered refused; read
+ *     only, its name and id kept, a copy the operator's own.
  *   v1.3.0 — 2026-11-04 — Tiilitaivas: offered beside AIMEAT with the default unchanged, read only and
  *     copyable, its sheet and faces served by the node, a person's choice kept, the operator's list wins.
  *   v1.2.0 — 2026-10-02 — An AI's JSON answer applied as the "Ask your AI" paste does, and its
@@ -411,6 +414,66 @@ await test('The operator takes it off the list: only AIMEAT is saved as written,
     assert(refused.status === 422 && refused.body.error?.code === 'NOT_OFFERED', `choice ${refused.status} ${refused.body.error?.code}`);
     const back = await json('/v1/themes/policy', op(put({ offered: ['aimeat', 'tiilitaivas'], default: 'aimeat' })));
     assert(back.status === 200 && back.body.data.policy.offered.join(',') === 'aimeat,tiilitaivas', JSON.stringify(back.body.data?.policy));
+});
+
+console.log('\nThe shipped theme Selkeä');
+
+await test('On a node with no list of its own Selkeä is not offered, yet the operator sees it built in and its sheet is served', async () => {
+    const offered = await json('/v1/themes');
+    assert(offered.body.data.policy.offered.join(',') === 'aimeat,tiilitaivas', `offered ${offered.body.data.policy.offered}`);
+    assert(!offered.body.data.themes.some((x: any) => x.id === 'selkea'), 'not offered by default');
+    const all = await json('/v1/themes/all', op());
+    const t = all.body.data.themes.find((x: any) => x.id === 'selkea');
+    assert(!!t && t.name === 'Selkeä' && t.builtin === true, JSON.stringify(t && { id: t.id, name: t.name, builtin: t.builtin }));
+    assert(t.styles.length === 1 && t.styles[0].onlyMode === 'light', 'one style, light only');
+    const res = await fetch(`${BASE}/v1/themes/selkea/theme.css`);
+    assert(res.status === 200 && (res.headers.get('content-type') ?? '').includes('text/css'), `${res.status} ${res.headers.get('content-type')}`);
+    const css = await res.text();
+    for (const expected of ['--bg: #FAFAF8;', '--font-body: \'Hanken Grotesk\'', '--shape-corner: 4px;', '.poster-section-title small.og-sec-num { order: -1;', 'min-height: 40px; line-height: 19px;']) {
+        assert(css.includes(expected), `missing ${expected}`);
+    }
+    assert(!/url\(|@import|https?:/i.test(css), 'no outside address');
+});
+
+await test('A member\'s choice of Selkeä while it is not offered → 422 NOT_OFFERED', async () => {
+    const refused = await json('/v1/themes/choice', member(put({ theme: 'selkea' })));
+    assert(refused.status === 422 && refused.body.error?.code === 'NOT_OFFERED', `choice ${refused.status} ${refused.body.error?.code}`);
+});
+
+await test('The operator offers it with the policy and may make it the default; a member then chooses it', async () => {
+    const on = await json('/v1/themes/policy', op(put({ offered: ['aimeat', 'tiilitaivas', 'selkea'], default: 'aimeat' })));
+    assert(on.status === 200 && on.body.data.policy.offered.join(',') === 'aimeat,tiilitaivas,selkea', JSON.stringify(on.body.data?.policy ?? on.body.error));
+    const listed = (await json('/v1/themes')).body.data.themes.find((x: any) => x.id === 'selkea');
+    assert(listed?.sheet?.startsWith('/v1/themes/selkea/theme.css?v='), `sheet ${listed?.sheet}`);
+    assert(listed.styles.length === 1 && listed.styles[0].onlyMode === 'light' && listed.styles[0].swatch.light.bg === '#fafaf8', JSON.stringify(listed.styles[0]));
+    const ok = await json('/v1/themes/choice', member(put({ theme: 'selkea' })));
+    assert(ok.status === 200 && ok.body.data.style === 'selkea', `choice ${ok.status}: ${JSON.stringify(ok.body)}`);
+    const read = await json('/v1/themes/choice', member());
+    assert(read.body.data.theme === 'selkea' && read.body.data.style === 'selkea', JSON.stringify(read.body.data));
+    const def = await json('/v1/themes/policy', op(put({ default: 'selkea' })));
+    assert(def.status === 200 && def.body.data.policy.default === 'selkea', JSON.stringify(def.body.data?.policy ?? def.body.error));
+    const back = await json('/v1/themes/policy', op(put({ offered: ['aimeat', 'tiilitaivas'], default: 'aimeat' })));
+    assert(back.status === 200 && back.body.data.policy.offered.join(',') === 'aimeat,tiilitaivas' && back.body.data.policy.default === 'aimeat', JSON.stringify(back.body.data?.policy));
+});
+
+await test('It is read only, its name and id cannot be taken → 409, and a copy of it is the operator\'s own', async () => {
+    const edit = await json('/v1/themes/selkea', op(put({ name: 'Mine' })));
+    assert(edit.status === 409 && edit.body.error?.code === 'READ_ONLY', `edit ${edit.status} ${edit.body.error?.code}`);
+    const taken = await json('/v1/themes', op(post({ name: 'Selkeä' })));
+    assert(taken.status === 409 && taken.body.error?.code === 'NAME_TAKEN', `name ${taken.status} ${taken.body.error?.code}`);
+    const sameSlug = await json('/v1/themes', op(post({ name: 'selkea' })));
+    assert(sameSlug.status === 201 && sameSlug.body.data.theme.id !== 'selkea', `id ${sameSlug.status} ${sameSlug.body.data?.theme?.id}`);
+    const still = await json('/v1/themes/all', op());
+    assert(still.body.data.themes.find((x: any) => x.id === 'selkea')?.builtin === true, 'the shipped theme keeps its id');
+    await json(`/v1/themes/${sameSlug.body.data.theme.id}`, op(put({ retired: true })));
+    const copy = await json('/v1/themes', op(post({ name: 'Oma selkeä', basedOn: 'selkea' })));
+    assert(copy.status === 201, `copy ${copy.status}: ${JSON.stringify(copy.body.error)}`);
+    const t = copy.body.data.theme;
+    assert(t.builtin === false && t.basedOn === 'selkea', 'the copy is the operator\'s own');
+    assert(t.styles.length === 1 && t.styles[0].id !== 'selkea' && t.styles[0].onlyMode === 'light' && t.styles[0].light['--bg'] === '#FAFAF8', JSON.stringify(t.styles[0].id));
+    assert(t.shapes['--shape-corner'] === '4px' && (t.css ?? '').includes('og-sec-num'), 'shapes and theme CSS copied');
+    const own = await json(`/v1/themes/${t.id}`, op(put({ retired: true })));
+    assert(own.status === 200, `retire the copy ${own.status}`);
 });
 
 // ─── Summary ───

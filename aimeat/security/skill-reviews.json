@@ -558,16 +558,17 @@
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css",
         "aimeat/src/services/themes/tokens.ts",
         "aimeat/src/services/app-ui/signature-tokens.ts",
-        "aimeat/src/services/themes/tiilitaivas.ts"
+        "aimeat/src/services/themes/tiilitaivas.ts",
+        "aimeat/src/services/themes/selkea.ts"
       ],
-      "digest": "sha256:ba84d520c1da705c5d896bc4",
+      "digest": "sha256:ba6bcbdb3b4108664131f517",
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
@@ -855,7 +856,8 @@
       "aimeat/public/lib/aimeat-fonts.css": "8e1826590b7d1bc9",
       "aimeat/src/services/themes/tokens.ts": "7178b915f0c271ee",
       "aimeat/src/services/app-ui/signature-tokens.ts": "3e2b6b25cc6e44d8",
-      "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121"
+      "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121",
+      "aimeat/src/services/themes/selkea.ts": "dc442080b2ec1377"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc",
