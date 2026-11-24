@@ -16,8 +16,15 @@ const repo = path.resolve(process.cwd(), '..');
 
 describe('codeReach', () => {
   it('runs the whole sweep for a change on every request\'s path', () => {
-    expect(codeReach(repo, ['aimeat/src/server-bootstrap/service-init.ts']).full).toMatch(/every request/);
+    expect(codeReach(repo, ['aimeat/src/middleware/envelope.ts']).full).toMatch(/every request/);
     expect(codeReach(repo, ['aimeat/package.json']).full).not.toBeNull();
+  });
+
+  it('runs a few suites for a boot change, since every suite starts a node', () => {
+    const r = codeReach(repo, ['aimeat/src/server-bootstrap/service-init.ts']);
+    expect(r.full).toBeNull();
+    expect(r.suites.length).toBeGreaterThan(0);
+    expect(r.suites.length).toBeLessThan(10);
   });
 
   it('picks the federation suites for the federated sign-in check, and not the library suites', () => {

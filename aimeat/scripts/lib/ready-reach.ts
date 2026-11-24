@@ -16,9 +16,10 @@
  *   COMMON_SAMPLE of them run, not all.
  *
  *   THE BOOTSTRAP IS NOT FOLLOWED. src/server-bootstrap/ imports every service to wire it, so going
- *   through it would reach every route for every change. A change INSIDE the bootstrap, or in what
- *   every request passes through (middleware, auth, storage, config, the entry point, the generated
- *   types, the dependencies), cannot be narrowed this way and runs the whole sweep.
+ *   through it would reach every route for every change. A change INSIDE the bootstrap is proven by
+ *   any suite, since each starts a node, so COMMON_SAMPLE suites run for it. A change in what every
+ *   request passes through (middleware, auth, storage, config, the generated types, the
+ *   dependencies) cannot be narrowed this way and runs the whole sweep.
  *
  *   OUTSIDE src/. A served browser library (src/static/sdk-libs/, public/lib/) or a page under
  *   public/ is reached by a suite that names its file. The Python package (python/) has its own tests
@@ -33,7 +34,14 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 /** Changed paths that every request passes through, or that decide what runs at all: the whole sweep. */
-export const FULL_SWEEP = /^(?:aimeat\/src\/(?:server-bootstrap|middleware|auth|storage|generated|config)\/|aimeat\/src\/(?:index|config|config-types|server)\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|openapi\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated|config)\/|aimeat\/src\/(?:config|config-types|server)\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|openapi\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+
+/**
+ * The bootstrap and the entry point wire every service and run the boot steps. A change there is
+ * proven by any suite, because every suite starts a node: COMMON_SAMPLE suites run for it, beside the
+ * suites the services it calls reach.
+ */
+const BOOT = /^aimeat\/src\/(?:server-bootstrap\/|index\.ts$)/;
 
 /** How many suites prove a path that only the helpers every suite uses call (see codeReach). */
 const COMMON_SAMPLE = 3;
@@ -186,6 +194,8 @@ export function codeReach(repo: string, files: string[]): CodeReach {
     if ([...suiteHelpers.get(s)!].some(h => common.has(h) && helperHit.get(h))) viaCommon.push(name);
   }
   for (const name of viaCommon.sort().slice(0, COMMON_SAMPLE)) picked.add(name);
+  // A boot change: a few suites prove the node still starts and serves.
+  if (files.some(f => BOOT.test(f))) for (const s of suiteFiles.map(f => path.basename(f, '.ts')).sort().slice(0, COMMON_SAMPLE)) picked.add(s);
   // A suite that imports a reached source file directly is in `reached` through the importer map.
   for (const f of reached) if (f.startsWith(testDir) && /e2e-.*\.ts$/.test(f)) picked.add(path.basename(f, '.ts'));
   return { full: null, suites: [...picked].sort() };
