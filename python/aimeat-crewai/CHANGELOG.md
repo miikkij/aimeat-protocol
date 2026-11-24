@@ -3,6 +3,14 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.2 (not yet published) - 2026-11-24 addition
+
+- **An agent may be named by its full identity.** The credential lookup behind the liaison and
+  `push_direct_log()` now take `crew-forge#alice@node` as well as `crew-forge`. Before, the lookup
+  searched for a file named after the whole identity and said the agent was unknown, and the
+  decision log was written under a key the node refuses with 400 AGENT_KEY_NOT_A_NAME. An owner you
+  pass yourself still wins over the one in the identity. `publish_offers()` already took both.
+
 ## 0.41.2 (not yet published) - 2026-11-21 addition
 
 - **The liaison knows when content may try to steer it.** An AIMEAT node now marks text that tries to

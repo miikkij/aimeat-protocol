@@ -203,6 +203,23 @@ def test_read_token_ambiguous_owner_raises(tmp_path, monkeypatch) -> None:
         _read_token("demo-crew")
 
 
+def test_read_token_takes_the_full_identity(tmp_path, monkeypatch) -> None:
+    """A caller that names the agent by identity (`name#owner@node`) finds the same credential as
+    one that gives the bare name, and the identity's owner picks between two owners' agents."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "tokens" / "demo-crew@alice.token").write_text("alices")
+    (tmp_path / "tokens" / "demo-crew@bob.token").write_text("bobs")
+
+    token, _ = _read_token("demo-crew#bob@node-1")
+    assert token == "bobs"
+    # An owner the caller passes wins over the one in the identity.
+    token, _ = _read_token("demo-crew#bob@node-1", owner="alice")
+    assert token == "alices"
+
+
 def test_read_token_missing_raises(tmp_path, monkeypatch) -> None:
     """No token file -> clear error pointing to the connect-add command."""
     import pytest

@@ -461,16 +461,29 @@ class _Api:
         return self.session.patch(f"{self.base_url}{path}", **kwargs)
 
 
+def _name_and_owner(agent_name: str, owner: str | None = None) -> tuple[str, str | None]:
+    """The bare agent name and its owner from either form a caller may give: `crew-forge`, or the
+    full identity `crew-forge#isoalice@node`. An owner the caller passed wins over the one in the
+    identity."""
+    if "#" not in agent_name:
+        return agent_name, owner
+    name, _, rest = agent_name.partition("#")
+    return name, owner or (rest.split("@", 1)[0] or None)
+
+
 def _locate_credential(agent_name: str, owner: str | None = None) -> Path:
     """
     The credential file this machine holds for `agent_name`, of either family.
 
-    `agent_name` is the BARE NAME here, always: the file is `{name}@{owner}`, so handing this a
-    GAII produces a search for `keys/crew-forge#isoalice@node@*.key`, which matches nothing and
-    reports the agent as unknown when its key is sitting right there.
+    `agent_name` may be the bare name or the full identity `name#owner@node`. The file is
+    `{name}@{owner}`, so a GAII used as the name produced a search for
+    `keys/crew-forge#isoalice@node@*.key`, which matched nothing and reported the agent as unknown
+    when its key was sitting right there. A GAII is split here: its name names the file, and its
+    owner is used when the caller gave none.
     """
     import glob
 
+    agent_name, owner = _name_and_owner(agent_name, owner)
     home_dir = aimeat_home()
     tokens_dir = home_dir / "tokens"
     keys_dir = home_dir / "keys"
@@ -618,6 +631,7 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     Returns (token, node_url). The token is "" for a v2 agent, because there is
     no bearer on disk to return and nothing consumes it.
     """
+    agent_name, owner = _name_and_owner(agent_name, owner)
     credential_file = _locate_credential(agent_name, owner)
 
     # A key is the agent's private signing material and is not a bearer: read the file only when it

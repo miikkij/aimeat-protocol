@@ -826,6 +826,19 @@ def test_pushing_the_direct_log_labels_it_as_made_without_the_node(_direct, monk
     assert sum(index_write["value"]["days"].values()) == 1
 
 
+def test_pushing_the_direct_log_with_a_full_identity_writes_under_the_bare_name(_direct, monkeypatch) -> None:
+    # The node refuses `agents.<name#owner@node>.…` with 400 AGENT_KEY_NOT_A_NAME, so a caller that
+    # names its agent by identity must still land under the agent's own name.
+    monkeypatch.setattr("requests.post", lambda url, **kw: _typesafe_ok({"safe": {"type": "noul", "noul": 0.6}}))
+    decide({"subject": "s"}, questions={"safe": yes_no("safe")})
+    monkeypatch.delenv(DIRECT_ENV, raising=False)
+
+    s = _StubSession(_ok({"key": "agents.mailer.decide.direct-log"}))
+    push_direct_log(agent_name="mailer#alice@node-1", **_node_kwargs(s))
+    keys = [c["json"]["key"] for c in s.calls if c["method"] == "POST"]
+    assert keys and all(k.startswith("agents.mailer.decide.direct-log.") for k in keys), keys
+
+
 def test_a_second_push_sends_only_what_is_new(_direct, monkeypatch) -> None:
     # The log is append-only, so the lines already pushed are a cursor. Without one, every push
     # re-sent the whole history.

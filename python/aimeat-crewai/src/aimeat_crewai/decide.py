@@ -1486,7 +1486,9 @@ def push_direct_log(
     if not agent_name:
         raise DecideError("push_direct_log needs agent_name= to know which agent's key to write.")
     node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token, session=session)
-    prefix = key or f"agents.{agent_name}.decide.direct-log"
+    # A full identity picks the credential above; the memory key segment is its bare agent name,
+    # because the node refuses `agents.<name#owner@node>.…` with 400 AGENT_KEY_NOT_A_NAME.
+    prefix = key or f"agents.{agent_name.partition('#')[0]}.decide.direct-log"
     note = (
         "Decisions this agent made in DIRECT mode, with no node in the path: not scrubbed, not "
         "capped, not cached, and not on the decision register."
