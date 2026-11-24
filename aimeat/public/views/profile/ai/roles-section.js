@@ -12,6 +12,8 @@
  * @structure secRoles · roleRow · roleOpen · appRoleRow
  * @usage import { secRoles } from './ai/roles-section.js';
  * @version-history
+ *   v1.3.0 — 2026-11-24 — secRoles takes `plain`: the section without its headline and id, for the
+ *     page's "Fine-tuning" rows (ai/page.js v1.44.0).
  *   v1.2.0 — 2026-10-02 — The question marks that explain a role's this-machine-only and price ceiling
  *     rows: ai.local_only, ai.max_cost_per_call (components/HelpTip.js).
  *   v1.1.0 — 2026-09-28 — The lifecycle and the fit: a role or a binding unused for 90 days is marked,
@@ -52,12 +54,12 @@ function orderWords(role, titleOf) {
     .join(' · ');
 }
 
-export function secRoles(ctx, num) {
+export function secRoles(ctx, num, plain = false) {
   const rl = ctx.rl;
   const titleOf = (id) => ctx.pv.providers.find((p) => p.id === id)?.title || id;
   const count = rl.view ? x('rl.count', { n: rl.roles.length, waiting: rl.waiting }) : '';
   return html`
-    <${PageSection} id="ai-roles" num=${num} title=${x('rl.title')} count=${count}>
+    <${PageSection} id=${plain ? undefined : 'ai-roles'} plain=${plain} num=${num} title=${x('rl.title')} count=${count}>
       <${Note} kind="lead">${x('rl.lead')}<//>
       ${rl.error ? html`<${Note} kind="message" error>${rl.error}<//>` : null}
       ${!rl.view && !rl.error ? html`<${Note} kind="loading">${x('loading')}<//>` : null}

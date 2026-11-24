@@ -12,6 +12,11 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.44.0 -- 2026-11-24 -- The page is ordered by what a person needs first: the figures over the
+ *     page's start, then 01 Connection, 02 Budget and spending with 02.1 What spends your key, 03 Routing,
+ *     and 04 Fine-tuning, whose four parts (providers, roles, model policy, the rules for pictures and
+ *     videos) are rows that say their state and open in place. App roles that wait for the person are
+ *     said in the page's aside. No section lost a control; the simple view is unchanged.
  *   v1.43.0 -- 2026-11-01 -- In the simple view the sections inside "02 Lisäasetukset" are numbered 02.1 to 02.8, so none of them reads 01 under 02 (Grok's first-timer review 1.11 c); the full page keeps 01 to 08.
  *   v1.42.0 -- 2026-11-01 -- No count of messages anywhere: messagesLeft and its 30-day history fallback are gone, and the head explains the credit in Jouni's words, that it is used according to the model and the amount of use (Jouni, 1.11 04.00: no promises about what the credit lasts).
  *   v1.41.0 -- 2026-11-01 -- The simple view says what the credit still buys as a sentence in the head ("Saldosi riittää vielä noin N tavalliseen viestiin."), not in the strip's monospace line, and its crumb names the page Tekoälysaldo (commercial's check of 2c31d1d22).
@@ -190,36 +195,49 @@ export function renderPage(ctx) {
   if (simpleView(ctx)) return renderSimple(ctx);
   const s = ctx.settings;
   const loading = !s;
+  // The state of each part of 04, as its row says it while the part is shut.
+  const pvCount = ctx.pv.view ? x('pv.count', { own: ctx.pv.owned.length, all: ctx.pv.providers.length }) : '';
+  const rlCount = ctx.rl.view ? x('rl.count', { n: ctx.rl.roles.length, waiting: ctx.rl.waiting }) : '';
+  const polCount = ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '';
+  const part = (id, num, title, sub, body) => html`
+    <${FoldSection} id=${id} num=${num} title=${title} sub=${sub} open=${!!ctx.folds[id]} onToggle=${() => ctx.toggleFold(id)}>${body}<//>`;
+  const opens = (id) => () => ctx.openFold(id);
   return html`
     <${SettingsPage} name="ai"
       crumb=${crumb()}
       ...${mast(ctx)}
-      strip=${strip(ctx)}
+      strip=${strip(ctx)} stripFirst
       start=${html`<${PageStart} id="ai" done=${loading ? null : !!ctx.keyed} link=${{ onClick: () => openTab('mcp') }}
         action=${ctx.keyed ? null : { onClick: () => scrollToSection('ai-connection') }} />`}
       railTitle=${x('railTitle')}
       sections=${[
         { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
-        { id: 'ai-providers', num: '02', label: x('pv.title'), count: ctx.pv.view ? String(ctx.pv.providers.length) : '' },
+        { id: 'ai-budget', num: '02', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
+        { id: 'ai-consumers', num: '02.1', label: x('secConsumers'), count: '' },
         { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
-        { id: 'ai-roles', num: '04', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '' },
-        { id: 'ai-policy', num: '05', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
-        { id: 'ai-gen-rules', num: '06', label: x('gr.title'), count: '' },
-        { id: 'ai-budget', num: '07', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-consumers', num: '08', label: x('secConsumers'), count: '' },
+        { id: 'ai-params', num: '04', label: x('secParams'), count: '' },
+        { id: 'ai-providers', num: '04.1', label: x('pv.title'), count: ctx.pv.view ? String(ctx.pv.providers.length) : '', open: opens('ai-providers') },
+        { id: 'ai-roles', num: '04.2', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '', open: opens('ai-roles') },
+        { id: 'ai-policy', num: '04.3', label: x('pol.title'), count: polCount, open: opens('ai-policy') },
+        { id: 'ai-gen-rules', num: '04.4', label: x('gr.title'), count: '', open: opens('ai-gen-rules') },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        ${ctx.rl.view && ctx.rl.waiting ? html`<${Note} kind="aside">${x('rl.stripWaiting', { n: ctx.rl.waiting })}${' '}
+          <${Action} small onClick=${() => { ctx.openFold('ai-roles'); scrollToSection('ai-roles'); }}>${x('rl.title')} →<//><//>` : null}
         ${secConnection(ctx)}
-        ${secProviders(ctx, '02')}
+        ${secBudget(ctx, '02')}
+        ${secConsumers(ctx, '02.1')}
         ${secRouting(ctx, '03')}
-        ${secRoles(ctx, '04')}
-        ${secPolicy(ctx, '05')}
-        <${GenRulesSection} num="06" />
-        ${secBudget(ctx)}
-        ${secConsumers(ctx)}`}
+        <${PageSection} id="ai-params" num="04" title=${x('secParams')} count=${null}>
+          <${Note} kind="lead">${x('paramsLead')}<//>
+          ${part('ai-providers', '04.1', x('pv.title'), pvCount, secProviders(ctx, '04.1', true))}
+          ${part('ai-roles', '04.2', x('rl.title'), rlCount, secRoles(ctx, '04.2', true))}
+          ${ctx.pv.policy ? part('ai-policy', '04.3', x('pol.title'), polCount, secPolicy(ctx, '04.3', true)) : null}
+          ${part('ai-gen-rules', '04.4', x('gr.title'), '', html`<${GenRulesSection} num="04.4" plain />`)}
+        <//>`}
     <//>
     ${ctx.extras || null}`;
 }

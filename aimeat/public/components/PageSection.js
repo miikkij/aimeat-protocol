@@ -9,6 +9,10 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-11-24 — A section with a count shows its number too: the number is `small.og-sec-num` and the
+ *     count `small.og-sec-count`, so the contents rail's "02" is found in the headline it leads to.
+ *     Until now the count replaced the number (Jouni, 2026-11-24). The classes are new; a headline
+ *     without a count draws as before.
  *   2026-11-19 — An empty count ("") says no ": " either, so a screen reader does not read "Risk
  *     assessment:" with nothing after it; nothing changes on the screen.
  *   2026-11-01 — `step`: one numbered step of a procedure on the page, the number in the ink square
@@ -110,10 +114,13 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
   // (P&L, Nodes, Organisms, Notebook, Living documents, Federation, Chat sessions).
   // ends (added for the home's agent pages): the section shows where it stops. There is more air
   // under its body and before what follows, so two sections on a long page do not read as one.
+  // The number and the count each have an element of their own: a section with both shows both.
+  const hasNum = num !== null && num !== undefined && num !== '';
+  const hasCount = count !== null && count !== undefined && count !== '';
   return html`
     <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}`} id=${id}>
       <div class=${band || group ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
-        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count !== '' ? saidApart() : null}${count}</small>` : html`<small>${num}</small>`}</h2>
+        <h2 class="poster-section-title">${title}${hasNum ? html`<small class="og-sec-num">${num}</small>` : null}${hasCount ? html`<small class="og-sec-count">${saidApart()}${count}</small>` : null}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>
       ${children}

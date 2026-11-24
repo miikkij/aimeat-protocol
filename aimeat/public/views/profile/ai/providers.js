@@ -13,6 +13,8 @@
  *   classifierRow · regionRows · secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.11.0 — 2026-11-24 — secProviders and secPolicy take `plain`: the section without its headline and
+ *     id, for the page's "Fine-tuning" rows, whose fold row carries both (ai/page.js v1.44.0).
  *   v1.10.0 — 2026-11-20 — A capability's model is chosen from a list (modelControl, the Model picker):
  *     the models the person may use for it, searchable while typing, with their prices, and a field
  *     for an id the list lacks; a chosen model outside the list is marked; a line says when the
@@ -103,11 +105,11 @@ function healthWords(p) {
 
 /* ── Providers ────────────────────────────────────────────────────────────────────────────────── */
 
-export function secProviders(ctx, num) {
+export function secProviders(ctx, num, plain = false) {
   const pv = ctx.pv;
   const count = pv.view ? x('pv.count', { own: pv.owned.length, all: pv.providers.length }) : '';
   return html`
-    <${PageSection} id="ai-providers" num=${num} title=${x('pv.title')} count=${count}>
+    <${PageSection} id=${plain ? undefined : 'ai-providers'} plain=${plain} num=${num} title=${x('pv.title')} count=${count}>
       <${Note} kind="lead">${x('pv.lead')}<//>
       ${offLines(ctx)}
       ${pv.error ? html`<${Note} kind="message" error>${pv.error}<//>` : null}
@@ -510,7 +512,7 @@ export function secRouting(ctx, num) {
 
 /* ── Model policy ─────────────────────────────────────────────────────────────────────────────── */
 
-export function secPolicy(ctx, num) {
+export function secPolicy(ctx, num, plain = false) {
   const pv = ctx.pv;
   if (!pv.policy) return null;
   const pol = pv.policy.policy || { mode: 'open' };
@@ -537,7 +539,7 @@ export function secPolicy(ctx, num) {
       : x('pol.noRecommended'), missing: !recCaps.length, sub: x('pol.recommendedSub') },
   ];
   return html`
-    <${PageSection} id="ai-policy" num=${num} title=${x('pol.title')} count=${x('pol.mode.' + pol.mode)}>
+    <${PageSection} id=${plain ? undefined : 'ai-policy'} plain=${plain} num=${num} title=${x('pol.title')} count=${x('pol.mode.' + pol.mode)}>
       <${Note} kind="lead">${x('pol.lead')}<//>
       <${Facts} rows=${rows} />
       <${Actions}>

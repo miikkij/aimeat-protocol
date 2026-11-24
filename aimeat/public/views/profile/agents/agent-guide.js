@@ -24,6 +24,8 @@
  *   NoComputersHere({ session }) · nodeTakesComputers() · NoAgentsYet({ onPick })
  * @usage <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} first />
  * @version-history
+ *   v1.3.0 — 2026-11-24 — AgentGuide takes `num`: the Agents page numbers it 02.1, a part of its
+ *     "Add an agent" section (agents-tab.js v4.28.0).
  *   v1.2.0 — 2026-11-08 — The "Where agents run" fold is gone: the four places are explained in the
  *     page's question mark, concept.agent (.claude/rules/page-guidance.md: no fold hides an explanation).
  *   v1.1.0 — 2026-10-14 — ConnectorSteps shows NoComputersHere when the node's connector tunnel is
@@ -139,12 +141,12 @@ function Result({ answer, where, setWhere, session, onConnect, onNew }) {
 }
 
 /** Section 01: the question and the answer. Where agents run is in the page's question mark. */
-export function AgentGuide({ session, onConnect, onNew, first = false }) {
+export function AgentGuide({ session, onConnect, onNew, first = false, num = '01' }) {
   const [answer, setAnswer] = useState(null);
   const [where, setWhere] = useState(null);
   const pick = (v) => { setAnswer(v); setWhere(null); };
   return html`
-    <${Section} id="agp-guide" num="01" title=${g('title')} first=${first}>
+    <${Section} id="agp-guide" num=${num} title=${g('title')} first=${first}>
       <${Note} kind="lead">${g('lead')}<//>
       <${Stack} gap="medium">
         <${Choice} ariaLabel=${g('title')} value=${answer} onChange=${pick} boxed cols=${4}

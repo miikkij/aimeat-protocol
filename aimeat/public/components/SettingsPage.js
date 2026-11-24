@@ -47,6 +47,8 @@
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.6.0 — 2026-11-24 — `stripFirst`: the figures stand over the page's start, for a page whose first
+ *     line is its state (the AI page). Without it the order is as before; additive.
  *   v1.5.2 — 2026-11-22 — railFold takes the closed row's count from the first rail's `count` when
  *     it has one (the App Catalog app detail, whose sections stand in several groups); additive.
  *   v1.5.1 — 2026-11-14 — railFold is exported: the home and the Settings & Controls overview draw
@@ -110,7 +112,7 @@ export function railFold(rails) {
 }
 
 export function SettingsPage(props) {
-  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, help, start, children } = props;
+  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, stripFirst, rail, side, aside, after, asKey, help, start, children } = props;
   const rails = (Array.isArray(rail) ? rail : [rail || settingsRail(props)]).filter(Boolean);
   const head = html`
     ${crumb ? html`<${Crumb} steps=${crumb} />` : null}
@@ -121,8 +123,9 @@ export function SettingsPage(props) {
   return html`
     <div class=${cx('og', name && `og-${name}`, page && 'og-page')}>
       ${column ? head : html`<div class="settings-page-head">${head}</div>`}
+      ${stripFirst ? strip : null}
       ${start ? html`<${PageInfo.Provider} value=${{ title, desc, help }}>${start}<//>` : null}
-      ${strip}
+      ${stripFirst ? null : strip}
       ${!side && rails.length ? railFold(rails) : null}
       ${column ? html`
         <div class="og-grid">

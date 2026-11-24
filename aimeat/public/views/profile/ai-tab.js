@@ -16,6 +16,8 @@
  * @structure AiSettingsTab() — state + handlers (each a legacy call, and the provider call on a 410) → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.9.0 — 2026-11-24 — `folds`, `toggleFold` and `openFold`: which parts of the page's "Fine-tuning"
+ *     section are open (ai/page.js v1.44.0); all shut until opened.
  *   v1.8.0 — 2026-11-01 — `ownAi`: in the simple view, whether the person chose an AI account of their
  *     own over the AI credit, the first and default choice (Jouni's review of v33, K60).
  *   v1.7.0 — 2026-10-31 — `extras`: the cards the AI tab shows below the page (decision model,
@@ -76,6 +78,10 @@ export default function AiSettingsTab({ navigate, showToast, extras = null }) {
   const [showAllApps, setShowAllApps] = useState(false);
   // The simple view's "Lisäasetukset" fold (ai/page.js renderSimple), shut until opened.
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // The parts of "Fine-tuning" that are open (ai/page.js renderPage), by section id.
+  const [folds, setFolds] = useState({});
+  const toggleFold = (id) => setFolds((f) => ({ ...f, [id]: !f[id] }));
+  const openFold = (id) => setFolds((f) => (f[id] ? f : { ...f, [id]: true }));
   // In the simple view, whether the person picked an AI account of their own over the AI credit,
   // which is the first choice and the default (Jouni's review of v33, K60).
   const [ownAi, setOwnAi] = useState(false);
@@ -254,7 +260,7 @@ export default function AiSettingsTab({ navigate, showToast, extras = null }) {
 
   const ctx = {
     settings, aiSettings, usage, history, chat, conn,
-    budgetEditing, budgetDraft, capsEditing, caps, showAllApps, metric, busy, advancedOpen, setAdvancedOpen,
+    budgetEditing, budgetDraft, capsEditing, caps, showAllApps, metric, busy, advancedOpen, setAdvancedOpen, folds, toggleFold, openFold,
     connMsg, budgetMsg, capsMsg,
     keyed: keyedFor(settings), host,
     quotas: aiSettings?.app_quotas || {},

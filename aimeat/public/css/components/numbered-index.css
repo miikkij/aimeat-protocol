@@ -8,6 +8,9 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.4.0 — 2026-11-24 — A row's number is "1." and no longer "01": a page's sections are numbered
+ *     01, 02, 03, and a list inside section 02 that also began at 01 read as a second section 01
+ *     (Jouni, 2026-11-24).
  *   v1.3.0 — 2026-11-01 — .poster-index-item--locked: a step that does not open yet, without the arrow.
  *   v1.2.0 — 2026-09-26 — The rule over the rows and the line under each row read --shape-frame-heavy, --shape-frame and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
  *   v1.1.0 — 2026-09-26 — The line under a name, the first row on the sun with every mark dark, the
@@ -30,7 +33,7 @@
   color: var(--text); text-decoration: none; text-align: left;
   counter-increment: poster-index;
 }
-.poster-index .poster-index-item::before { content: counter(poster-index, decimal-leading-zero); font-family: var(--font-mono); font-size: var(--text-small); color: var(--accent); flex: 0 0 2.2rem; }
+.poster-index .poster-index-item::before { content: counter(poster-index) "."; font-family: var(--font-mono); font-size: var(--text-small); color: var(--accent); flex: 0 0 2.2rem; }
 .poster-index .poster-index-item::after { content: '\2192'; margin-left: auto; font-family: var(--font-poster); font-size: var(--text-lg); }
 .poster-index .poster-index-item:hover, .poster-index .poster-index-item--on { background: var(--sun); color: var(--on-sun); }
 .poster-index .poster-index-item--on::after { content: '\2193'; }

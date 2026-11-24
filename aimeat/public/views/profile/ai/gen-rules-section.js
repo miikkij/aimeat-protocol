@@ -11,6 +11,8 @@
  * @structure GenRulesSection({ num })
  * @usage html`<${GenRulesSection} num="06" />`
  * @version-history
+ *   v1.1.0 — 2026-11-24 — `plain`: the section without its headline and id, for the page's
+ *     "Fine-tuning" rows (ai/page.js v1.44.0).
  *   v1.0.0 — 2026-10-31 — Initial.
  */
 import { h } from 'preact';
@@ -35,7 +37,7 @@ const msgLine = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.
 /** What the node says about one rule, in the person's words. */
 const nodeWords = (rule) => (rule.required ? x('gr.node.required') : x('gr.node.' + rule.node));
 
-export function GenRulesSection({ num }) {
+export function GenRulesSection({ num, plain = false }) {
   const [view, setView] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -77,7 +79,7 @@ export function GenRulesSection({ num }) {
     return saved;
   };
 
-  if (error) return html`<${PageSection} id="ai-gen-rules" num=${num} title=${x('gr.title')}><${Note} kind="message" error>${error}<//><//>`;
+  if (error) return html`<${PageSection} id=${plain ? undefined : 'ai-gen-rules'} plain=${plain} num=${num} title=${x('gr.title')}><${Note} kind="message" error>${error}<//><//>`;
   if (!view) return null;
 
   const rules = view.rules || [];
@@ -105,7 +107,7 @@ export function GenRulesSection({ num }) {
   };
 
   return html`
-    <${PageSection} id="ai-gen-rules" num=${num} title=${x('gr.title')} count=${onCount ? x('gr.countOn', { n: onCount }) : x('gr.countNone')}>
+    <${PageSection} id=${plain ? undefined : 'ai-gen-rules'} plain=${plain} num=${num} title=${x('gr.title')} count=${onCount ? x('gr.countOn', { n: onCount }) : x('gr.countNone')}>
       <${Note} kind="lead">${x('gr.lead')}<//>
       <${Facts} rows=${rows} />
       <${List} cols="name-desc-doors" head=${[x('gr.exWho'), x('gr.exReason'), '']} empty=${x('gr.exNone')}>

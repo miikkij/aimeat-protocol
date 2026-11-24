@@ -7,6 +7,13 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.28.0 -- 2026-11-24 -- The page is ordered by what a person has and then what they add: 01 The
+ *     agents, 02 Add an agent with its four parts (02.1 the question, 02.2 the two ready agents, 02.3 an
+ *     agent of your own, 02.4 connecting an AI), 03 Allow always. A section no longer moves: what waits
+ *     is said in the page's aside with a button to 02.3, so the numbers run in order (Jouni,
+ *     2026-11-24; this replaces the move of v31 K49). No control was removed.
+ *   v4.27.0 -- 2026-11-24 -- The figures stand over the page's start, as on the AI page: a page's first
+ *     line is its state, and the start follows it.
  *   v4.26.0 -- 2026-11-20 -- Section 06, "Allow always, for all my AIs" (agents/allow-always-section.js):
  *     what every AI of the person may do without asking. A permission notice opens it with section=allow-always.
  *   v4.25.0 -- 2026-11-09 -- PageStart gets the page's title and concept, for "Explain this page to me".
@@ -598,18 +605,19 @@ export default function AgentsTab({ session, showToast, onStats }) {
   ];
   const pickExample = (draft) => { setNewDraft(draft); openNew(); };
   const sections = [
-    { id: 'agp-guide', num: '01', label: t('profile.agents.guide.title'), count: null },
-    { id: 'agp-basic', num: '02', label: t('profile.agents.basic.title'), count: null },
-    { id: 'agp-new', num: '03', label: t('profile.agents.new.title'), count: waitingCount || null },
-    { id: 'agp-connect', num: '04', label: p('secConnect'), count: null },
-    { id: 'agp-list', num: '05', label: p('secAgents'), count: agents.length },
-    { id: 'agp-always', num: '06', label: t('profile.agents.always.title'), count: null },
+    { id: 'agp-list', num: '01', label: p('secAgents'), count: agents.length },
+    { id: 'agp-add', num: '02', label: p('secAdd'), count: null },
+    { id: 'agp-guide', num: '02.1', label: t('profile.agents.guide.title'), count: null },
+    { id: 'agp-basic', num: '02.2', label: t('profile.agents.basic.title'), count: null },
+    { id: 'agp-new', num: '02.3', label: t('profile.agents.new.title'), count: waitingCount || null },
+    { id: 'agp-connect', num: '02.4', label: p('secConnect'), count: null },
+    { id: 'agp-always', num: '03', label: t('profile.agents.always.title'), count: null },
   ];
 
   // One panel element, placed first while a proposal waits and third otherwise (v31 K49). The same
   // key in both places keeps the panel mounted when it moves, so an open form keeps what was typed.
   const newAgentPanel = html`<${NewAgentPanel} key="agp-new" session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
-    open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} draft=${newDraft} />`;
+    open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} draft=${newDraft} num="02.3" />`;
 
   return html`
     <${SettingsPage} name="agp"
@@ -625,9 +633,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
               shows the same panel for the person's FIRST agent, and a copy here would drift from it.
               Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
         <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} busyCode=${consentBusy} />
+        <${FigureStrip} items=${strip} />
         <${PageStart} id="agents" done=${agents.length > 0} action=${{ onClick: openNew }}
-          title=${t('profile.agents.title')} concept="concept.agent" />
-        <${FigureStrip} items=${strip} />`}
+          title=${t('profile.agents.title')} concept="concept.agent" />`}
       railTitle=${p('railTitle')}
       sections=${sections}
       pagesLabel=${p('pages')}
@@ -639,23 +647,70 @@ export default function AgentsTab({ session, showToast, onStats }) {
           onSave=${handleSaveScopes}
           onCancel=${() => setScopesModal(null)} />`}
         <${ConfirmUI} />`}>
-          ${/* A proposal that waits comes first, with its Approve and Decline: the page's top said
-                "1 waiting for you" while the proposal sat in the third section, and a buyer found
-                nothing to press (v31 K49). With nothing waiting, the order below. */''}
-          ${waitingCount > 0 && newAgentPanel}
-          ${/* The one-press road in. Above the connect guide on purpose: for somebody whose connector
-                is already running, this is the whole job, and the guide below is the long way round. */''}
-          ${/* What should an agent do: the question first, so the sections below are reached by an
-                answer rather than compared by the person (agents/agent-guide.js). */''}
-          <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} first=${true} />
-          <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} num="02" />
+          ${/* What waits for the person is said first, with the button that goes to it. The section
+                keeps its place, so the numbers on the page run in order (Jouni, 2026-11-24). */''}
+          ${waitingCount > 0 ? html`<${Note} kind="aside">${p('waitingCount', { n: waitingCount })}${' '}
+            <${Action} small onClick=${() => scrollToSection('agp-new')}>${t('profile.agents.new.title')} →<//><//>` : null}
 
-          ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
-                names on purpose: those are what a new account should take first, and this is the door
-                for the job they do not cover. */''}
-          ${waitingCount > 0 ? null : newAgentPanel}
+          <${Section} id="agp-list" num="01" first=${true} title=${p('secAgents')} count=${agents.length}>
+            ${agents.length === 0
+              ? html`<${NoAgentsYet} onPick=${pickExample} />`
+              : html`
+                <${AgentSearch}
+                  query=${query}
+                  setQuery=${setQuery}
+                  shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
+                  total=${agents.length}
+                />
+                <${FilterBar} agents=${agents} tagFilter=${tagFilter} setTagFilter=${setTagFilter} groupBy=${groupBy} setGroupBy=${pickGroupBy} />
+                ${running > 0 ? html`<${ActiveTasksPanel}
+                  activeTasksMap=${activeTasksMap}
+                  agents=${agents}
+                  onOpen=${openAgentTask}
+                />` : null}
+                ${renderAgentGroups({
+                  agents,
+                  tagFilter,
+                  query,
+                  groupBy,
+                  onboardings,
+                  taskStatsMap,
+                  activeTasksMap,
+                  changesMap,
+                  onTabSeen: handleTabSeen,
+                  expandedAgent,
+                  toggleAgent,
+                  session,
+                  showToast,
+                  setScopesModal,
+                  handleDeleteAgent,
+                  toggleFederate,
+                  onPopOut: popOutAgent,
+                  dnd,
+                  agentOrder,
+                  deepLink,
+                  agentGroups,
+                  collapsedGroups,
+                  editingGroup,
+                  setEditingGroup,
+                  addGroup,
+                  renameGroup,
+                  removeGroup,
+                  toggleGroupCollapsed,
+                  groupDnd,
+                })}
+              `}
+          <//>
 
-          <${Section} id="agp-connect" num="04" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
+          ${/* The ways to get an agent, as the parts of one section: the question, the two ready agents,
+                an agent of the person's own (with what waits for approval) and connecting an AI. */''}
+          <${Section} id="agp-add" num="02" title=${p('secAdd')}>
+          <${Note} kind="lead">${p('addLede')}<//>
+          <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} num="02.1" />
+          <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} num="02.2" />
+          ${newAgentPanel}
+
+          <${Section} id="agp-connect" num="02.4" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
             ${!connectOpen ? html`<${Note} kind="lead">${p('connectLede')}<//>` : html`
               <${Note} kind="lead">${p('connectLede')}<//>
               ${/* The recommended road comes first and OPEN: the tool the person already pays for,
@@ -727,60 +782,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
               <//>
             `}
           <//>
-
-          <${Section} id="agp-list" num="05" title=${p('secAgents')} count=${agents.length}>
-            ${agents.length === 0
-              ? html`<${NoAgentsYet} onPick=${pickExample} />`
-              : html`
-                <${AgentSearch}
-                  query=${query}
-                  setQuery=${setQuery}
-                  shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
-                  total=${agents.length}
-                />
-                <${FilterBar} agents=${agents} tagFilter=${tagFilter} setTagFilter=${setTagFilter} groupBy=${groupBy} setGroupBy=${pickGroupBy} />
-                ${running > 0 ? html`<${ActiveTasksPanel}
-                  activeTasksMap=${activeTasksMap}
-                  agents=${agents}
-                  onOpen=${openAgentTask}
-                />` : null}
-                ${renderAgentGroups({
-                  agents,
-                  tagFilter,
-                  query,
-                  groupBy,
-                  onboardings,
-                  taskStatsMap,
-                  activeTasksMap,
-                  changesMap,
-                  onTabSeen: handleTabSeen,
-                  expandedAgent,
-                  toggleAgent,
-                  session,
-                  showToast,
-                  setScopesModal,
-                  handleDeleteAgent,
-                  toggleFederate,
-                  onPopOut: popOutAgent,
-                  dnd,
-                  agentOrder,
-                  deepLink,
-                  agentGroups,
-                  collapsedGroups,
-                  editingGroup,
-                  setEditingGroup,
-                  addGroup,
-                  renameGroup,
-                  removeGroup,
-                  toggleGroupCollapsed,
-                  groupDnd,
-                })}
-              `}
           <//>
 
           ${/* What every AI of the person may do without asking (agents/allow-always-section.js). A
                 permission notice links here with section=allow-always. */''}
-          <${Section} id="agp-always" num="06" title=${t('profile.agents.always.title')}>
+          <${Section} id="agp-always" num="03" title=${t('profile.agents.always.title')}>
             <${AllowAlwaysSection} showToast=${showToast} />
           <//>
     <//>

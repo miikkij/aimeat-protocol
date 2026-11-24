@@ -26,6 +26,8 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.17.0 -- 2026-11-24 -- `num`: the Agents page numbers the panel 02.3, a part of its "Add an
+ *     agent" section, and no longer moves it to the top (agents-tab.js v4.28.0).
  *   v2.16.0 -- 2026-10-18 -- A waiting proposal whose permissions cover organism:invite says that the agent may invite people.
  *   v2.15.0 -- 2026-10-08 -- An agent approved with no connector connected is "waiting for your connector": it gets its key when the connector connects, without a press.
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain what the agent reaches and how it runs: access.scopes, agent.run_mode (components/HelpTip.js).
@@ -91,7 +93,7 @@ const BLANK = {
   template: 'researcher', scopes: 'standard', runMode: 'spawn',
 };
 
-export default function NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting, draft }) {
+export default function NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting, draft, num = '03' }) {
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState([]);
@@ -215,7 +217,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
     { id: 'none', name: t('profile.agents.new.shapeNone'), desc: t('profile.agents.new.shapeNoneHint') }];
 
   return html`
-    <${Section} id="agp-new" num="03" title=${t('profile.agents.new.title')}
+    <${Section} id="agp-new" num=${num} title=${t('profile.agents.new.title')}
       count=${waiting.length > 0 ? p('waitingCount', { n: waiting.length }) : null} doors=${door}>
       ${!open && waiting.length === 0 && unattached.length === 0
         ? html`<${Note} kind="lead">${t('profile.agents.new.desc')}<//>`
