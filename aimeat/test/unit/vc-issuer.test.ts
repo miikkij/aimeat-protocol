@@ -1,3 +1,10 @@
+/**
+ * @file vc-issuer.test.ts
+ * @description Unit tests for the unsigned identity credential and the issuer DID it names.
+ * @version-history
+ *   2026-11-24 — Core DISC-03: the default issuer DID is the did:web of the node address; the nodeId
+ *     form remains only when the node has no address.
+ */
 import { describe, it, expect } from 'vitest';
 import { createVcIssuerService } from '../../src/services/vc-issuer.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -47,7 +54,14 @@ describe('VC Issuer Service', () => {
             expect(vc.type).toEqual(['VerifiableCredential', 'AIMEATIdentityCredential']);
         });
 
-        it('includes correct default issuer DID based on nodeId', () => {
+        it('the default issuer DID is the did:web of the node address (Core DISC-03)', () => {
+            const service = createVcIssuerService(makeConfig({ vcIssuerDid: '', baseUrl: 'https://node.example' } as Partial<AimeatConfig>));
+            expect(service.issueIdentityCredential(makeGHIIRecord()).issuer).toBe('did:web:node.example');
+            const local = createVcIssuerService(makeConfig({ vcIssuerDid: '', baseUrl: 'http://localhost:40050' } as Partial<AimeatConfig>));
+            expect(local.getIssuerDid()).toBe('did:web:localhost%3A40050');
+        });
+
+        it('without a node address the default falls back to the nodeId form', () => {
             const service = createVcIssuerService(makeConfig({ vcIssuerDid: '' }));
             const vc = service.issueIdentityCredential(makeGHIIRecord());
             expect(vc.issuer).toBe('did:web:test-node-001.aimeat.example');

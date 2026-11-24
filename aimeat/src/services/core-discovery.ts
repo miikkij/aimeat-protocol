@@ -31,6 +31,7 @@
  * @usage
  *   res.json(success(config.nodeId, { node_id, ..., ...coreDiscoveryFields(config) }));
  * @version-history
+ *   v1.1.2 — 2026-11-24 — DISC-03 leaves CORE_OPEN_REQUIREMENTS: the default issuer DID is the node's own address (vc-issuer.ts).
  *   v1.1.1 — 2026-11-15 — FED-06 leaves CORE_OPEN_REQUIREMENTS: a link invitation is used on the version that was read (link-invites.ts, since 2026-10-18).
  *   v1.1.0 — 2026-10-16 — `profile_gaps`: the open requirements of each claimed profile, from CORE_OPEN_REQUIREMENTS (QA audit D3-06).
  *   v1.0.0 — 2026-10-12 — Initial (wish-core-2026-11-gaps-with-no-wish-consent-reach-local-discovery).
@@ -55,7 +56,7 @@ export type CoreProfile = typeof CORE_PROFILES[number];
  * closed there, in the same change (test/unit/core-open-requirements.test.ts).
  */
 export const CORE_OPEN_REQUIREMENTS: Readonly<Partial<Record<CoreProfile, readonly string[]>>> = {
-  Base: ['ID-11', 'AUTH-06', 'DATA-06', 'HTTP-01', 'HTTP-02', 'DISC-03'],
+  Base: ['ID-11', 'AUTH-06', 'DATA-06', 'HTTP-01', 'HTTP-02'],
   Pacing: ['PACE-05', 'PACE-11'],
   Federation: ['FED-16'],
 };

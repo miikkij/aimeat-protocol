@@ -2,6 +2,7 @@
  * @file vc-issuer-signed.test.ts
  * @description Unit tests for VC JWT signing and round-trip verification
  * @version-history
+ *   v1.1.0 — 2026-11-24 — DISC-03: the old default issuer still verifies after the default moved.
  *   v1.0.0 — 2026-05-02 — Initial test suite
  */
 
@@ -96,6 +97,19 @@ describe('VC Issuer -- Signed Credentials', () => {
   it('throws when node keypair is null', async () => {
     const service = createVcIssuerService(makeConfig());
     await expect(service.issueSignedCredential(makeGhiiRecord())).rejects.toThrow('Node keypair not available');
+  });
+
+  it('a credential signed under the old default DID still verifies after the default moved to the host (DISC-03)', async () => {
+    // Before 2026-11-24 a node without vcIssuerDid signed as did:web:<nodeId>.aimeat.example.
+    const before = createVcIssuerService(makeConfig({ vcIssuerDid: '' }), testKeyPair);
+    const oldJwt = await before.issueSignedCredential(makeGhiiRecord());
+    const now = createVcIssuerService(makeConfig({ vcIssuerDid: '', baseUrl: 'https://node.example' }), testKeyPair);
+    expect(now.getIssuerDid()).toBe('did:web:node.example');
+    await expect(now.verifyIdentityCredential(oldJwt)).resolves.toBeDefined();
+    await expect(now.verifyIdentityCredential(await now.issueSignedCredential(makeGhiiRecord()))).resolves.toBeDefined();
+    // Another node's DID is not taken for this node's own.
+    const other = createVcIssuerService(makeConfig({ vcIssuerDid: 'did:web:other.example' }), testKeyPair);
+    await expect(now.verifyIdentityCredential(await other.issueSignedCredential(makeGhiiRecord()))).rejects.toThrow();
   });
 
   it('setNodeKeyPair enables signing on a service created without keypair', async () => {

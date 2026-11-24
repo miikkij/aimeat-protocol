@@ -10,12 +10,27 @@
  *   v2.1.0 — 2026-10-11 — The credential's context is https://aimeat.io/ns/credentials/v1, the node's
  *     own namespace, served at /ns/credentials/v1 (services/vc-context.ts); it was a host this
  *     project does not serve. verifyIdentityCredential accepts both the new and the old context.
+ *   v2.2.0 — 2026-11-24 — Core DISC-03: the default issuer DID is the did:web of the node's public
+ *     address (baseUrl), which resolves; it was did:web:<nodeId>.aimeat.example, which does not.
+ *     A configured vcIssuerDid still wins. verifyIdentityCredential accepts the old default as the
+ *     issuer of credentials this node signed before (decision of 2026-11-24 in Lifecycle Central).
  */
 
 import { SignJWT, importJWK, jwtVerify, type JWK } from 'jose';
 import type { AimeatConfig } from '../config.js';
 import type { GHIIRecord } from '../storage/interface.js';
 import { ACCEPTED_CREDENTIALS_CONTEXTS, CREDENTIALS_CONTEXT, W3C_CREDENTIALS_CONTEXT } from './vc-context.js';
+import { nodeDidWeb } from './dataspace/settings.js';
+
+/** The default issuer DID before 2026-11-24: a host nobody serves, kept only to verify what it signed. */
+export const legacyIssuerDid = (nodeId: string): string => `did:web:${nodeId}.aimeat.example`;
+
+/** The issuer DID: the configured one, else the did:web of the node's public address. */
+export function defaultIssuerDid(config: Pick<AimeatConfig, 'vcIssuerDid' | 'baseUrl' | 'nodeId'>): string {
+  if (config.vcIssuerDid) return config.vcIssuerDid;
+  // A node without a parseable public address keeps the old form rather than failing to start.
+  return config.baseUrl && URL.canParse(config.baseUrl) ? nodeDidWeb(config.baseUrl) : legacyIssuerDid(config.nodeId);
+}
 
 export interface VerifiableCredential {
   '@context': string[];
@@ -43,7 +58,9 @@ export function createVcIssuerService(
   config: AimeatConfig,
   initialNodeKeyPair: { publicKey: string; privateKey: string } | null = null,
 ): VcIssuerService {
-  const issuerDid = config.vcIssuerDid || `did:web:${config.nodeId}.aimeat.example`;
+  const issuerDid = defaultIssuerDid(config);
+  // What this node accepts as its own issuer: today's, and the old default it signed under before.
+  const acceptedIssuers = [...new Set([issuerDid, legacyIssuerDid(config.nodeId)])];
   let nodeKeyPair = initialNodeKeyPair;
 
   function buildCredentialPayload(ghiiRecord: GHIIRecord): VerifiableCredential {
@@ -106,7 +123,7 @@ export function createVcIssuerService(
       const publicKey = await importJWK({
         kty: 'OKP', crv: 'Ed25519', x: Buffer.from(nodeKeyPair.publicKey, 'base64').toString('base64url'),
       }, 'EdDSA');
-      const { payload } = await jwtVerify(jwt, publicKey, { issuer: issuerDid, typ: 'vc+ld+jwt', algorithms: ['EdDSA'] });
+      const { payload } = await jwtVerify(jwt, publicKey, { issuer: acceptedIssuers, typ: 'vc+ld+jwt', algorithms: ['EdDSA'] });
       const vc = payload.vc as VerifiableCredential | undefined;
       const context = Array.isArray(vc?.['@context']) ? vc['@context'] : [];
       if (context[0] !== W3C_CREDENTIALS_CONTEXT || context.length !== 2 || !ACCEPTED_CREDENTIALS_CONTEXTS.includes(context[1] as string)) {
