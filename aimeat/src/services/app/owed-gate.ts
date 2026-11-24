@@ -12,8 +12,8 @@
  *   without them: on aimeat.io on 2026-11-24, nine apps of one package had no data map, no design
  *   spec and no bound skill after 5 to 28 versions each, published by a session that followed its
  *   own repository's instructions instead of the answer. A reminder is read or it is not; a refusal
- *   is the one thing every publish route, script and model meets (Jouni, 2026-11-24: "vaaditaan
- *   datakartta jos siellä on dataa.. ja design spec aina").
+ *   is the one thing every publish route, script and model meets. Ruled: the design spec always, the
+ *   data map when the app keeps data (Jouni, 2026-11-24).
  *
  *   THE FIRST PUBLISH ALWAYS GOES THROUGH: a data map, a design spec and a bound skill can only be
  *   written once the app exists, so the gate starts at the second version.
