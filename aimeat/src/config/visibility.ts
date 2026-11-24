@@ -12,6 +12,8 @@
  *   import { visibilityDefaults } from './visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.11.0 — 2026-11-24 — appOwedOnPublish (AIMEAT_APP_OWED_ON_PUBLISH): an update of an app that
+ *     lacks what it owes is refused (services/app/owed-gate.ts).
  *   v1.10.0 — 2026-11-07 — receiversMode (AIMEAT_RECEIVERS_MODE): who may make a receiver.
  *   v1.9.0 — 2026-10-25 — appInternetOpening and appInternetOpeningMaxDays: how one app is opened to
  *     the internet on a closed node (services/internet-opening/).
@@ -81,6 +83,12 @@ export interface VisibilityConfig extends ContentDefaultsConfig {
   /** A new app gets an access code of its own (generated, returned to the publisher). Off by default. */
   appDefaultAccessCode: boolean;
   /**
+   * What a publish of an app that already has a version does while the app lacks what it owes: its
+   * design spec, its data map when it keeps data, its bound skill and agent face (not on a quick
+   * prototype or a presentation), and the roadmap line of the update. refuse (default) or warn.
+   */
+  appOwedOnPublish: 'refuse' | 'warn';
+  /**
    * Who may make something public without the owner answering a request first (plan
    * doc-mvcn6c7e4e5q, V4; services/publish-gate.ts). 'off' (the code default, so a running node does
    * not change under its apps): anyone who may write it. 'agents': an agent needs publish:public,
@@ -141,6 +149,7 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
       ? env.AIMEAT_APP_DEFAULT_LISTING : 'listed',
     appDefaultAccess: env.AIMEAT_APP_DEFAULT_ACCESS === 'signed-in' ? 'signed-in' : 'anyone',
     appDefaultAccessCode: env.AIMEAT_APP_DEFAULT_ACCESS_CODE === 'true',
+    appOwedOnPublish: env.AIMEAT_APP_OWED_ON_PUBLISH === 'warn' ? 'warn' : 'refuse',
     publishGate: env.AIMEAT_PUBLISH_GATE === 'agents' || env.AIMEAT_PUBLISH_GATE === 'agents-and-apps'
       ? env.AIMEAT_PUBLISH_GATE : 'off',
     appInternetOpening: env.AIMEAT_APP_INTERNET_OPENING === 'off' || env.AIMEAT_APP_INTERNET_OPENING === 'self'

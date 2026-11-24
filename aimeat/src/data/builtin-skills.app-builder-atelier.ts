@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-24 — Step 9: the next publish is refused until the owed items exist (APP_OWES_ITEMS), and
+ *     an update needs a roadmap line (services/app/owed-gate.ts).
  *   2026-11-22 — The proposal asks whether the owner wants a guided tour (built only on a yes), and the
  *     kit paragraph points to the tour's format (the aimeat-tour block, the kit's TOUR text). Two lines,
  *     because SKILL.md stays under the standard's 500.
@@ -558,8 +560,7 @@ changed after you fetched it says so.
    section, says how; a state that waits for a timer to come round has not met it.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
-   Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and the app
-   is not finished while one is missing: the **agent face** (\`agent_face_present\`), the **bound
+   Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and THE NEXT PUBLISH IS REFUSED until they exist (\`APP_OWES_ITEMS\` names each; an update also needs a \`roadmap\` line, a draft's notice counts; a quick prototype or a presentation owes no skill and no face): the **agent face** (\`agent_face_present\`), the **bound
    skill** (\`bound_skills_count\` above zero; written for the person who operates the app through
    their AI, and \`ai_path\` says what it holds and when an app tool is owed), the **data map** (\`data_map_present\`: write it
    with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,

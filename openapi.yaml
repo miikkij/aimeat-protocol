@@ -41336,6 +41336,11 @@ paths:
         Scoped principals require `app:write` for both inline publishing and presigned upload
         authorization. Owner sessions retain access. Missing permission returns `403` before
         changing any app or issuing an upload token.
+        From an app's second version on, a publish answers `422 APP_OWES_ITEMS` and stores nothing
+        while the app lacks its design spec, its data map when it keeps data, its bound skill and
+        agent face (not on a quick prototype or a declared presentation), or a `roadmap` line for the
+        update; `error.details.missing` names each item and `error.details.how` how to write it.
+        The node setting `apps.owed_on_publish` = `warn` lets the update through instead.
       tags: [Apps]
       security:
         - BearerAuth: []

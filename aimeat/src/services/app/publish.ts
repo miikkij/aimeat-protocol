@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-24 — An update of an app that lacks its design spec, its data map (when it keeps data), its
+ *     bound skill and agent face (not on proto or a presentation) or the update's roadmap line is
+ *     refused, APP_OWES_ITEMS, under apps.owed_on_publish = refuse (owed-gate.ts).
  *   2026-11-22 — The app's `aimeat-tour` block is parsed into `manifest.tour` (services/app/tour.ts), a
  *     broken one refused with APP_TOUR_INVALID; a new version keeps the owner's `tourInviteOff`.
  *   2026-11-21 — A publish that names no display version takes the page's <meta name="aimeat-app-version">;
@@ -143,6 +146,7 @@ import { accountOf } from './members.js';
 import { effectiveDevLevel, mayAct, isSharedApp } from './dev-grant.js';
 import { roadmapGate, addRoadmapEntry, roadmapStamp } from './roadmap.js';
 import { readAppDesignSpec, designSpecStamp, designSpecHint } from './design-spec.js';
+import { owedMissing, owedRefusal } from './owed-gate.js';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest, AppManifestCortex } from '../../storage/interface.js';
@@ -416,6 +420,14 @@ export async function publishApp(
         details: { held_scopes: provenanceRefused.heldScopes },
       },
     };
+  }
+
+  // What every app owes, from its second version on (owed-gate.ts): refused before anything is written.
+  if (isUpdate && isHtml && input.source !== 'package-install' && config.appOwedOnPublish === 'refuse') {
+    const missing = await owedMissing(storage, config, {
+      ownerName, ownerGhii, filename, html, hasDesignSpec: !!designSpec, roadmapLine: 'line' in road ? road.line : null,
+    });
+    if (missing.length) return { refusal: owedRefusal(missing, `${ownerName}/${filename}`) };
   }
 
   // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is

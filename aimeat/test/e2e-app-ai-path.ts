@@ -8,6 +8,8 @@
  *   prototype get no line. A recommendation: every publish here answers 201.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ai-path
  * @version-history
+ *   v1.2.0 — 2026-11-24 — apps.owed_on_publish = refuse: an update that owes items is refused, naming
+ *     each, and goes through once they exist; a quick prototype owes no skill and no face.
  *   v1.1.0 — 2026-11-24 — Section server-side sends an MCP build to the extension skill, which answers.
  *   v1.0.0 — 2026-11-20 — Initial (wish-atelier-ohjaa-teko-lykiihdytykseen-skilli-suora-kirjoitus-ja).
  */
@@ -84,6 +86,44 @@ await test('section server-side sends an MCP build to the extension skill, which
     assert(!section.isError && /over MCP the skill is the specification/.test(section.text), `the section says it: ${section.text.slice(0, 300)}`);
     const skill = await callTool(session, 'aimeat_skill_get', { ref: 'node:aimeat-extension-builder', body_only: true });
     assert(!skill.isError && skill.text.length > 1000, `the skill it names answers: ${skill.text.slice(0, 200)}`);
+});
+
+// apps.owed_on_publish = refuse, as production runs it (owed-gate.ts). The first publish goes through
+// because nothing can be written for an app that does not exist; the second is refused until the app
+// has its design spec, its data map, its bound skill and agent face, and a roadmap line.
+await test('an update of an app that owes items is refused, naming each, and goes through once they exist', async () => {
+    const setting = (value: string) => json('/v1/admin/config', owner, { method: 'PUT', body: JSON.stringify({ changes: [{ path: 'apps.owed_on_publish', value }] }) });
+    const on = await setting('refuse');
+    assert(on.status === 200, `the operator turns the gate on: ${on.status} ${JSON.stringify(on.body?.error)}`);
+    try {
+        const f = `owed${stamp}.html`;
+        const pub = (html: string, roadmap?: string) => json('/v1/apps', owner, { method: 'POST', body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(html), name: 'Owed app', description: 'An app that keeps notes.', ...(roadmap ? { roadmap } : {}) }) });
+        const first = await pub(page(f));
+        assert(first.status === 201, `the first publish goes through: ${first.status} ${JSON.stringify(first.body?.error)}`);
+
+        const bare = await pub(page(f));
+        assert(bare.status === 422 && bare.body?.error?.code === 'APP_OWES_ITEMS', `the update is refused: ${bare.status} ${JSON.stringify(bare.body?.error)}`);
+        const missing = (bare.body.error.details?.missing ?? []) as string[];
+        for (const item of ['design_spec', 'data_map', 'bound_skill', 'agent_face', 'roadmap']) assert(missing.includes(item), `${item} is named: ${JSON.stringify(missing)}`);
+        assert(/aimeat_datamap_set/.test(bare.body.error.message) && /spec_set/.test(bare.body.error.message), `the refusal says how: ${bare.body.error.message.slice(0, 300)}`);
+
+        const spec = await json(`/v1/apps/${ownerName}/${f}/design-spec`, owner, { method: 'PUT', body: JSON.stringify({ markdown: '# Design spec\n\n## Purpose\nNotes the person keeps.\n' }) });
+        assert(spec.status === 201 || spec.status === 200, `design spec: ${spec.status} ${JSON.stringify(spec.body?.error)}`);
+        const map = await json(`/v1/datamap/apps/${ownerName}/${f}`, owner, { method: 'PUT', body: JSON.stringify({
+            spec: 'aimeat.datamap/2', what: 'Notes.', usedFor: 'Proving the gate.', form: 'one-person', arrangement: 'One record in the owner\'s memory.', machinery: [], leaves: [], elsewhere: [],
+            held: [{ what: 'notes.seen', holds: 'one flag', kind: 'user-written', usedFor: 'user-returns-to-read', where: 'owner-memory-private', owner: 'person', readers: 'owner-only', writers: ['person-in-the-ui'], shape: 'one-record', keptFor: 'until-deleted', lossRisk: 'user-can-rewrite', personalData: 'no', why: 'The person\'s own flag.' }],
+        }) });
+        assert(map.status === 200, `data map: ${map.status} ${JSON.stringify(map.body?.error)}`);
+
+        const still = await pub(page(f), 'Second version.');
+        const left = (still.body?.error?.details?.missing ?? []) as string[];
+        assert(still.status === 422 && left.join() === 'bound_skill,agent_face', `only the skill and the face are left: ${still.status} ${JSON.stringify(left)}`);
+
+        const proto = await pub(page(f, '<meta name="aimeat-level" content="proto">'), 'A quick prototype now.');
+        assert(proto.status === 201, `a quick prototype owes no skill and no face: ${proto.status} ${JSON.stringify(proto.body?.error)}`);
+    } finally {
+        await setting('warn');
+    }
 });
 
 // The skill and the publish answer send an AI to the data map to find where the data lives, so

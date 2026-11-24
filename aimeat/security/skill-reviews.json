@@ -542,7 +542,7 @@
       "digest": "sha256:b5d81d0a5efaeb4ea4bbf922"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:368c426b71dbd760853df6ae",
+      "digest": "sha256:96a5f0a007b95011c677069a",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -843,7 +843,7 @@
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
       "aimeat/src/services/builder/atelier-prompt.ts": "bf79ee288d5f50c3",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
-      "aimeat/src/services/app/publish.ts": "24a2e2d4db521027",
+      "aimeat/src/services/app/publish.ts": "8c9f47f3f1c6ce07",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
       "aimeat/src/services/app/agent-deploy.ts": "cf9f7771be84c7c5",
