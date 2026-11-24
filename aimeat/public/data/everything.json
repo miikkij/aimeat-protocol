@@ -524,10 +524,10 @@
      "slug": "g-2-verifiable-credential",
      "cells": [
       "<strong>Verifiable credential</strong>",
-      "The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. Limits: until the operator sets the issuer's DID, the issuer is a placeholder (<code>did:web:&lt;node&gt;.aimeat.example</code>) that nobody outside can resolve.",
+      "The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. The issuer is the did:web of the node's own address, whose DID document is at <code>/.well-known/did.json</code>, unless the operator sets another; a credential signed under the earlier placeholder issuer (<code>did:web:&lt;node&gt;.aimeat.example</code>) still verifies here.",
       "<code>GET /v1/ghii/:ghii/credential</code> (<code>?format=jwt</code>), <code>eudiw.vc_issuer_did</code> (<code>AIMEAT_VC_ISSUER_DID</code>)"
      ],
-     "plain": "Verifiable credential The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. Limits: until the operator sets the issuer's DID, the issuer is a placeholder (did:web:<node>.aimeat.example) that nobody outside can resolve. GET /v1/ghii/:ghii/credential (?format=jwt), eudiw.vc_issuer_did (AIMEAT_VC_ISSUER_DID)"
+     "plain": "Verifiable credential The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. The issuer is the did:web of the node's own address, whose DID document is at /.well-known/did.json, unless the operator sets another; a credential signed under the earlier placeholder issuer (did:web:<node>.aimeat.example) still verifies here. GET /v1/ghii/:ghii/credential (?format=jwt), eudiw.vc_issuer_did (AIMEAT_VC_ISSUER_DID)"
     },
     {
      "slug": "g-2-start-page",

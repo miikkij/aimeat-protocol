@@ -242,7 +242,6 @@ async function run(): Promise<void> {
     });
 
     await test('B knows A, and a peer B refuses memory replication to', async () => {
-        // allow_federated_auth: B lists its people's records for A only with the operator's permission (Core FED-16).
         await addPeer(B, A_ID, A.baseUrl, A.nodeKey.publicKey, { allow_federated_auth: true });
         await addPeer(B, HOP1_ID, DEAD_URL, hop1.publicKey, { replicate_memory: false });
         const list = await B.json('/v1/federation/peers', { headers: auth(B.ownerToken) });

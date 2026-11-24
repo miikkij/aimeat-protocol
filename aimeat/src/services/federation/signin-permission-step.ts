@@ -15,13 +15,13 @@
  *   told which peers it closed: one security incident lists them, and the Federation page gives the
  *   permission back per peer (PUT /v1/federation/peers/:nodeId allow_federated_auth, the same as
  *   aimeat_admin_federation). A node with no such peer records the step and opens nothing.
- * @structure FED16_SIGNIN_STEP_KEY · nameClosedSignInPeersOnce(storage, config)
- * @usage await nameClosedSignInPeersOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
+ * @structure FED16_SIGNIN_STEP_KEY · nameClosedSignInPeersOnce(storage, config, rows)
+ * @usage await nameClosedSignInPeersOnce(storage, config, savedPeers);   // server-bootstrap/service-init.ts
  * @version-history
  *   v1.0.0 — 2026-11-24 — Initial (decision of 2026-11-24 in Lifecycle Central, Core FED-16).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { FederationPeerRecord, Storage } from '../../storage/interface.js';
 import { LIVENESS_RECOVERABLE } from '../federation.js';
 import { coerceTier, tierCeiling } from './tiers.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
@@ -39,13 +39,14 @@ const INCIDENT_ROWS = 50;
  * Throws when a read or write fails, and then leaves no record, so the next start tries again.
  */
 export async function nameClosedSignInPeersOnce(
-  storage: Storage, config: AimeatConfig,
+  storage: Storage, config: AimeatConfig, rows: readonly FederationPeerRecord[],
 ): Promise<{ ran: false } | { ran: true; peers: string[] }> {
   const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, FED16_SIGNIN_STEP_KEY);
   if (!claim) return { ran: false };
   try {
     const at = new Date().toISOString();
-    const peers = (await storage.listFederationPeers())
+    // The stored peer rows the boot already read (server-bootstrap/service-init.ts), not a second whole-table read.
+    const peers = rows
       .filter(p => p.nodeId !== config.nodeId && LIVENESS_RECOVERABLE.has(p.status))
       .filter(p => tierCeiling(coerceTier(p.tier ?? 'member')).allowFederatedAuth && p.allowFederatedAuth !== true)
       .map(p => p.nodeId)

@@ -51,6 +51,7 @@ import { audienceProof, deliveryProof } from '../src/services/signed-node-reques
 import { bootNode, setupOperator, addPeer, auth, sleep, type NodeState } from './helpers/federation-two-node.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner, ownerSignIn, type RegisteredOwner } from './helpers/owner-login.js';
+import { expectRefusal } from './helpers/harness.js';
 
 const RUNNER_BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now().toString(36);
@@ -193,6 +194,12 @@ try {
 
     await test('the person gives A the sign-in consent and signs in on A with the home password', async () => {
         aliceConsentId = await grantSignIn(alice, `node:${A_ID}`);
+        // Core FED-16: with the consent but without B's operator permission for A, B checks no sign-in for A.
+        const off = await B.json(`/v1/federation/peers/${A_ID}`, { method: 'PUT', headers: auth(B.ownerToken), body: JSON.stringify({ allow_federated_auth: false }) });
+        assert(off.status === 200, `take the permission away: ${off.status} ${JSON.stringify(off.body)}`);
+        expectRefusal(await ownerSignIn(A.baseUrl, `${alice.name}@${B_ID}`, alice.password), 403, 'FEDERATION_AUTH_NOT_ALLOWED');
+        const on = await B.json(`/v1/federation/peers/${A_ID}`, { method: 'PUT', headers: auth(B.ownerToken), body: JSON.stringify({ allow_federated_auth: true }) });
+        assert(on.status === 200, `give it back: ${on.status} ${JSON.stringify(on.body)}`);
         const r = await ownerSignIn(A.baseUrl, `${alice.name}@${B_ID}`, alice.password);
         assert(r.status === 200 && r.body.data?.federated === true, `federated sign-in: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
         visitorToken = r.body.data.token;

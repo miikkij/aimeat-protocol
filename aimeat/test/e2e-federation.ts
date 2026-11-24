@@ -314,8 +314,6 @@ await test('10. Update peer info', async () => {
     const { body } = await json(`/v1/federation/peers/${directPeerNodeId}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        // allow_federated_auth: this node acts for its people (replicate, sign-in check) only for a
-        // peer the operator allowed it for (Core FED-16, 2026-11-24).
         body: JSON.stringify({ url: 'http://localhost:9997', status: 'active', allow_federated_auth: true }),
     });
     assert(body.ok === true, `update: ${JSON.stringify(body.error)}`);

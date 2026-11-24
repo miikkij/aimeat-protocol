@@ -18,7 +18,7 @@
       "digest": "sha256:6b23a152aca660cb9c888a0a"
     },
     "2. Accounts and sign-in": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/external-login.ts",
@@ -41,7 +41,7 @@
         "aimeat/src/services/adult-assurance.ts",
         "aimeat/src/services/vc-issuer.ts"
       ],
-      "digest": "sha256:abb9945933e75238c731dab9"
+      "digest": "sha256:bc4a15eeda1aabd14a71c5fb"
     },
     "3. Agents and machine identity": {
       "reviewedOn": "2026-11-22",
@@ -220,7 +220,7 @@
       "digest": "sha256:206bfd33753a0940910a718d"
     },
     "11. Served libraries and the Design Book": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/data/library-packs",
         "aimeat/src/tool-catalog/definitions/designbook.ts",
@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:0a4d1012a0534ccdfc6295c4"
+      "digest": "sha256:1354c513a88ed83cdc91d399"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-23",
@@ -557,7 +557,7 @@
       "aimeat/src/routes/totp.ts": "494d66ab99aa9bfb",
       "aimeat/src/routes/scim.ts": "2a7149ea1dc93d7c",
       "aimeat/src/services/adult-assurance.ts": "76573002fb7d23f5",
-      "aimeat/src/services/vc-issuer.ts": "d2fb731d4deda427"
+      "aimeat/src/services/vc-issuer.ts": "abcd750b519d38bc"
     },
     "3. Agents and machine identity": {
       "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
@@ -786,7 +786,7 @@
       "aimeat/src/data/library-packs/sdk-parties.ts": "d2838f150aa66604",
       "aimeat/src/data/library-packs/sdk-prompt.ts": "206aa7682b3c2ba0",
       "aimeat/src/data/library-packs/sdk-refinery.ts": "021747beff86728b",
-      "aimeat/src/data/library-packs/sdk-ui.ts": "35709a346f8a6518",
+      "aimeat/src/data/library-packs/sdk-ui.ts": "f23cfd0cd6c92953",
       "aimeat/src/data/library-packs/sdk-validate.ts": "f5d19d902b3f8c86",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "f4a79e184d275a7e",

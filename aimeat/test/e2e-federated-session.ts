@@ -364,7 +364,7 @@ async function run() {
         const act = await json(`/v1/federation/peers/${homeNodeId}`, {
             method: 'PUT',
             headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ status: 'active' }),
+            body: JSON.stringify({ status: 'active', allow_federated_auth: true }),
         });
         assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body)}`);
         assert(act.body.data.status === 'active', `status: ${act.body.data.status}`);
@@ -940,18 +940,6 @@ async function run() {
             body: JSON.stringify({ username: localPerson.name, password: localPerson.password, requesting_node: homeNodeId, timestamp, signature, ...proof }),
         });
     };
-    // Core FED-16 (2026-11-24): this node answers a sign-in check only for a peer the operator allowed
-    // sign-ins for, not for every peer whose tier permits it.
-    await test('FED-16: without the operator\'s permission for the peer, verify answers 403 FEDERATION_AUTH_NOT_ALLOWED', async () => {
-        const { status, body } = await verifyAsPeer();
-        assert(status === 403 && (body.error?.code ?? body.code) === 'FEDERATION_AUTH_NOT_ALLOWED', `expected 403 FEDERATION_AUTH_NOT_ALLOWED, got ${status} ${JSON.stringify(body)}`);
-        const put = await json(`/v1/federation/peers/${homeNodeId}`, {
-            method: 'PUT',
-            headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ allow_federated_auth: true }),
-        });
-        assert(put.status === 200, `allow sign-ins from the peer: ${put.status} ${JSON.stringify(put.body)}`);
-    });
     const grantAuthConsent = async (expires: string) => {
         const r = await json('/v1/consent', {
             method: 'POST',

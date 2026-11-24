@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-24 — After the stored peers load, the Core FED-16 step names the peers whose sign-in checks
+ *     stopped, from the same rows (services/federation/signin-permission-step.ts).
  *   2026-11-14 — The hourly team-end sweep (services/team/expiry.ts): temporary members and team end days.
  *   2026-11-07 — seedCsmTemplates is imported from services/csm/seed.ts, where it moved unchanged.
  *   2026-11-05 — resumeReencryptAtBoot: a data key re-encrypt job left running is taken up again
@@ -158,6 +160,7 @@ import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task/start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
+import { nameClosedSignInPeersOnce } from '../services/federation/signin-permission-step.js';
 import { flagOrphanPeerApprovalsOnce } from '../services/federation/orphan-approvals.js';
 import { peerInfoFromRow } from '../services/federation/peer-reload.js';
 import { startNodeBusRelay } from './bus-relay-start.js';
@@ -477,6 +480,9 @@ export async function initializeServices(
     if (savedPeers.length > 0) {
       logger.info(`Loaded ${savedPeers.length} persisted federation peers`);
     }
+    // The peers whose sign-in checks stopped under Core FED-16 are named on the Security page, once, from the rows read above.
+    await nameClosedSignInPeersOnce(storage, config, savedPeers)
+      .catch(err => logger.error('Failed to name the peers whose sign-in checks stopped; the next boot tries again', { error: String(err) }));
   } catch (err) {
     logger.error('Failed to load persisted peers', { error: String(err) });
   }
