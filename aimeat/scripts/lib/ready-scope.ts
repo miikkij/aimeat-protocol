@@ -283,7 +283,7 @@ export function readyScope(repo: string, base: string): ReadyScope {
   const removed = removedTexts(repo, base, files);
   const textSuites = targetedSuites(repo, base, files, removed.parts);
   if (code.length) {
-    const reach = codeReach(repo, code);
+    const reach = codeReach(repo, code, base);
     if (reach.full) return { full: true, code, suites: [], wide: null, fullWhy: reach.full };
     return { full: false, code, suites: [...new Set([...reach.suites, ...textSuites])].sort(), wide: null, fullWhy: null };
   }

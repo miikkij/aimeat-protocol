@@ -6,7 +6,12 @@
  *   sweep. The whole sweep runs every night (.github/workflows/e2e-full.yml) and for a release; pnpm
  *   ready runs what the change could have broken (Jouni, 2026-11-24).
  *
- *   HOW A SUITE IS REACHED. An E2E suite talks to a running node over HTTP, so what it reaches is the
+ *   THE COVERAGE MAP FIRST. The nightly sweep records which src/ function every suite executed
+ *   (scripts/lib/e2e-coverage-map.ts, fetched into coverage-e2e/ by gate-coverage.ts). A changed line
+ *   picks the suites that ran its function, which is the exact answer. The rules below are the
+ *   fallback for what the map does not know: a new file, a machine without the map.
+ *
+ *   HOW A SUITE IS REACHED WITHOUT THE MAP. An E2E suite talks to a running node over HTTP, so what it reaches is the
  *   routes it calls. From each changed file under aimeat/src/ this follows the files that import it,
  *   type imports included (a service handed to a router by the bootstrap is named by its type there),
  *   up to the route modules (src/routes/, src/mcp/). The paths those routes register are then looked
@@ -27,14 +32,27 @@
  * @structure FULL_SWEEP · codeReach(repo, files)
  * @usage const reach = codeReach(repo, codeFiles);   // scripts/lib/ready-scope.ts readyScope()
  * @version-history
+ *   v1.1.0 — 2026-11-25 — The nightly's coverage map decides first; a route is matched by every fixed
+ *     part of its path to its end; a route or file more than COMMON_SHARE of the suites run picks
+ *     COMMON_SAMPLE of them; a configuration change starts from the code that reads the setting.
  *   v1.0.0 — 2026-11-24 — Initial (Jouni, 2026-11-24: pnpm ready runs only what the change can reach,
  *     the nightly runs the whole sweep).
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { coverageSelection } from './gate-coverage.js';
 
 /** Changed paths that every request passes through, or that decide what runs at all: the whole sweep. */
-export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated|config)\/|aimeat\/src\/(?:config|config-types|server)\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|openapi\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated)\/|aimeat\/src\/server\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|openapi\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+
+/**
+ * The configuration. Every module names its type, so its importers are every route; what a changed
+ * setting reaches is the code that READS that setting. The settings a change adds or edits are the
+ * names on its changed lines (`appsOwedOnPublish:`), and the files that read `.appsOwedOnPublish` are
+ * where the walk starts. A list that names no setting (known-env-names.ts) reaches nothing.
+ */
+const CONFIG = /^aimeat\/src\/(?:config\/|config\.ts$|config-types\.ts$|services\/config\/)/;
 
 /**
  * The bootstrap and the entry point wire every service and run the boot steps. A change there is
@@ -43,7 +61,8 @@ export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated
  */
 const BOOT = /^aimeat\/src\/(?:server-bootstrap\/|index\.ts$)/;
 
-/** How many suites prove a path that only the helpers every suite uses call (see codeReach). */
+/** A route more than this share of the suites call is on every suite's way; COMMON_SAMPLE of them run for it. */
+const COMMON_SHARE = 0.3;
 const COMMON_SAMPLE = 3;
 
 /** Files under these never run in the node a suite talks to. */
@@ -95,6 +114,30 @@ function routeParts(route: string): string[] {
   return route.split(/:[A-Za-z_]\w*\??|\*|\([^)]*\)/).filter(p => p.length > 1);
 }
 
+/**
+ * The source files that read a setting the configuration file changed: the property names on the
+ * lines the diff adds or removes, looked for as `.<name>` outside the configuration itself.
+ */
+function settingReaders(repo: string, file: string, base: string, srcDir: string): string[] {
+  let diff = '';
+  try { diff = execFileSync('git', ['diff', base, '--', file], { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); } catch { return []; }
+  const names = new Set<string>();
+  for (const line of diff.split('\n')) {
+    if (!/^[+-][^+-]/.test(line)) continue;
+    for (const m of line.matchAll(/\b([a-z][A-Za-z0-9]{5,})\s*[:?]/g)) names.add(m[1]!);
+    for (const m of line.matchAll(/\bkey:\s*'([a-z][A-Za-z0-9]{5,})'/g)) names.add(m[1]!);
+  }
+  if (!names.size) return [];
+  const readers: string[] = [];
+  for (const f of walk(srcDir)) {
+    const rel = path.relative(repo, f).split(path.sep).join('/');
+    if (CONFIG.test(rel)) continue;
+    const src = readFileSync(f, 'utf8');
+    if ([...names].some(n => src.includes(`.${n}`))) readers.push(path.normalize(f));
+  }
+  return readers;
+}
+
 /** One importer map per tree in a process: reading every source file takes seconds. */
 const graphs = new Map<string, Map<string, Set<string>>>();
 function graphOf(repo: string, build: () => Map<string, Set<string>>): Map<string, Set<string>> {
@@ -109,7 +152,7 @@ export interface CodeReach {
 }
 
 /** The E2E suites the changed code files can reach (see the header). `files` are repo-relative. */
-export function codeReach(repo: string, files: string[]): CodeReach {
+export function codeReach(repo: string, files: string[], base = 'origin/main'): CodeReach {
   const full = files.find(f => FULL_SWEEP.test(f));
   if (full) return { full: `${full} is on every request's path`, suites: [] };
 
@@ -123,10 +166,28 @@ export function codeReach(repo: string, files: string[]): CodeReach {
     return reverseImports([...srcFiles, ...helperFiles, ...suiteFiles]);
   });
 
+  // FIRST THE COVERAGE MAP. The nightly records which src/ function each suite executed
+  // (scripts/lib/e2e-coverage-map.ts); a changed line picks the suites that ran its function. A file
+  // the map does not know (new, or run by no suite) goes the import way below, unless every file that
+  // imports it is a changed file the map knows: their suites are the ones that call it.
+  const aimeatDir = path.join(repo, 'aimeat');
+  const covered = new Map<string, string[]>();
+  const srcTs = files.filter(f => /^aimeat\/src\/.+\.ts$/.test(f) && !f.startsWith('aimeat/src/static/') && !f.startsWith('aimeat/src/data/library-packs/'));
+  for (const f of srcTs) {
+    const c = coverageSelection(repo, aimeatDir, [f], base, { refresh: true });
+    if (c.suites === null) break;            // no map on this machine: every file goes the import way
+    if (!c.unknown.includes(f)) covered.set(f, c.suites);
+  }
+  const newOnlyCalledByCovered = (f: string): boolean => {
+    const importers = [...(rev.get(path.normalize(path.join(repo, f))) ?? [])].map(i => path.relative(repo, i).split(path.sep).join('/'));
+    return importers.length > 0 && importers.every(i => covered.has(i));
+  };
+
   const reached = new Set<string>();
   const names = new Set<string>();     // served files a suite may name (a browser library, a page)
   for (const f of files) {
     if (NO_NODE.test(f)) continue;
+    if (covered.has(f) || (covered.size && newOnlyCalledByCovered(f))) continue;
     const abs = path.normalize(path.join(repo, f));
     if (f.startsWith('aimeat/src/static/sdk-libs/') || f.startsWith('aimeat/public/')) {
       const parts = f.split('/');
@@ -141,32 +202,40 @@ export function codeReach(repo: string, files: string[]): CodeReach {
     // importers would pick every package suite for a changelog line.
     if (f.startsWith('aimeat/src/data/library-packs/')) { names.add('/v1/libs'); continue; }
     if (!f.startsWith('aimeat/src/')) continue;
-    // Follow the importers, not through the bootstrap.
-    const queue = [abs];
+    // A configuration file: start from the code that reads the settings it changed.
+    const starts = CONFIG.test(f) ? settingReaders(repo, f, base, srcDir) : [abs];
+    // Follow the importers, not through the bootstrap and not through the configuration's type.
+    const queue = [...starts];
     while (queue.length) {
       const cur = queue.pop()!;
       if (reached.has(cur)) continue;
       reached.add(cur);
       if (cur.includes(`${path.sep}server-bootstrap${path.sep}`)) continue;
+      if (CONFIG.test(path.relative(repo, cur).split(path.sep).join('/'))) continue;
       for (const imp of rev.get(cur) ?? []) if (!reached.has(imp)) queue.push(imp);
     }
   }
 
-  // The paths the reached routes register, each as its fixed parts.
-  const routes = new Map<string, string[]>();
+  // What a suite must contain to call each reached route: its fixed parts, the last one ending where
+  // the path ends, so `/v1/ghii` is not found inside `/v1/ghii/login`.
+  const matchers: RegExp[][] = [];
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const addRoute = (route: string) => {
+    const parts = routeParts(route);
+    // The root (`/`, the discovery document or an app's subdomain page) is a prefix of every path.
+    if (parts.join('').length < 4) return;
+    const open = /[:*)]\??$/.test(route);   // ends in a parameter: the last part is followed by one
+    matchers.push(parts.map((p, i) => new RegExp(esc(p) + (i === parts.length - 1 && !open ? '(?![A-Za-z0-9_/-])' : ''))));
+  };
   for (const f of reached) {
     const rel = path.relative(srcDir, f).split(path.sep).join('/');
-    if (rel.startsWith('mcp/')) { for (const p of ['/mcp', '/v1/mcp', '/v2/mcp']) routes.set(p, [p]); continue; }
+    if (rel.startsWith('mcp/')) { for (const p of ['/mcp', '/v1/mcp', '/v2/mcp']) addRoute(p); continue; }
     if (!rel.startsWith('routes/') || !existsSync(f)) continue;
-    for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) {
-      // The root (`/`, the discovery document or an app's subdomain page) is a prefix of every path,
-      // so it would pick every suite; the same module's longer paths name what it serves.
-      const parts = routeParts(m[1]!);
-      if (parts.join('').length >= 4) routes.set(m[1]!, parts);
-    }
+    for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) addRoute(m[1]!);
   }
+  for (const n of names) matchers.push([new RegExp(esc(n))]);
 
-  // The helpers each suite imports, directly or through another helper.
+  // Each suite's text with every test helper it imports, directly or through another helper.
   const helpersDir = path.join(testDir, 'helpers');
   const helpersOf = (file: string, seen = new Set<string>()): Set<string> => {
     for (const m of readFileSync(file, 'utf8').matchAll(IMPORT_RE)) {
@@ -175,28 +244,25 @@ export function codeReach(repo: string, files: string[]): CodeReach {
     }
     return seen;
   };
-  const suiteHelpers = new Map(suiteFiles.map(s => [s, helpersOf(s)]));
-  // A helper most suites use (the harness, the server boot) calls its paths in every suite, so a path
-  // found only there is exercised by any suite: a few of them prove it, all of them prove nothing more.
-  const uses = new Map<string, number>();
-  for (const hs of suiteHelpers.values()) for (const h of hs) uses.set(h, (uses.get(h) ?? 0) + 1);
-  const common = new Set([...uses].filter(([, n]) => n > suiteFiles.length * 0.3).map(([h]) => h));
-  const hits = (text: string): boolean => [...routes.values()].some(parts => parts.every(p => text.includes(p))) || [...names].some(n => text.includes(n));
-  const helperHit = new Map([...uses.keys()].map(h => [h, hits(readFileSync(h, 'utf8'))]));
+  const texts = suiteFiles.map(s => ({
+    name: path.basename(s, '.ts'),
+    text: [s, ...helpersOf(s)].map(f => readFileSync(f, 'utf8')).join('\n'),
+  }));
 
+  // A route (or a source file) that more than COMMON_SHARE of the suites call is what every suite
+  // goes through (signing up, signing in, the readiness read): any suite proves it still works, so
+  // COMMON_SAMPLE of them run for it. Every other route runs every suite that calls it.
   const picked = new Set<string>();
-  const viaCommon: string[] = [];
-  for (const s of suiteFiles) {
-    const name = path.basename(s, '.ts');
-    if (reached.has(path.normalize(s))) { picked.add(name); continue; }
-    const own = [...suiteHelpers.get(s)!].filter(h => !common.has(h));
-    if (hits(readFileSync(s, 'utf8')) || own.some(h => helperHit.get(h))) { picked.add(name); continue; }
-    if ([...suiteHelpers.get(s)!].some(h => common.has(h) && helperHit.get(h))) viaCommon.push(name);
-  }
-  for (const name of viaCommon.sort().slice(0, COMMON_SAMPLE)) picked.add(name);
+  const take = (group: string[]) => {
+    const list = group.length > suiteFiles.length * COMMON_SHARE ? group.sort().slice(0, COMMON_SAMPLE) : group;
+    for (const n of list) picked.add(n);
+  };
+  for (const suites of covered.values()) take([...suites]);
+  for (const parts of matchers) take(texts.filter(t => parts.every(re => re.test(t.text))).map(t => t.name));
+  // A suite that imports a reached source file, itself or through a helper.
+  const importers = new Set([...reached].filter(f => f.startsWith(testDir)));
+  take(suiteFiles.filter(s => importers.has(path.normalize(s)) || [...helpersOf(s)].some(h => importers.has(path.normalize(h)))).map(s => path.basename(s, '.ts')));
   // A boot change: a few suites prove the node still starts and serves.
   if (files.some(f => BOOT.test(f))) for (const s of suiteFiles.map(f => path.basename(f, '.ts')).sort().slice(0, COMMON_SAMPLE)) picked.add(s);
-  // A suite that imports a reached source file directly is in `reached` through the importer map.
-  for (const f of reached) if (f.startsWith(testDir) && /e2e-.*\.ts$/.test(f)) picked.add(path.basename(f, '.ts'));
   return { full: null, suites: [...picked].sort() };
 }
