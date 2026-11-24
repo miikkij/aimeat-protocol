@@ -5,6 +5,8 @@
  * @description The lane count of pnpm ready's sweep follows the machine and, on PostgreSQL, the
  *   server's connection limit (scripts/lib/ready-lanes.ts).
  * @version-history
+ *   v1.1.0 — 2026-11-24 — The numbers measured on 12 lanes (22 a lane, 120 beside), and the limit the
+ *     note asks for is held above the measured peak.
  *   v1.0.0 — 2026-11-23 — Initial.
  */
 import { describe, expect, it } from 'vitest';
@@ -34,11 +36,23 @@ describe('postgresLanes', () => {
         expect(postgresLanes(12, 100)).toBe(4);
     });
 
-    it('takes as many lanes as the connection limit carries, 30 connections each and 40 kept back', () => {
-        expect(postgresLanes(12, 200)).toBe(5);
+    it('takes as many lanes as the connection limit carries, 22 connections each and 120 kept back', () => {
+        expect(postgresLanes(12, 200)).toBe(4);
+        expect(postgresLanes(12, 250)).toBe(5);
         expect(postgresLanes(12, 300)).toBe(8);
-        expect(postgresLanes(12, 400)).toBe(12);
+        expect(postgresLanes(12, 383)).toBe(11);
+        expect(postgresLanes(12, 384)).toBe(12);
+        expect(postgresLanes(12, 500)).toBe(12);
         expect(postgresLanes(12, 1000)).toBe(12);
+    });
+
+    it('keeps more than the measured peak of a sweep under the limit it asks for', () => {
+        // Measured on 2026-11-24 (ready-lanes.ts, MEASURED): the k busiest lanes of one second.
+        const measured: Record<number, number> = { 1: 65, 4: 133, 8: 213, 12: 232 };
+        for (const [lanes, peak] of Object.entries(measured)) {
+            const asked = Number(/max_connections = (\d+)/.exec(postgresLaneNote(Number(lanes), 0, 100) ?? '')?.[1]);
+            expect(asked).toBeGreaterThan(peak);
+        }
     });
 
     it('runs 4 lanes when the limit could not be read', () => {
@@ -57,13 +71,13 @@ describe('postgresLaneNote', () => {
         const note = postgresLaneNote(12, 4, 100);
         expect(note).toContain('PostgreSQL runs on 4 lanes, not the 12 this machine carries');
         expect(note).toContain('the server allows 100 connections');
-        expect(note).toContain('max_connections = 400');
-        expect(postgresLanes(12, 400)).toBe(12);
+        expect(note).toContain('max_connections = 384');
+        expect(postgresLanes(12, 384)).toBe(12);
     });
 
     it('says the limit could not be read, and nothing when no lane is held back', () => {
         expect(postgresLaneNote(12, 4, null)).toContain('its connection limit could not be read');
-        expect(postgresLaneNote(12, 12, 400)).toBeNull();
+        expect(postgresLaneNote(12, 12, 500)).toBeNull();
         expect(postgresLaneNote(4, 4, 100)).toBeNull();
     });
 });

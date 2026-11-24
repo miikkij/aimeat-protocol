@@ -15,28 +15,44 @@
  *   a node (0.5 to 1 GB) and a suite process; the divisor leaves room for the suites that start
  *   nodes of their own.
  *
- *   POSTGRESQL. The same number, held under what the server's connection limit carries. Measured on
- *   2026-11-23 with 8 lanes on a server that allows 100: the server was at 100 of 100 within 15 s,
- *   while the lanes' nodes started, and one lane's database held 29 connections (the node's pool of
- *   20, its event-bus listener, and the runner's own). So a lane is counted as PER_LANE connections
- *   and RESERVE are kept for the suites that start nodes of their own. A server with the default limit
- *   of 100 carries fewer than the 4 lanes the package script names; the sweep still runs those 4, as
- *   it did before, and that is where a suite now and then runs out of connections. A server set to
- *   400 carries 12, and postgresLaneNote() says so in the run's output.
+ *   POSTGRESQL. The same number, held under what the server's connection limit carries: PER_LANE
+ *   connections a lane, and RESERVE beside them.
+ *
+ *   MEASURED on 2026-11-24: one full sweep on 12 lanes against a server that allows 500, the
+ *   server's client connections read each second (1 578 samples in 27 minutes). The sweep held 232
+ *   at its peak and 199 or fewer in 99 % of the seconds, and no connection was refused. A lane's
+ *   node holds 21 (its pool of 20 and its event-bus listener). A suite that starts nodes of its own
+ *   adds a database of up to 22 for each, 42 for the two-process suite; at most 7 such databases
+ *   were open at once, with 130 connections between them, and one lane with its suite's own nodes
+ *   held 65. The k busiest lanes of the same second held 65, 133, 213 and 232 for k = 1, 4, 8 and
+ *   12, which is 21 a lane and about 50 on top until the last lanes, where it flattens. So
+ *   PER_LANE is 22 (the 21 and the runner's own connection), and RESERVE is 120: the 50, the 65 of
+ *   a suite another session runs on the same server while it develops, and the server's own 3.
+ *
+ *   A server with the default limit of 100 does not carry the 4 lanes the package script names
+ *   (their busiest second held 133); the sweep still runs those 4, as it did before, and that is
+ *   where suites ran out of connections on 2026-11-23, three times in one sweep. A server set to
+ *   384 carries 12, and postgresLaneNote() says so in the run's output.
  * @structure sweepLanes() · postgresLanes() · postgresLaneNote() · postgresMaxConnections()
  * @usage
  *   const lanes = sweepLanes();                      // SQLite
  *   const pg = postgresLanes(lanes, maxConnections); // PostgreSQL, maxConnections from SHOW max_connections
  * @version-history
+ *   v1.1.0 — 2026-11-24 — PER_LANE 22 and RESERVE 120, from a 12-lane sweep measured on a server
+ *     that allows 500. They were 30 and 40, from 8 lanes on a server that stopped them at 100, and
+ *     counted 400 connections for the 12 lanes that hold 232.
  *   v1.0.0 — 2026-11-23 — Initial.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 
-/** The connections one lane holds at its peak, measured (29): the node's pool, its bus listener, the runner. */
-const PER_LANE = 30;
-/** Connections kept for the suites that start nodes of their own. */
-const RESERVE = 40;
+/** The connections of one lane: its node's pool of 20, the node's event-bus listener, the runner's own. */
+const PER_LANE = 22;
+/**
+ * Connections beside the lanes: the suites' own nodes at their busiest (50), one suite another
+ * session runs on the same server (65), and the server's own reserved ones (3).
+ */
+const RESERVE = 120;
 /** The lanes the package scripts name, and the fewest a sweep runs on. */
 const FLOOR = 4;
 const CEILING = 12;
@@ -69,7 +85,7 @@ export function postgresLaneNote(lanes: number, pgLanes: number, maxConnections:
     if (pgLanes >= lanes) return null;
     const needed = lanes * PER_LANE + RESERVE;
     const limit = maxConnections === null ? 'its connection limit could not be read' : `the server allows ${maxConnections} connections`;
-    return `PostgreSQL runs on ${pgLanes} lanes, not the ${lanes} this machine carries: ${limit}, and a lane holds up to ${PER_LANE}. max_connections = ${needed} on the test server carries ${lanes}.`;
+    return `PostgreSQL runs on ${pgLanes} lanes, not the ${lanes} this machine carries: ${limit}, a lane holds ${PER_LANE}, and ${RESERVE} are kept for the suites' own nodes and another session's suite. max_connections = ${needed} on the test server carries ${lanes}.`;
 }
 
 /**
