@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-24 — Names the app tools (get before publish, invoke to try) and the component catalogue,
+ *     now on the appdev surface.
  *   2026-11-21 — The aimeat-ai example names prefer.* only and says what local.<capability>=yes does:
  *     it turned the owner's cloud provider off for builders who copied it.
  *   2026-11-20 — An extension's `config.app` is named `owner/name`, without `.html` (services/members-only.ts resolves it).
@@ -145,7 +147,10 @@ switches the script off per app, or the weekly fixing agent on.
 or a public skill bound to it, the served app shows a round "Use with your AI" mark that links to
 \`/v1/use-with-ai/{owner}/{filename}\`: the tools, each skill's text, and how a person's own AI, an agent or
 a program uses them. Write the tool descriptions and the skill for that reader. The owner takes the
-mark off with \`aimeat_app_manage\` action \`marks\`, \`aiUse: false\`.
+mark off with \`aimeat_app_manage\` action \`marks\`, \`aiUse: false\`. \`aimeat_app_tools_publish\` replaces
+the whole list, so read it first with \`aimeat_app_tools_get\`, and try a published tool with
+\`aimeat_app_tool_invoke\`. Before you draw a control of your own, \`aimeat_ui_component_list\` and
+\`aimeat_ui_component_get\` say which component of the node's interface already does it.
 
 **Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
 \`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·

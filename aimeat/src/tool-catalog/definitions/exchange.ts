@@ -13,6 +13,8 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-11-24 — aimeat_app_tool_invoke on the `appdev` surface, to try an app's tools while building
+ *     it (wish-v2-surfaces-kuntoon).
  *   2026-11-21 — aimeat_app_tool_invoke's description says to load the app's bound skill and read the
  *     one tool's schema before the first call, and what a refusal of the input names.
  *   2026-11-20 — aimeat_app_tool_invoke's `app` is the app's name without `.html` (services/app/app-ref.ts).
@@ -236,7 +238,8 @@ export const exchangeTools = [
         scopeEnforcedFrom: { 'ext:invoke': REST_SCOPE_GATES_ENFORCED_IN },
         // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         // On `agent`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
-        surfaces: ['agent', 'service'],
+        // On `appdev`: try the app's own published tools while building it.
+        surfaces: ['agent', 'service', 'appdev'],
         input: {
             owner: { type: 'string', required: true, description: 'The provider app\'s owner (bare name or GHII).', zod: z.string().min(1).max(120) },
             app: { type: 'string', required: true, description: 'The provider app\'s name, e.g. "lifecycle-central" (its file name "lifecycle-central.html" works too).', zod: z.string().min(1).max(120) },

@@ -32,6 +32,9 @@
  *   cd aimeat && pnpm check:surface-focus            # report
  *   cd aimeat && pnpm check:surface-focus --strict   # the hook/CI gate
  * @version-history
+ *   v1.2.0 — 2026-11-24 — SPREAD_SEED 13: aimeat_app_tools_get joins the appdev surface, its fourth.
+ *     A v2 surface is a task, and building an app reads and publishes its tools (decision of
+ *     2026-11-24 in Lifecycle Central, wish-v2-surfaces-kuntoon).
  *   v1.1.0 — 2026-10-02 — The `chat` surface is seeded, and left out of the spread count
  *     (NOT_A_PLACEMENT): its list is what a session starts with, not where a tool lives.
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface it measures against.
@@ -60,8 +63,12 @@ const DISTANCE_SEED: Record<Exclude<SurfaceRole, 'full'>, number> = {
  */
 const NOT_A_PLACEMENT: ReadonlySet<string> = new Set(['chat']);
 
-/** Tools carried by four or more surfaces — placed everywhere is placed nowhere. */
-const SPREAD_SEED = 12;
+/**
+ * Tools carried by four or more surfaces — placed everywhere is placed nowhere. 13 since 2026-11-24:
+ * aimeat_app_tools_get is on agent (the buyer reads a tool before calling it), service and commerce
+ * (the seller), and appdev (building an app publishes its tools, and a publish replaces the whole list).
+ */
+const SPREAD_SEED = 13;
 /** A tool on this many surfaces or more counts toward SPREAD_SEED. */
 const SPREAD_AT = 4;
 

@@ -8,6 +8,8 @@
  * @structure uiLibraryTools
  * @usage import { uiLibraryTools } from './ui-library.js';
  * @version-history
+ *   2026-11-24 — Both tools on the `appdev` surface too: a v2 surface is a task, and building an app
+ *     reads the component catalogue (decision of 2026-11-24, wish-v2-surfaces-kuntoon).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-24 — "component" for every catalogue entry, as the lab and the language
@@ -27,7 +29,8 @@ export const uiLibraryTools = [
         annotations: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // On `admin`: ...and the parts those pages are drawn from, and the themes they wear.
         // On `agent`: The parts this node's own interface is built from, read before a page is changed.
-        surfaces: ['agent', 'admin'],
+        // On `appdev`: building an app reads which component exists before it writes a second copy.
+        surfaces: ['agent', 'admin', 'appdev'],
         input: {
             kind: { type: 'string', description: "'component' or 'shape'.", zod: z.enum(['component', 'shape']) },
             status: { type: 'string', description: "'active' or 'unused'.", zod: z.enum(['active', 'unused']) },
@@ -40,7 +43,7 @@ export const uiLibraryTools = [
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        surfaces: ['agent', 'admin'],
+        surfaces: ['agent', 'admin', 'appdev'],
         input: {
             id: { type: 'string', required: true, description: "The component's id or name, from aimeat_ui_component_list.", zod: z.string().min(1).max(80) },
         },

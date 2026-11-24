@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-11-24 — aimeat_app_tools_publish and aimeat_app_tools_get on the `appdev` surface: a v2
+ *     surface is a task, and an app's tools are part of building it (wish-v2-surfaces-kuntoon).
  *   2026-11-21 — aimeat_app_tools_publish says a binding to an action marked `decision: person` is refused PERSON_DECIDES.
  *   2026-11-21 — aimeat_app_tools_get takes `tool` (one tool's entry) and an owner written `user:alice`.
  *   2026-11-20 — aimeat_app_tools_publish and aimeat_app_tools_get name the app without `.html`
@@ -280,7 +282,8 @@ export const commerceTools = [
         annotations: { title: 'Publish App Tool Manifest', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // commerce:sell, and the word POST /v1/memory asks, where the tool manifest is written (secaudit 2026-10 follow-up, A4).
         scope: ['commerce:sell', 'memory:write'],
-        surfaces: ['service', 'commerce'],
+        // On `appdev`: an app's tools are published as part of building the app.
+        surfaces: ['service', 'commerce', 'appdev'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s name, e.g. "shop" (its file name "shop.html" works too). The manifest is stored under your app\'s file name, apps.shop.html.tools, and the answer names it.', zod: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/) },
             tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, priceMoney?: {amount /* micro-units */, currency}, pricesMoney?: [{amount, currency}], tollMorsels? /* pacing morsels per use, 0-100 */, usageTerms?, provenance?, odps? }]', zod: z.array(z.record(z.string(), z.unknown())).max(200) },
@@ -295,7 +298,8 @@ export const commerceTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Read App Tool Manifest', readOnlyHint: true },
         // On `agent`: Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
-        surfaces: ['agent', 'service', 'commerce'],
+        // On `appdev`: read the manifest before republishing it, since a publish replaces the whole list.
+        surfaces: ['agent', 'service', 'commerce', 'appdev'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s name, e.g. "lifecycle-central" (its file name "lifecycle-central.html" and "owner/lifecycle-central" work too)', zod: z.string().min(1).max(120) },
             owner: { type: 'string', required: false, description: 'App owner: a bare name ("alice"), "alice@node-id" or "user:alice". Default: the owner in app_id, else your own owner', zod: z.string().min(1).max(100) },

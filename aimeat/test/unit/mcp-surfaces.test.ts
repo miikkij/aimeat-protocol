@@ -4,6 +4,7 @@
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
+ *   v1.4.0 -- 2026-11-24 -- appdev carries the data map, the component catalogue and the app tools.
  *   v1.3.0 -- 2026-11-15 -- Audit M222: no admin tool outside admin/full, no memory or wallet write
  *     tool on appdev, asserted over every listed tool.
  *   v1.2.0 -- 2026-11-02 -- The chat starts with aimeat_home_feed; at most 23 start tools.
@@ -71,6 +72,15 @@ describe('v2 MCP surfaces', () => {
         expect(s.has('aimeat_memory_write')).toBe(false);
         expect(s.has('aimeat_task_create')).toBe(false);
         expect(s.has('aimeat_board_read')).toBe(false);
+    });
+
+    it('appdev carries what building an app needs: the data map, the component catalogue and the app tools', () => {
+        // A v2 surface is a task, not a role (decision of 2026-11-24, wish-v2-surfaces-kuntoon).
+        const s = toolsForSurface('appdev');
+        for (const name of ['aimeat_datamap_get', 'aimeat_datamap_set', 'aimeat_ui_component_list', 'aimeat_ui_component_get',
+            'aimeat_app_tools_get', 'aimeat_app_tools_publish', 'aimeat_app_tool_invoke']) {
+            expect({ name, onAppdev: s.has(name) }).toEqual({ name, onAppdev: true });
+        }
     });
 
     /**
