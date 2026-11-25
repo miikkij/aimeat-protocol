@@ -564,7 +564,7 @@ changed after you fetched it says so.
    section, says how; a state that waits for a timer to come round has not met it.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
-   Read the WHOLE answer and keep it whole. Four of its lines are owed, by level ${OWED_BY_LEVEL}, and THE NEXT PUBLISH IS REFUSED until they exist (\`APP_OWES_ITEMS\` names each; an update also needs a \`roadmap\` line, a draft's notice counts): the **agent face** (\`agent_face_present\`), the **bound
+   Read the WHOLE answer and keep it whole. Four of its lines are owed, by level ${OWED_BY_LEVEL}, and THE NEXT PUBLISH IS REFUSED until they exist (\`APP_OWES_ITEMS\` names each; an update also needs a \`roadmap\` line, a draft's notice counts): the **agent face** (\`agent_face_present\`: \`aimeat_app_manage { action: "face_set", filename, markdown }\`), the **bound
    skill** (\`bound_skills_count\` above zero; written for the person who operates the app through
    their AI, and \`ai_path\` says what it holds and when an app tool is owed), the **data map** (\`data_map_present\`: write it
    with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,

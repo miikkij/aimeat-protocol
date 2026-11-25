@@ -30,8 +30,8 @@
  * @version-history
  *   v1.50.1 — 2026-11-25 — Finishing reads the size matrix from app/publish-finish.ts, the text the
  *     handbook, the skills and the publish answer read; it called its four sizes "these three" and
- *     said every app owes all four items, where the owed items depend on the level (skill step 9),
- *     and it names face_set for the agent face. The part `libraries` holds it within MAX_PART_CHARS.
+ *     said every app owes all four items, where the owed items depend on the level (skill step 9).
+ *     The part `libraries` is at MAX_PART_CHARS, so face_set is named in step 9 and next_steps only.
  *   v1.50.0 — 2026-11-20 — The level is the finest unless the owner chose a lower one (item 0 is no
  *     longer a question). "The phone and the desktop" (atelier-screens.ts, part `screens`): the two
  *     layouts decided from the tasks. Finishing's size matrix gains 1920×1080.
@@ -794,7 +794,7 @@ function composeBody(config: AimeatConfig): string {
     + 'built against the spec in force. Then read `next_steps` in the publish answer, whole: the '
     + 'app is not finished while one of the things it owes at its level is missing, and a '
     + 'successful publish does not mean they are there. They are the agent face '
-    + '(`agent_face_present`, `aimeat_app_manage { action: "face_set" }`), a skill bound to the app (`bound_skills_count` above zero), the '
+    + '(`agent_face_present`), a skill bound to the app (`bound_skills_count` above zero), the '
     + 'data map (`data_map_present`, written with `aimeat_datamap_set`) and the design spec '
     + '(`design_spec_present`, written with `aimeat_app_manage { action: "spec_set" }`); step 9 '
     + 'of the skill `node:aimeat-app-builder-atelier` says what each holds, by level. These sizes '
