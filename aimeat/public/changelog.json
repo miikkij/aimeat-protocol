@@ -4,6 +4,16 @@
     {
       "date": "2026-11-25",
       "kind": "feature",
+      "id": "2026-11-25-new-theme-selkea",
+      "highlight": false,
+      "audience": ["user", "operator"],
+      "title": { "en": "New theme: Selkeä", "fi": "Uusi teema Selkeä" },
+      "body": { "en": "The new theme Selkeä gives every page a businesslike look: white boxes with a dark frame, and one height for every button and field. Choose it in the top bar once your operator offers it in Themes & Styles. The AI models and Agents pages now show their state first and have fewer sections, in every theme.", "fi": "Uusi teema Selkeä antaa jokaiselle sivulle asiallisen ilmeen: valkoiset laatikot tummalla kehyksellä ja yksi korkeus kaikille painikkeille ja kentille. Valitse se yläpalkista, kun ylläpitäjäsi on lisännyt sen tarjolle Teemat ja tyylit -sivulla. Tekoälymallit- ja Agentit-sivu näyttävät nyt ensin tilan, ja niissä on vähemmän osioita kaikissa teemoissa." },
+      "summary": { "en": "A businesslike theme, Selkeä. The AI models and Agents pages show their state first.", "fi": "Asiallinen teema Selkeä. Tekoälymallit- ja Agentit-sivu näyttävät ensin tilan." }
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "feature",
       "id": "2026-11-25-your-ai-creates-a-knowledge-package",
       "highlight": false,
       "audience": ["user", "agent"],
