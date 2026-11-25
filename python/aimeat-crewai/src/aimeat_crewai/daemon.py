@@ -14,6 +14,8 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  unreleased -- 2026-11-25 -- The default tool list carries `aimeat_knowledge_create`, loaded when
+    offered: a crew creates a knowledge package with its entries in one call.
   0.41.1 -- 2026-11-12 -- PROPOSE plans a queued task only when it carries no live plan
     (`_tasks_needing_plan`). A queued task with a plan waits for the owner's OK; a spawned worker
     starts with an empty `proposed_ids`, so it planned such a task again at every start: a model
@@ -1594,6 +1596,11 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     "aimeat_memory_list",
     "aimeat_knowledge_contribute",
     "aimeat_knowledge_get",
+    # A new knowledge package with all its entries in one call (2026-11-25). Loaded
+    # when offered (a node after 4.3.1, to an agent holding memory:write); on the
+    # connector it is also the knowledge write that works, since contribute has
+    # no REST route there. See DAEMON_TOOLS_IF_OFFERED.
+    "aimeat_knowledge_create",
     # Telemetry
     "aimeat_agent_telemetry_report",
     # Messages (so the daemon can listen for owner messages too)
@@ -1615,14 +1622,16 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
 # The names in the default list that the liaison loads when the MCP server
 # offers them and runs without when it does not. A filter normally refuses to
 # start on a tool the server did not expose (liaison.select_liaison_tools), and
-# these seven can be missing for a reason that is not an error:
+# these eight can be missing for a reason that is not an error:
 #   - a connector started with `--surface agent` offers `aimeat_discover` and
 #     not `aimeat_invoke` or the three `aimeat_mcp_*` tools (they are on the
 #     `primitives`, `chat` and `full` surfaces);
 #   - a node's own MCP lists `aimeat_mcp_*` only to a session that holds
-#     `mcp:read` / `mcp:use`, which an agent with default permissions does not;
+#     `mcp:read` / `mcp:use`, which an agent with default permissions does not,
+#     and `aimeat_knowledge_create` only to one that holds `memory:write`;
 #   - a connector or a node older than a tool does not have it (the two
-#     `aimeat_goal_*` tools arrived after node 4.1.2).
+#     `aimeat_goal_*` tools arrived after node 4.1.2, `aimeat_knowledge_create`
+#     after 4.3.1).
 # The 25 names above them stay required: without one of those the daemon's
 # own loop cannot work, so a missing one still stops the start with its name.
 DAEMON_TOOLS_IF_OFFERED: tuple[str, ...] = (
@@ -1633,6 +1642,7 @@ DAEMON_TOOLS_IF_OFFERED: tuple[str, ...] = (
     "aimeat_mcp_call",
     "aimeat_goal_get",
     "aimeat_goal_work",
+    "aimeat_knowledge_create",
 )
 
 

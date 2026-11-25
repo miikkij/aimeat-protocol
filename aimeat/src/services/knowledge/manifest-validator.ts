@@ -1,5 +1,5 @@
 /**
- * @file src/routes/knowledge/manifest-validator.ts
+ * @file src/services/knowledge/manifest-validator.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one compiled validator for a knowledge package manifest.
@@ -16,9 +16,11 @@
  *   compiled in two files is a schema that can be changed in one.
  * @structure validateManifest(manifest) — the AJV validator, with `.errors` after a failure
  * @usage
- *   import { validateManifest } from './manifest-validator.js';
+ *   import { validateManifest } from '../../services/knowledge/manifest-validator.js';
  *   if (!validateManifest(manifest)) { … validateManifest.errors … }
  * @version-history
+ *   2026-11-25 — Moved from src/routes/knowledge/ to src/services/knowledge/: the package import is a
+ *     service now (package-import.ts), and a service does not import a route.
  *   v1.1.0 — 2026-09-13 — allErrors off: a refusal stops at the first problem instead of walking a
  *     caller-sized tree to collect every one.
  *   v1.0.0 — 2026-09-12 — Extracted from packages-core.ts so the operator's import uses it too.

@@ -2,8 +2,8 @@
  * @file knowledge.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description MCP knowledge tools and resource registrations. Provides 4 tools for knowledge
- *   package management (list, get, contribute, links) and 1 resource template for reading
+ * @description MCP knowledge tools and resource registrations. Provides 5 tools for knowledge
+ *   package management (list, get, create, contribute, links) and 1 resource template for reading
  *   knowledge packages via the MCP resource protocol.
  * @structure
  *   - registerKnowledgeTools() — registers all knowledge tools and resources on an McpServer instance
@@ -11,6 +11,9 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-25 — aimeat_knowledge_create: creates a knowledge package through the service POST
+ *     /v1/knowledge/import calls (services/knowledge/package-import.ts). An agent could add to a
+ *     package over MCP and could not create one.
  *   2026-11-14 — aimeat_knowledge_links reads through packageLinksFor (services/knowledge/package-links.ts),
  *     as GET /v1/knowledge/:id/links does: another account's public package is found, and an agent
  *     reaches its owner's private package with memory:read-as-owner, on both (unit 2b, B15).
@@ -82,6 +85,8 @@ import { agentSessionCaller, type CallerContext } from '../services/caller-conte
 import { packageLinksFor } from '../services/knowledge/package-links.js';
 import { presentKnowledgeManifest } from '../services/toll-morsels-names.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
+import { importKnowledgePackage } from '../services/knowledge/package-import.js';
+import { toolError } from './tool-error.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -283,6 +288,31 @@ export function registerKnowledgeTools(
                     }),
                 }],
             };
+        },
+    );
+
+    // ── Tool 2b: aimeat_knowledge_create ──
+    mcp.registerTool(
+        'aimeat_knowledge_create',
+        {
+            description: descriptionFor('aimeat_knowledge_create'),
+            inputSchema: zodShapeFor('aimeat_knowledge_create'),
+            annotations: annotationsFor('aimeat_knowledge_create'),
+        },
+        async ({ package: pkg, overrides, entry_data, ai_provenance }) => {
+            // ONE implementation: the service POST /v1/knowledge/import calls
+            // (services/knowledge/package-import.ts). The package lands under the agent's own identity,
+            // as the route stores it for an agent's token, so aimeat_knowledge_contribute finds it.
+            const out = await importKnowledgePackage({ storage, config }, caller(), undefined, {
+                package: pkg, overrides, entry_data, ai_provenance,
+            });
+            if (!out.ok) {
+                const details = out.details === undefined ? '' : ` Details: ${JSON.stringify(out.details).slice(0, 800)}`;
+                const refused = toolError(out.code, `${out.message}${details}`);
+                return { content: [...refused.content], isError: true };
+            }
+            emitResourceUpdated(agentGaii, `aimeat://knowledge/${encodeURIComponent(out.packageId)}`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data) }] };
         },
     );
 

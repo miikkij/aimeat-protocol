@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.86.2 -- 2026-11-25 -- The knowledge paragraph names aimeat_knowledge_create and the other two
+ *     kinds of package.
  *   v1.86.1 -- 2026-11-25 -- The workspace read names the answer's `mode` (index, content), sends the rows
  *     of a row space to aimeat_workspace_rows_read, and says a title in the index is not a read of the
  *     document (wish-agentti-saa-nykyiset-aimeat-ohjeet-ja-tekee-sovitun-ty-n-lop, item 2).
@@ -489,8 +491,11 @@ The optional \`set_avatar\` onboarding step ticks once it can be shown. Template
 skill \`agent-avatar\` (\`aimeat_skill_get\`).
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
-\`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real
-knowledge package over ad-hoc memory keys when the output is reusable.
+\`aimeat_knowledge_get\` · \`aimeat_knowledge_create\` · \`aimeat_knowledge_contribute\` ·
+\`aimeat_knowledge_links\`. Prefer a real knowledge package over ad-hoc memory keys when the output is
+reusable: create it with \`aimeat_knowledge_create\` (all its entries in one call), then add to it with
+\`aimeat_knowledge_contribute\`. A knowledge package is not a component package (installable apps,
+\`aimeat_package_*\`) and not a data package (a published table, \`aimeat_datapackage_*\`).
 
 **Capabilities (use, don't publish).** \`aimeat_capabilities_list\` · \`aimeat_capabilities_get\`
 (read the input schema first) · \`aimeat_capabilities_invoke\`.

@@ -9,10 +9,12 @@
  * @structure datapackageSellTools
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-11-25 — The description ends with DATA_PACKAGE_KIND (./package-kinds.ts).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.2).
  */
 import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
+import { DATA_PACKAGE_KIND } from './package-kinds.js';
 
 export const datapackageSellTools = [
     {
@@ -23,7 +25,7 @@ export const datapackageSellTools = [
             + 'toll_morsels is pacing per read, never a price: describe it as "N morsels of pacing per read". usage_terms (derivatives, resale, attribution, note) are required. '
             + 'The listing is projected from these terms at once, and the answer says what listed or why it was skipped. A buyer with an account accepts it with aimeat_exchange_accept; a buyer with no account buys at POST /v1/exchange/offerings/{id}/buy and gets a key. '
             + 'A contract signed earlier keeps its price and the package versions of the schemas it was signed on. A package whose audience already admits a reader is read free by it, so sell a package that is private or shared narrower than its buyers. '
-            + 'On a node that runs no data intermediation service a new listing is refused with DATA_INTERMEDIATION_NOT_OFFERED; tell the person and offer a named share instead (aimeat_party). Needs exchange:write.',
+            + 'On a node that runs no data intermediation service a new listing is refused with DATA_INTERMEDIATION_NOT_OFFERED; tell the person and offer a named share instead (aimeat_party). Needs exchange:write.' + DATA_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Sell Data Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -6,6 +6,7 @@
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-25 — The manifest validator is imported from services/knowledge/manifest-validator.ts.
  *   v1.7.1 — 2026-10-27 — GET /v1/knowledge/:id/reviews answers a caller who is not the operator only
  *     when the caller's account holds the oldest copy of the package's manifest key: another account's
  *     record written at the same key read the operator's review (secaudit2026oct26,
@@ -46,7 +47,7 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { firstPackageCopy, type KnowledgeHelpers } from './helpers.js';
-import { validateManifest } from './manifest-validator.js';
+import { validateManifest } from '../../services/knowledge/manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge/overview.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { isOperatorCaller } from '../../services/operator/override.js';

@@ -38,6 +38,8 @@ from aimeat_crewai import daemon as daemon_module
 FIVE = ("aimeat_discover", "aimeat_invoke", "aimeat_mcp_list", "aimeat_mcp_tools", "aimeat_mcp_call")
 # 0.38.0: a goal's work is read and handed on with these two, which a node before them does not offer.
 GOALS = ("aimeat_goal_get", "aimeat_goal_work")
+# 2026-11-25: a new knowledge package, offered by a node after 4.3.1 to an agent holding memory:write.
+KNOWLEDGE = ("aimeat_knowledge_create",)
 REQUIRED = tuple(n for n in DAEMON_DEFAULT_TOOL_FILTER if n not in DAEMON_TOOLS_IF_OFFERED)
 
 
@@ -50,10 +52,10 @@ def names_of(tools: list[SimpleNamespace]) -> set[str]:
 
 
 def test_the_default_list_names_the_five_and_keeps_its_25() -> None:
-    assert set(FIVE) | set(GOALS) <= set(DAEMON_DEFAULT_TOOL_FILTER)
-    assert set(DAEMON_TOOLS_IF_OFFERED) == set(FIVE) | set(GOALS)
+    assert set(FIVE) | set(GOALS) | set(KNOWLEDGE) <= set(DAEMON_DEFAULT_TOOL_FILTER)
+    assert set(DAEMON_TOOLS_IF_OFFERED) == set(FIVE) | set(GOALS) | set(KNOWLEDGE)
     assert len(REQUIRED) == 25
-    assert len(DAEMON_DEFAULT_TOOL_FILTER) == len(set(DAEMON_DEFAULT_TOOL_FILTER)) == 32
+    assert len(DAEMON_DEFAULT_TOOL_FILTER) == len(set(DAEMON_DEFAULT_TOOL_FILTER)) == 33
 
 
 def test_a_node_without_goals_starts_without_the_goal_tools() -> None:
@@ -64,7 +66,7 @@ def test_a_node_without_goals_starts_without_the_goal_tools() -> None:
     assert left_out == ["aimeat_goal_get", "aimeat_goal_work"]
 
 
-def test_a_connector_that_offers_everything_loads_all_32() -> None:
+def test_a_connector_that_offers_everything_loads_all_33() -> None:
     server = offered(*DAEMON_DEFAULT_TOOL_FILTER, "aimeat_wallet_balance", "aimeat_board_post")
     tools, left_out = select_liaison_tools(server, DAEMON_DEFAULT_TOOL_FILTER, DAEMON_TOOLS_IF_OFFERED)
     assert names_of(tools) == set(DAEMON_DEFAULT_TOOL_FILTER)
@@ -73,15 +75,15 @@ def test_a_connector_that_offers_everything_loads_all_32() -> None:
 
 def test_a_connector_on_the_agent_surface_starts_without_invoke_and_the_mcp_tools() -> None:
     # `aimeat connect serve --surface agent`: the 25, aimeat_discover and the goal tools are on it, the other four are not.
-    server = offered(*REQUIRED, "aimeat_discover", *GOALS)
+    server = offered(*REQUIRED, "aimeat_discover", *GOALS, *KNOWLEDGE)
     tools, left_out = select_liaison_tools(server, DAEMON_DEFAULT_TOOL_FILTER, DAEMON_TOOLS_IF_OFFERED)
-    assert names_of(tools) == set(REQUIRED) | {"aimeat_discover"} | set(GOALS)
+    assert names_of(tools) == set(REQUIRED) | {"aimeat_discover"} | set(GOALS) | set(KNOWLEDGE)
     assert left_out == ["aimeat_invoke", "aimeat_mcp_call", "aimeat_mcp_list", "aimeat_mcp_tools"]
 
 
 def test_a_session_without_the_mcp_permissions_starts_without_the_mcp_tools() -> None:
     # A node's own MCP registers aimeat_mcp_* only for a session that holds mcp:read / mcp:use.
-    server = offered(*REQUIRED, "aimeat_discover", "aimeat_invoke", *GOALS)
+    server = offered(*REQUIRED, "aimeat_discover", "aimeat_invoke", *GOALS, *KNOWLEDGE)
     tools, left_out = select_liaison_tools(server, DAEMON_DEFAULT_TOOL_FILTER, DAEMON_TOOLS_IF_OFFERED)
     assert {"aimeat_discover", "aimeat_invoke"} <= names_of(tools)
     assert left_out == ["aimeat_mcp_call", "aimeat_mcp_list", "aimeat_mcp_tools"]

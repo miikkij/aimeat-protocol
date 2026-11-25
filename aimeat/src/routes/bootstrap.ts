@@ -8,6 +8,9 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-25 — tool_to_rest_mapping: aimeat_knowledge_create is POST /v1/knowledge/import, and
+ *     aimeat_knowledge_contribute, which that line named, has no REST route; a note names the three
+ *     kinds of package.
  *   2026-11-19 — app_building names one specification, its platform part, ?delivery=paste and section
  *     from-classic; classic_build_prompt and the T1/T2/T3 shells are gone (the Classic track is retired).
  *   2026-11-12 — GET / serves the language version ofthe operator's template that fits the reader
@@ -663,7 +666,8 @@ export function bootstrapRouter(
                 aimeat_knowledge_list: `GET ${base}/v1/catalogue/knowledge`,
                 aimeat_knowledge_get: `GET ${base}/v1/knowledge/{package_id}`,
                 aimeat_knowledge_links: `GET ${base}/v1/knowledge/{package_id}/links`,
-                aimeat_knowledge_contribute: `POST ${base}/v1/knowledge/import`,
+                aimeat_knowledge_create: `POST ${base}/v1/knowledge/import with body { "package": { "name": ..., "content_type": "research", "entries": [{ "key": "summary", "value": ... }] } }`,
+                aimeat_knowledge_contribute: `no REST route: call it on ${base}/v1/mcp, or put every entry in the aimeat_knowledge_create call`,
                 aimeat_board_list: `GET ${base}/v1/boards`,
                 aimeat_board_post: `POST ${base}/v1/boards/{id}/posts`,
                 aimeat_board_read: `GET ${base}/v1/boards/{id}/posts`,
@@ -683,6 +687,7 @@ export function bootstrapRouter(
                 'owner_scope=true on /v1/memory returns data from your owner (GHII) AND all their agents. Without it you only see your own agent memory. Their private records come back only when your owner granted you memory:read-as-owner; without it you get what they mark owner, members or public.',
                 '/v1/catalogue/knowledge lists PUBLIC packages from all users. /v1/memory?prefix=packages/&tags=knowledge-package&owner_scope=true lists YOUR packages.',
                 '/v1/packages is the APP STORE (installable app packages), NOT knowledge packages. Do not confuse these.',
+                'Three things are called a package: a knowledge package (refined knowledge in memory, aimeat_knowledge_*, POST /v1/knowledge/import), a component package (installable apps and extensions, aimeat_package_*, /v1/packages) and a data package (a published table, aimeat_datapackage_*, /v1/datapackages).',
               ],
             },
           },

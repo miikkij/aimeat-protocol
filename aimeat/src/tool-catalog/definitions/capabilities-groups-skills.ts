@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-25 — The knowledge package tools moved to ./knowledge.ts (max-file-lines), spread in place;
+ *     aimeat_knowledge_create joins them there.
  *   2026-11-21 — aimeat_appdev_pitfall_report's category says a word outside the list files under the
  *     nearest category with a warning, instead of being refused.
  *   2026-11-21 — aimeat_skill_publish's visibility names the public default of a new skill bound to an app.
@@ -86,6 +88,7 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 import { organismAudienceInput } from '../input-schemas.js';
 import { CAPABILITY_RECORD_INPUT } from './capability-record-input.js';
+import { knowledgeTools } from './knowledge.js';
 
 export const capabilitiesGroupsSkillsTools = [
     {
@@ -523,61 +526,8 @@ export const capabilitiesGroupsSkillsTools = [
         scope: 'wallet:read',
         input: { instance_id: { type: 'string', required: true, description: 'Instance identifier.' } },
     },
-    {
-        name: 'aimeat_knowledge_list',
-        description: 'List knowledge packages owned across your scope (your GHII and same-owner agents) — curated memory collections under "packages/", each with name, content type, tags, and entry count. Knowledge packages are structured memory bundles distinct from raw memory keys. Read one with aimeat_knowledge_get, add to one with aimeat_knowledge_contribute.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        annotations: { title: 'List Knowledge Packages', readOnlyHint: true },
-        // Package manifests and entries are memory records: read with the word aimeat_memory_read asks
-        // (secaudit 2026-10, v56). The resource aimeat://knowledge/{id} takes aimeat_knowledge_get's.
-        scope: 'memory:read',
-        surfaces: ['agent', 'service'],
-        input: {},
-    },
-    {
-        name: 'aimeat_knowledge_get',
-        description: 'Get a knowledge package by id: its manifest plus every entry with the entry values inlined. Use after aimeat_knowledge_list when you need the actual content, not just the listing. To see relationships to other packages use aimeat_knowledge_links.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        annotations: { title: 'Read Knowledge Package', readOnlyHint: true },
-        scope: 'memory:read',
-        surfaces: ['agent', 'service'],
-        input: { package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' } },
-    },
-    {
-        name: 'aimeat_knowledge_contribute',
-        description: 'Add or update an entry in an existing knowledge package: pass the package id, a short entry key, and content (JSON is parsed if valid, otherwise stored as text). Bumps the entry version and registers it in the package manifest if new. The package must already exist (it is not created here). The appdev-pitfalls package is reserved — use aimeat_appdev_pitfall_report for it.' + AI_PROVENANCE_TOOL_NOTE,
-        caller: 'agent',
-        visibility: agentEverywhere,
-        annotations: { title: 'Contribute to Knowledge Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        // These write memory records underneath, whatever the tool is called: a workspace
-        // document, a skill manifest, a schedule report, a knowledge contribution.
-        scope: 'memory:write',
-        surfaces: ['agent', 'service'],
-        input: {
-            ...aiProvenanceCatalogInput,
-            package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
-            entry_key: { type: 'string', required: true, description: 'Entry key.' },
-            content: { type: 'string', required: true, description: 'Entry content.' },
-            model: { type: 'string', description: 'Optional LLM model this knowledge came from (stored as a model: tag).', zod: z.string().max(64) },
-        },
-    },
-    {
-        name: 'aimeat_knowledge_links',
-        description: 'List the relationship links of a knowledge package (incoming, outgoing, or both) — each a source/target/relation describing how packages connect. Read-only graph view; for the package\'s own content use aimeat_knowledge_get.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        annotations: { title: 'Get Knowledge Links', readOnlyHint: true },
-        scope: 'memory:read',
-        surfaces: ['agent', 'service'],
-        input: {
-            package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
-            direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'], description: 'Link direction (default: both).' },
-            // As GET /v1/knowledge/:id/links reads it (unit 3b).
-            relation: { type: 'string', description: 'List only the links of this relation: related-to, extends, derived-from, contradicts, supersedes or references.', zod: z.string().max(INPUT_LIMITS.name) },
-        },
-    },
+    // The knowledge package tools: ./knowledge.ts, spread where they stood so the catalog keeps its order.
+    ...knowledgeTools,
     {
         name: 'aimeat_appdev_overview',
         description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, the Atelier shells and genres a build starts from, loadable skills (node:aimeat-app-builder-atelier first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',

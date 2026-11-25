@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-25 -- aimeat_knowledge_create: a proxy over POST /v1/knowledge/import (package, overrides,
+ *     entry_data, ai_provenance), so a fleet agent creates a knowledge package over the connector too.
  *   2026-11-15 -- aimeat_action_execute forwards input as given, so the route refuses one that is not a
  *     JSON object with a message naming the field; it was dropped in silence.
  *   2026-11-13 -- aimeat_knowledge_links forwards relation (unit 3b).
@@ -77,7 +79,7 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord, withProvenanceFields } from './tool-call-helpers.js';
 import { dataMapCliTools } from './tool-call-defs-data-map.js';
 import { memoryWriteMode } from '../utils/memory-write-mode.js';
 import type { ApiResponse } from './api-client.js';
@@ -105,7 +107,8 @@ function copyCapabilityRecordFields(input: JsonObject, body: JsonObject): void {
  */
 export const KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE =
     ' CONNECTOR LIMIT: this write has no HTTP route, so calling it here refuses and tells you where to '
-    + 'run it instead. The knowledge read tools (list, get, links) work normally.';
+    + 'run it instead. The knowledge read tools (list, get, links) work normally, and so does '
+    + 'aimeat_knowledge_create, which takes every entry of a new package in one call.';
 
 /**
  * Adding an entry to a knowledge package, from a connector that speaks HTTP and nothing else.
@@ -131,7 +134,8 @@ export function knowledgeContributeUnreachable(): ApiResponse {
                 + 'and the connector only speaks HTTP. POST /v1/knowledge/{id}/contribute is a different '
                 + 'capability: it shares a whole package with an organism and requires organism_id. '
                 + 'Run aimeat_knowledge_contribute against the node MCP endpoint ({node_url}/v1/mcp) to '
-                + 'add the entry, or write the entry record yourself with aimeat_memory_write under '
+                + 'add the entry; for a new package, aimeat_knowledge_create works here and takes every '
+                + 'entry in one call. Or write the entry record yourself with aimeat_memory_write under '
                 + 'packages/{package_id}/{entry_key}, which stores the content but leaves the package '
                 + 'manifest without an index line for it.',
         },
@@ -815,6 +819,16 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_knowledge_get',
         handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}`),
+    },
+    {
+        // A proxy over POST /v1/knowledge/import: the route normalises the package, checks it and
+        // records the declaration (services/knowledge/package-import.ts). Nothing is decided here.
+        name: 'aimeat_knowledge_create',
+        handler: ({ client }, input) => client.post('/v1/knowledge/import', withProvenanceFields({
+            package: requiredRecord(input, 'package'),
+            ...(optionalRecord(input, 'overrides') ? { overrides: optionalRecord(input, 'overrides') } : {}),
+            ...(optionalRecord(input, 'entry_data') ? { entry_data: optionalRecord(input, 'entry_data') } : {}),
+        }, input)),
     },
     {
         // No HTTP door for the entry write on this node. See knowledgeContributeUnreachable() above:

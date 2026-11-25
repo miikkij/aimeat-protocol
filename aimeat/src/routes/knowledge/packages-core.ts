@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-25 — POST /v1/knowledge/import calls services/knowledge/package-import.ts, where its work
+ *     moved unchanged, so the MCP tool aimeat_knowledge_create creates a package the same way.
  *   2026-11-21 — POST /v1/knowledge/import: each entry gets its content risk marks at the intake point.
  *   2026-11-14 — GET /v1/knowledge/:id/links reads through packageLinksFor (services/knowledge/package-links.ts),
  *     which aimeat_knowledge_links asks too: an agent holding memory:read-as-owner reaches its owner's
@@ -65,39 +67,23 @@
  *     directly, past the provenance:write gate, and stamped no entry (aiprov E10).
  */
 import type { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, KnowledgeManifest, MemoryLinkRecord, MemoryRecord } from '../../storage/interface.js';
-import { checkAudienceWrite } from '../../services/audience-write.js';
-import {
-  KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, packageAudienceOf, manifestRecordVisibility, entryRecordVisibility,
-} from '../../services/knowledge/audience.js';
+import type { Storage, KnowledgeManifest, MemoryLinkRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
-import { validateManifest } from './manifest-validator.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../../services/ai/provenance.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
-import { memoryContentBytes } from '../../utils/memory-content.js';
-import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
-import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge/publish-ask.js';
-import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
+import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 import { callerOf } from '../../middleware/caller.js';
 import { packageLinksFor } from '../../services/knowledge/package-links.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
-import { contentRiskAfterWrite } from '../../services/content/risk-intake.js';
-
-// The validator is shared with the operator's import, which used to write a manifest nothing
-// checked. → ./manifest-validator.ts
+import { importKnowledgePackage } from '../../services/knowledge/package-import.js';
 
 export function registerPackagesCoreRoutes(
   router: Router,
@@ -109,304 +95,19 @@ export function registerPackagesCoreRoutes(
 
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
   // The package is stored under packages/<id>/ and may be listed in the catalogue, outside the
-  // anonymous.* namespace, so the shared anonymous principal does not import one.
+  // anonymous.* namespace, so the shared anonymous principal does not import one. The work is
+  // services/knowledge/package-import.ts, which the MCP tool aimeat_knowledge_create calls too.
   router.post('/v1/knowledge/import', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req, res) => {
-    const ownerGaii = resolve(req);
-    const ghii = req.auth!.owner as string;
-    const { package: pkg, overrides } = req.body;
-
-    if (!pkg || typeof pkg !== 'object') {
-      res.status(400).json(error(config.nodeId, 'INVALID_PACKAGE', 'Request body must include a "package" object'));
+    const out = await importKnowledgePackage({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, req.body ?? {});
+    if (!out.ok) {
+      // `details` is the FIFTH argument; the fourth is httpStatus (v1.3.0 above).
+      res.status(out.status).json(error(config.nodeId, out.code, out.message, undefined, out.details));
       return;
     }
-
-    // Normalize AI chat output format → strict manifest format
-    if (!pkg.type && pkg.aimeat_knowledge_package) pkg.type = 'knowledge-package';
-    if (!pkg.type) pkg.type = 'knowledge-package';
-    if (!pkg.name && pkg.title) pkg.name = pkg.title;
-    if (!pkg.name && pkg.id) pkg.name = pkg.id;
-    if (!pkg.version) pkg.version = '1.0.0';
-    if (!pkg.author) pkg.author = ghii;
-    if (!pkg.synthesis) {
-      pkg.synthesis = { level: 'original', description: 'Imported from AI chat' };
-    }
-    if (!pkg.sharing) {
-      const catalogListed = overrides?.catalog_listed ?? false;
-      pkg.sharing = {
-        catalog_listed: catalogListed,
-        allow_clone: catalogListed,
-        toll_morsels: 0,
-      };
-    }
-    // The pacing amount is sharing.toll_morsels; the 3.x name morsel_price is taken with the
-    // Deprecation headers, counted, and stored under the new name. Two names that disagree are 400.
-    const sharing = normalizeKnowledgeSharing(pkg.sharing);
-    if (!sharing.ok) {
-      res.status(sharing.status).json(error(config.nodeId, sharing.code, sharing.message));
-      return;
-    }
-    pkg.sharing = sharing.value;
-    if (!pkg.tags) pkg.tags = [];
-    if (!pkg.language) pkg.language = 'en';
-    // Normalize entries: ensure each has title, default visibility
-    if (Array.isArray(pkg.entries)) {
-      for (const entry of pkg.entries) {
-        if (!entry.title) entry.title = entry.key || 'Untitled';
-        if (!entry.visibility) entry.visibility = 'private';
-        // Normalize 'shared' → 'owner' (memory layer doesn't have shared; prompt may produce it)
-        if (entry.visibility === 'shared') entry.visibility = 'owner';
-      }
-    }
-
-    // An entry override may name an audience too; it is applied before the checks below.
-    if (overrides?.entries && Array.isArray(pkg.entries)) {
-      for (const entry of pkg.entries) {
-        const entryOverride = overrides.entries[String(entry.key ?? '').split('/').pop() ?? ''];
-        if (entryOverride?.visibility) entry.visibility = entryOverride.visibility;
-      }
-    }
-    // An import names no group, so an entry at 'group' would open to nobody but its owner. Private keeps
-    // the entry with the same reader, and PATCH .../entries/{key}/visibility shares it with a group.
-    if (Array.isArray(pkg.entries)) {
-      for (const entry of pkg.entries) if (entry.visibility === 'group') entry.visibility = 'private';
-    }
-
-    // Validate manifest structure
-    const manifest = pkg as KnowledgeManifest;
-    if (!validateManifest(manifest)) {
-      // `details` is the FIFTH argument; the fourth is httpStatus. The AJV errors went into the
-      // status slot for as long as this call has existed, and the untyped require() hid it — so a
-      // message promising "the details below" carried none. Sharing the typed validator is what
-      // surfaced it.
-      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION',
-        'The description file for this package has something wrong in it. The details below say which part.',
-        undefined, validateManifest.errors));
-      return;
-    }
-
-    const packageId = uuidv4();
-    const now = new Date().toISOString();
-    const manifestKey = `packages/${packageId}/manifest`;
-
-    // Entry overrides were applied before the validation above, so an override passes the schema too.
-    if (overrides?.catalog_listed !== undefined) {
-      manifest.sharing.catalog_listed = overrides.catalog_listed;
-      // If catalog_listed is enabled and allow_clone wasn't explicitly set, enable cloning
-      if (overrides.catalog_listed && !manifest.sharing.allow_clone) {
-        manifest.sharing.allow_clone = true;
-      }
-    }
-
-    // sharing.audience 'public' is the catalogue, so it lists the package; any other audience on a
-    // listed package is a contradiction, refused as PATCH /v1/knowledge/:id/sharing refuses it.
-    if (manifest.sharing.audience === 'public') manifest.sharing.catalog_listed = true;
-    else if (manifest.sharing.audience !== undefined && manifest.sharing.catalog_listed) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'catalog_listed is true exactly when the audience is public; send one of the two.'));
-      return;
-    }
-
-    // An audience that names an organism is refused before anything is written when the writer is
-    // not in it: the package's own, and each entry's (services/audience-write.ts, plan V3.6).
-    const named = [
-      ...(manifest.sharing.audience !== undefined && !manifest.sharing.catalog_listed ? [manifest.sharing.audience] : []),
-      ...manifest.entries.map(e => e.visibility).filter(v => v.startsWith('organism:')),
-    ];
-    for (const value of named) {
-      const checked = await checkAudienceWrite(storage, value, req.auth, KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING);
-      if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
-    }
-
-    // A node that shows its content to signed-in accounts only stores a listed package and its public
-    // entries at 'members' instead, and says so (services/closed-node-level.ts, plan V1.6). Before the
-    // gate, so a lowered package asks nothing.
-    const pkgClosed = closedNodeLevel(config, manifest.sharing.catalog_listed === true ? 'public' : undefined, 'members' as const);
-    let closedWarning = pkgClosed.warning;
-    if (pkgClosed.warning) {
-      manifest.sharing.catalog_listed = false;
-      manifest.sharing.audience = 'members';
-    }
-    for (const e of manifest.entries) {
-      const entryClosed = closedNodeLevel(config, e.visibility, 'members' as const);
-      if (entryClosed.warning) { e.visibility = entryClosed.level; closedWarning = entryClosed.warning; }
-    }
-
-    // A listed package or a public entry asks the node's publish gate before anything is stored (plan
-    // doc-mvcn6c7e4e5q, V4). On an ask the package is stored unlisted with its author and those
-    // entries private, and one request naming them is filed after the write.
-    const listed = manifest.sharing.catalog_listed === true;
-    const keptEntries = manifest.entries.filter(e => e.visibility === 'public');
-    const publishAsk = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, listed || keptEntries.length > 0);
-    if (publishAsk.kind === 'refused') {
-      res.status(publishAsk.status).json(error(config.nodeId, publishAsk.code, publishAsk.message));
-      return;
-    }
-    if (publishAsk.kind === 'ask') {
-      manifest.sharing.catalog_listed = false;
-      if (manifest.sharing.audience === 'public') manifest.sharing.audience = 'owner';
-      for (const e of keptEntries) e.visibility = 'private';
-    }
-
-    // Resolve entry data — can be in req.body.entry_data, pkg.entry_data,
-    // or directly on each entry's .value field (AI chat output format)
-    const entryData: Record<string, unknown> = req.body.entry_data ?? pkg.entry_data ?? {};
-    // Extract inline values from entries into entryData
-    for (const entry of manifest.entries) {
-      if ((entry as { value?: unknown }).value !== undefined) {
-        const entryName = entry.key.split('/').pop() ?? entry.key;
-        if (!entryData[entry.key] && !entryData[entryName]) {
-          entryData[entryName] = (entry as { value?: unknown }).value;
-        }
-      }
-    }
-
-    // Normalize entry keys to full path BEFORE storing manifest
-    for (const entry of manifest.entries) {
-      if (!entry.key.startsWith('packages/')) {
-        entry.key = `packages/${packageId}/${entry.key}`;
-      }
-    }
-
-    // Store manifest (with normalized entry keys)
-    manifest.created = now;
-    manifest.updated = now;
-
-    // TARGET-058, through THE write decision (provenanceForWrite) since 2026-10-08 (aiprov E10). It
-    // called mintProvenance directly, which skipped the provenance:write gate, gave an agent's
-    // undeclared package no stamp, stamped none of the entries, and took no declaration.
-    //   - `ai_provenance` in the body is the caller's own statement, and a declaration the caller
-    //     may not make is refused before anything is stored.
-    //   - `synthesis.level` is the SAME vocabulary as the record's `level` (the record borrowed it
-    //     from here), so a package saying anything other than `original` states AI involvement. It is
-    //     honoured as a declaration by a caller who may declare; for an agent that may not, the
-    //     node's own stamp (model-written, no review) says the same without taking its word.
-    //   - `humanInvolvement` defaults to `none`: the manifest has no field for review, so nobody has
-    //     told us a person read the substance (decision D4).
-    // The manifest and every entry get their own record, because each is a different set of bytes.
-    const principal = ownerGaii;
-    const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
-    if (!declaration.ok) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The ai_provenance block does not parse.', 400, { violations: declaration.violations }));
-      return;
-    }
-    const explicitRefusal = await provenanceDeclarationRefusal(storage, {
-      principal, declared: declaration.declared, enabled: config.aiProvenance, scopes: req.auth!.scopes,
-    });
-    if (explicitRefusal) { res.status(403).json(error(config.nodeId, explicitRefusal.code, explicitRefusal.message)); return; }
-    let declared: DeclaredProvenance | undefined = declaration.declared;
-    if (!declared && manifest.synthesis && manifest.synthesis.level !== 'original') {
-      const fromSynthesis: DeclaredProvenance = {
-        level: manifest.synthesis.level,
-        ...(manifest.synthesis.model ? { model: manifest.synthesis.model } : {}),
-        ...(manifest.synthesis.description ? { notes: manifest.synthesis.description } : {}),
-      };
-      const mayNot = await provenanceDeclarationRefusal(storage, { principal, declared: fromSynthesis, enabled: config.aiProvenance, scopes: req.auth!.scopes });
-      if (!mayNot) declared = fromSynthesis;
-    }
-    const recordFor = (content: unknown, visibility: MemoryRecord['visibility']) => provenanceForWrite(storage, {
-      principal, scopes: req.auth!.scopes, content: memoryContentBytes(content), declared,
-      pipeline: 'knowledge.import', surface: { visibility, humanAudience: true },
-      labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance,
-    });
-    const aiProvenanceId = await recordFor(manifest, manifestRecordVisibility(manifest));
-
-    await storage.setMemory({
-      key: manifestKey,
-      ownerGaii,
-      value: manifest,
-      visibility: manifestRecordVisibility(manifest),
-      tags: ['knowledge-package', manifest.content_type, ...manifest.tags],
-      ttlHours: null,
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-      ...(aiProvenanceId ? { aiProvenanceId } : {}),
-    });
-
-    // Store entries with their content
-    const createdEntries: string[] = [];
-    for (const entry of manifest.entries) {
-      const shortKey = entry.key.split('/').pop() ?? '';
-      const data = entryData[entry.key] ?? entryData[shortKey] ?? {};
-      // Each entry's own record: the package's declaration about these bytes, or the stamp.
-      const entryProvenanceId = await recordFor(data, entryRecordVisibility(entry.visibility));
-      await storage.setMemory({
-        key: entry.key,
-        ownerGaii,
-        value: data,
-        visibility: entryRecordVisibility(entry.visibility),
-        tags: ['knowledge-entry', manifest.content_type, ...manifest.tags],
-        ttlHours: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-        ...(entryProvenanceId ? { aiProvenanceId: entryProvenanceId } : {}),
-      });
-      createdEntries.push(entry.key);
-      // An imported package is content from outside: each entry's risk marks are written beside it.
-      contentRiskAfterWrite({ storage, config }, { kind: 'memory', owner: ownerGaii, key: entry.key }, { point: 'intake' });
-    }
-
-    // Create memory links if specified: rows of the namespace that holds the manifest just written,
-    // contributed by the caller's account in its full identity (secaudit 2026-10, v78 and v79).
-    const linkedBy = callerOf(req, config.nodeId, storage).ownerGhii;
-    for (const link of manifest.links ?? []) {
-      await storage.createLink({
-        source: manifestKey,
-        target: link.target,
-        relation: link.relation,
-        description: link.description,
-        linked_at: link.linked_at || now,
-        linked_by: linkedBy,
-      }, ownerGaii);
-    }
-
-    // Create organism consent grant if requested
-    if (overrides?.organism_share) {
-      await storage.createConsent({
-        id: uuidv4(),
-        ownerGaii,
-        dataPattern: `packages/${packageId}/*`,
-        recipient: `organism.${overrides.organism_share}`,
-        purpose: 'Knowledge package shared with organism',
-        scope: 'local',
-        expires: null,
-        status: 'active',
-        grantedAt: now,
-        revokedAt: null,
-      });
-    }
-
-    // The request the publish gate asked for, now that the package it names exists.
-    const asked = publishAsk.kind === 'ask'
-      ? await fileKnowledgeAsk({ storage, config }, ghii, publishAsk.requester, {
-        ownerGaii, packageId, name: String(manifest.name ?? packageId),
-        field: listed ? 'audience' : 'entries', from: listed ? packageAudienceOf(manifest) : 'private',
-        entries: keptEntries.map(e => e.key),
-      })
-      : closedNodeWarnings(closedWarning);
-
-    res.status(asked.publish_request ? 202 : 201).json(success(config.nodeId, {
-      package_id: packageId,
-      manifest_key: manifestKey,
-      entries_created: createdEntries.length,
-      catalog_listed: manifest.sharing.catalog_listed,
-      audience: packageAudienceOf(manifest),
-      ...asked,
-    }, [
-      { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(manifestKey)}` },
+    res.status(out.status).json(success(config.nodeId, out.data, [
+      { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(out.manifestKey)}` },
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },
     ]));
-    emitChange('knowledge');
-    // Public landing feed — only when the package opts into the public catalogue.
-    if (manifest.sharing.catalog_listed) {
-      void recordPublicActivity(storage, config, {
-        category: 'agents',
-        actor: ghii,
-        summary: `Knowledge package "${manifest.name}" published`,
-        detail: manifest.synthesis?.description || '',
-        link: `/v1/knowledge/${packageId}`,
-      }).catch(err => { logger.warn('POST /v1/knowledge/import: feed is best-effort', { error: String(err) }); });
-    }
   });
 
   /* ── GET /v1/knowledge/:id — Get package manifest ── */

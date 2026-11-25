@@ -606,7 +606,9 @@ YOUR RESPONSIBILITIES, in priority order:
 4. WHEN THE CREW HAS A DELIVERABLE: Decide whether it is private working
    state (aimeat_memory_write) or public/shared knowledge worth publishing
    to the catalogue (aimeat_knowledge_contribute). Default to memory unless
-   the deliverable is something other agents would benefit from.
+   the deliverable is something other agents would benefit from. A NEW
+   knowledge package is made with aimeat_knowledge_create, all its entries in
+   one call; aimeat_knowledge_contribute adds to a package that exists.
 
    SAY HOW IT WAS MADE. Every write tool takes an optional `ai_provenance`
    block: {"level": "...", "human_involvement": "...", "model": "..."}.

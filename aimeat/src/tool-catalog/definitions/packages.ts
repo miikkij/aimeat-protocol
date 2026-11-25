@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-11-25 — Every description ends with COMPONENT_PACKAGE_KIND (./package-kinds.ts): which of the
+ *     three packages this is, and where the knowledge and data packages are.
  *   2026-11-20 — `apps` are app names without `.html`; file names work too (services/app/app-ref.ts).
  *   2026-11-13 — aimeat_package_list takes category, as GET /v1/packages does (unit 3b).
  *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
@@ -63,6 +65,7 @@
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
+import { COMPONENT_PACKAGE_KIND } from './package-kinds.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 import { INPUT_LIMITS, documentText } from '../../models/input-limits.js';
 
@@ -79,7 +82,7 @@ export const PACKAGE_CONFIG_PARAM = 'Each part\'s config, keyed by component id:
 export const packagesTools = [
     {
         name: 'aimeat_package_list',
-        description: 'List component packages on this node. These are NOT the single-file web apps — for those use aimeat_app_list.',
+        description: 'List component packages on this node. These are NOT the single-file web apps — for those use aimeat_app_list.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Component packages (/v1/packages). A different thing from an app, and named so since
@@ -107,7 +110,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_get',
-        description: 'Get one component package by its group id.',
+        description: 'Get one component package by its group id.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Package', readOnlyHint: true },
@@ -116,7 +119,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_versions',
-        description: "List one component package's version history.",
+        description: "List one component package's version history." + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: connectorOnly,
         annotations: { title: 'List Package Versions', readOnlyHint: true },
@@ -124,7 +127,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_delete',
-        description: 'Archive one version of a component package.',
+        description: 'Archive one version of a component package.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: connectorOnly,
         annotations: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -136,7 +139,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_publish',
-        description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together. When the node asks the owner before making something public, a package asked public is created private and the answer contains publish_request, with the address to give the owner.',
+        description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together. When the node asks the owner before making something public, a package asked public is created private and the answer contains publish_request, with the address to give the owner.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: connectorOnly,
         annotations: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -166,7 +169,7 @@ export const packagesTools = [
         // getting the dependency order right, which is why the only packages on a node were the ones
         // it seeds itself. The node already knows what each app loads, so the caller names apps.
         name: 'aimeat_package_compose',
-        description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself. When the node asks the owner before making something public, a new package asked public is created private and the answer contains publish_request, with the address to give the owner.',
+        description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself. When the node asks the owner before making something public, a new package asked public is created private and the answer contains publish_request, with the address to give the owner.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Not idempotent: composing twice under one name is refused as a conflict, and composing under
@@ -191,7 +194,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_compose_set',
-        description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks contain, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. When the node asks the owner before making something public, the new packages of a set asked public are created private and the answer contains publish_request (and publish_requests, one per package). The same as POST /v1/packages/compose-set.',
+        description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks contain, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. When the node asks the owner before making something public, the new packages of a set asked public are created private and the answer contains publish_request (and publish_requests, one per package). The same as POST /v1/packages/compose-set.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Compose a Set to Sell', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -222,7 +225,7 @@ export const packagesTools = [
         // could author a package and then neither see it (the list and get doors read published) nor
         // install it (install refuses anything else).
         name: 'aimeat_package_status_set',
-        description: 'Move one package version between draft, published, beta and archived. Only the author may. A beta version is served only to the customer nodes whose entitlement follows the beta channel (aimeat_package_entitlements).',
+        description: 'Move one package version between draft, published, beta and archived. Only the author may. A beta version is served only to the customer nodes whose entitlement follows the beta channel (aimeat_package_entitlements).' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Not destructive: it changes who may reach a version, never its bytes, and archiving is
@@ -238,7 +241,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_withdraw',
-        description: 'Withdraw a bad version of your package, with a reason. Nothing serves it again: not an install, not a pull, not a repository\'s customers. Every installed copy of it is told once and its extensions are switched off; on another node that happens at that node\'s daily check. Apps and records stay as they are. It cannot be undone: publish a fixed version, which managed copies receive as an ordinary update. The package\'s author, or an operator. The same as POST /v1/packages/:groupId/versions/:version/withdraw.',
+        description: 'Withdraw a bad version of your package, with a reason. Nothing serves it again: not an install, not a pull, not a repository\'s customers. Every installed copy of it is told once and its extensions are switched off; on another node that happens at that node\'s daily check. Apps and records stay as they are. It cannot be undone: publish a fixed version, which managed copies receive as an ordinary update. The package\'s author, or an operator. The same as POST /v1/packages/:groupId/versions/:version/withdraw.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Withdraw a Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
@@ -255,7 +258,7 @@ export const packagesTools = [
         // "install that one from over there" and "bring me the newer one": a source that has nothing
         // newer answers applied:false rather than an error.
         name: 'aimeat_package_pull',
-        description: 'Bring a package published on another node onto this one, verifying that node\'s signature and every component digest before anything is written.',
+        description: 'Bring a package published on another node onto this one, verifying that node\'s signature and every component digest before anything is written.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // openWorld: it reaches another node over the network, which is the one package tool that does.
@@ -276,7 +279,7 @@ export const packagesTools = [
         // exists and is what a component the owner EDITED goes through; this one moves everything
         // that can move safely and names the rest.
         name: 'aimeat_package_update',
-        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten. A new version that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves (status awaiting_owner).',
+        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten. A new version that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves (status awaiting_owner).' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
@@ -294,7 +297,7 @@ export const packagesTools = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, listing, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that contains code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. The package\'s apps: installing your owner\'s own package approves them, so they sign in with no question; for someone else\'s package, tell your owner what each app asks for (`capabilities.apps`) and pass `grant_apps` true to approve them now, or leave it out so each app asks on its first visit (`app_approval` in the dry run says which applies). A set (a package that contains an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, listing, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that contains code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. The package\'s apps: installing your owner\'s own package approves them, so they sign in with no question; for someone else\'s package, tell your owner what each app asks for (`capabilities.apps`) and pass `grant_apps` true to approve them now, or leave it out so each app asks on its first visit (`app_approval` in the dry run says which applies). A set (a package that contains an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Not idempotent: each install mints a fresh instance with its own component names, so calling
@@ -319,7 +322,7 @@ export const packagesTools = [
     {
         // The installed copies, which update and fork both address by id.
         name: 'aimeat_package_instances',
-        description: 'List your owner\'s installed package copies: each one\'s instance_id, package, version, whether it is managed (the package owns the code and layout) or editable, when it was forked, and the names its components were registered under.',
+        description: 'List your owner\'s installed package copies: each one\'s instance_id, package, version, whether it is managed (the package owns the code and layout) or editable, when it was forked, and the names its components were registered under.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Installed Packages', readOnlyHint: true },
@@ -335,7 +338,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_instance_set',
-        description: 'Change your owner\'s choices about one installed package copy: its label, and whether the daily update check updates it by itself (auto_update true) or tells your owner that an update is ready (false). Managed installs start with auto_update on, editable ones with it off.',
+        description: 'Change your owner\'s choices about one installed package copy: its label, and whether the daily update check updates it by itself (auto_update true) or tells your owner that an update is ready (false). Managed installs start with auto_update on, editable ones with it off.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set Installed Package Options', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -350,7 +353,7 @@ export const packagesTools = [
     {
         // The daily core job, for this owner's installs and on demand.
         name: 'aimeat_package_check_updates',
-        description: 'Check your owner\'s installed packages against the nodes they came from, now. A newer version is pulled; a copy with auto_update on is updated (parts your owner edited are left alone and reported), and the rest are listed as ready to update with aimeat_package_update. A source whose updates ended (the monthly fee ran out) is reported as updates_ended. The node also runs this daily.',
+        description: 'Check your owner\'s installed packages against the nodes they came from, now. A newer version is pulled; a copy with auto_update on is updated (parts your owner edited are left alone and reported), and the rest are listed as ready to update with aimeat_package_update. A source whose updates ended (the monthly fee ran out) is reported as updates_ended. The node also runs this daily.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // openWorld: it reaches the nodes the packages came from. Not idempotent: it may pull and update.
@@ -361,7 +364,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_repository',
-        description: 'List what a package repository serves this node: its public packages and the private ones this node is entitled to, each with the version its entitlement reaches and when its updates end. The repository must be a peer of this node. Take one with aimeat_package_pull (node_id and group_id), then install it with aimeat_package_install, usually with mode "managed".',
+        description: 'List what a package repository serves this node: its public packages and the private ones this node is entitled to, each with the version its entitlement reaches and when its updates end. The repository must be a peer of this node. Take one with aimeat_package_pull (node_id and group_id), then install it with aimeat_package_install, usually with mode "managed".' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Repository Packages', readOnlyHint: true, openWorldHint: true },
@@ -374,7 +377,7 @@ export const packagesTools = [
     {
         // The repository side. Phase 5 (purchase) will write these; until then the author grants them.
         name: 'aimeat_package_entitlements',
-        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, or be registered with the grant by giving `node` (its address and the public key its /.well-known/aimeat publishes), and this node must be in the repository role (repository_role in the answer) for the grant to take effect. A node given with `node` is registered only when its own card answers with the same node id and key (PEER_ID_MISMATCH or PEER_KEY_MISMATCH otherwise, and nothing is granted). When the node does not answer, the grant is made anyway and `peer_pending` is true: the node is registered on its first signed request to this repository. A grant to an install bundle serves the packages the bundle lists as well.',
+        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, or be registered with the grant by giving `node` (its address and the public key its /.well-known/aimeat publishes), and this node must be in the repository role (repository_role in the answer) for the grant to take effect. A node given with `node` is registered only when its own card answers with the same node id and key (PEER_ID_MISMATCH or PEER_KEY_MISMATCH otherwise, and nothing is granted). When the node does not answer, the grant is made anyway and `peer_pending` is true: the node is registered on its first signed request to this repository. A grant to an install bundle serves the packages the bundle lists as well.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
@@ -394,7 +397,7 @@ export const packagesTools = [
     {
         // The author's one decision that lets a shop's node sell with no token.
         name: 'aimeat_package_sellers',
-        description: 'On a package repository: list, add or remove the nodes that sell your packages. A seller node (a shop\'s own AIMEAT, e.g. store.aimeat.io) then asks for a package\'s questions, grants a customer node, ends its updates and revokes it by requests signed with its own node key, with no token and no copied secret. A seller sells every package of yours and nothing of anyone else\'s. To add a node this repository does not know yet, give `node` ({ url, public_key }; the key is on its /.well-known/aimeat): it is registered as a packages-only peer once its card answers with the same node id and key, and refused with PEER_UNREACHABLE when it does not answer (try again when it is up). Only an author with a package on this repository, on a node in the repository role, names sellers (NOT_AN_AUTHOR, NOT_A_REPOSITORY). Removing a seller leaves the grants it made; revoke those with aimeat_package_entitlements. The same as GET, PUT and DELETE /v1/package-sellers.',
+        description: 'On a package repository: list, add or remove the nodes that sell your packages. A seller node (a shop\'s own AIMEAT, e.g. store.aimeat.io) then asks for a package\'s questions, grants a customer node, ends its updates and revokes it by requests signed with its own node key, with no token and no copied secret. A seller sells every package of yours and nothing of anyone else\'s. To add a node this repository does not know yet, give `node` ({ url, public_key }; the key is on its /.well-known/aimeat): it is registered as a packages-only peer once its card answers with the same node id and key, and refused with PEER_UNREACHABLE when it does not answer (try again when it is up). Only an author with a package on this repository, on a node in the repository role, names sellers (NOT_AN_AUTHOR, NOT_A_REPOSITORY). Removing a seller leaves the grants it made; revoke those with aimeat_package_entitlements. The same as GET, PUT and DELETE /v1/package-sellers.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -410,7 +413,7 @@ export const packagesTools = [
     {
         // What a shop asks before payment, before the customer's node exists.
         name: 'aimeat_package_config_needs',
-        description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator, and for anyone on this node when the package is public, so an installer answers the questions before installing. The same as GET /v1/packages/:groupId/config-needs.',
+        description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator, and for anyone on this node when the package is public, so an installer answers the questions before installing. The same as GET /v1/packages/:groupId/config-needs.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
@@ -424,7 +427,7 @@ export const packagesTools = [
         // Releasing a managed install. It is the one act that lets the owner change code the
         // package owns, and it costs the package's updates, so the description says both.
         name: 'aimeat_package_fork',
-        description: 'Fork a managed package install: it becomes your own editable copy in place, keeping every address, every record and every schedule, and it receives no further updates from its package. Use it when your owner wants to change the code or layout of a managed install. It cannot be undone; to get the package\'s updates again, install the package again beside it.',
+        description: 'Fork a managed package install: it becomes your own editable copy in place, keeping every address, every record and every schedule, and it receives no further updates from its package. Use it when your owner wants to change the code or layout of a managed install. It cannot be undone; to get the package\'s updates again, install the package again beside it.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
@@ -441,7 +444,7 @@ export const packagesTools = [
         // is how one is read and answered from a chat. The owner in person answers on the
         // notification; an agent of theirs answers here, and only for a request it did not file.
         name: 'aimeat_package_install_requests',
-        description: 'List your owner\'s package install requests, read one, or approve or decline one. You may approve a request only when you did not file it yourself and you hold packages:write, memory:write and memory:write-as-owner; otherwise your owner approves it on their Notifications page. You may decline any request you did not file.',
+        description: 'List your owner\'s package install requests, read one, or approve or decline one. You may approve a request only when you did not file it yourself and you hold packages:write, memory:write and memory:write-as-owner; otherwise your owner approves it on their Notifications page. You may decline any request you did not file.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Lists and reads, and decides: approving installs what was asked, declining closes it. Idempotent:
@@ -461,7 +464,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_offer',
-        description: 'On a package repository, for a package\'s author: the terms seller nodes sell it on. action "get" reads the offer; "set" appends new terms, changes the state, or both. Terms: `grant` "payment" (with `price` { amount, currency }, EUR or USD in micro-units, 1 EUR = 1000000), "approval" (the seller approves each request, no money) or "automatic" (granted at once, no money); `updates` { included_days, renewal: { amount, currency, period_days } or null }; `channel` stable or beta; `licence` { spdx, terms_url, text_sha256 }; `tax` { prices_include_tax, category }; `support` { email, security_email }, and a paid offer must name security_email. A price change is new terms: a buyer keeps the terms they accepted, so a new price reaches only new sales, and a new package version changes no price. `state` on_sale, paused (no new sales, renewals go on) or ended. Only a private package has an offer. Name your sellers with aimeat_package_sellers. The same as GET and PUT /v1/packages/:groupId/offer.',
+        description: 'On a package repository, for a package\'s author: the terms seller nodes sell it on. action "get" reads the offer; "set" appends new terms, changes the state, or both. Terms: `grant` "payment" (with `price` { amount, currency }, EUR or USD in micro-units, 1 EUR = 1000000), "approval" (the seller approves each request, no money) or "automatic" (granted at once, no money); `updates` { included_days, renewal: { amount, currency, period_days } or null }; `channel` stable or beta; `licence` { spdx, terms_url, text_sha256 }; `tax` { prices_include_tax, category }; `support` { email, security_email }, and a paid offer must name security_email. A price change is new terms: a buyer keeps the terms they accepted, so a new price reaches only new sales, and a new package version changes no price. `state` on_sale, paused (no new sales, renewals go on) or ended. Only a private package has an offer. Name your sellers with aimeat_package_sellers. The same as GET and PUT /v1/packages/:groupId/offer.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Package Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -476,7 +479,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_buy',
-        description: 'Buy a package for your owner. WITHOUT `repository`: a package its author sells to accounts of this node (aimeat_package_list with for_sale true lists them). action "offer" answers the listing: what it is, its parts, the preview, the price and the author; tell your owner before buying. action "checkout" opens the checkout for `group_id`; pay with aimeat_checkout_complete within your daily purchase limit, and the money goes to the author\'s own payment account. Once paid, your owner\'s account may read and install the package and every later version of it: install it with aimeat_package_install. A refund ends that. action "purchases": what your owner bought this way. WITH `repository`, a package this node sells node to node: this node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.',
+        description: 'Buy a package for your owner. WITHOUT `repository`: a package its author sells to accounts of this node (aimeat_package_list with for_sale true lists them). action "offer" answers the listing: what it is, its parts, the preview, the price and the author; tell your owner before buying. action "checkout" opens the checkout for `group_id`; pay with aimeat_checkout_complete within your daily purchase limit, and the money goes to the author\'s own payment account. Once paid, your owner\'s account may read and install the package and every later version of it: install it with aimeat_package_install. A refund ends that. action "purchases": what your owner bought this way. WITH `repository`, a package this node sells node to node: this node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -494,7 +497,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_price_set',
-        description: 'Sell your own package to other accounts of this node, for money that goes to your own payment account. Set `price` { amount, currency } (EUR or USD in micro-units, 1 EUR = 1000000); null ends the sale. `state` on_sale (listed and sold), paused (listed, not sold) or ended. `preview`: up to three ids of the package\'s memory parts that anyone may read before buying (screenshots, a description). Every version must be private first (PRICE_NEEDS_PRIVATE), and you need your own Stripe account connected (NO_PAYMENT_ACCOUNT; aimeat_commerce_psp_set). While it is on sale, the package stays private: its listing (name, description, parts without content, the preview, the price, you as author) is public, and only buyers, you and the node operator read or install the content. A buyer\'s purchase covers every later version. A new price reaches only new buyers. The node\'s usual commerce fee applies. The same as PUT /v1/packages/:groupId/price.',
+        description: 'Sell your own package to other accounts of this node, for money that goes to your own payment account. Set `price` { amount, currency } (EUR or USD in micro-units, 1 EUR = 1000000); null ends the sale. `state` on_sale (listed and sold), paused (listed, not sold) or ended. `preview`: up to three ids of the package\'s memory parts that anyone may read before buying (screenshots, a description). Every version must be private first (PRICE_NEEDS_PRIVATE), and you need your own Stripe account connected (NO_PAYMENT_ACCOUNT; aimeat_commerce_psp_set). While it is on sale, the package stays private: its listing (name, description, parts without content, the preview, the price, you as author) is public, and only buyers, you and the node operator read or install the content. A buyer\'s purchase covers every later version. A new price reaches only new buyers. The node\'s usual commerce fee applies. The same as PUT /v1/packages/:groupId/price.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set a Package Price', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -510,7 +513,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_sales',
-        description: 'Your sales of a package you sell to accounts of this node. action "list": the price, the state, every purchase (buyer, order, amount, state paid, pending or refunded) and the totals. action "refund": give one purchase\'s money back on the payment method that collected it, on your own payment account; the buyer can then no longer read, install or update the package, and is told. Copies the buyer installed stay. The same as GET /v1/packages/:groupId/sales and POST /v1/packages/:groupId/sales/:order/refund.',
+        description: 'Your sales of a package you sell to accounts of this node. action "list": the price, the state, every purchase (buyer, order, amount, state paid, pending or refunded) and the totals. action "refund": give one purchase\'s money back on the payment method that collected it, on your own payment account; the buyer can then no longer read, install or update the package, and is told. Copies the buyer installed stay. The same as GET /v1/packages/:groupId/sales and POST /v1/packages/:groupId/sales/:order/refund.' + COMPONENT_PACKAGE_KIND,
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive: a refund ends a buyer's access to the package.

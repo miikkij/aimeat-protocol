@@ -3,6 +3,15 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.2 (not yet published) - 2026-11-25 addition
+
+- **A crew can create a knowledge package.** The daemon's default tool list carries
+  `aimeat_knowledge_create`, and the liaison's instructions say to use it for a new package: one call
+  with the package's name, its content type and all its entries. Before, a crew could only add to a
+  package that already existed (`aimeat_knowledge_contribute`), and on the connector not even that,
+  because that write has no REST route. The tool is loaded when the node offers it (a node after
+  4.3.1, to an agent that holds `memory:write`); without it the daemon starts as before.
+
 ## 0.41.2 (not yet published) - 2026-11-24 addition
 
 - **An agent may be named by its full identity.** The credential lookup behind the liaison and
