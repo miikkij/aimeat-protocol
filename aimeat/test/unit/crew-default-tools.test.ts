@@ -14,6 +14,7 @@
  *   `agent` surface, the narrowest one a crew is served from, carries every one of them.
  * @usage cd aimeat && pnpm exec vitest run test/unit/crew-default-tools.test.ts
  * @version-history
+ *   2026-11-25 — The default list carries aimeat_knowledge_create, loaded when offered (33 tools).
  *   v1.0.0 — 2026-10-12 — Initial, with aimeat-crewai 0.35.0 (the default list gains aimeat_discover,
  *     aimeat_invoke, aimeat_mcp_list, aimeat_mcp_tools and aimeat_mcp_call).
  */
@@ -42,9 +43,10 @@ const required = defaults.filter(name => !ifOffered.includes(name));
 describe("the crew daemon's default tools exist on aimeat connect serve", () => {
     it('reads both lists from daemon.py', () => {
         // 32 since aimeat-crewai 0.38.0: aimeat_goal_get and aimeat_goal_work, loaded when offered.
-        expect(defaults).toHaveLength(32);
-        expect(new Set(defaults).size).toBe(32);
-        expect([...ifOffered].sort()).toEqual(['aimeat_discover', 'aimeat_goal_get', 'aimeat_goal_work', 'aimeat_invoke', 'aimeat_mcp_call', 'aimeat_mcp_list', 'aimeat_mcp_tools']);
+        // 33 since 2026-11-25: aimeat_knowledge_create, loaded when offered.
+        expect(defaults).toHaveLength(33);
+        expect(new Set(defaults).size).toBe(33);
+        expect([...ifOffered].sort()).toEqual(['aimeat_discover', 'aimeat_goal_get', 'aimeat_goal_work', 'aimeat_invoke', 'aimeat_knowledge_create', 'aimeat_mcp_call', 'aimeat_mcp_list', 'aimeat_mcp_tools']);
         expect(ifOffered.filter(name => !defaults.includes(name))).toEqual([]);
     });
 

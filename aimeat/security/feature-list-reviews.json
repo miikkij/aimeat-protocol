@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:2f37fada8c539d33e8d6fe92"
+      "digest": "sha256:bd24578269ecab944fd03f52"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-24",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:d4903ec05847771b9f3b5217"
+      "digest": "sha256:e5c065a6876c318b046c5939"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-22",
@@ -149,7 +149,7 @@
       "digest": "sha256:3fd4be9b502d6d98aef8572b"
     },
     "8. Automation: schedules, workflows and extensions": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/hooks.ts",
         "aimeat/src/mcp/agent-schedules.ts",
@@ -165,7 +165,7 @@
         "aimeat/src/routes/commerce-ucp.ts",
         "aimeat/src/routes/commerce-acp.ts"
       ],
-      "digest": "sha256:2d11cd7c79b1ce2c068ec038"
+      "digest": "sha256:d873015ecdc8ca651ee32d7d"
     },
     "9. AI on the node": {
       "reviewedOn": "2026-11-22",
@@ -511,7 +511,7 @@
       "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
       "aimeat/src/mcp/oauth-consent-info.ts": "36d3fc455b40c6ee",
       "aimeat/src/mcp/protocol-version.ts": "f57eb3836e14df1e",
-      "aimeat/src/routes/bootstrap.ts": "1456a200b4c5d174",
+      "aimeat/src/routes/bootstrap.ts": "5f5d9f74ef848dfe",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/mcp/tasks-extension.ts": "ef9e3abaac54ea08",
       "aimeat/src/routes/mcp-servers.ts": "1d4290edfd5cb7e7",
@@ -658,8 +658,10 @@
       "aimeat/src/services/workspace-rows/row-space.ts": "81e86a414994de22",
       "aimeat/src/services/knowledge/audience.ts": "dc0306b7688d848a",
       "aimeat/src/services/knowledge/link-owner-keep.ts": "822037c470099c01",
+      "aimeat/src/services/knowledge/manifest-validator.ts": "fa85443c34ad69dc",
       "aimeat/src/services/knowledge/overview.ts": "84801f43db62b464",
       "aimeat/src/services/knowledge/package-entry.ts": "c873ea18af7f1374",
+      "aimeat/src/services/knowledge/package-import.ts": "53dc67e680b8db66",
       "aimeat/src/services/knowledge/package-links.ts": "d1f532ced747c653",
       "aimeat/src/services/knowledge/publish-ask.ts": "1b743e7f5fc92eee",
       "aimeat/src/services/knowledge/review-reach.ts": "54a2a3a7fd25e9fe",
@@ -721,8 +723,8 @@
       "aimeat/src/routes/schedules.ts": "445717db006e0f07",
       "aimeat/src/routes/workflows.ts": "efaf105d6380eca6",
       "aimeat/src/routes/cortex.ts": "05d7830ff08fc276",
-      "aimeat/src/tool-catalog/definitions/install-sets.ts": "dc7cc3f81a345d3f",
-      "aimeat/src/tool-catalog/definitions/packages.ts": "757eed1afe275902",
+      "aimeat/src/tool-catalog/definitions/install-sets.ts": "871411aeb42fe872",
+      "aimeat/src/tool-catalog/definitions/packages.ts": "5aaaf8bfc021d7b1",
       "aimeat/src/routes/tracked-responses.ts": "c909e26202eb2db3",
       "aimeat/src/routes/signals.ts": "8d30230fbe030bb6",
       "aimeat/src/routes/commerce-ucp.ts": "61be124c31e96974",

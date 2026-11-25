@@ -331,6 +331,7 @@
     "aimeat_instance_status": ["wallet:read"],
     "aimeat_invoke": [],
     "aimeat_knowledge_contribute": ["memory:write"],
+    "aimeat_knowledge_create": ["memory:write"],
     "aimeat_knowledge_get": ["memory:read"],
     "aimeat_knowledge_links": ["memory:read"],
     "aimeat_knowledge_list": ["memory:read"],
