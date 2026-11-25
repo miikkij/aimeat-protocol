@@ -29,7 +29,7 @@ third-party packs from `/lib/`. Mixing them 404s.
 One directory per lib under `src/static/sdk-libs/` (`_core` and `dist` are not libs; count them there rather than trusting a number here). Authored as **componentized, JSDoc-typed ESM** under `src/static/sdk-libs/<name>/`,
 sharing code through `_core/`, **under 800 lines per file**, esbuild-bundled to a classic IIFE with
 `pnpm build:sdk`, and served with a per-node config prelude by `src/routes/libs.ts`. Guarded by
-`check:sdk` (bundle in sync with sources), which runs in `pnpm gate` and CI, and `typecheck:sdk`, which runs in the pre-commit hook. A stale bundle therefore passes a commit and is caught by the gate, so run `pnpm build:sdk` before you commit.
+`check:sdk` (bundle in sync with sources), which runs in `pnpm check:fast`, `pnpm ready` and CI, and `typecheck:sdk`, which runs in the pre-commit hook. A stale bundle therefore passes a commit and is caught by `pnpm check:fast`, so run `pnpm build:sdk` before you commit.
 
 - **Never author a served lib as JavaScript inside a TypeScript template string.** That was the old
   `lib-*.ts` / `auth-lib-part*.ts` pattern, removed 2026-07-19. Edit the ESM source and rebuild.
