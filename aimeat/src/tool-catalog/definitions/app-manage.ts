@@ -189,7 +189,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     party_name: { type: 'string', description: 'For party_remove, party_stop and party_resume: the name of a person registered to the app (ap-..., from parties).', zod: z.string().max(40) },
     open: { type: 'boolean', description: 'For party_registration_set: true lets people without an account register to the app (when this server allows it), false closes the signup.' },
     // design spec (routes/apps/design-spec.ts)
-    markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
+    markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision. For face_set: the whole agent face as one markdown document, at most 256 KB; it replaces the face there.' },
     words: { type: 'array', description: 'For scope_allowance_remove: the scopes to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
     expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
     // the app's structure and plan (routes/apps/structure.ts)
@@ -349,6 +349,10 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'replace the WHOLE layout (read it first); the answer names the version it replaced' },
     ui_restore: { fields: F(['filename', 'version'], []), scope: 'memory:write',
         summary: 'put a replaced layout version back' },
+    // The agent face (services/app/agent-face-write.ts): one of the four owed items, and the one the
+    // appdev surface had no tool for.
+    face_set: { fields: F(['filename', 'markdown'], []), provenance: true, scope: 'memory:write',
+        summary: 'write the app\'s agent face, one of the four things an app owes: the markdown an AI reads at the app\'s address instead of the page. It replaces the face there. It is one PUBLIC record (apps.<filename>.agentface), so it says what the app does, its views and how to act on it, never a person\'s records. The app\'s own code may also keep it current with AIMEATAgentFace.publish' },
     config_get: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'the config the app declares it needs: each field, its value (defaults filled in) and which required ones are still empty' },
     config_set: { fields: F(['filename', 'values'], []), scope: 'app:write',

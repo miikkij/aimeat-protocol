@@ -29,6 +29,8 @@
  * @usage
  *   import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
  * @version-history
+ *   v1.0.3 — 2026-11-25 — "When you have finished a change" names the one size matrix of the Atelier
+ *     specification (services/app/publish-finish.ts); it named three of its four sizes.
  *   v1.0.2 — 2026-11-19 — "What does NOT change" names the Atelier spec and guide only, and section
  *     from-classic for an app built on the retired Classic track.
  *   v1.0.1 — 2026-09-19 — "What does NOT change" names the Atelier spec and guide beside the
@@ -40,6 +42,7 @@
  *     pipelines that already keep four apps in aimeat-apps small.
  */
 import type { BuiltinSkill } from './builtin-skills.js';
+import { ATELIER_SIZE_MATRIX } from '../services/app/publish-finish.js';
 
 export const WORKSTATION_SKILL_ENTRY: BuiltinSkill =
 {
@@ -155,7 +158,7 @@ much, something was inlined.
 
 ## When you have finished a change
 
-Drive a real browser at 390x844, 1280x900 and 1280x460 in both themes. A build that compiles is not
+Drive a real browser at ${ATELIER_SIZE_MATRIX} in both themes. A build that compiles is not
 a screen that works, and at this size the thing you broke is usually somewhere you did not look.
 `,
 };

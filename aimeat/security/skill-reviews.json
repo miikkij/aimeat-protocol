@@ -193,12 +193,12 @@
       "digest": "sha256:b9f96b5526e764d31255d42e"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:1dcb7b8965563154abf238ac"
+      "digest": "sha256:ab255c8655bcf7bb5771fd43"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-22",
@@ -211,14 +211,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/builder/atelier-prompt.ts",
         "aimeat/src/services/builder/atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:2a6ce36b7dc930615e3abf6b"
+      "digest": "sha256:2337aa9af80bc6c25f34f38c"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -542,7 +542,7 @@
       "digest": "sha256:b5d81d0a5efaeb4ea4bbf922"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:96a5f0a007b95011c677069a",
+      "digest": "sha256:45e8580fc8a51f50d6e115b7",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -720,7 +720,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "905fba7ed8d0e386",
-      "aimeat/src/services/app/publish-next-steps.ts": "d7fcedfa3748b732"
+      "aimeat/src/services/app/publish-next-steps.ts": "80c6611c43f06ced"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
@@ -728,7 +728,7 @@
       "aimeat/src/services/app/spec-gate.ts": "95bb1883f65b8ebb"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "bf79ee288d5f50c3",
+      "aimeat/src/services/builder/atelier-prompt.ts": "3187f63dfd509ee7",
       "aimeat/src/services/builder/atelier-layers.ts": "f092e049fdd0e7e0",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "ff1edefcea10eb67",
       "aimeat/src/services/design-book/component.ts": "12d4355f129e437f"
@@ -841,7 +841,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
-      "aimeat/src/services/builder/atelier-prompt.ts": "bf79ee288d5f50c3",
+      "aimeat/src/services/builder/atelier-prompt.ts": "3187f63dfd509ee7",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
       "aimeat/src/services/app/publish.ts": "8c9f47f3f1c6ce07",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",

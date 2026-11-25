@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-25 -- face_set reaches POST /v1/memory with the app's agent face, a public record.
  *   2026-11-15 -- icon_upload reaches POST /v1/apps/{owner}/{app}/icon with icon or storage_key.
  *   2026-11-15 -- parties forwards limit and offset to GET .../parties, a page of the registered people.
  *   2026-11-01 -- party_stop and party_resume reach POST .../parties/{name}/stop and /resume (WP9d).
@@ -48,6 +49,7 @@
  */
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { checkAppManageInput, uiReadQuery } from '../tool-catalog/definitions/app-manage.js';
+import { htmlFilenameOf } from '../services/app/app-ref.js';
 
 type Input = Record<string, unknown>;
 
@@ -137,6 +139,14 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         }
         case 'ui_restore':
             return client.post(`/v1/apps/${enc(owner)}/${file}/ui/restore`, { version: input.version });
+        case 'face_set':
+            // The face is one public memory record, apps.<filename>.agentface (services/agent/face.ts
+            // agentFaceKey), written through POST /v1/memory as the node MCP writes it through the
+            // same service (services/app/agent-face-write.ts).
+            return client.post('/v1/memory', {
+                key: `apps.${htmlFilenameOf(String(input.filename ?? ''))}.agentface`,
+                value: input.markdown, visibility: 'public', ...provenance,
+            });
         case 'config_get':
             return client.get(`${app}/config`);
         case 'config_set':

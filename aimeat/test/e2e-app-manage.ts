@@ -15,8 +15,11 @@
  *   - Phase 2: the field list and the permission words
  *   - Phase 3: settings, versions, lineage, thumbnail, preview link, layout restore
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
+ *   - Phase 6: face_set writes the agent face the app's address serves (25, 26)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   2026-11-25 — 25 and 26: face_set, the agent face over MCP; refused without memory:write and for an
+ *     unknown app (wish-agentti-saa-nykyiset-aimeat-ohjeet-ja-tekee-sovitun-ty-n-lop, item 4).
  *   2026-10-19 — 24: aimeat_app_draft_save and aimeat_app_draft_publish set the display version that
  *     aimeat_app_manage versions shows, and refuse a bad one (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-16 — 5b, 6 and 6b: aimeat_app_get answers an unlisted or coded app only to the owner's and
@@ -490,6 +493,32 @@ await test('24. The draft tools set the display version: draft_save states it, d
     assert(!override.isError, `the draft survived the refusal and publishes with the override: ${override.text.slice(0, 300)}`);
     const v2 = await lastVersion();
     assert(v2.version_number === v1.version_number + 1 && v2.version === '2.1.0', `the override is the live version: ${JSON.stringify(v2)}`);
+});
+
+console.log('\nPhase 6 — the agent face, the owed item the appdev surface had no tool for');
+
+const FACE_APP = `am${STAMP}-face`;
+
+await test('25. face_set writes the agent face an AI reads at the app\'s address, given the app\'s bare name', async () => {
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: authed(A.token), body: JSON.stringify({
+            filename: `${FACE_APP}.html`, content: Buffer.from('<!doctype html><title>Face</title><h1>page body zqxpage</h1>').toString('base64'),
+            mime_type: 'text/html', name: 'Face', description: 'An app with a face', version: '1.0.0', category: 'tools', tags: [],
+        }),
+    });
+    assert(pub.status === 200 || pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const r = await manage(s, { action: 'face_set', filename: FACE_APP, markdown: '# Face\n\nThe face zqxface says what the app does.' });
+    assert(!r.isError && r.data.key === `apps.${FACE_APP}.html.agentface` && r.data.visibility === 'public', `face_set: ${r.text.slice(0, 300)}`);
+    const md = await fetch(`${BASE}/v1/apps/${A.owner}/${FACE_APP}.html?format=md`);
+    const text = await md.text();
+    assert(md.status === 200 && text.includes('zqxface') && !text.includes('zqxpage'), `the address serves the face: ${md.status} ${text.slice(0, 300)}`);
+});
+
+await test('26. FAILURE: face_set without memory:write is refused naming the word, and an unknown app is NOT_FOUND', async () => {
+    const r = await manage(sNarrow, { action: 'face_set', filename: FACE_APP, markdown: '# Not mine to write' });
+    assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('memory:write'), `expected SCOPE_DENIED memory:write: ${r.text}`);
+    const none = await manage(s, { action: 'face_set', filename: `am${STAMP}-none`, markdown: '# Nothing' });
+    assert(none.isError && none.text.startsWith('NOT_FOUND'), `expected NOT_FOUND: ${none.text}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

@@ -20,6 +20,7 @@
  * @structure OwedFacts · owedMissing(storage, config, facts) · owedRefusal(missing)
  * @usage const missing = await owedMissing(storage, config, facts); if (missing.length && config.appOwedOnPublish === 'refuse') return { refusal: owedRefusal(missing, ...) };
  * @version-history
+ *   v1.0.1 — 2026-11-25 — The agent face's `how` names aimeat_app_manage face_set, the MCP call for it.
  *   v1.0.0 — 2026-11-24 — Initial (wish-corp-paketin-apit-saavat-datakartan-design-specin-ja-skillin).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -69,7 +70,7 @@ export async function owedMissing(storage: Storage, config: AimeatConfig, f: Owe
     }
     const face = await getOwnerScopePublicMemory(storage, config.nodeId, f.ownerName, agentFaceKey(f.filename));
     if (!face) {
-      out.push({ item: 'agent_face', how: `one public memory record ${agentFaceKey(f.filename)} (AIMEATAgentFace.publish from /v1/libs/aimeat-agentface.js): what the app does, for an AI that opens its address` });
+      out.push({ item: 'agent_face', how: `one public memory record ${agentFaceKey(f.filename)} (aimeat_app_manage { action: "face_set", filename: "${f.filename}", markdown }, or AIMEATAgentFace.publish from /v1/libs/aimeat-agentface.js): what the app does, for an AI that opens its address` });
     }
   }
   if (!f.roadmapLine) {

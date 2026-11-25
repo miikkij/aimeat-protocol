@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-25 — Steps 7 to 9 read the size matrix and the owed items by level from
+ *     services/app/publish-finish.ts, the texts the specification, FINISH and the publish answer read;
+ *     step 9 now says the data map is owed when the app keeps data, as the refusal reads it.
  *   2026-11-24 — Step 9: the next publish is refused until the owed items exist (APP_OWES_ITEMS), and
  *     an update needs a roadmap line (services/app/owed-gate.ts).
  *   2026-11-22 — The proposal asks whether the owner wants a guided tour (built only on a yes), and the
@@ -191,6 +194,7 @@
  */
 import type { BuiltinSkill } from './builtin-skills.js';
 import { APP_BUILDER_COMMON } from './builtin-skills.app-builder-common.js';
+import { ATELIER_SCREENSHOT_SIZES, ATELIER_SIZE_MATRIX, OWED_BY_LEVEL } from '../services/app/publish-finish.js';
 
 export const APP_BUILDER_ATELIER_SKILL_ENTRY: BuiltinSkill =
 {
@@ -520,7 +524,7 @@ changed after you fetched it says so.
 6. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
    (\`aimeat_image_generate\` → storage URL; the spec contains the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
-7. **Verify** — 390×844, 1280×900, 1280×460 and 1920×1080, both themes, and the phone and the
+7. **Verify** — ${ATELIER_SIZE_MATRIX}, both themes, and the phone and the
    desktop each as the layout the specification's part \`screens\` asks for (the desktop is never
    the phone column stretched), no horizontal scroll, every state
    reachable, no console errors. Read the console with the browser's own warnings as well, for
@@ -539,8 +543,8 @@ changed after you fetched it says so.
    the owner asked for and did not get.
 8. **Accept it beside the genre it forked.** (A \`proto\` or \`plain\` page forked no genre: the
    seven measured checks below are its acceptance.) ONE SIZE MATRIX holds for every check here and
-   in step 7, the specification's "Finishing" included: 390×844, 1280×900, 1280×460 and
-   1920×1080, in both themes. An Atelier app is finished when its screenshots at 390×844 and 1280×900, in both themes,
+   in step 7, the specification's "Finishing" included:
+   ${ATELIER_SIZE_MATRIX}, in both themes. An Atelier app is finished when its screenshots at ${ATELIER_SCREENSHOT_SIZES}, in both themes,
    hold up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre list at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question
@@ -560,7 +564,7 @@ changed after you fetched it says so.
    section, says how; a state that waits for a timer to come round has not met it.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
-   Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and THE NEXT PUBLISH IS REFUSED until they exist (\`APP_OWES_ITEMS\` names each; an update also needs a \`roadmap\` line, a draft's notice counts; a quick prototype or a presentation owes no skill and no face): the **agent face** (\`agent_face_present\`), the **bound
+   Read the WHOLE answer and keep it whole. Four of its lines are owed, by level ${OWED_BY_LEVEL}, and THE NEXT PUBLISH IS REFUSED until they exist (\`APP_OWES_ITEMS\` names each; an update also needs a \`roadmap\` line, a draft's notice counts): the **agent face** (\`agent_face_present\`), the **bound
    skill** (\`bound_skills_count\` above zero; written for the person who operates the app through
    their AI, and \`ai_path\` says what it holds and when an app tool is owed), the **data map** (\`data_map_present\`: write it
    with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,

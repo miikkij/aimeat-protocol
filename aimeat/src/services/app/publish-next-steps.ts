@@ -18,6 +18,9 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.8.0 — 2026-11-25 — `screens` and `acceptance` read the one size matrix from publish-finish.ts
+ *     (`screens` named three of its four sizes), and `agent_face` and `bound_skill` say "Not owed" on a
+ *     quick prototype and a presentation, which the publish refusal (owed-gate.ts) asks for neither.
  *   v1.7.0 — 2026-11-21 — `register`, for an app whose data map says it keeps personal data and that
  *     has no register: the three calls that write one (compliance/register-step.ts). Every other app
  *     gets no key.
@@ -71,6 +74,7 @@ import { designBookStep } from './genre-fork.js';
 import { levelStep, declaredLevel } from './build-level.js';
 import { aiPathStep, declaresNoAiPath } from './ai-path-step.js';
 import { appToolsKey } from '../../models/app-tool-schemas.js';
+import { ATELIER_DESKTOP_SIZES, ATELIER_PHONE_SIZE, ATELIER_SCREENSHOT_SIZES, ATELIER_SIZE_MATRIX, faceAndSkillNotOwed } from './publish-finish.js';
 
 /** How many tools a stored manifest names: the value is the manifest object or its JSON text. */
 function toolsCountOf(value: unknown): number {
@@ -176,6 +180,7 @@ export async function buildPublishNextSteps(
     // no genre, so they are not judged beside one and owe the Design Book nothing; they are told
     // which level they were published at, in words the builder can repeat to the owner.
     const level = html ? levelStep(html) : undefined;
+    const notOwed = faceAndSkillNotOwed(html ? declaredLevel(html) : undefined, declaresNoAiPath(html));
 
     return {
       ...(size ? { size } : {}),
@@ -183,14 +188,14 @@ export async function buildPublishNextSteps(
       // The phone and the desktop (atelier-screens.ts), on every level but a quick prototype: the
       // desktop is where builds fail, and a plain page is not judged beside a genre.
       ...(track === 'atelier' && !(html && declaredLevel(html) === 'proto') ? {
-        screens: 'Look at the app at 390×844 (the phone) and at 1280×900 and 1920×1080 (the desktop), and say in your report which task is primary and where it is, '
+        screens: `Look at the app at every size of the one size matrix (${ATELIER_SIZE_MATRIX}): the phone at ${ATELIER_PHONE_SIZE} and the desktop at ${ATELIER_DESKTOP_SIZES}, and say in your report which task is primary and where it is, `
           + 'what each desktop column holds and why, and what the first, empty visit shows. A desktop that is the phone column stretched across the screen, '
           + 'cards with empty room inside them, or empty cards before the work, is not finished: aimeat_handbook_get { tier: "build-app-atelier/screens" }.',
       } : {}),
       ...(track === 'atelier' && !level ? {
-        acceptance: 'Accept this app from screenshots at 390×844 and 1280×900, in both themes, placed '
+        acceptance: `Accept this app from screenshots at ${ATELIER_SCREENSHOT_SIZES}, in both themes, placed `
           + `beside the genre it forked (${genreAddress}), and ask while looking: would this pass `
-          + 'beside the genre? Measure alongside it, at 390×844, 1280×900, 1280×460 and 1920×1080 (the one size matrix '
+          + `beside the genre? Measure alongside it, at ${ATELIER_SIZE_MATRIX} (the one size matrix `
           + 'of the skill and the spec): page width equal to the viewport, nothing '
           + 'past the viewport edge (including inside a box that clips), no text under 11 px, no '
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '
@@ -208,12 +213,18 @@ export async function buildPublishNextSteps(
       bound_skills_count: boundSkills.length,
       // Stated every time, present or not. An app without a face is a page agents have to scrape,
       // and an app without a bound skill teaches nobody how to operate it.
+      // Owed by level, as owed-gate.ts refuses (publish-finish.ts): a quick prototype and a
+      // presentation owe neither, and the answer says so rather than asking for them.
       agent_face: faceRec
         ? `This app has an agent face (${agentFaceKey(filename)}). Update it on the SAME writes that update the visible view, or agents and humans see different states.`
-        : `No agent face yet. Publish one with /v1/libs/aimeat-agentface.js — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One PUBLIC memory record: ${agentFaceKey(filename)}, so an app whose data is private describes what it does and never its records.`,
+        : notOwed
+          ? `Not owed: ${notOwed}. Raising the level makes both owed.`
+          : `No agent face yet. Write one with aimeat_app_manage { action: "face_set", filename: "${filename}", markdown }, or from the app with /v1/libs/aimeat-agentface.js — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One PUBLIC memory record: ${agentFaceKey(filename)}, so an app whose data is private describes what it does and never its records.`,
       bound_skill: boundSkills.length > 0
         ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
-        : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,
+        : notOwed
+          ? `Not owed: ${notOwed}.`
+          : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,
       // How the person's own AI uses the app (ai-path-step.ts): a recommendation, quiet for a quick
       // prototype and a presentation.
       ...aiPathStep({

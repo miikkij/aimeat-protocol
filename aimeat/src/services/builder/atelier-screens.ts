@@ -17,8 +17,10 @@
  * @structure ATELIER_SCREENS_SECTION
  * @usage body += ATELIER_SCREENS_SECTION;   // its own part, `screens` (atelier-layers.ts)
  * @version-history
+ *   v1.0.1 — 2026-11-25 — Step 6 reads the phone and desktop sizes from app/publish-finish.ts; same text.
  *   v1.0.0 — 2026-11-20 — Initial.
  */
+import { ATELIER_DESKTOP_SIZES, ATELIER_PHONE_SIZE } from '../app/publish-finish.js';
 
 /** The section, ending in a blank line like every other section of the specification. */
 export const ATELIER_SCREENS_SECTION = '## The phone and the desktop: two layouts of one app\n\n'
@@ -51,6 +53,6 @@ export const ATELIER_SCREENS_SECTION = '## The phone and the desktop: two layout
   + '- Keyboard and pointer work: every action is reached with Tab in reading order, the primary one with Enter, and what can be clicked shows it on hover.\n\n'
   + '**5. The phone.** One column in the order of the tasks, the primary action within reach of the thumb, one task at a time, the views in the bottom bar. '
   + 'The supporting column comes after the work, or behind a link when it is long. The kit does the rest: touch sizes, no sideways scroll, the bars.\n\n'
-  + '**6. Check both before you call it done**, at the size matrix of "Finishing" (390×844 the phone, 1280×900 and 1920×1080 the desktop), and say in the report for the desktop: which task is primary and where it is; '
+  + '**6. Check both before you call it done**, at the size matrix of "Finishing" (' + ATELIER_PHONE_SIZE + ' the phone, ' + ATELIER_DESKTOP_SIZES + ' the desktop), and say in the report for the desktop: which task is primary and where it is; '
   + 'what each column holds and why; what the first, empty visit shows. A screenshot where the cards span the whole width with empty room inside them, '
   + 'or where empty cards come before the work, fails this check.\n\n';

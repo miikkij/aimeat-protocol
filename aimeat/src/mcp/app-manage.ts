@@ -23,6 +23,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-25 — action face_set writes the app's agent face through the shared memory write
+ *     (services/app/agent-face-write.ts): the one owed item the appdev surface had no tool for.
  *   2026-11-15 — action icon_upload calls services/app/icon-store.ts, as POST .../icon does; marks
  *     answers `install`, who can install the app and whether it has its own PNG icon
  *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
@@ -107,6 +109,7 @@ import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
 } from '../services/subdomain/sites.js';
 import { appManageMemberAction } from './app-manage-members.js';
+import { writeAgentFace } from '../services/app/agent-face-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskedFields } from '../services/app/publish-gate.js';
@@ -338,6 +341,20 @@ export function registerAppManageTool(
             case 'ui_restore': {
                 const app = await ui.ownApp(callerGaii, filename);
                 return answer(await ui.restore(app.ownerGaii, filename, Number(args.version), { principal: callerGaii }));
+            }
+            case 'face_set': {
+                // The shared memory write with the face's key and level (services/app/agent-face-write.ts),
+                // in this session's own namespace, as aimeat_memory_write writes without owner_scope.
+                const out = await writeAgentFace({ storage, config }, { ...caller().principalView, targetGaii: callerGaii },
+                    callerOwner, filename, args.markdown, { declared, declaredId });
+                if (!out.ok) return toolError(out.code, out.message);
+                return answer({
+                    filename: out.filename, key: out.record.key, version: out.record.version, visibility: out.record.visibility,
+                    ...(out.publishRequest ? { publish_request: out.publishRequest } : {}),
+                    note: out.publishRequest
+                        ? 'Stored, and waiting for the owner to allow it public; until then the app\'s address shows its converted page to an AI.'
+                        : 'An AI that opens the app\'s address now reads this face. Write it again when the app changes what it does.',
+                });
             }
             case 'config_get': {
                 // The same gates as the REST read: this session's owner, or an operator, passes them.

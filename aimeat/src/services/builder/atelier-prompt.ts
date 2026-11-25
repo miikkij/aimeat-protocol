@@ -28,6 +28,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.50.1 — 2026-11-25 — Finishing reads the size matrix from app/publish-finish.ts, the text the
+ *     handbook, the skills and the publish answer read; it called its four sizes "these three" and
+ *     said every app owes all four items, where the owed items depend on the level (skill step 9),
+ *     and it names face_set for the agent face. The part `libraries` holds it within MAX_PART_CHARS.
  *   v1.50.0 — 2026-11-20 — The level is the finest unless the owner chose a lower one (item 0 is no
  *     longer a question). "The phone and the desktop" (atelier-screens.ts, part `screens`): the two
  *     layouts decided from the tasks. Finishing's size matrix gains 1920×1080.
@@ -208,6 +212,7 @@ import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 import { atelierPasteDelivery } from './atelier-platform.js';
 import { ATELIER_AI_PATH_SECTION } from './atelier-ai-path.js';
 import { ATELIER_SCREENS_SECTION } from './atelier-screens.js';
+import { ATELIER_SCREENSHOT_SIZES, ATELIER_SIZE_MATRIX } from '../app/publish-finish.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -781,20 +786,20 @@ function composeBody(config: AimeatConfig): string {
   body += ATELIER_AI_PATH_SECTION;
 
   body += '## Finishing\n\n';
-  body += 'Before you call it done: open the app at 390×844, 1280×900, 1280×460 and 1920×1080 in BOTH '
+  body += `Before you call it done: open the app at ${ATELIER_SIZE_MATRIX} in BOTH `
     + 'themes; `document.body.scrollWidth === document.documentElement.clientWidth` at every '
     + 'width; every state (loading, empty, error, signed-out) reached through `a.status(...)`; '
     + 'no console errors. Publish with `aimeat_app_publish` and pass `spec_token: '
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
     + 'built against the spec in force. Then read `next_steps` in the publish answer, whole: the '
-    + 'app is not finished while one of the four things every app owes is missing, and a '
+    + 'app is not finished while one of the things it owes at its level is missing, and a '
     + 'successful publish does not mean they are there. They are the agent face '
-    + '(`agent_face_present`), a skill bound to the app (`bound_skills_count` above zero), the '
+    + '(`agent_face_present`, `aimeat_app_manage { action: "face_set" }`), a skill bound to the app (`bound_skills_count` above zero), the '
     + 'data map (`data_map_present`, written with `aimeat_datamap_set`) and the design spec '
     + '(`design_spec_present`, written with `aimeat_app_manage { action: "spec_set" }`); step 9 '
-    + 'of the skill `node:aimeat-app-builder-atelier` says what each one holds. These three sizes '
+    + 'of the skill `node:aimeat-app-builder-atelier` says what each holds, by level. These sizes '
     + 'are the one size matrix for every check, the skill\'s included; on the level `fine`, the '
-    + 'screenshots at 390×844 and 1280×900 are also put beside the genre the app forked (step 8 '
+    + `screenshots at ${ATELIER_SCREENSHOT_SIZES} are also put beside the genre the app forked (step 8 `
     + 'of the skill). Report published, '
     + 'checked and accepted as three separate things: a check you could not run is said, never '
     + 'counted as passed.\n\n';

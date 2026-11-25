@@ -5,6 +5,9 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-25 — FINISH says which owed items an app owes at its level, the refusal from the second
+ *     version, and the size matrix, from app/publish-finish.ts (the texts the specification, the skill
+ *     and the publish answer read), and names face_set for the agent face.
  *   2026-11-24 — Names the app tools (get before publish, invoke to try) and the component catalogue,
  *     now on the appdev surface.
  *   2026-11-21 — The aimeat-ai example names prefer.* only and says what local.<capability>=yes does:
@@ -88,6 +91,7 @@
  *     docs/agent-workspace-contracts.md) so workspace-processing agents are built to the convention.
  */
 import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
+import { ATELIER_SIZE_MATRIX, OWED_BY_LEVEL } from '../app/publish-finish.js';
 
 export const APPDEV_HANDBOOK = `# AIMEAT — App-Dev Surface Handbook
 
@@ -292,8 +296,11 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
    PERSON: a member's agents inherit it.
 3. PROPOSE the frame to the user in 3-5 lines; adjust.
 4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).
-5. FINISH: the four things every app owes — agent face, bound skill (\`metadata.binding\`), data map
-   (\`aimeat_datamap_set\`) and design spec (\`aimeat_app_manage { action: "spec_set" }\`) — then
+5. FINISH: the four things an app owes — agent face (\`aimeat_app_manage { action: "face_set" }\`),
+   bound skill (\`metadata.binding\`), data map
+   (\`aimeat_datamap_set\`) and design spec (\`aimeat_app_manage { action: "spec_set" }\`), by level
+   ${OWED_BY_LEVEL}; from the second version a publish that lacks one is refused (\`APP_OWES_ITEMS\`).
+   Check at ${ATELIER_SIZE_MATRIX}, both themes. Then
    \`aimeat_app_template_propose\` and \`aimeat_appdev_pitfall_report\`; the publish response's
    \`next_steps\` shows what is missing. Its \`ai_path\` line says how the person's own AI uses the
    app: the bound skill names the keys, the record shape, the rules and what the person confirms,

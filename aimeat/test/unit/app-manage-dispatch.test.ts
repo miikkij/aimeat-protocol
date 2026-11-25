@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-25 — face_set reaches POST /v1/memory with the agent face as a public record.
  *   2026-11-22 — settings' tour_invite field (the guided tour's invitation).
  *   2026-11-15 — icon_upload reaches POST .../icon with icon and storage_key.
  *   2026-11-15 — parties carries limit and offset (a page of the registered people).
@@ -101,6 +102,8 @@ const EXPECT: Record<string, [string, string]> = {
     ui_get: ['GET', '/v1/apps/me-owner/shop.html/ui?catalogue=index&detail=zqxdetail'],
     ui_set: ['PUT', '/v1/apps/me-owner/shop.html/ui'],
     ui_restore: ['POST', '/v1/apps/me-owner/shop.html/ui/restore'],
+    // The agent face is a public memory record: the caller's own, as aimeat_memory_write writes it.
+    face_set: ['POST', '/v1/memory'],
     config_get: ['GET', '/v1/apps/alice/shop.html/config'],
     config_set: ['PUT', '/v1/apps/me-owner/shop.html/config'],
     cost: ['GET', '/v1/apps/cost?app_id=alice%2Fshop.html'],
@@ -184,6 +187,12 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
             }
         });
     }
+
+    it('face_set writes apps.<filename>.agentface as a public record, and a bare name gets .html', async () => {
+        const a = recorder();
+        await appManageCall(a.client, 'me', { action: 'face_set', filename: 'shop', markdown: '# Shop' });
+        expect(a.sent[0]).toEqual({ method: 'POST', path: '/v1/memory', body: { key: 'apps.shop.html.agentface', value: '# Shop', visibility: 'public' } });
+    });
 
     it('legal with remove sends remove inside the kind, and no kind reads the state', async () => {
         const a = recorder();
