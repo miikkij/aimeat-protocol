@@ -9,6 +9,7 @@
  *   "kill-test-servers reads the port only from the shell" and "test:env:init can derive a worktree
  *   port that an E2E suite owns").
  * @version-history
+ *   v1.1.0 — 2026-11-25 — pgAccountOf(): the account pnpm ready's batch worktree takes from the session.
  *   v1.0.0 — 2026-11-21 — Initial.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -18,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { envFileArgs, portFor } from '../../scripts/lib/env-file-port.js';
-import { derivePort, portsNamedByTests } from '../../scripts/lib/worktree-ports.js';
+import { derivePort, pgAccountOf, portsNamedByTests } from '../../scripts/lib/worktree-ports.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'aimeat-env-port-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -80,5 +81,18 @@ describe('a derived worktree port is not one a suite writes down', () => {
         for (const slug of ['cc-jouni-agents-p1', 'cc-jouni-pitfalls', 'agent-aaab48633cc402bbd']) {
             expect(named.has(derivePort(slug, named))).toBe(false);
         }
+    });
+});
+
+describe("the PostgreSQL account pnpm ready's batch worktree takes", () => {
+    it('reads the account and server from the test env, without the database', () => {
+        const a = join(dir, 'a'); const b = join(dir, 'b');
+        mkdirSync(a); mkdirSync(b);
+        writeFileSync(join(a, '.env.test.postgres-kysely'), 'DATABASE_URL="postgresql://appuser:devpassword123@localhost:5432/aimeat_kysely_e2e_one?schema=public"\n');
+        writeFileSync(join(b, '.env.test.postgres-kysely'), 'DATABASE_URL="postgresql://alice:secret@localhost:5432/aimeat_kysely_e2e_two?schema=public"\n');
+        expect(pgAccountOf(a)?.account).toBe('appuser:devpassword123@localhost:5432');
+        expect(pgAccountOf(b)?.account).toBe('alice:secret@localhost:5432');
+        expect(pgAccountOf(b)?.url).toContain('aimeat_kysely_e2e_two');
+        expect(pgAccountOf(join(dir, 'missing'))).toBeNull();
     });
 });

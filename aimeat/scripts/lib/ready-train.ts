@@ -38,6 +38,8 @@
  *   await ensureTrain(cfg);
  *   const verdicts = await runBatch(trainDeps(cfg), entries, batchId);
  * @version-history
+ *   v1.2.0 — 2026-11-25 — The batch's worktree takes the PostgreSQL account of the session that runs
+ *     the batch, when its own differs.
  *   v1.1.0 — 2026-11-24 — A code change runs the E2E suites it can reach (ready-reach.ts) and the unit
  *     files it reaches (vitest --changed); --full and the nightly run everything (Jouni, 2026-11-24).
  *   v1.0.1 — 2026-11-23 — A sweep's probe answers green only when every red suite ran again: it ran
@@ -54,7 +56,7 @@ import { passedStore, type PassedStore } from './ready-passed.js';
 import type { QueueEntry } from './ready-queue.js';
 import { readyScope } from './ready-scope.js';
 import { failedFiles, runUnitWithRerun, type RunCommand } from './unit-rerun.js';
-import { envPortOf, TRAIN_PORT, TRAIN_WORKTREE } from './worktree-ports.js';
+import { envPortOf, pgAccountOf, TRAIN_PORT, TRAIN_WORKTREE } from './worktree-ports.js';
 
 /** A test node gets this long to start in a sweep (the runner's own limit is 60 s, for a quiet machine). */
 const NODE_START_MS = '180000';
@@ -312,8 +314,14 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             // The worktree's env files were written when it was made, by the test:env:init of main as
             // it was then. One made before that script knew this worktree's port has a hashed one,
             // which a session can hold too: the candidate's script writes the right one.
-            if (envPortOf(aimeat) !== TRAIN_PORT) {
-                await runLogged(cfg, 'pnpm test:env:init --force', 'pnpm', ['test:env:init', '--force'], { cwd: aimeat });
+            // The PostgreSQL account comes from the session that runs the batch, whose own tests
+            // reach the server; the recipe wrote the example's CI account, which a developer's
+            // server rarely has, and the PostgreSQL stage went red after the whole SQLite one.
+            const own = pgAccountOf(cfg.sessionAimeat);
+            const accountDiffers = own !== null && own.account !== pgAccountOf(aimeat)?.account;
+            if (envPortOf(aimeat) !== TRAIN_PORT || accountDiffers) {
+                if (accountDiffers) cfg.say("the batch's worktree takes the PostgreSQL account of this session's test env");
+                await runLogged(cfg, 'pnpm test:env:init --force', 'pnpm', ['test:env:init', '--force'], { cwd: aimeat, env: own ? { AIMEAT_TEST_DATABASE_URL: own.url } : {} });
                 if (envPortOf(aimeat) !== TRAIN_PORT) throw new Error(`the batch's worktree has E2E port ${envPortOf(aimeat)}, not ${TRAIN_PORT}, and pnpm test:env:init --force did not change it; log: ${cfg.logFile}`);
             }
         },

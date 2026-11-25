@@ -10,9 +10,10 @@
  *   it starts, and a Postgres run empties its database between suites. The port is derived from the
  *   worktree's name, so two names can land on one port, and a copied env file carries another
  *   worktree's port; nothing said so until a run failed in a way that looked like a defect.
- * @structure envPortOf(aimeatDir) · portsOfOtherCheckouts(aimeatDir) · portsNamedByTests(aimeatDir) · portConflicts(aimeatDir, port)
+ * @structure envPortOf(aimeatDir) · pgAccountOf(aimeatDir) · portsOfOtherCheckouts(aimeatDir) · portsNamedByTests(aimeatDir) · portConflicts(aimeatDir, port)
  * @usage import { portConflicts } from './lib/worktree-ports.js';
  * @version-history
+ *   v1.3.0 — 2026-11-25 — pgAccountOf(): the PostgreSQL account a checkout's test env uses.
  *   v1.2.0 — 2026-11-23 — TRAIN_WORKTREE and TRAIN_PORT: the worktree of pnpm ready's batch and its port.
  *   v1.1.0 — 2026-11-21 — portsNamedByTests(): the 40xxx numbers the test files write down, which
  *     test:env:init no longer derives a port onto.
@@ -29,6 +30,24 @@ export function envPortOf(aimeatDir: string): number | null {
   if (!existsSync(f)) return null;
   const m = /^AIMEAT_PORT=(\d+)$/m.exec(readFileSync(f, 'utf-8'));
   return m ? Number(m[1]) : null;
+}
+
+/**
+ * The PostgreSQL account and server in a checkout's .env.test.postgres-kysely (`user:pass@host:port`),
+ * with the URL it came from, or null when there is none. The database part is left out: every
+ * checkout has its own database, and only the account says whether two checkouts can reach the server.
+ */
+export function pgAccountOf(aimeatDir: string): { account: string; url: string } | null {
+  const f = join(aimeatDir, '.env.test.postgres-kysely');
+  if (!existsSync(f)) return null;
+  const m = /^DATABASE_URL="?([^"\r\n]+)"?$/m.exec(readFileSync(f, 'utf-8'));
+  if (!m) return null;
+  try {
+    const u = new URL(m[1]!);
+    return { account: `${u.username}:${u.password}@${u.host}`, url: m[1]! };
+  } catch {
+    return null; // not a URL: test:env:init writes one, and a hand-edited file is left to its writer
+  }
 }
 
 /** The E2E port of every OTHER checkout of this repository (the main one and each worktree). */
