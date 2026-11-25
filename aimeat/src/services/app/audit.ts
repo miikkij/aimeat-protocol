@@ -38,6 +38,8 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-11-26 — `version.rollback` (services/app/rollback-ops.ts), and the audit answer carries
+ *     `changes`: the versions published and the rollbacks over 90 days, and their rate (changeRecord).
  *   2026-11-06 — `about`: the owner set or took off the text about the app (TARGET-093).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
@@ -125,7 +127,9 @@ export type AppAuditAction =
   // each word its owner took away.
   | 'scope_allowance.kept' | 'scope_allowance.removed'
   // The app opened to the internet on a closed node, asked for, extended or closed (services/internet-opening/).
-  | 'internet.requested' | 'internet.opened' | 'internet.extended' | 'internet.closed';
+  | 'internet.requested' | 'internet.opened' | 'internet.extended' | 'internet.closed'
+  // An earlier version published again (services/app/rollback-ops.ts): from, to, new_version, reason.
+  | 'version.rollback';
 
 export interface AppAuditEntry {
   at: string;
@@ -179,6 +183,36 @@ export async function readAppAudit(storage: Storage, ownerGhii: string, filename
  * live half of it asks neither. The run is read-only: nothing about the app changes, and no entry
  * is added to the log, because a playtest is not a change to how the app is offered.
  */
+/** How often the app's changes failed over the window: DORA's change-failure rate, read from what the node recorded. */
+export interface AppChangeRecord {
+  window_days: number;
+  /** Versions published in the window that were not a rollback. */
+  changes: number;
+  /** Rollbacks in the window: each one is a change that had to be undone. */
+  failed: number;
+  /** failed / changes, three decimals; null when nothing changed. */
+  change_failure_rate: number | null;
+}
+
+const CHANGE_WINDOW_DAYS = 90;
+
+/**
+ * The change record from the version rows and the active log. A rollback publishes a version too, so
+ * it is taken out of the changes it is counted against. Entries moved to an archive are not read: an
+ * archive holds what is older than the owner kept active, which is past this window in every case
+ * but a fresh manual archive.
+ */
+export function changeRecord(versions: Array<{ createdAt: string }>, log: ReadonlyArray<{ at: string; action: string }>, now = Date.now()): AppChangeRecord {
+  const since = now - CHANGE_WINDOW_DAYS * 86_400_000;
+  const published = versions.filter(v => Date.parse(v.createdAt) >= since).length;
+  const failed = log.filter(e => e.action === 'version.rollback' && Date.parse(e.at) >= since).length;
+  const changes = Math.max(0, published - failed);
+  return {
+    window_days: CHANGE_WINDOW_DAYS, changes, failed,
+    change_failure_rate: changes > 0 ? Math.round((failed / changes) * 1000) / 1000 : null,
+  };
+}
+
 export async function ownerAppAudit(
   storage: Storage,
   config: AimeatConfig,
@@ -186,6 +220,7 @@ export async function ownerAppAudit(
 ): Promise<{
   total: number; entries: AppAuditEntry[]; archives: Array<{ year: string; entries: number }>;
   keep: { keep: number; source: 'owner' | 'node' }; year?: string; live?: AppPlaytestBundle;
+  changes?: AppChangeRecord;
 } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
   if (!scope) return { error: 'This connection is not acting for an owner, so it has no app to read the log of.' };
@@ -202,7 +237,7 @@ export async function ownerAppAudit(
     total: all.length, entries,
     archives: await listArchives(storage, scope.ownerGhii, args.filename),
     keep: await effectiveKeep(storage, scope.ownerGhii),
-    ...(args.year ? { year: args.year } : {}),
+    ...(args.year ? { year: args.year } : { changes: changeRecord(await storage.listAppVersionSummaries(app.ownerGaii, args.filename), all) }),
   };
   if (!args.playtest) return base;
   const live = await auditAppWithPlaytest(storage, config, { ownerName: scope.ownerName, filename: args.filename });

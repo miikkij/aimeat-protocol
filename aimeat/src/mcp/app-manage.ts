@@ -229,7 +229,7 @@ export function registerAppManageTool(
                 if ('error' in out) return plainRefusal(out.error);
                 return answer({
                     filename, total: out.total, entries: out.entries, archives: out.archives, keep: out.keep,
-                    ...(out.year ? { year: out.year } : {}), ...(out.live ? { live: out.live } : {}),
+                    ...(out.year ? { year: out.year } : {}), ...(out.changes ? { changes: out.changes } : {}), ...(out.live ? { live: out.live } : {}),
                 });
             }
             case 'versions': {

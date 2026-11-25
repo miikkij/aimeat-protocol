@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-26 — rollback: an earlier version back as the newest, with the reason in the audit log
+ *     (services/app/rollback-ops.ts); `version` and `note` describe it.
  *   2026-11-20 — `filename` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
  *   2026-11-15 — icon_upload, with the icon and storage_key fields: the app's PNG icon over MCP, as
  *     POST /v1/apps/:owner/:filename/icon sets it; marks also answers whether the app can be installed
@@ -130,8 +132,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // ui
     detail: { type: 'array', description: UI_DETAIL_PARAM, zod: z.array(z.string().max(INPUT_LIMITS.id)) },
     layout: { type: 'object', description: 'For ui_set: the WHOLE layout { v: 1, look?, nav?, blocks: [{ id, component, props }] }. It replaces what is there; read it first with ui_get.' },
-    note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set and builder_set: the owner\'s own note on the decision (at most 400 characters; the person does not see it). For member_request: your message to the owner, who sees it with the request.' },
-    version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).', zod: z.number().int().min(1) },
+    note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set and builder_set: the owner\'s own note on the decision (at most 400 characters; the person does not see it). For member_request: your message to the owner, who sees it with the request. For rollback: why the version is put back, at most 400 characters; it goes into the audit log.' },
+    version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced). For rollback: the published version number to put back, earlier than the live one (versions lists them).', zod: z.number().int().min(1) },
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version. For structure_set: the app\'s name while it is not published yet.' },
     descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.', zod: z.record(z.string(), z.string().max(INPUT_LIMITS.description)) },
@@ -327,6 +329,8 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'read or set how much of each app\'s audit log is kept. Everything is kept by default; "all" keeps it so, and a limit that deletes is the account holder\'s own decision' },
     versions: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'list the version history (number, display version, size, created at)' },
+    rollback: { fields: F(['filename', 'version', 'note'], ['owner']), scope: 'app:write',
+        summary: 'put an earlier version back when a release broke the app: its bytes are published again as the newest version, the broken one stays in the history, and the reason goes into the audit log. Every check on the bytes still holds; what the app owes beside them (design spec, data map, skill) is named in the answer and does not stop the rollback. audit counts the rollbacks of the last 90 days as failed changes. The owner and everybody who may publish the app' },
     lineage: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'the fork tree: where the app came from and every fork made of it' },
     screenshot: { fields: F(['filename'], ['owner']), scope: 'app:write',

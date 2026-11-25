@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-26 — edit-published-app names aimeat_app_manage rollback for undoing a broken release.
  *   2026-11-26 — +key-in-page-source (the publish refuses a key in the page) and
  *     +html-built-from-values (warns on values written into HTML with nothing escaped), both read by
  *     services/app/generated-code-lint.ts.
@@ -487,12 +488,13 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'edit-published-app',
     title: 'Editing a published app: seed a draft, change it, publish it under the same filename',
     symptom: 'Rebuilding an app from scratch, publishing under a new filename, or looking for the source in aimeat_app_get (which returns the manifest, not the HTML) loses version history and forks the audience.',
-    fix: 'aimeat_app_draft_seed copies the live app into a draft on the node; change it with aimeat_app_draft_read / aimeat_app_draft_replace, open its preview_url, and publish with aimeat_app_draft_publish under the SAME filename, which bumps the version. When you need a local copy, GET the app\'s download_url (the stored file). A copy saved from the inline page contains the node\'s serve marks; publishing one still works, because the publish removes those marks before storing and names them in served_marks_removed, but the stored file is the one to edit.',
+    fix: 'aimeat_app_draft_seed copies the live app into a draft on the node; change it with aimeat_app_draft_read / aimeat_app_draft_replace, open its preview_url, and publish with aimeat_app_draft_publish under the SAME filename, which bumps the version. When you need a local copy, GET the app\'s download_url (the stored file). A copy saved from the inline page contains the node\'s serve marks; publishing one still works, because the publish removes those marks before storing and names them in served_marks_removed, but the stored file is the one to edit. To undo a release that broke the app, do not seed and republish by hand: aimeat_app_manage { action: "rollback", filename, version, note } puts that version back as the newest in one call and records why.',
     appliesTo: ['publish'],
     severity: 'info',
     source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
+    updatedAt: '2026-11-26',
+    verifiedAt: '2026-11-26',
+    verifiedVersion: '4.3.1',
   }),
   E({
     id: 'display-version-carried',

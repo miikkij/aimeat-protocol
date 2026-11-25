@@ -45074,6 +45074,50 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/rollback:
+    post:
+      operationId: appRollback
+      summary: Put an earlier version of the app back, in one call
+      description: >
+        Body `{ version, note }`. `version` is a published version number earlier than the live one;
+        `note` says why, at most 400 characters, and goes into the app's audit log as
+        `version.rollback` with `from`, `to`, `new_version` and `reason`. The old version's bytes are
+        published again as the newest version, so the replaced version stays in the history. Every
+        check on the bytes still holds (422 `APP_ARTIFACT_BROKEN`); the documents the app owes beside
+        its bytes do not stop a rollback and are named in `owes`. Returns 201 with
+        `{ filename, rolled_back_to, replaced_version, version_number, version, reason, url, owes,
+        app_hints, meaning }`. Refuses 400 `INVALID_INPUT` without a note or for a version that is not
+        earlier, 404 `VERSION_NOT_FOUND` for a version no longer kept, 409 `ALREADY_LIVE` when the live
+        bytes are that version's. Needs `app:write` and the owner, one of the owner's agents, or a
+        development right that may publish. The app's audit answer counts the rollbacks of the last 90
+        days in `changes`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, note]
+              properties:
+                version: { type: integer, minimum: 1 }
+                note: { type: string, maxLength: 400 }
+      responses:
+        '201':
+          description: Rolled back
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { description: 'APP_ARTIFACT_BROKEN: the version''s bytes would not publish today; details.findings names why.' }
   /v1/apps/{owner}/{filename}/design-spec:
     get:
       operationId: appDesignSpecGet
@@ -83908,6 +83952,10 @@ paths:
         record per year; `archives` lists the archived years with their counts, `?archive=<year>`
         reads that year instead of the active log (400 for anything but four digits), and `keep`
         is the limit in force ({ keep, source }, 0 = all; see /v1/audit/apps/settings).
+
+        Without `?archive`, `changes` counts how often a change had to be undone over the last 90
+        days: `{ window_days, changes, failed, change_failure_rate }`, where `failed` is the
+        rollbacks (POST .../rollback) and `changes` the other versions published in the window.
 
         With `?playtest=true` the node also OPENS the app: the same check the publish runs on its
         bytes, then a live run in a headless browser with nobody signed in, at a 390x844 phone and

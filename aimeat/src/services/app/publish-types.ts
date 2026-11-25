@@ -8,6 +8,7 @@
  * @structure RequestedManifest · PublishAppInput · PublishAppRefusal
  * @usage import type { PublishAppInput } from './publish.js';
  * @version-history
+ *   v1.2.0 — 2026-11-26 — PublishAppInput.source `rollback`.
  *   v1.1.0 — 2026-10-27 — PublishAppInput.publishingApp, the app whose grant publishes (secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Moved unchanged from services/app-publish.ts.
  */
@@ -72,8 +73,12 @@ export interface PublishAppInput {
    * refreshed — with three announcements muted, because installing a copy of something that already
    * exists is not the event those announcements are for, and a six-app package would put six rows in
    * a feed that stops being read at that point. See `announces` below.
+   *
+   * `rollback` is an earlier version's bytes published again (services/app/rollback-ops.ts). Every
+   * check on the bytes holds; the owed-documents gate does not, because those documents do not change
+   * with the bytes and a rollback must not wait for them. The rollback's answer names what is owed.
    */
-  source: 'inline' | 'presigned' | 'draft' | 'package-install';
+  source: 'inline' | 'presigned' | 'draft' | 'package-install' | 'rollback';
   /** The publish gate's answer for the caller, asked by the door (null: a package install). Read on a first publish only (app-publish-gate.ts). */
   publishGate: PublishAsk | null;
   /** A provenance record the caller asked to attach — checked against their own account. */

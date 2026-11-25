@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-26 — Source `rollback` (services/app/rollback-ops.ts) is not held to the owed-documents gate;
+ *     every byte check still holds.
  *   2026-11-24 — An update of an app that lacks its design spec, its data map (when it keeps data), its
  *     bound skill and agent face (not on proto or a presentation) or the update's roadmap line is
  *     refused, APP_OWES_ITEMS, under apps.owed_on_publish = refuse (owed-gate.ts).
@@ -423,7 +425,8 @@ export async function publishApp(
   }
 
   // What every app owes, from its second version on (owed-gate.ts): refused before anything is written.
-  if (isUpdate && isHtml && input.source !== 'package-install' && config.appOwedOnPublish === 'refuse') {
+  // A rollback is not held to it: it names what is owed in its own answer (rollback-ops.ts).
+  if (isUpdate && isHtml && input.source !== 'package-install' && input.source !== 'rollback' && config.appOwedOnPublish === 'refuse') {
     const missing = await owedMissing(storage, config, {
       ownerName, ownerGhii, filename, html, hasDesignSpec: !!designSpec, roadmapLine: 'line' in road ? road.line : null,
     });

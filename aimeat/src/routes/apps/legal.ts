@@ -22,6 +22,7 @@
  *   the MCP tool, both through services/app/legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   2026-11-26 — GET …/audit carries `changes`: versions published and rollbacks over 90 days (changeRecord).
  *   2026-11-15 — GET …/legal/:kind answers a browser's navigation to a missing app, kind or page with
  *     the not-found page (middleware/not-found-page.ts); every other caller gets the same JSON 404.
  *   2026-10-21 — authenticated() asks isAnonymousPrincipal, so the minted anonymous token is no owner of
@@ -68,7 +69,7 @@ import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
   appSellsForMoney,
 } from '../../services/app/legal.js';
-import { readAppAudit } from '../../services/app/audit.js';
+import { changeRecord, readAppAudit } from '../../services/app/audit.js';
 import { listArchives, readArchiveYear, effectiveKeep } from '../../services/app/audit-archive.js';
 import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../../services/app/audit-keep.js';
 import { sendAppOp } from '../app-op-answer.js';
@@ -247,7 +248,8 @@ export function registerLegalRoutes(
       // What else is kept, and how much: the archived years, and the limit in force.
       archives: await listArchives(storage, app.ownerGaii, app.filename),
       keep: await effectiveKeep(storage, app.ownerGaii),
-      ...(year ? { year } : {}),
+      // How often a change had to be undone, over 90 days (services/app/audit.ts changeRecord).
+      ...(year ? { year } : { changes: changeRecord(await storage.listAppVersionSummaries(app.ownerGaii, app.filename), all) }),
       ...(live ? { live } : {}),
     }));
   });
