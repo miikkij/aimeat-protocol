@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:e38c0cbc37c526293489fd78"
+      "digest": "sha256:e529932b8ec74eb1246e0303"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-23",
@@ -777,10 +777,10 @@
     },
     "11. Served libraries and the Design Book": {
       "aimeat/src/data/library-packs/cortex.ts": "c3249dd149ece481",
-      "aimeat/src/data/library-packs/sdk-ai.ts": "5cc0de78620b488e",
+      "aimeat/src/data/library-packs/sdk-ai.ts": "4889ff3f13bd1a1a",
       "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
       "aimeat/src/data/library-packs/sdk-datapackage.ts": "7a3d4cea84ada9e1",
-      "aimeat/src/data/library-packs/sdk-decide.ts": "9c4e0846fd0b07d9",
+      "aimeat/src/data/library-packs/sdk-decide.ts": "98c1a25253bc5eb2",
       "aimeat/src/data/library-packs/sdk-intake-connect.ts": "fbf9d13b9bce917a",
       "aimeat/src/data/library-packs/sdk-labels.ts": "9f31f95039f0f126",
       "aimeat/src/data/library-packs/sdk-living.ts": "92600357aae8cb3a",
