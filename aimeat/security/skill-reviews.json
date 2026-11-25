@@ -329,12 +329,12 @@
       "digest": "sha256:c77e32bfcaedee39f2f7ebd7"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:ee8198c1303e0603436fbb0e"
+      "digest": "sha256:b309954fb6153039258dea36"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -568,7 +568,7 @@
         "aimeat/src/services/themes/tiilitaivas.ts",
         "aimeat/src/services/themes/selkea.ts"
       ],
-      "digest": "sha256:aac34395f1b480c1c27d9707",
+      "digest": "sha256:9d47f2a3578c80d1fc6215dd",
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
@@ -643,7 +643,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:a88aa5b2a65d09060c3796c9",
+      "digest": "sha256:2c16b5fe141d15eb509ee2f0",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -660,7 +660,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:a88aa5b2a65d09060c3796c9",
+      "digest": "sha256:2c16b5fe141d15eb509ee2f0",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -802,7 +802,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "750a491fc4f14c88",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "cfc28a2a1c167a7d"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "3a65e66af820fe5d"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -852,12 +852,12 @@
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "46ed1982e891c427",
-      "aimeat/public/css/poster.css": "1a5ae68e3545e472",
+      "aimeat/public/css/poster.css": "075788be849de4b4",
       "aimeat/public/lib/aimeat-fonts.css": "8e1826590b7d1bc9",
       "aimeat/src/services/themes/tokens.ts": "7178b915f0c271ee",
       "aimeat/src/services/app-ui/signature-tokens.ts": "3e2b6b25cc6e44d8",
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121",
-      "aimeat/src/services/themes/selkea.ts": "273e4200a32f7b3c"
+      "aimeat/src/services/themes/selkea.ts": "a513a825250424bc"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "ff5667f45f677f32",
@@ -1059,14 +1059,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "628c1747cf689bef"
+      "aimeat/test/run-e2e-ci.ts": "0843c73b3925f702"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "ff5667f45f677f32"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "628c1747cf689bef"
+      "aimeat/test/run-e2e-ci.ts": "0843c73b3925f702"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
