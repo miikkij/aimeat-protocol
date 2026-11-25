@@ -168,7 +168,7 @@
       "digest": "sha256:d873015ecdc8ca651ee32d7d"
     },
     "9. AI on the node": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/tool-catalog/definitions/calibrator.ts",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:e6af7b237ae23df0b701ba55"
+      "digest": "sha256:fa7937fa8b76dc7b22aba4b5"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-25",
@@ -736,25 +736,25 @@
       "aimeat/src/services/calibrator/projects.ts": "5211587c214e3e55",
       "aimeat/src/services/calibrator/templates.ts": "448f5fe229c721d1",
       "aimeat/src/services/ai/routing.ts": "2afc4763d5e75031",
-      "aimeat/src/services/ai/roles.ts": "e2afb7ec8d3c1029",
+      "aimeat/src/services/ai/roles.ts": "1f3d081517970758",
       "aimeat/src/services/ai/policy-store.ts": "4f4c8e2abba6f06c",
       "aimeat/src/services/ai/gen-rules-store.ts": "2f8415970c2bfebb",
       "aimeat/src/services/operator/confirm.ts": "348eaf355869e551",
       "aimeat/src/services/ai/allowance.ts": "d77d33042b513f2a",
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61",
-      "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
+      "aimeat/src/services/ai/openrouter-region.ts": "35855149762a3935",
       "aimeat/src/services/ai/transcription.ts": "994b10f23a26e665",
       "aimeat/src/services/ai/voice.ts": "87d6b0f6a2227a69",
       "aimeat/src/routes/ai.ts": "5a597fdae8434769",
       "aimeat/src/routes/llm-proxy.ts": "027d67cf9f0f75cc",
       "aimeat/src/routes/ai-providers.ts": "223c9be9d18fb28c",
       "aimeat/src/routes/ai-decide.ts": "a24ebb94effd126a",
-      "aimeat/src/routes/ai-decide-rules.ts": "98a8f991a7dd5a65",
+      "aimeat/src/routes/ai-decide-rules.ts": "b365b7b7be6079ea",
       "aimeat/src/routes/ai-jobs.ts": "e63ac7114ec0946d",
       "aimeat/src/routes/calibrator.ts": "76c47a4541980801",
       "aimeat/src/routes/living.ts": "e1a23e862add5ae0",
-      "aimeat/src/tool-catalog/definitions/ai-models.ts": "5938f22554edac2b",
-      "aimeat/src/tool-catalog/definitions/decide.ts": "9cf56e2da276e690"
+      "aimeat/src/tool-catalog/definitions/ai-models.ts": "483ec4bb385c5321",
+      "aimeat/src/tool-catalog/definitions/decide.ts": "597e5c74f1e42574"
     },
     "10. Apps": {
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
