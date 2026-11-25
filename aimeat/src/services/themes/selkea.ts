@@ -240,9 +240,11 @@ function themeCss(): string {
 /* A tab is a framed button in the body face: no line under its word in any of its cuts. */
 :root .poster-tab { text-decoration: none; font-family: var(--font-body); }
 /* A tag inside a list cell is measured with its frame, so its own max-width keeps it inside the cell,
-   and it wraps between its words. On a narrow screen the boards list gives its visibility column the
-   width of the tag, up to 9rem, so a two-word tag takes two lines and stays clear of the row's button. */
+   and it wraps between its words. The boards list gives its visibility column the width of the tag:
+   up to 13rem on a wide screen, where a two-word tag then takes one line, and up to 9rem on a narrow
+   one, where it takes two lines and stays clear of the row's button. */
 :root .listing-row .poster-chip { box-sizing: border-box; white-space: normal; }
+:root .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(13rem) minmax(0, 8rem) minmax(0, 11rem) minmax(3.5rem, max-content); }
 @media (max-width: 900px) {
   :root .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(9rem) minmax(3.5rem, max-content); }
 }

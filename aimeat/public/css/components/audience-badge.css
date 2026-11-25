@@ -10,6 +10,9 @@
  *   reads 4.5:1 or better in both themes and is not the coral of a destructive action.
  * @structure .audience-badge · --open (anyone with the link, the code or the password) · .audience-badge-eye
  * @version-history
+ *   v1.1.1 — 2026-11-25 — The badge is measured with its frame, so its max-width of 100% is the cell's
+ *     width. Without it a long badge in a listing cell was wider than the cell by its padding and
+ *     frame (16px), and its frame stood on the next column's text.
  *   v1.1.0 — 2026-10-18 — The eye before the words and semibold words, so the badge reads as its own
  *     mark beside other tags (a board's page head).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V6.4; the browser check of 1c0b57fba).
@@ -20,6 +23,7 @@
   gap: .35rem;
   justify-self: start;
   align-self: center;
+  box-sizing: border-box;
   width: max-content;
   max-width: 100%;
   font-size: var(--text-xs);
