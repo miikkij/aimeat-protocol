@@ -12,6 +12,7 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.38.0 — 2026-11-25 — The cut name-n-n-n-n-n (Usage's report on tools, which gained the column Largest answer), with the widths of name-n-n-n-n and one more figure column.
  *   v1.37.0 — 2026-11-24 — The action column of a list grows to its content: its fixed width is now its
  *     minimum (`3rem` is `minmax(3rem, max-content)`, in 36 layouts). A theme that draws a row's action as
  *     a button with side padding, or a language with a longer word, stood past the column's edge. The
@@ -379,9 +380,12 @@
 .listing--name-n-n { grid-template-columns: minmax(0, 1fr) auto auto; }
 .listing--name-n-n-n { grid-template-columns: minmax(0, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto) minmax(4rem, auto); }
 .listing--name-n-n-n-n { grid-template-columns: minmax(0, 1fr) minmax(4rem, auto) minmax(4rem, auto) minmax(4rem, auto) minmax(4.5rem, auto); }
+.listing--name-n-n-n-n-n { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(4rem, auto)) repeat(2, minmax(4.5rem, auto)); }
 .listing--name-desc-state-doors { grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr) auto auto; }
 @media (max-width: 560px) {
-  .listing--name-n-n-n, .listing--name-n-n-n-n { gap: 0 .6rem; }
+  .listing--name-n-n-n, .listing--name-n-n-n-n, .listing--name-n-n-n-n-n { gap: 0 .6rem; }
+  /* Five figure columns at their desktop minimums leave the name no width on a phone. */
+  .listing--name-n-n-n-n-n { grid-template-columns: minmax(0, 1fr) repeat(5, auto); }
 }
 /* cuts: group 8 (the lists held back while the line under a name was a question). Where a list kept
    its heading row on a phone, its cut shows the heading row again under 860px. */

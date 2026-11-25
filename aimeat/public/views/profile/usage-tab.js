@@ -29,6 +29,9 @@
  *   (PageStart id "usage") gives the prompt that has one's own AI read the same reports.
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.11.0 -- 2026-11-25 -- The report on tools has the column Largest answer (answer_chars_max of
+ *     each tool, in characters), and its column head opens the explanation usage.answerSize. Only
+ *     that report has it: the node measures the answer of an MCP tool call and of nothing else.
  *   v1.10.0 -- 2026-11-08 -- Unpriced and Refused open their explanation (usage.unpriced,
  *     usage.refused): the word in the figure strip, and Refused's column head in the activity table.
  *   v1.9.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
@@ -183,13 +186,26 @@ export default function UsageTab() {
   // A word that opens its own explanation (`explain.<term>.*`); without a term the word alone.
   const helpWord = (words, term) => (term ? html`<${HelpLabel} term=${term} label=${words}>${words}<//>` : words);
 
+  // The size of an answer is measured on MCP tool calls alone, so only the report on tools shows it.
+  const withAnswerSize = report === 'tool';
+
+  // A column head: its words, and the explanation it opens when it has one.
   const headers = current.kind === 'spend'
-    ? [t('profile.usage.colName'), t('profile.usage.statCost'), t('profile.usage.statTokens'), t('profile.usage.statCalls')]
-    : [t('profile.usage.colName'), t('profile.usage.statCalls'), t('profile.usage.statRefused'), t('profile.usage.statErrors'), t('profile.usage.colAvgTime')];
+    ? [{ label: t('profile.usage.colName') }, { label: t('profile.usage.statCost') }, { label: t('profile.usage.statTokens') }, { label: t('profile.usage.statCalls') }]
+    : [
+        { label: t('profile.usage.colName') },
+        { label: t('profile.usage.statCalls') },
+        { label: t('profile.usage.statRefused'), term: 'usage.refused' },
+        { label: t('profile.usage.statErrors') },
+        { label: t('profile.usage.colAvgTime') },
+        ...(withAnswerSize ? [{ label: t('profile.usage.colMaxAnswer'), term: 'usage.answerSize' }] : []),
+      ];
 
   const rows = groups.map(g => (current.kind === 'spend'
     ? [g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
-    : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg)]));
+    : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg),
+        // A row with no measured answer (a web request, a call from before the measurement) stays empty.
+        ...(withAnswerSize ? [g.answer_chars_max ? compact(g.answer_chars_max) : ''] : [])]));
 
   // An empty report is a fact about this account, not a broken page — so it says which
   // question was asked and over what window, rather than showing a bare dash.
@@ -222,10 +238,10 @@ export default function UsageTab() {
       ${data ? html`<${TabPanel} value=${`${report}-${period}`} label=${t(REPORTS.find(r => r.id === report)?.label || '')}>
         <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: helpWord(c.label, c.term) }))} />
         ${chart}
-        <${List} keepCols cols=${headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
+        <${List} keepCols cols=${headers.length > 5 ? 'name-n-n-n-n-n' : headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
           head=${headers.map((hd, i) => (i
-            ? { label: helpWord(hd, hd === t('profile.usage.statRefused') ? 'usage.refused' : null), num: true }
-            : hd))}
+            ? { label: helpWord(hd.label, hd.term), num: true }
+            : hd.label))}
           empty=${emptyWords}
           rows=${rows}
           render=${(row, ri) => html`<${Row} key=${ri}>${row.map((cell, i) => (i
