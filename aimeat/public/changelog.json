@@ -4,6 +4,37 @@
     {
       "date": "2026-11-25",
       "kind": "feature",
+      "id": "2026-11-25-your-ai-creates-a-knowledge-package",
+      "highlight": false,
+      "audience": ["user", "agent"],
+      "title": { "en": "Your AI creates a knowledge package", "fi": "Tekoälysi luo tietopaketin" },
+      "body": { "en": "Your AI can now create a new knowledge package and all its entries in one call, and add to it later. Every package tool says which package it works on.", "fi": "Tekoälysi voi nyt luoda uuden tietopaketin ja kaikki sen merkinnät yhdellä kutsulla ja lisätä siihen myöhemmin. Jokainen pakettityökalu kertoo, mitä pakettia se käsittelee." },
+      "summary": { "en": "Your AI creates a knowledge package with all its entries in one call, and adds to it later.", "fi": "Tekoälysi luo tietopaketin merkintöineen yhdellä kutsulla ja lisää siihen myöhemmin." }
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "fix",
+      "id": "2026-11-25-codex-and-other-desktop-ais-stay-connected-after-a-restart",
+      "highlight": false,
+      "audience": ["user", "agent"],
+      "title": { "en": "Codex and other desktop AIs stay connected after a restart", "fi": "Codex ja muut työpöydän tekoälyt pysyvät yhteydessä uudelleenkäynnistyksen jälkeen" },
+      "body": { "en": "A client that registers as public needs no secret, so its sign-in renews after a restart.", "fi": "Julkiseksi rekisteröityvä asiakas ei tarvitse salaisuutta, joten sen kirjautuminen uusiutuu uudelleenkäynnistyksen jälkeen." },
+      "summary": { "en": "Codex and other desktop AIs stay connected after they restart.", "fi": "Codex ja muut työpöydän tekoälyt pysyvät yhteydessä uudelleenkäynnistyksen jälkeen." },
+      "impact": { "en": "If Codex lost its connection, sign it out of AIMEAT and in again once; after that it stays connected.", "fi": "Jos Codexin yhteys katkesi, kirjaa se kerran ulos AIMEATista ja takaisin sisään. Sen jälkeen yhteys pysyy." }
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "feature",
+      "id": "2026-11-25-an-app-sells-its-own-subscription",
+      "highlight": false,
+      "audience": ["user", "developer"],
+      "title": { "en": "An app sells its own subscription", "fi": "Sovellus myy oman tilauksensa" },
+      "body": { "en": "An app can open a payment for a subscription it sells itself, and you pay on Stripe's own card page. The app needs no permission to spend your money. It cannot sell another app's subscription this way.", "fi": "Sovellus voi avata maksun tilaukselle, jota se itse myy, ja sinä maksat Stripen omalla korttisivulla. Sovellus ei tarvitse lupaa käyttää rahojasi. Toisen sovelluksen tilausta se ei voi myydä näin." },
+      "summary": { "en": "An app sells its own subscription, and you pay on Stripe's card page.", "fi": "Sovellus myy oman tilauksensa, ja sinä maksat Stripen korttisivulla." }
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "feature",
       "id": "2026-11-25-your-ai-reads-larger-answers-in-one-go",
       "highlight": false,
       "audience": ["user", "agent", "operator"],
