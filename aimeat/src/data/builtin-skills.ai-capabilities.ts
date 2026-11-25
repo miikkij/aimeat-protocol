@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.6.2 — 2026-11-25 — The page where the owner sets a key and connects a role is named the AI
+ *     models page, its name since 2026-11-25, in four places. Measured with the eval suite.
  *   v1.6.1 — 2026-11-23 — Plain verbs: an answer or an error has or includes a field, a job's answer is
  *     stored in the owner's namespace, and an off capability gives three fields that say how to fix
  *     it. The instructions are otherwise the same; measured before and after with the eval suite.
@@ -105,7 +107,7 @@ each capability it answers \`on\`, the \`model\` and \`provider\` a call would u
 |---|---|
 | NO_MODEL | The owner sets a model for it on a provider, or the operator sets a node default. |
 | NO_PROVIDER_SUPPORTS | The owner adds a provider of a type in \`providersThatCan\`. |
-| NO_KEY | The owner sets the key on the AI settings page. Never ask for a key in chat. |
+| NO_KEY | The owner sets the key on the AI models page. Never ask for a key in chat. |
 | POLICY_EMPTY | Propose a policy change with aimeat_ai_policy_set; the owner confirms. |
 | BUDGET_EXHAUSTED | The owner raises the daily budget, or it resets at midnight UTC. |
 | RETIRED_MODEL | Find another with aimeat_ai_models and propose it. |
@@ -173,9 +175,9 @@ with \`+\` (\`role.illustrator=text+image\`), and its fine-tuning (\`temperature
   names the providers and models in order, so the app works on any owner's providers. The owner's role
   must have a provider for every capability yours needs, or the connection is refused.
 - **Say how much text the role reads**: \`role.<name>.context=100000\` (tokens). A model the catalogue
-  says reads less is passed over, and the owner's AI page says so on the role.
+  says reads less is passed over, and the owner's AI models page says so on the role.
 - **Nothing runs until the owner connects it.** An unconnected role is refused with AI_ROLE_NOT_BOUND
-  (409) and the owner sees the request on the AI page. \`capabilities()\` answers \`roles\`, each with
+  (409) and the owner sees the request on the AI models page. \`capabilities()\` answers \`roles\`, each with
   \`bound\` and a \`fix\`: show it beside the control, as for a capability that is off.
 - **As an app:** \`AIMEAT.ai.roles()\` answers the app's own roles only, each with \`boundTo\` (null while
   it waits). It never shows the owner's other apps.
@@ -235,7 +237,7 @@ otherwise; the provider's own bill is the real one.
 
 Other codes a call can answer: AI_MODEL_POLICY_EMPTY (the owner's policy and the app's \`models=\` share
 no model), AI_PROVIDER_NOT_CONFIGURED (the named model's provider type is not set up), NO_API_KEY and
-INVALID_API_KEY (the owner enters the key again on the AI settings page; it is not the app's sign-in,
+INVALID_API_KEY (the owner enters the key again on the AI models page; it is not the app's sign-in,
 so do not refresh the session), PROMPT_TOO_LONG, FILES_TOO_LARGE, and the role codes AI_ROLE_NOT_BOUND,
 AI_ROLE_NOT_DECLARED and AI_ROLE_LACKS_CAPABILITY. Each answers with a message to show; never an empty
 result.

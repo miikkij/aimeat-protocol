@@ -20,6 +20,7 @@
  *   the routing tries it (route-plan.ts), so the capability is on and a call finds out.
  * @structure CAPABILITY_ORDER · CapabilityState · aiCapabilitiesView()
  * @version-history
+ *   v1.5.1 — 2026-11-25 — An unbound role's fix names the AI models page, the page's name since 2026-11-25.
  *   v1.5.0 — 2026-11-07 — `main`, `power` and, for an app that declares AI roles, `needs`: what the
  *     sign-in pill shows (ai-status.ts), from the text state planned here.
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
@@ -94,7 +95,7 @@ export interface CapabilityState {
   fix?: string;
   /** The same fix for an AI that can act on it: tool names and parameters. */
   agentFix?: string;
-  /** The AI settings page, opened at the provider to fix (and its test, when a test is the fix). */
+  /** The AI models page, opened at the provider to fix (and its test, when a test is the fix). */
   settingsUrl?: string;
   /** For UNTESTED: the provider whose test turns the capability on. */
   testProvider?: { id: string; title: string; capability: AiCapability };
@@ -191,7 +192,7 @@ async function rolesOf(
       const bound = record.bindings[bindingKey(app.address ?? appRef!, r.name)];
       return {
         name: r.name, capabilities: r.capabilities, ...(r.purpose ? { purpose: r.purpose } : {}), bound: !!bound,
-        ...(bound ? {} : { fix: `The owner connects the role '${r.name}' to one of their AI roles on the AI page, or you propose it with aimeat_ai_role_set and the owner confirms. Until then a call with role '${r.name}' is refused.` }),
+        ...(bound ? {} : { fix: `The owner connects the role '${r.name}' to one of their AI roles on the AI models page, or you propose it with aimeat_ai_role_set and the owner confirms. Until then a call with role '${r.name}' is refused.` }),
       };
     });
   }
