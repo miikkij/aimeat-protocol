@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:bd24578269ecab944fd03f52"
+      "digest": "sha256:abeca9994c21a13b06d27373"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-24",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:e5c065a6876c318b046c5939"
+      "digest": "sha256:f1d754671a43b333a808abb2"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-22",
@@ -511,7 +511,7 @@
       "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
       "aimeat/src/mcp/oauth-consent-info.ts": "36d3fc455b40c6ee",
       "aimeat/src/mcp/protocol-version.ts": "f57eb3836e14df1e",
-      "aimeat/src/routes/bootstrap.ts": "5f5d9f74ef848dfe",
+      "aimeat/src/routes/bootstrap.ts": "0fc4e4a55dff0d37",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/mcp/tasks-extension.ts": "ef9e3abaac54ea08",
       "aimeat/src/routes/mcp-servers.ts": "1d4290edfd5cb7e7",
@@ -659,6 +659,7 @@
       "aimeat/src/services/knowledge/audience.ts": "dc0306b7688d848a",
       "aimeat/src/services/knowledge/link-owner-keep.ts": "822037c470099c01",
       "aimeat/src/services/knowledge/manifest-validator.ts": "fa85443c34ad69dc",
+      "aimeat/src/services/knowledge/manifest-write.ts": "fe35cd192ee51b0a",
       "aimeat/src/services/knowledge/overview.ts": "84801f43db62b464",
       "aimeat/src/services/knowledge/package-entry.ts": "c873ea18af7f1374",
       "aimeat/src/services/knowledge/package-import.ts": "53dc67e680b8db66",

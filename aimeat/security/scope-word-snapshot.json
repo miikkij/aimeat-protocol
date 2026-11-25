@@ -1818,6 +1818,7 @@
     "src/routes/knowledge/packages-core.ts:GET:/v1/knowledge/:id": [],
     "src/routes/knowledge/packages-core.ts:GET:/v1/knowledge/:id/broken-links": ["memory:read"],
     "src/routes/knowledge/packages-core.ts:GET:/v1/knowledge/:id/links": [],
+    "src/routes/knowledge/packages-core.ts:POST:/v1/knowledge/:id/entries": ["memory:write"],
     "src/routes/knowledge/packages-core.ts:POST:/v1/knowledge/:id/link": ["memory:write"],
     "src/routes/knowledge/packages-core.ts:POST:/v1/knowledge/import": ["memory:write"],
     "src/routes/knowledge/sharing.ts:GET:/v1/knowledge/:id/export": [],

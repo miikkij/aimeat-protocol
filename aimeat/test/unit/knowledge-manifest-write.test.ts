@@ -43,7 +43,8 @@ describe('a knowledge package manifest written as memory', () => {
 
     it('refuses a content type outside the list, and a missing sharing block', () => {
         expect(knowledgeManifestWriteRefusal(KEY, { ...valid(), content_type: 'gossip' }, undefined, undefined)?.code).toBe('SCHEMA_VALIDATION_FAILED');
-        const { sharing: _s, ...noSharing } = valid();
+        const noSharing: Record<string, unknown> = valid();
+        delete noSharing.sharing;
         expect(knowledgeManifestWriteRefusal(KEY, noSharing, undefined, undefined)?.code).toBe('SCHEMA_VALIDATION_FAILED');
     });
 

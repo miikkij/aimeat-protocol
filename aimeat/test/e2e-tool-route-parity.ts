@@ -1043,14 +1043,7 @@ let pbReaderAg!: McpAgent, pbReaderMcp!: McpSession;
 const pkgLinks = (id: string, token: string) => call('GET', `/v1/knowledge/${id}/links`, token);
 await test('Setup (B15): alice in person writes a public and a private package manifest; her agent holding memory:read and memory:read-as-owner', async () => {
     for (const [id, visibility] of [[PB_PKG_PUBLIC, 'public'], [PB_PKG_PRIVATE, 'private']] as const) {
-        // A manifest the knowledge manifest schema accepts, which a memory write now checks.
-        const value = {
-            type: 'knowledge-package', name: id, version: '1.0.0', author: pbAlice.name, content_type: 'document', tags: [],
-            entries: [{ key: `packages/${id}/intro`, title: 'Introduction', visibility }],
-            sharing: { catalog_listed: visibility === 'public', allow_clone: false, toll_morsels: 0 },
-            synthesis: { level: 'original', description: 'A test package.' },
-        };
-        const w = await call('POST', '/v1/memory', pbAlice.token, { key: `packages/${id}/manifest`, value, visibility, tags: ['knowledge-package'] });
+        const w = await call('POST', '/v1/memory', pbAlice.token, { key: `packages/${id}/manifest`, value: { type: 'knowledge-package', name: id, version: '1.0.0', author: pbAlice.name, content_type: 'document', tags: [], entries: [{ key: `packages/${id}/intro`, title: 'Introduction', visibility }], sharing: { catalog_listed: visibility === 'public', allow_clone: false, toll_morsels: 0 }, synthesis: { level: 'original', description: 'A test package.' } }, visibility, tags: ['knowledge-package'] });
         assert(w.status === 201 || w.status === 200, `manifest ${id}: ${show(w)}`);
     }
     pbReaderAg = await makeAgent(BASE, pbAlice, ['memory:read', 'memory:read-as-owner'], N('pbreader'));

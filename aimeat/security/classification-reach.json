@@ -444,13 +444,13 @@
     },
     "src/routes/memory/bulk.ts": {
       "reads": {
-        "getMemory": 6,
+        "getMemory": 7,
         "memoryDb.listOwnerScope": 2,
         "listMemory": 2,
         "getMemoryByKeys": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis item D-e): getMemoryByKeys is the rename-mode lookup of which of the caller's own keys already exist; only the keys are used. The read was there before; the check counts it since the call lost its non-null assertion. 2026-11-08 (secaudit2026nov08b round 15b): a bundled file is asked through storedFileShownTo, which adds the labels a data package version keeps for a package file."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis item D-e): getMemoryByKeys is the rename-mode lookup of which of the caller's own keys already exist; only the keys are used. The read was there before; the check counts it since the call lost its non-null assertion. 2026-11-08 (secaudit2026nov08b round 15b): a bundled file is asked through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-25: the seventh getMemory reads the caller's own record at a package manifest key, only to tell whether its stored value already fails the knowledge manifest schema (services/knowledge/manifest-write.ts); nothing of it reaches the caller."
     },
     "src/routes/memory/copy.ts": {
       "reads": {

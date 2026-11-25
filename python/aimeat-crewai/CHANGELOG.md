@@ -5,6 +5,9 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
 
 ## 0.41.2 (not yet published) - 2026-11-25 addition
 
+- **A crew adds to a knowledge package through the connector too.** The node now has a route for
+  adding an entry, so `aimeat_knowledge_contribute` works on a connector of that node; the package
+  needs no change for it. Before, the connector refused the call.
 - **A crew can create a knowledge package.** The daemon's default tool list carries
   `aimeat_knowledge_create`, and the liaison's instructions say to use it for a new package: one call
   with the package's name, its content type and all its entries. Before, a crew could only add to a

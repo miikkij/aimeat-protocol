@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-25 — Section 2: an import or a copy of a knowledge package manifest the package schema
+ *     refuses fails with SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — Section 6: who accepted content risk marks in a workspace gets the pseudonym too.
  *   2026-11-21 — Section 4: a restore of an app tool manifest that binds an action marked `decision: person`
  *     answers PERSON_DECIDES (services/app-tools/decision-binding.ts, services/memory/bin.ts).
@@ -211,7 +213,8 @@ What an export leaves out, and why:
   whose classification limits who may see it more narrowly than its visibility fails with
   \`LABEL_CAPS_AUDIENCE\`. An import names no sharing group, so an entry at \`group\` keeps the group
   its record already has, and with none it is stored private with its data kept. Share it afterwards
-  with \`PUT /v1/memory/{key}\` and \`group_id\`.
+  with \`PUT /v1/memory/{key}\` and \`group_id\`. A knowledge package manifest that the package schema
+  refuses fails with \`SCHEMA_VALIDATION_FAILED\`, unless the record already there fails it too.
 - **An organism or a workspace:** \`aimeat_organism_import\` or \`aimeat_workspace_transfer\` with
   \`direction: "import"\`. Both create a NEW organism or workspace; members and the board are not
   restored. A ZIP that fails the safety checks is refused and kept aside for the operator.
@@ -221,7 +224,8 @@ What an export leaves out, and why:
   \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it;
   for a record of a workspace or an organism that is the higher of its own and the workspace's or
   organism's classification.
-  A schema lock on the key holds for the copy too: a value that does not match is refused (422). Under
+  A schema lock on the key holds for the copy too: a value that does not match is refused (422), and so
+  is a knowledge package manifest that the package schema refuses. Under
   the keys of a data description (CSM) the person may not read, its lock answers as no lock, as on
   every memory write.
 

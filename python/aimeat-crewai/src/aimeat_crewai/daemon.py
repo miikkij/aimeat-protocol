@@ -1597,9 +1597,10 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     "aimeat_knowledge_contribute",
     "aimeat_knowledge_get",
     # A new knowledge package with all its entries in one call (2026-11-25). Loaded
-    # when offered (a node after 4.3.1, to an agent holding memory:write); on the
-    # connector it is also the knowledge write that works, since contribute has
-    # no REST route there. See DAEMON_TOOLS_IF_OFFERED.
+    # when offered (a node after 4.3.1, to an agent holding memory:write). On the
+    # connector, aimeat_knowledge_contribute works from the node that has
+    # POST /v1/knowledge/{id}/entries; before it, the connector refused it.
+    # See DAEMON_TOOLS_IF_OFFERED.
     "aimeat_knowledge_create",
     # Telemetry
     "aimeat_agent_telemetry_report",
