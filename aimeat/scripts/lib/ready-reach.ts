@@ -26,12 +26,19 @@
  *   request passes through (middleware, auth, storage, config, the generated types, the
  *   dependencies) cannot be narrowed this way and runs the whole sweep.
  *
+ *   THE CONTRACT. openapi.yaml changes with every route change, and the body guard checks a request
+ *   only against its own route's schema, so a change there reaches the paths it changed (directly or
+ *   through a component they refer to) and the suites that read the contract; only a change of its
+ *   security, or a side that does not parse, runs the whole sweep.
+ *
  *   OUTSIDE src/. A served browser library (src/static/sdk-libs/, public/lib/) or a page under
  *   public/ is reached by a suite that names its file. The Python package (python/) has its own tests
  *   and reaches no node suite.
- * @structure FULL_SWEEP · codeReach(repo, files)
+ * @structure FULL_SWEEP · openapiChangedRoutes(repo, base) · registeredSuites(aimeat) · codeReach(repo, files)
  * @usage const reach = codeReach(repo, codeFiles);   // scripts/lib/ready-scope.ts readyScope()
  * @version-history
+ *   v1.3.0 — 2026-11-25 — openapi.yaml runs the suites that call the paths it changed, not the whole
+ *     sweep (openapiChangedRoutes).
  *   v1.2.0 — 2026-11-25 — The suites are the runner's ALL_SUITES list, not the files named e2e-*.ts,
  *     so federation-mesh, api-full and the other suites without the prefix are reachable.
  *   v1.1.0 — 2026-11-25 — The nightly's coverage map decides first; a route is matched by every fixed
@@ -43,10 +50,64 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { coverageSelection } from './gate-coverage.js';
 
 /** Changed paths that every request passes through, or that decide what runs at all: the whole sweep. */
-export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated)\/|aimeat\/src\/server\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|openapi\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated)\/|aimeat\/src\/server\.ts$|aimeat\/package\.json$|pnpm-lock\.yaml$|aimeat\/pnpm-lock\.yaml$|aimeat\/test\/helpers\/|aimeat\/test\/run-e2e[^/]*\.ts$)/;
+
+/**
+ * What a suite that reads the contract itself contains: the served /openapi.json, or openapi.yaml read
+ * from the disk (e2e-contract). Not /v1/spec, which a hundred suites poll only to see their node start
+ * (test/helpers/wait-for-server.ts).
+ */
+const CONTRACT_READERS = [/\/openapi\.json/, /'openapi\.yaml'\)/];
+
+/**
+ * The API paths whose contract changed in openapi.yaml since `base`, in Express form (`/v1/x/:id`),
+ * or null when the change cannot be placed on paths (a security scheme, the top-level security, a
+ * side that does not parse): then the whole sweep runs. The body guard (middleware/openapi-body-guard.ts)
+ * checks a request against its own route's schema only, so a changed schema reaches the routes that
+ * use it: a path changed itself, or refers to a component that changed, directly or through others.
+ */
+export function openapiChangedRoutes(repo: string, base: string): string[] | null {
+  type Contract = { security?: unknown; components?: Record<string, Record<string, unknown>>; paths?: Record<string, unknown> };
+  let before: Contract, after: Contract;
+  try {
+    before = parseYaml(execFileSync('git', ['show', `${base}:openapi.yaml`], { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })) as Contract;
+    after = parseYaml(readFileSync(path.join(repo, 'openapi.yaml'), 'utf8')) as Contract;
+  } catch {
+    return null; // a side that cannot be read or parsed cannot be narrowed: the whole sweep says so
+  }
+  const json = (v: unknown) => JSON.stringify(v ?? null);
+  if (json(before.security) !== json(after.security) || json(before.components?.securitySchemes) !== json(after.components?.securitySchemes)) return null;
+  const changed = new Set<string>();
+  const comps: Array<[string, unknown]> = [];
+  for (const section of new Set([...Object.keys(before.components ?? {}), ...Object.keys(after.components ?? {})])) {
+    if (section === 'securitySchemes') continue;
+    const a = before.components?.[section] ?? {}, b = after.components?.[section] ?? {};
+    for (const name of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const ref = `"#/components/${section}/${name}"`;
+      comps.push([ref, b[name]]);
+      if (json(a[name]) !== json(b[name])) changed.add(ref);
+    }
+  }
+  // A component that refers to a changed one has changed in effect, through any depth.
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [ref, value] of comps) {
+      if (changed.has(ref)) continue;
+      const text = json(value);
+      if ([...changed].some(c => text.includes(c))) { changed.add(ref); grew = true; }
+    }
+  }
+  const routes: string[] = [];
+  for (const p of new Set([...Object.keys(before.paths ?? {}), ...Object.keys(after.paths ?? {})])) {
+    const a = json(before.paths?.[p]), b = json(after.paths?.[p]);
+    if (a !== b || [...changed].some(c => b.includes(c))) routes.push(p.replace(/\{([A-Za-z_]\w*)\}/g, ':$1'));
+  }
+  return routes;
+}
 
 /**
  * The configuration. Every module names its type, so its importers are every route; what a changed
@@ -170,6 +231,8 @@ export function registeredSuites(aimeat: string): string[] {
 export function codeReach(repo: string, files: string[], base = 'origin/main'): CodeReach {
   const full = files.find(f => FULL_SWEEP.test(f));
   if (full) return { full: `${full} is on every request's path`, suites: [] };
+  const contract = files.includes('openapi.yaml') ? openapiChangedRoutes(repo, base) : [];
+  if (contract === null) return { full: 'openapi.yaml changed its security or cannot be read on both sides', suites: [] };
 
   const aimeat = path.join(repo, 'aimeat');
   const srcDir = path.join(aimeat, 'src');
@@ -249,6 +312,11 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
     for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) addRoute(m[1]!);
   }
   for (const n of names) matchers.push([new RegExp(esc(n))]);
+  // A contract change: the routes it changed, and the suites that read the contract itself.
+  if (files.includes('openapi.yaml')) {
+    for (const r of contract) addRoute(r);
+    for (const re of CONTRACT_READERS) matchers.push([re]);
+  }
 
   // Each suite's text with every test helper it imports, directly or through another helper.
   const helpersDir = path.join(testDir, 'helpers');
