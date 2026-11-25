@@ -38,6 +38,8 @@
  *   await ensureTrain(cfg);
  *   const verdicts = await runBatch(trainDeps(cfg), entries, batchId);
  * @version-history
+ *   v1.3.0 — 2026-11-25 — More than 40 suites reach the runner as a file (--tests-file): 758 names
+ *     made a command line Windows refused.
  *   v1.2.0 — 2026-11-25 — The batch's worktree takes the PostgreSQL account of the session that runs
  *     the batch, when its own differs.
  *   v1.1.0 — 2026-11-24 — A code change runs the E2E suites it can reach (ready-reach.ts) and the unit
@@ -48,7 +50,7 @@
  */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, closeSync, createWriteStream, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { flakyLine, readRunResults } from './e2e-run-results.js';
 import type { BatchDeps, Stage, StageResult } from './ready-batch.js';
@@ -84,6 +86,20 @@ export interface TrainConfig {
 }
 
 interface RunOptions { cwd: string; env?: Record<string, string> }
+
+/**
+ * The suite names for the runner: `--test=` each, or past 40 one `--tests-file=` the runner reads as
+ * if each line were a `--test=`. 758 `--test=` arguments made a command line Windows refused ("The
+ * command line is too long", 2026-11-24), as pnpm gate's did on 2026-10-12. `stem` is a path relative
+ * to the package folder with no space in it, since the command goes through a shell on Windows.
+ */
+export function suiteArgs(aimeat: string, stem: string, names: string[]): string[] {
+    if (names.length <= 40) return names.map(s => `--test=${s}`);
+    const list = `${stem}.suites.txt`;
+    mkdirSync(path.dirname(path.join(aimeat, list)), { recursive: true });
+    writeFileSync(path.join(aimeat, list), names.join('\n') + '\n', 'utf-8');
+    return [`--tests-file=${list}`];
+}
 
 const trainRoot = (cfg: TrainConfig): string => path.join(path.dirname(cfg.commonDir), '.worktrees', TRAIN_WORKTREE);
 const trainAimeat = (cfg: TrainConfig): string => path.join(trainRoot(cfg), 'aimeat');
@@ -265,7 +281,7 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
             }
             // A path from the package folder, with no space in it: the command goes through a shell on Windows.
             const resultsArg = `test-results/ready-batch/${key.replace(/[^A-Za-z0-9]+/g, '-').slice(0, 60)}-${Date.now()}.json`;
-            const args = [script, '--retry-red', '--stop-on-lost-lane', `--workers=${lanes}`, ...suites.map(s => `--test=${s}`), `--results-out=${resultsArg}`];
+            const args = [script, '--retry-red', '--stop-on-lost-lane', `--workers=${lanes}`, ...suiteArgs(aimeat, resultsArg, suites), `--results-out=${resultsArg}`];
             const status = await timed(cfg, name, () => runLogged(cfg, name, 'pnpm', args, { cwd: aimeat, env }), s => s === 0);
             let red: string[] = [];
             const notes: string[] = [];
@@ -284,7 +300,7 @@ export function trainDeps(cfg: TrainConfig): BatchDeps {
                     const here = red.filter(s => existsSync(path.join(aimeat, 'test', `${s}.ts`)));
                     if (here.length === 0) return false;
                     const again = async (some: string[]): Promise<boolean> =>
-                        await runLogged(cfg, `${name}: ${some.length} red suite(s) again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, some.length)}`, ...some.map(s => `--test=${s}`)], { cwd: aimeat, env }) !== 0;
+                        await runLogged(cfg, `${name}: ${some.length} red suite(s) again`, 'pnpm', [script, '--retry-red', `--workers=${Math.min(lanes, some.length)}`, ...suiteArgs(aimeat, `${resultsArg}.again`, some)], { cwd: aimeat, env }) !== 0;
                     // Red is known from the first of them. Green is known only when every one ran: the
                     // batch reads a green probe as a red that did not repeat, and goes on to the push.
                     if (await again(here.slice(0, FIRST_PROBE_SUITES))) return true;
