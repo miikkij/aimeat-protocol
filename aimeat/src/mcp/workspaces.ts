@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description MCP tools for organism WORKSPACES — the manifest-driven document/record spaces an
  *   organism holds (organism.{id}.w.{ws}.*). Makes the feature first-class for agents instead of
- *   requiring them to hand-construct memory keys: list workspaces, read a workspace (manifest +
- *   objects + drafts), write a draft, publish it, and add a markdown document.
+ *   requiring them to hand-construct memory keys: list workspaces, read a workspace (an index of
+ *   titles first, then the instances asked for by id), write a draft, publish it, and add a markdown
+ *   document.
  *
  *   Identity model (v1): operations run as the agent's OWNER GHII (owner@node). This is the primary
  *   case — the owner's own agent working in the owner's organism. Reads/writes therefore see exactly
