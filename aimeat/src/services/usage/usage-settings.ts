@@ -10,14 +10,18 @@
  * @structure UsageSettings · bindUsageSettings(config) · usageSettings()
  * @usage const { usageHotDays } = usageSettings();
  * @version-history
+ *   2026-11-25 — mcpToolAnswerChars, the limit the rollup counts an answer against (mcp.tool_answer_chars).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 import type { RuntimeConfig } from '../../config/runtime.js';
+import type { NodeLimitsConfig } from '../../config/node-limits.js';
+import { TOOL_ANSWER_CHARS_DEFAULT } from '../../models/answer-budget.js';
 
-export type UsageSettings = Pick<RuntimeConfig, 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' | 'usageRollupBatch' | 'usageRollupPasses'>;
+export type UsageSettings = Pick<RuntimeConfig, 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' | 'usageRollupBatch' | 'usageRollupPasses'>
+  & Pick<NodeLimitsConfig, 'mcpToolAnswerChars'>;
 
 /** The loader's defaults, for a process that never bound a config (a unit test, a CLI command). */
-const DEFAULTS: UsageSettings = { usageHotDays: 90, usageHourRollupDays: 30, usageArchiveBatch: 2_000, usageRollupBatch: 5_000, usageRollupPasses: 20 };
+const DEFAULTS: UsageSettings = { usageHotDays: 90, usageHourRollupDays: 30, usageArchiveBatch: 2_000, usageRollupBatch: 5_000, usageRollupPasses: 20, mcpToolAnswerChars: TOOL_ANSWER_CHARS_DEFAULT };
 
 let bound: UsageSettings | null = null;
 
@@ -32,5 +36,6 @@ export function usageSettings(): UsageSettings {
     usageArchiveBatch: Math.max(1, bound.usageArchiveBatch),
     usageRollupBatch: Math.max(1, bound.usageRollupBatch),
     usageRollupPasses: Math.max(1, bound.usageRollupPasses),
+    mcpToolAnswerChars: bound.mcpToolAnswerChars,
   };
 }

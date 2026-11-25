@@ -668,9 +668,9 @@
   "explain.usage.refused.tipLabel": "Conviene saber",
   "explain.usage.refused.tip": "Un rechazo significa que un límite funcionó. Muchos rechazos en una misma oferta indican que la gente la quiere y algo se lo impide: el precio, un límite o un acceso que falta.",
   "explain.usage.answerSize.title": "Respuesta más larga",
-  "explain.usage.answerSize.short": "El tamaño de la respuesta más larga que esta herramienta dio a tu IA, en caracteres. Una respuesta de más de 40 000 caracteres puede ser demasiado larga para que tu IA la lea de una vez.",
-  "explain.usage.answerSize.what": "Cada vez que tu IA llama a una herramienta por MCP, este servidor mide cuántos caracteres de texto tiene la respuesta. Esta columna muestra la respuesta más larga de cada herramienta en el periodo elegido. El límite de este servidor es de 40 000 caracteres, porque un programa de IA no lee entera una respuesta más larga: un programa la guarda en un archivo y otro la corta sin avisar. Por eso una herramienta que da una lista responde por páginas. Una cifra de más de 40k indica una herramienta cuya respuesta superó el límite. Una celda vacía significa que no se midió ninguna respuesta de esa fila: solo se miden las llamadas por MCP, y solo desde el 24 de noviembre de 2026.",
-  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke muestra 61k: una herramienta de una de tus aplicaciones respondió con más de lo que tu IA lee de una vez. Pregúntale a tu IA: ¿qué herramientas mías dieron respuestas por encima del límite, y con qué frecuencia?",
+  "explain.usage.answerSize.short": "El tamaño de la respuesta más larga que esta herramienta dio a tu IA, en caracteres. Una respuesta por encima del límite de este servidor puede ser demasiado larga para que tu IA la lea de una vez.",
+  "explain.usage.answerSize.what": "Cada vez que tu IA llama a una herramienta por MCP, este servidor mide cuántos caracteres de texto tiene la respuesta. Esta columna muestra la respuesta más larga de cada herramienta en el periodo elegido. Este servidor tiene un límite para una respuesta: 250 000 caracteres, salvo que quienes lo administran lo hayan cambiado. Un programa de IA no lee entera una respuesta de cualquier tamaño: un programa guarda en un archivo una respuesta larga y otro la corta sin avisar. Por eso una herramienta que da una lista responde por páginas. Una cifra por encima del límite indica una herramienta cuya respuesta lo superó. Una celda vacía significa que no se midió ninguna respuesta de esa fila: solo se miden las llamadas por MCP, y solo desde el 24 de noviembre de 2026.",
+  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke muestra 310k: una herramienta de una de tus aplicaciones respondió con más de lo que tu IA lee de una vez. Pregúntale a tu IA: ¿qué herramientas mías dieron respuestas por encima del límite, y con qué frecuencia?",
   "explain.usage.answerSize.tipLabel": "Conviene saber",
   "explain.usage.answerSize.tip": "Una respuesta larga ocupa espacio de lectura de tu IA aunque quepa. Si arriba está una herramienta de tu propia aplicación, pide a quien la construyó que responda primero con un resumen y dé las listas por páginas.",
   "explain.nodeStats.latencyP95.title": "Latencia P95",
@@ -14729,6 +14729,7 @@
     "cfg_mcp_legacy_sessions_per_principal": "Sesiones MCP del protocolo antiguo por IA o persona",
     "cfg_mcp_legacy_sessions_per_owner": "Sesiones MCP del protocolo antiguo por persona y sus IA",
     "cfg_mcp_legacy_sessions_total": "Sesiones MCP del protocolo antiguo en total",
+    "cfg_mcp_tool_answer_chars": "Tamaño máximo de la respuesta de una herramienta (caracteres)",
     "cfg_storage_request_statement_ms": "Límite de una consulta a la base de datos al responder (ms)",
     "cfg_registration_mode": "Quién puede registrarse",
     "cfg_registration_members_see_each_other": "Todos en este servidor se ven entre sí",
@@ -15097,6 +15098,7 @@
     "cfgDesc_mcp_legacy_sessions_per_principal": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener una IA o una persona. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
     "cfgDesc_mcp_legacy_sessions_per_owner": "Cuántas sesiones abiertas del protocolo MCP antiguo pueden tener en total una persona y todas sus IA. Al pasar el límite, una sesión nueva cierra la suya que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
     "cfgDesc_mcp_legacy_sessions_total": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener todo el servidor. Cada una guarda en memoria su propia copia de la lista de herramientas. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse entre las de la persona que tiene más sesiones, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
+    "cfgDesc_mcp_tool_answer_chars": "Cuántos caracteres de texto puede tener una respuesta de una herramienta a una IA. Cuando una IA abre muchos registros de un espacio de trabajo en una sola llamada, el servidor se detiene en este tamaño e indica qué registros quedan por abrir. El informe de uso cuenta las respuestas que lo superan. Cada herramienta también comunica este tamaño al programa de IA, así que Claude Code entrega al modelo una respuesta de este tamaño como texto, hasta 500 000 caracteres. Una conexión abierta conserva el valor con el que empezó. 0 significa sin límite.",
     "cfgDesc_storage_request_statement_ms": "En PostgreSQL, cuánto puede durar una consulta a la base de datos mientras el servidor responde a una página, una aplicación o una IA. Una consulta más larga se detiene y esa petición falla. Las tareas programadas conservan el límite propio de la base de datos, de 120 segundos. El valor por defecto 120000 es ese mismo límite. 0 significa sin límite.",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación; sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
     "cfgDesc_registration_members_see_each_other": "Para el servidor de una empresa. Cada persona con cuenta aquí aparece como colega en la libreta de direcciones de todas las demás, y el primer mensaje entre dos de ellas no necesita aprobación. Desactivado por defecto.",
@@ -31049,6 +31051,15 @@
           "low": "Menor: se usa menos memoria; en un servidor con mucho uso, las aplicaciones vuelven a conectarse más a menudo.",
           "high": "Mayor: más sesiones siguen abiertas y pueden usar más memoria.",
           "tip": "Deja el valor por defecto salvo que al servidor le falte memoria. Las aplicaciones que usan el protocolo nuevo (2026) no guardan sesión y no cuentan."
+        },
+        "tool_answer_chars": {
+          "title": "Tamaño máximo de la respuesta de una herramienta (caracteres)",
+          "short": "Cuántos caracteres de texto puede tener una respuesta de una herramienta a una IA. 0 significa sin límite. El valor por defecto es 250000.",
+          "what": "Cuando una IA llama a una herramienta de este servidor, la respuesta es texto, y un programa de IA solo acepta cierta cantidad de texto en una respuesta. Este ajuste es el tamaño al que el servidor limita sus respuestas. Cuando una IA abre muchos registros de un espacio de trabajo en una sola llamada, el servidor se detiene en este tamaño e indica qué registros quedan por abrir. El informe de uso cuenta cada respuesta que lo supera, así ves qué herramienta da respuestas cada vez más largas. Cada herramienta también comunica este tamaño al programa de IA. Claude Code entrega entonces al modelo una respuesta de este tamaño como texto, hasta 500 000 caracteres. Sin ese aviso, guarda en un archivo una respuesta de más de 50 000 caracteres y solo da al modelo la ubicación del archivo. Una conexión abierta conserva el valor con el que empezó.",
+          "range": "Un número entero de 0 a 10000000. El valor por defecto es 250000. 0 significa sin límite.",
+          "low": "Menor: las respuestas son más cortas y una IA hace más llamadas para leer los mismos datos.",
+          "high": "Mayor: una IA lee más en una llamada, y una respuesta puede ocupar más del espacio de lectura de la IA.",
+          "tip": "Deja el valor por defecto con Claude Code. Bájalo a unos 40000 cuando aquí se use un programa de IA que corte una respuesta larga o la guarde en un archivo."
         }
       },
       "storage": {

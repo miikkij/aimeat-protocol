@@ -668,9 +668,9 @@
   "explain.usage.refused.tipLabel": "Hyvä tietää",
   "explain.usage.refused.tip": "Hylkäys tarkoittaa, että raja toimi. Jos yhdellä tarjouksella on paljon hylkäyksiä, ihmiset haluavat sitä, mutta jokin estää heitä: hinta, raja tai puuttuva käyttöoikeus.",
   "explain.usage.answerSize.title": "Suurin vastaus",
-  "explain.usage.answerSize.short": "Suurin vastaus, jonka tämä työkalu antoi tekoälyllesi, merkkeinä. Yli 40 000 merkin vastaus voi olla liian suuri tekoälysi luettavaksi kerralla.",
-  "explain.usage.answerSize.what": "Aina kun tekoälysi kutsuu työkalua MCP-yhteyden kautta, tämä palvelin mittaa, montako merkkiä tekstiä vastauksessa on. Sarake näyttää kunkin työkalun suurimman vastauksen valitulta aikaväliltä. Tämän palvelimen raja on 40 000 merkkiä, koska tekoälyohjelma ei lue sitä pidempää vastausta kokonaan: yksi ohjelma tallentaa sen tiedostoon, toinen katkaisee sen eikä kerro siitä. Siksi luettelon antava työkalu vastaa sivuina. Jos luku on yli 40k, työkalun vastaus kasvoi rajan yli. Tyhjä solu tarkoittaa, että rivin vastauksia ei ole mitattu: vain MCP-yhteyden kautta tulleet kutsut mitataan, ja vasta 24.11.2026 alkaen.",
-  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke näyttää 61k: jonkin sovelluksesi työkalu vastasi enemmän kuin tekoälysi lukee kerralla. Kysy tekoälyltäsi: mitkä työkaluni antoivat rajan ylittäviä vastauksia, ja kuinka usein?",
+  "explain.usage.answerSize.short": "Suurin vastaus, jonka tämä työkalu antoi tekoälyllesi, merkkeinä. Palvelimen rajaa suurempi vastaus voi olla liian suuri tekoälysi luettavaksi kerralla.",
+  "explain.usage.answerSize.what": "Aina kun tekoälysi kutsuu työkalua MCP-yhteyden kautta, tämä palvelin mittaa, montako merkkiä tekstiä vastauksessa on. Sarake näyttää kunkin työkalun suurimman vastauksen valitulta aikaväliltä. Palvelimella on raja yhdelle vastaukselle: 250 000 merkkiä, elleivät palvelimen ylläpitäjät ole muuttaneet sitä. Tekoälyohjelma ei lue minkä tahansa kokoista vastausta kokonaan: yksi ohjelma tallentaa pitkän vastauksen tiedostoon, toinen katkaisee sen eikä kerro siitä. Siksi luettelon antava työkalu vastaa sivuina. Jos luku on rajaa suurempi, työkalun vastaus kasvoi rajan yli. Tyhjä solu tarkoittaa, että rivin vastauksia ei ole mitattu: vain MCP-yhteyden kautta tulleet kutsut mitataan, ja vasta 24.11.2026 alkaen.",
+  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke näyttää 310k: jonkin sovelluksesi työkalu vastasi enemmän kuin tekoälysi lukee kerralla. Kysy tekoälyltäsi: mitkä työkaluni antoivat rajan ylittäviä vastauksia, ja kuinka usein?",
   "explain.usage.answerSize.tipLabel": "Hyvä tietää",
   "explain.usage.answerSize.tip": "Suuri vastaus vie tekoälysi lukutilaa silloinkin, kun se mahtuu. Jos listan kärjessä on oman sovelluksesi työkalu, pyydä sovelluksen rakentajaa vastaamaan ensin yhteenvedolla ja antamaan luettelot sivuina.",
   "explain.nodeStats.latencyP95.title": "P95-viive",
@@ -16318,6 +16318,7 @@
     "cfg_mcp_legacy_sessions_per_principal": "Vanhan MCP-protokollan sessiot tekoälyä tai ihmistä kohden",
     "cfg_mcp_legacy_sessions_per_owner": "Vanhan MCP-protokollan sessiot ihmistä ja hänen tekoälyjään kohden",
     "cfg_mcp_legacy_sessions_total": "Vanhan MCP-protokollan sessiot yhteensä",
+    "cfg_mcp_tool_answer_chars": "Työkalun vastauksen enimmäiskoko (merkkiä)",
     "cfg_storage_request_statement_ms": "Tietokantakyselyn aikaraja vastattaessa (ms)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
     "cfg_registration_members_see_each_other": "Kaikki tämän palvelimen käyttäjät näkevät toisensa",
@@ -16686,6 +16687,7 @@
     "cfgDesc_mcp_legacy_sessions_per_principal": "Montako vanhan MCP-protokollan sessiota yhdellä tekoälyllä tai ihmisellä voi olla auki. Kun raja ylittyy, uusi sessio sulkee heidän pisimpään käyttämättä olleen sessionsa, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_mcp_legacy_sessions_per_owner": "Montako vanhan MCP-protokollan sessiota yhdellä ihmisellä ja kaikilla hänen tekoälyillään voi olla yhteensä auki. Kun raja ylittyy, uusi sessio sulkee heidän pisimpään käyttämättä olleen sessionsa, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_mcp_legacy_sessions_total": "Montako vanhan MCP-protokollan sessiota koko palvelimella voi olla auki. Jokainen sessio pitää muistissa oman kopion työkalulistasta. Kun raja ylittyy, uusi sessio sulkee pisimpään käyttämättä olleen session sen henkilön sessioista, jolla niitä on eniten, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
+    "cfgDesc_mcp_tool_answer_chars": "Montako merkkiä tekstiä yhdessä työkalun vastauksessa tekoälylle saa olla. Kun tekoäly avaa monta työtilan tietuetta yhdellä kutsulla, palvelin pysähtyy tähän kokoon ja kertoo, mitkä tietueet jäivät avaamatta. Käyttöraportti laskee tätä suuremmat vastaukset. Jokainen työkalu myös ilmoittaa tämän koon tekoälyohjelmalle, joten Claude Code antaa tämän kokoisen vastauksen mallille tekstinä, enintään 500 000 merkkiä. Avoin yhteys pitää arvon, jolla se alkoi. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_storage_request_statement_ms": "PostgreSQL-tietokannassa: kuinka kauan yksi tietokantakysely saa kestää, kun palvelin vastaa sivulle, sovellukselle tai tekoälylle. Pidempi kysely pysäytetään, ja se pyyntö epäonnistuu. Ajastetuilla töillä on tietokannan oma 120 sekunnin raja. Oletus 120000 on sama raja. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
     "cfgDesc_registration_members_see_each_other": "Yrityksen palvelimelle. Jokainen täällä tilin omistava näkyy jokaisen muun osoitekirjassa kollegana, eikä kahden käyttäjän ensimmäinen viesti tarvitse hyväksyntää. Oletuksena pois päältä.",
@@ -33260,6 +33262,15 @@
           "low": "Pienempi: muistia kuluu vähemmän, mutta kiireisellä palvelimella sovellukset yhdistävät uudelleen useammin.",
           "high": "Suurempi: useampi sessio pysyy auki, ja ne voivat viedä enemmän muistia.",
           "tip": "Pidä oletus, ellei palvelimen muisti käy vähiin. Uudempaa protokollaa (2026) käyttävät sovellukset eivät pidä sessiota, joten niitä ei lasketa."
+        },
+        "tool_answer_chars": {
+          "title": "Työkalun vastauksen enimmäiskoko (merkkiä)",
+          "short": "Montako merkkiä tekstiä yhdessä työkalun vastauksessa tekoälylle saa olla. 0 tarkoittaa, että rajaa ei ole. Oletus on 250000.",
+          "what": "Kun tekoäly kutsuu tämän palvelimen työkalua, vastaus on tekstiä, ja tekoälyohjelma ottaa yhdessä vastauksessa vastaan vain tietyn määrän tekstiä. Tämä asetus on koko, jossa palvelin pitää vastauksensa. Kun tekoäly avaa monta työtilan tietuetta yhdellä kutsulla, palvelin pysähtyy tähän kokoon ja kertoo, mitkä tietueet jäivät avaamatta. Käyttöraportti laskee jokaisen tätä suuremman vastauksen, joten näet, minkä työkalun vastaukset kasvavat. Jokainen työkalu myös ilmoittaa tämän koon tekoälyohjelmalle. Claude Code antaa silloin tämän kokoisen vastauksen mallille tekstinä, enintään 500 000 merkkiä. Ilman ilmoitusta se tallentaa yli 50 000 merkin vastauksen tiedostoon ja antaa mallille vain tiedoston sijainnin. Avoin yhteys pitää arvon, jolla se alkoi.",
+          "range": "Kokonaisluku, vähintään 0 ja enintään 10000000. Oletus on 250000. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: vastaukset pysyvät pieninä, ja tekoäly tekee useamman kutsun saman tiedon lukemiseen.",
+          "high": "Suurempi: tekoäly lukee enemmän yhdellä kutsulla, ja yksi vastaus voi viedä suuremman osan tekoälyn lukutilasta.",
+          "tip": "Pidä oletus, jos käytössä on Claude Code. Laske arvo noin 40000:een, jos täällä käytetään tekoälyohjelmaa, joka katkaisee pitkän vastauksen tai tallentaa sen tiedostoon."
         }
       },
       "storage": {

@@ -13,6 +13,7 @@
  *   import { nodeLimitsDefaults } from './node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-11-25 — mcpToolAnswerChars: the size of one tool answer is a setting, default 250 000.
  *   2026-11-08 — mcpLegacySessionsPerOwner (secaudit2026nov08 round 14, mcp-legacy-session-node-cap-evicts-other-owners).
  *   2026-11-04 — dbRequestStatementMs (codebase analysis 2026-11-03, item C8), mcpLegacySessionsPerPrincipal
  *     and mcpLegacySessionsTotal (item C5).
@@ -148,6 +149,13 @@ export interface NodeLimitsConfig {
    * default 1000; 0 is no limit (codebase analysis 2026-11-03, item C5; secaudit2026nov08 round 14).
    */
   mcpLegacySessionsTotal: number;
+  /**
+   * Characters of text one tool answer may hold (models/answer-budget.ts): a batch of records stops
+   * at it, the usage report counts the answers over it, and every tool declares it to the client so
+   * Claude Code passes an answer of that size to the model as text. AIMEAT_MCP_TOOL_ANSWER_CHARS,
+   * default 250000; 0 is no limit.
+   */
+  mcpToolAnswerChars: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -177,5 +185,6 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     mcpLegacySessionsPerPrincipal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL, 100),
     mcpLegacySessionsPerOwner: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_OWNER, 300),
     mcpLegacySessionsTotal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, 1000),
+    mcpToolAnswerChars: wholeOr(env.AIMEAT_MCP_TOOL_ANSWER_CHARS, 250_000),
   };
 }

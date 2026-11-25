@@ -23,8 +23,10 @@
  * @usage
  *   import { runUsageRollup } from './services/usage/rollup-engine.js';
  * @version-history
+ *   2026-11-25 — answersOverBudget counts against the setting mcp.tool_answer_chars as it is when
+ *     the row folds (usage-settings.ts); a row folded earlier keeps the count it got.
  *   2026-11-24 — A call's `answerChars` folds into answerCharsSum, answerCharsMax and
- *     answersOverBudget (an answer over TOOL_ANSWER_BUDGET_CHARS, models/answer-budget.ts).
+ *     answersOverBudget (an answer over the tool answer budget, models/answer-budget.ts).
  *   v1.1.0 — 2026-10-25 — The batch and the pass cap come from the config on each run (usage-settings.ts);
  *     they were read from process.env at import, out of the admin Config tab's reach.
  *   v1.0.0 — 2026-08-14 — Initial: incremental, transactional fold over the llm and call streams.
@@ -35,7 +37,7 @@ import type {
 import { logger } from '../../utils/logger.js';
 import { cutsForStream, type UsageCut, type UsageDim } from './rollup-cuts.js';
 import { usageSettings } from './usage-settings.js';
-import { TOOL_ANSWER_BUDGET_CHARS } from '../../models/answer-budget.js';
+import { toolAnswerBudgetChars } from '../../models/answer-budget.js';
 
 /**
  * Raw rows per pass (usage.rollup_batch): small enough that one transaction stays short, large enough
@@ -156,6 +158,8 @@ interface Bucket { delta: UsageRollupDelta; actors: Set<string> }
  */
 function accumulate(facts: Fact[], stream: 'llm' | 'call'): UsageRollupDelta[] {
   const buckets = new Map<string, Bucket>();
+  // The limit of one answer as the operator has it now (mcp.tool_answer_chars).
+  const answerBudget = toolAnswerBudgetChars(usageSettings());
 
   for (const fact of facts) {
     for (const cut of cutsForStream(stream)) {
@@ -193,7 +197,7 @@ function accumulate(facts: Fact[], stream: 'llm' | 'call'): UsageRollupDelta[] {
         if (fact.durationMs > d.durationMsMax) d.durationMsMax = fact.durationMs;
         d.answerCharsSum += fact.answerChars;
         if (fact.answerChars > d.answerCharsMax) d.answerCharsMax = fact.answerChars;
-        if (fact.answerChars > TOOL_ANSWER_BUDGET_CHARS) d.answersOverBudget += 1;
+        if (fact.answerChars > answerBudget) d.answersOverBudget += 1;
         if (fact.actorGaii) entry.actors.add(fact.actorGaii);
       }
     }

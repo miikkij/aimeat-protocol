@@ -30,6 +30,7 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-25 — The bounded read stops at the setting mcp.tool_answer_chars (models/answer-budget.ts).
  *   2026-11-21 — The content risk read is given each record's writer from its provenance, so a
  *     document the reader's own person wrote is not checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — A batch open names `ambiguous`: an id asked without `space` that records of more than
@@ -186,7 +187,7 @@ import { contentRiskTextOf } from '../content/risk-intake.js';
 import { isPageStale } from './opened.js';
 import { directiveFields } from '../organism/directives.js';
 import { pageIndex, pageLimitOf, decodeCursor, type BoundedRead } from './read-page.js';
-import { TOOL_ANSWER_BUDGET_CHARS } from '../../models/answer-budget.js';
+import { toolAnswerBudgetChars } from '../../models/answer-budget.js';
 
 /** What the index says of a page's life: an HTML page's kind, the day it was last opened, and whether it went stale. */
 const pageLifeOf = (cur: MemoryRecord, lastOpened: string | undefined): Record<string, unknown> => ({
@@ -350,7 +351,7 @@ export async function readWorkspaceOp(
         let chars = 0;
         // What the items may take: the budget less the ids themselves, which the answer may have to
         // list again in `not_opened`, and the fields around the items.
-        const itemBudget = Math.max(TOOL_ANSWER_BUDGET_CHARS - JSON.stringify(asks.map(a => a.asked)).length - 800, 4000);
+        const itemBudget = Math.max(toolAnswerBudgetChars(config) - JSON.stringify(asks.map(a => a.asked)).length - 800, 4000);
         for (const { asked, hit } of asks) {
             const latest = wholeOf(hit?.slot.latest);
             const draft = wholeOf(hit?.slot.draft);
@@ -478,7 +479,7 @@ export async function readWorkspaceOp(
     const { index, page } = pageIndex(listed, {
         limit: pageLimitOf(bounded.limit), q: bounded.q,
         ...(only ? { only: only.name } : {}), ...(cursorAt ? { cursor: cursorAt } : {}),
-        budgetChars: Math.max(TOOL_ANSWER_BUDGET_CHARS - fixedChars - 2000, 4000),
+        budgetChars: Math.max(toolAnswerBudgetChars(config) - fixedChars - 2000, 4000),
     });
     const moreSpaces = Object.keys(page.more);
     return { ok: true, data: { ...head, index, page, ...tail,

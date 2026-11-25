@@ -9,6 +9,7 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './schema-node-limits.js';
  * @version-history
+ *   2026-11-25 — mcp.tool_answer_chars.
  *   2026-11-08 — mcp.legacy_sessions_per_owner (secaudit2026nov08 round 14).
  *   2026-11-04 — storage.request_statement_ms (codebase analysis 2026-11-03, item C8),
  *     mcp.legacy_sessions_per_principal and mcp.legacy_sessions_total (item C5).
@@ -89,4 +90,7 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'mcpLegacySessionsTotal', dotPath: 'mcp.legacy_sessions_total', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_TOTAL', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most open MCP sessions of the older (2025) protocol on the whole node. Each holds its own copy of the tool list in memory. A new session past it closes the least recently used session of the person holding the most sessions, and that client connects again by itself. 0 = no limit',
     range: '0-1000000' },
+  { key: 'mcpToolAnswerChars', dotPath: 'mcp.tool_answer_chars', envVar: 'AIMEAT_MCP_TOOL_ANSWER_CHARS', type: 'number', validate: v => wholeOrOff(v) && (v as number) <= 10_000_000, immutable: false,
+    description: 'Characters of text one tool answer to an AI may hold. Opening many workspace records in one call stops at it and names the ones still to open, the usage report counts the answers over it, and every tool declares it to the AI program, so Claude Code passes an answer of this size to the model as text, up to 500000 characters. A session that is open keeps the value it started with. Lower it when people here use an AI program that cuts a long answer. 0 = no limit',
+    range: '0-10000000' },
 ];

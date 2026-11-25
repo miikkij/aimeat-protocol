@@ -25,6 +25,8 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-11-25 -- Every tool declares the largest text result the client accepts in its `_meta`
+ *     (mcp/declared-answer-size.ts), in every surface role.
  *   2026-11-08 -- Stdio mode with --agent (and --owner) serves and polls for that agent only, so a tool
  *     call's agent_name cannot pick another credential in the home; an --agent the home does not hold
  *     stops the start. No --agent, and the daemon, are unchanged (secaudit2026nov08b round 15).
@@ -54,6 +56,8 @@ import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
 import { answerMovedTools } from '../../../mcp/moved-tools-answer.js';
 import { treatNullAsAbsent } from '../../../mcp/null-as-absent.js';
+import { withDeclaredAnswerSize } from '../../../mcp/declared-answer-size.js';
+import { CLIENT_RESULT_CEILING_CHARS } from '../../../models/answer-budget.js';
 import { registerResources } from './resources.js';
 import { startPollerForAgent } from './poller.js';
 import { isRunner } from '../task-runner.js';
@@ -72,20 +76,26 @@ export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistr
   // A null sent for an optional field the client left out reads as left out (mcp/null-as-absent.ts).
   treatNullAsAbsent(mcp);
 
+  type ToolFn = (...args: unknown[]) => unknown;
+  const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
+  const origRegister = patchable.registerTool.bind(mcp) as ToolFn;
+  // The node holds the size of an answer (its setting mcp.tool_answer_chars) and this server passes
+  // the node's answer on, so each tool declares the largest text result the client accepts: the
+  // client then holds no lower limit of its own (../../../mcp/declared-answer-size.ts).
+  const declaredRegister = withDeclaredAnswerSize(origRegister, () => CLIENT_RESULT_CEILING_CHARS);
   if (role === 'all') {
+    patchable.registerTool = declaredRegister;
     registerAllTools(mcp, registry);
+    patchable.registerTool = origRegister;
   } else {
     // Filter registration to the surface allowlist by patching registerTool for the duration. Every
     // tool registers through registerTool (the MCP SDK v2 form); a tool() call would skip the
     // allowlist, so it throws instead of registering.
     const allow = toolsForSurface(role);
-    type ToolFn = (...args: unknown[]) => unknown;
-    const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
     const origTool = patchable.tool;
-    const origRegister = patchable.registerTool.bind(mcp) as ToolFn;
     const gate = (name: string) => allow.has(name);
     patchable.tool = (...a: unknown[]) => { throw new Error(`the tool() form is not used here (${String(a[0])}): register with registerTool`); };
-    patchable.registerTool = (...a: unknown[]) => gate(a[0] as string) ? origRegister(...a) : undefined;
+    patchable.registerTool = (...a: unknown[]) => gate(a[0] as string) ? declaredRegister(...a) : undefined;
     registerAllTools(mcp, registry);
     patchable.tool = origTool;
     patchable.registerTool = origRegister;

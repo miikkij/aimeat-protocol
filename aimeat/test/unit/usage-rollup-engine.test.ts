@@ -24,7 +24,10 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, UsageCallRecord, AgentUsageEvent } from '../../src/storage/interface.js';
 import { runUsageRollup, rebuildUsageRollup } from '../../src/services/usage/rollup-engine.js';
 import { CUTS } from '../../src/services/usage/rollup-cuts.js';
-import { TOOL_ANSWER_BUDGET_CHARS } from '../../src/models/answer-budget.js';
+import { TOOL_ANSWER_CHARS_DEFAULT } from '../../src/models/answer-budget.js';
+
+/** No config is bound in this file, so the rollup counts against the setting's default. */
+const TOOL_ANSWER_BUDGET_CHARS = TOOL_ANSWER_CHARS_DEFAULT;
 
 let storage: Storage;
 

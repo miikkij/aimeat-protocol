@@ -6,6 +6,9 @@
  *   mcp/index.ts and the tests build the same chain.
  *
  *   ORDER, from the SDK inward to the tool's own handler:
+ *     0. declared answer size (mcp/declared-answer-size.ts) adds the size of a text answer the
+ *        client may pass to the model to the tool's `_meta`; it changes the entry in tools/list and
+ *        leaves the handler as it is.
  *     1. deferred-scope notice (mcp/deferred-scope-notice.ts) counts a call made without a word the
  *        tool names for a later release; outermost, so it sees the call itself.
  *     2. next step (mcp/error-next-step.ts) appends what to do next to every failing result.
@@ -22,6 +25,7 @@
  * @structure toolRegistrar(register, deps)
  * @usage const measuredTool = toolRegistrar(originalTool, { scopes: () => scopes, principal: () => agentGaii, storage, config });
  * @version-history
+ *   2026-11-25 — The declared answer size (mcp/declared-answer-size.ts), nearest the SDK.
  *   2026-11-20 — The app reference wrapper (mcp/app-ref-input.ts), nearest the handler.
  *   2026-10-16 — Moved out of mcp/index.ts, with the fault wrapper added (QA audit E1-01, D2-01, F5-02, E2-02, E5-01).
  */
@@ -33,6 +37,8 @@ import { withErrorNextStep } from './error-next-step.js';
 import { withDeferredScopeNotice } from './deferred-scope-notice.js';
 import { withToolFault } from './tool-fault.js';
 import { withAppRefInput } from './app-ref-input.js';
+import { withDeclaredAnswerSize } from './declared-answer-size.js';
+import { declaredResultChars } from '../models/answer-budget.js';
 
 type AnyFn = (...args: unknown[]) => unknown;
 
@@ -44,7 +50,8 @@ export interface ToolRegistrarDeps {
 }
 
 export function toolRegistrar(register: AnyFn, deps: ToolRegistrarDeps): AnyFn {
-  const noticed = withDeferredScopeNotice(register, deps.scopes);
+  const declared = withDeclaredAnswerSize(register, () => declaredResultChars(deps.config));
+  const noticed = withDeferredScopeNotice(declared, deps.scopes);
   const stepped = withErrorNextStep(noticed);
   const faulted = withToolFault(stepped, { storage: deps.storage, config: deps.config, principal: deps.principal });
   const gated = withOrganismAgentGate(wrapToolHandler(faulted, deps.principal), deps.principal, deps.storage);

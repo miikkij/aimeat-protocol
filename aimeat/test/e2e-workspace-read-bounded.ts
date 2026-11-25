@@ -13,7 +13,11 @@
  *   ids and titles as long as production's, and reads it over MCP.
  *
  *   What it proves:
- *     - the index of WISHES + BRIEFS records is one answer of at most TOOL_ANSWER_BUDGET_CHARS, shows
+ *     - the operator sets the size of one answer (mcp.tool_answer_chars) and a value that is not a
+ *       whole number from 0 to 10 000 000 is refused; every tool of a session declares the size in
+ *       `_meta["anthropic/maxResultSizeChars"]`; put back to the default of 250 000, 30 records
+ *       open in one call and a new session declares the default;
+ *     - the index of WISHES + BRIEFS records is one answer of at most the size set (40 000), shows
  *       one page per space, and says in `counts` and `page.more` what it did not show;
  *     - aimeat_workspace_overview, the same index as a Markdown map, is inside the budget as well
  *       (it listed every entry until this suite was written);
@@ -38,15 +42,25 @@
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-read-bounded
  * @version-history
+ *   2026-11-25 — The size of one answer is the operator's setting: the suite sets it to 40 000, reads
+ *     what each tool declares, and ends at the default.
  *   2026-11-24 — Initial.
  */
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import type { Storage } from '../src/storage/interface.js';
-import { TOOL_ANSWER_BUDGET_CHARS, ANSWER_PAGE_DEFAULT, ANSWER_PAGE_MAX } from '../src/models/answer-budget.js';
+import { TOOL_ANSWER_CHARS_DEFAULT, ANSWER_PAGE_DEFAULT, ANSWER_PAGE_MAX } from '../src/models/answer-budget.js';
+import { RESULT_SIZE_META_KEY } from '../src/mcp/declared-answer-size.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
-import { registerOwner } from './helpers/owner-login.js';
-import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
+import { registerOwner, setupOperator } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, mcpRpc, type McpSession } from './helpers/mcp-session.js';
 import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
+
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
+/**
+ * The size of one answer this suite runs at: the operator's setting mcp.tool_answer_chars, set here
+ * to 40 000 so the seeded workspace reaches it (the default of 250 000 holds 60 records of 2.6 kB).
+ */
+const TOOL_ANSWER_BUDGET_CHARS = 40_000;
 
 /** Production on 2026-11-24: 1040 wishes and 95 briefs in one workspace. */
 const WISHES = Number(process.env.SCALE_WISHES ?? 1100);
@@ -79,6 +93,31 @@ const keys: string[] = [];
 const auth = (): Record<string, string> => ({ Authorization: `Bearer ${owner.token}` });
 const read = (args: Record<string, unknown> = {}) => callTool(session, 'aimeat_workspace_read', { organism_id: orgId, ws: WS, ...args });
 
+let operatorToken = '';
+const setAnswerSize = (value: unknown) => json('/v1/admin/config', {
+    method: 'PUT', headers: { Authorization: `Bearer ${operatorToken}` },
+    body: JSON.stringify({ changes: [{ path: 'mcp.tool_answer_chars', value }] }),
+});
+/** The size each tool of a session declares to the client, as the set of distinct values. */
+const declaredSizes = async (s: McpSession): Promise<{ tools: number; sizes: unknown[] }> => {
+    const sizes = new Set<unknown>();
+    let tools = 0;
+    let cursor: string | undefined;
+    do {
+        const body = await mcpRpc(s, 'tools/list', cursor ? { cursor } : {});
+        for (const t of body?.result?.tools ?? []) { tools++; sizes.add(t._meta?.[RESULT_SIZE_META_KEY]); }
+        cursor = body?.result?.nextCursor;
+    } while (cursor);
+    return { tools, sizes: [...sizes] };
+};
+
+await test('The operator sets the size of one answer; a value that is not a whole number of 0 or more is refused', async () => {
+    operatorToken = (await setupOperator(BASE, ADMIN_PW, `${name}op`)).token;
+    for (const bad of [-1, 1.5, 'large', 10_000_001]) expectRefusal(await setAnswerSize(bad), 400, 'INVALID_INPUT');
+    const set = await setAnswerSize(TOOL_ANSWER_BUDGET_CHARS);
+    assert(set.status === 200 && set.body.data.applied.length === 1, `set: ${set.status} ${JSON.stringify(set.body.error ?? set.body.data)}`);
+});
+
 await test('Setup: an owner, an organism and a workspace with two record spaces', async () => {
     owner = await registerOwner(BASE, name);
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(), body: JSON.stringify({ name: 'Bounded Org', type: 'project', join_policy: 'invite', visibility: 'private' }) });
@@ -93,6 +132,12 @@ await test('Setup: an owner, an organism and a workspace with two record spaces'
     // The reader is the person's own agent with the one word the tool asks, as a connected AI is.
     const agent = await makeAgent(BASE, owner, ['organism:read']);
     session = await openSession(BASE, agent.token, 'workspace-read-bounded');
+});
+
+await test('Every tool of the session declares the size to the client in its _meta', async () => {
+    const { tools, sizes } = await declaredSizes(session);
+    assert(tools > 0, 'the session lists no tool');
+    assert(sizes.length === 1 && sizes[0] === TOOL_ANSWER_BUDGET_CHARS, `${tools} tools declare ${JSON.stringify(sizes)}, expected ${TOOL_ANSWER_BUDGET_CHARS} on each`);
 });
 
 await test(`Seed: ${WISHES} wishes and ${BRIEFS} briefs, each changed at its own second`, async () => {
@@ -237,6 +282,21 @@ await test('The usage report names the tool with the size of its largest answer,
     assert(tool.answers_over_budget === 0, `${tool.answers_over_budget} answer(s) over the budget`);
     assert(tool.answer_chars_avg > 0 && tool.answer_chars_avg <= tool.answer_chars_max, `average ${tool.answer_chars_avg}`);
     console.log(`     aimeat_workspace_read: ${tool.calls} calls, largest ${tool.answer_chars_max}, average ${tool.answer_chars_avg}, over the budget ${tool.answers_over_budget}`);
+});
+
+await test('At the default size 30 records open in one call, and a new session declares the default', async () => {
+    // The setting is put back here whatever the assertions below say: on PostgreSQL it outlives the suite.
+    const back = await setAnswerSize(TOOL_ANSWER_CHARS_DEFAULT);
+    assert(back.status === 200, `the default could not be put back: ${back.status} ${JSON.stringify(back.body.error)}`);
+    // 30 records with their marks are about 130 kB: over the 40 000 the suite ran at, inside the default.
+    const asked = Array.from({ length: 30 }, (_, i) => idOf('wish', i * 7));
+    const r = await read({ ids: asked, space: 'wish' });
+    assert(!r.isError, `open: ${r.text.slice(0, 300)}`);
+    assert(r.data.items.length === asked.length && r.data.not_opened === undefined, `opened ${r.data.items.length} of ${asked.length}, left ${JSON.stringify(r.data.not_opened ?? []).slice(0, 120)}`);
+    assert(r.text.length > TOOL_ANSWER_BUDGET_CHARS && r.text.length <= TOOL_ANSWER_CHARS_DEFAULT, `the answer is ${r.text.length} characters`);
+    const fresh = await openSession(BASE, session.token, 'workspace-read-bounded-default');
+    const { sizes } = await declaredSizes(fresh);
+    assert(sizes.length === 1 && sizes[0] === TOOL_ANSWER_CHARS_DEFAULT, `a session opened after the change declares ${JSON.stringify(sizes)}`);
 });
 
 await test('Cleanup: the seeded records are removed', async () => {

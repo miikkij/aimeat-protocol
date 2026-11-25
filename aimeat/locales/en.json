@@ -668,9 +668,9 @@
   "explain.usage.refused.tipLabel": "Good to know",
   "explain.usage.refused.tip": "A refusal means that a limit worked. Many refusals of one offering mean that people want it and something stops them: the price, a limit or a missing grant.",
   "explain.usage.answerSize.title": "Largest answer",
-  "explain.usage.answerSize.short": "The size of the largest answer this tool gave your AI, in characters. An answer over 40,000 characters can be too large for your AI to read in one go.",
-  "explain.usage.answerSize.what": "Each time your AI calls a tool over MCP, this server measures how many characters of text the answer has. This column shows the largest answer of each tool in the time window. The limit of this server is 40,000 characters, because an AI program does not read a longer answer whole: one program saves it to a file, another cuts it and does not say so. A tool that gives a list answers in pages for that reason. A figure over 40k names a tool whose answer grew past the limit. An empty cell means that no answer of that row was measured: only calls over MCP are measured, and only since 24 November 2026.",
-  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke shows 61k: a tool of one of your apps answered with more than your AI reads in one go. Ask your AI: which of my tools gave answers over the size limit, and how often?",
+  "explain.usage.answerSize.short": "The size of the largest answer this tool gave your AI, in characters. An answer over this server's limit can be too large for your AI to read in one go.",
+  "explain.usage.answerSize.what": "Each time your AI calls a tool over MCP, this server measures how many characters of text the answer has. This column shows the largest answer of each tool in the time window. This server has a limit for one answer: 250,000 characters, unless the people who run it changed it. An AI program does not read an answer of any size whole: one program saves a long answer to a file, another cuts it and does not say so. A tool that gives a list answers in pages for that reason. A figure over the limit names a tool whose answer grew past it. An empty cell means that no answer of that row was measured: only calls over MCP are measured, and only since 24 November 2026.",
+  "explain.usage.answerSize.ex1": "aimeat_app_tool_invoke shows 310k: a tool of one of your apps answered with more than your AI reads in one go. Ask your AI: which of my tools gave answers over the size limit, and how often?",
   "explain.usage.answerSize.tipLabel": "Good to know",
   "explain.usage.answerSize.tip": "A large answer uses your AI's reading space also when it fits. When a tool of your own app is at the top, ask the app's builder to answer with a summary first and to give the lists in pages.",
   "explain.nodeStats.latencyP95.title": "P95 Latency",
@@ -15551,6 +15551,7 @@
     "cfg_mcp_legacy_sessions_per_principal": "Older MCP sessions per AI or person",
     "cfg_mcp_legacy_sessions_per_owner": "Older MCP sessions per person and their AIs",
     "cfg_mcp_legacy_sessions_total": "Older MCP sessions in all",
+    "cfg_mcp_tool_answer_chars": "Largest tool answer (characters)",
     "cfg_storage_request_statement_ms": "Database query limit while answering (ms)",
     "cfg_registration_mode": "Who may register",
     "cfg_registration_members_see_each_other": "Everyone on this server sees each other",
@@ -15919,6 +15920,7 @@
     "cfgDesc_mcp_legacy_sessions_per_principal": "How many open sessions of the older MCP protocol one AI or person keeps. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_mcp_legacy_sessions_per_owner": "How many open sessions of the older MCP protocol one person and all of their AIs keep together. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_mcp_legacy_sessions_total": "How many open sessions of the older MCP protocol the whole server keeps. Each one holds its own copy of the tool list in memory. A new session past it closes the least recently used session of the person who holds the most, and that app connects again by itself. 0 means no limit.",
+    "cfgDesc_mcp_tool_answer_chars": "How many characters of text one tool answer to an AI may hold. When an AI opens many workspace records in one call, the server stops at this size and names the records still to open. The usage report counts the answers over it. Every tool also tells the AI program this size, so Claude Code gives an answer of this size to the model as text, up to 500,000 characters. A connection that is open keeps the value it started with. 0 means no limit.",
     "cfgDesc_storage_request_statement_ms": "On PostgreSQL, how long one database query may run while the server answers a page, an app or an AI. A longer query stops and that request fails. Scheduled jobs keep the database's own limit of 120 seconds. The default 120000 is that same limit. 0 means no limit.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation; no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
     "cfgDesc_registration_members_see_each_other": "For a company server. Every person with an account here is in every other person's address book as a colleague, and a first message between two of them needs no approval. Off by default.",
@@ -32493,6 +32495,15 @@
           "low": "Lower: less memory in use; on a busy server, apps connect again more often.",
           "high": "Higher: more sessions stay open, and they can use more memory.",
           "tip": "Keep the default unless the server runs short of memory. Apps that speak the newer protocol (2026) keep no session and do not count."
+        },
+        "tool_answer_chars": {
+          "title": "Largest tool answer (characters)",
+          "short": "How many characters of text one tool answer to an AI may hold. 0 means no limit. The default is 250000.",
+          "what": "When an AI calls a tool on this server, the answer is text, and an AI program accepts only so much text in one answer. This setting is the size this server holds its answers to. When an AI opens many workspace records in one call, the server stops at this size and names the records still to open. The usage report counts each answer over it, so you see which tool's answers grow. Every tool also tells the AI program this size. Claude Code then gives an answer of this size to the model as text, up to 500,000 characters. Without that, it saves an answer over 50,000 characters to a file and gives the model only the place of the file. A connection that is open keeps the value it started with.",
+          "range": "A whole number from 0 to 10000000. The default is 250000. 0 means no limit.",
+          "low": "Lower: answers stay small, and an AI makes more calls to read the same data.",
+          "high": "Higher: an AI reads more in one call, and one answer can fill more of the space the AI has for reading.",
+          "tip": "Keep the default for Claude Code. Lower it to about 40000 when people here use an AI program that cuts a long answer or saves it to a file."
         }
       },
       "storage": {

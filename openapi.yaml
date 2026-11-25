@@ -53403,7 +53403,8 @@ paths:
         shows one page per space, newest change first, with `counts` holding every space's total
         and `page` ({ limit, shown, more, matched?, q? }) naming in `more` each space that has
         entries left ({ remaining, next_cursor? }); and a read of `ids` stops at the size of one
-        tool answer (40 000 characters) and lists the ids it did not open in `not_opened`. The
+        tool answer (the setting mcp.tool_answer_chars, default 250 000 characters) and lists the
+        ids it did not open in `not_opened`. The
         first record asked for is always opened. Without these parameters the read is whole.
       tags: [Organisms]
       security:
