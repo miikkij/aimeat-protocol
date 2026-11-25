@@ -32,6 +32,8 @@
  * @structure FULL_SWEEP · codeReach(repo, files)
  * @usage const reach = codeReach(repo, codeFiles);   // scripts/lib/ready-scope.ts readyScope()
  * @version-history
+ *   v1.2.0 — 2026-11-25 — The suites are the runner's ALL_SUITES list, not the files named e2e-*.ts,
+ *     so federation-mesh, api-full and the other suites without the prefix are reachable.
  *   v1.1.0 — 2026-11-25 — The nightly's coverage map decides first; a route is matched by every fixed
  *     part of its path to its end; a route or file more than COMMON_SHARE of the suites run picks
  *     COMMON_SAMPLE of them; a configuration change starts from the code that reads the setting.
@@ -151,6 +153,19 @@ export interface CodeReach {
   suites: string[];
 }
 
+/**
+ * The suites the runner knows: the entries of ALL_SUITES in test/run-e2e-ci.ts, as absolute paths.
+ * A file-name filter missed the suites without the `e2e-` prefix (federation-mesh, api-full, ai),
+ * and a change that broke them reached main unseen (2026-11-25).
+ */
+export function registeredSuites(aimeat: string): string[] {
+  const runner = readFileSync(path.join(aimeat, 'test', 'run-e2e-ci.ts'), 'utf8');
+  const start = runner.indexOf('const ALL_SUITES = [');
+  if (start < 0) throw new Error('test/run-e2e-ci.ts has no ALL_SUITES list');
+  const list = runner.slice(start, runner.indexOf('\n];', start));
+  return [...list.matchAll(/^\s*'(test\/[^']+\.ts)'/gm)].map(m => path.join(aimeat, m[1]!));
+}
+
 /** The E2E suites the changed code files can reach (see the header). `files` are repo-relative. */
 export function codeReach(repo: string, files: string[], base = 'origin/main'): CodeReach {
   const full = files.find(f => FULL_SWEEP.test(f));
@@ -159,7 +174,7 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
   const aimeat = path.join(repo, 'aimeat');
   const srcDir = path.join(aimeat, 'src');
   const testDir = path.join(aimeat, 'test');
-  const suiteFiles = readdirSync(testDir).filter(n => /^e2e-.*\.ts$/.test(n)).map(n => path.join(testDir, n));
+  const suiteFiles = registeredSuites(aimeat);
   const rev = graphOf(repo, () => {
     const srcFiles = walk(srcDir).filter(f => !f.includes(`${path.sep}static${path.sep}sdk-libs${path.sep}`));
     const helperFiles = existsSync(path.join(testDir, 'helpers')) ? walk(path.join(testDir, 'helpers')) : [];

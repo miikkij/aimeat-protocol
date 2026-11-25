@@ -33,6 +33,7 @@
  *   PostgreSQL.
  * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope() (codeReach in ./ready-reach.ts)
  * @version-history
+ *   v2.1.0 — 2026-11-25 — A text change reaches the runner's suites without the e2e- prefix too.
  *   v2.0.0 — 2026-11-24 — A code change runs the suites it can reach (ready-reach.ts), not the whole
  *     sweep; the whole sweep stays for a change on every request's path and for the nightly.
  *   v1.3.0 — 2026-11-23 — public/changelog.json is text: a changelog entry alone ran the full sweep
@@ -44,11 +45,11 @@
  *   v1.0.0 — 2026-11-22 — Initial.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { parse as parseYaml } from 'yaml';
-import { codeReach } from './ready-reach.js';
+import { codeReach, registeredSuites } from './ready-reach.js';
 
 const git = (repo: string, ...args: string[]): string =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -245,11 +246,11 @@ function withoutComments(source: string, file: string): string {
 /** The E2E suites (by name) a text change can reach; `texts` are removedTexts' parts. */
 export function targetedSuites(repo: string, base: string, files: string[], texts = removedTexts(repo, base, files).parts): string[] {
   const testDir = path.join(repo, 'aimeat', 'test');
-  const suites = readdirSync(testDir).filter(n => /^e2e-.*\.ts$/.test(n));
+  const suites = registeredSuites(path.join(repo, 'aimeat')).map(s => path.basename(s));
   const picked = new Set<string>();
   // A suite whose code or strings changed runs; one whose comments alone changed does not.
   for (const f of files) {
-    const m = /^aimeat\/test\/(e2e-[^/]*)\.ts$/.exec(f);
+    const m = /^aimeat\/test\/([^/]+)\.ts$/.exec(f);
     if (!m || !suites.includes(`${m[1]}.ts`)) continue;
     const before = gitShow(repo, base, f);
     const after = readFileSync(path.join(repo, f), 'utf8');

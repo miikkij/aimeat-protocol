@@ -6,11 +6,12 @@
  *   against this repository's own source and suites: a change picks the suites that call what it
  *   reaches and leaves the rest, and a change on every request's path runs the whole sweep.
  * @version-history
+ *   v1.1.0 — 2026-11-25 — The suites without the e2e- prefix are reachable.
  *   v1.0.0 — 2026-11-24 — Initial.
  */
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { codeReach } from '../../scripts/lib/ready-reach.js';
+import { codeReach, registeredSuites } from '../../scripts/lib/ready-reach.js';
 
 const repo = path.resolve(process.cwd(), '..');
 
@@ -32,6 +33,13 @@ describe('codeReach', () => {
     expect(r.full).toBeNull();
     expect(r.suites).toEqual(expect.arrayContaining(['e2e-federated-session', 'e2e-federation-peer-consent', 'e2e-federation-peer-bounds']));
     expect(r.suites).not.toContain('e2e-libs');
+  });
+
+  it('reaches the runner\'s suites without the e2e- prefix', () => {
+    const suites = registeredSuites(path.join(repo, 'aimeat')).map(s => path.basename(s, '.ts'));
+    expect(suites).toEqual(expect.arrayContaining(['federation-mesh', 'federation-multinode', 'api-full', 'e2e-libs']));
+    const r = codeReach(repo, ['aimeat/src/services/federation/auth-consent.ts']);
+    expect(r.suites).toEqual(expect.arrayContaining(['federation-mesh', 'federation-multinode']));
   });
 
   it('picks the library suites for a change in the served libraries\' registry, and not the federation suites', () => {
