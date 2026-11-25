@@ -10,8 +10,8 @@
  *   Node C (contributor):  port 28262, node ID aimeat-node-001-testc
  *
  * @version-history
- *   2026-11-25 -- Core FED-16: Node B's operator turns allow_federated_auth on for Node A before the
- *     federated sign-in, which B now needs as well as the tier.
+ *   2026-11-25 -- Core FED-16: addAndActivatePeer turns allow_federated_auth on with the activation,
+ *     so Node B answers Node A's federated sign-in check: B now needs it as well as the tier.
  *   2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -246,11 +246,11 @@ async function addAndActivatePeer(
     });
     assert(status === 201, `add peer ${peerNodeId} on ${node.config.nodeId}: status ${status}: ${JSON.stringify(body)}`);
 
-    // Activate peer
+    // Activate peer, and allow it the sign-in check the tier no longer gives alone (Core FED-16)
     const activateRes = await node.json(`/v1/federation/peers/${peerNodeId}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${node.ownerToken}` },
-        body: JSON.stringify({ status: 'active' }),
+        body: JSON.stringify({ status: 'active', allow_federated_auth: true }),
     });
     assert(activateRes.body.ok === true, `activate peer ${peerNodeId} on ${node.config.nodeId}: ${JSON.stringify(activateRes.body.error)}`);
     assert(activateRes.body.data.status === 'active', `peer ${peerNodeId} active on ${node.config.nodeId}`);
@@ -640,17 +640,7 @@ await test('A non-operator on Node B cannot add, re-tune or de-peer → 403, and
 
 // Since secaudit 2026-10 (D1) the home node answers only an active peer that signs the request, so the
 // sign-in goes the way a person's does: through a node that peers with the home node. A is the hub;
-// B peers with A, not with C. B answers a sign-in check only for a peer its operator allowed it for,
-// beside the tier (Core FED-16, 2026-11-24), so B's operator turns allow_federated_auth on for A.
-await test('Node B\'s operator lets Node A ask sign-in checks (allow_federated_auth)', async () => {
-    const { body } = await nodeB!.json('/v1/federation/peers/aimeat-hub-001-testa', {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${nodeB!.ownerToken}` },
-        body: JSON.stringify({ allow_federated_auth: true }),
-    });
-    assert(body.ok === true, `allow_federated_auth on B: ${JSON.stringify(body.error)}`);
-});
-
+// B peers with A, not with C.
 await test('Create auth consent for Node A on Node B', async () => {
     const { status, body } = await nodeB!.json('/v1/consent', {
         method: 'POST',
