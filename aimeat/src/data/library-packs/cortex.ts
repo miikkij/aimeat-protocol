@@ -29,6 +29,8 @@
  *     aimeat-input/gesture-event-and-info-arguments-before-flight-math, ui/viewport-tap-target-is-host.
  *   v1.5.1 — 2026-11-25 — aimeat-viewport 1.2.0 and aimeat-dag 1.1.6: a press on a control is captured
  *     only once it becomes a drag, so a real mouse click reaches a button inside the host.
+ *   v1.5.2 — 2026-11-25 — aimeat-input 1.2.0: on() and pad() capture a press on a control inside the
+ *     element only once it moves, so a real mouse click reaches the control.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -297,7 +299,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-input/libs/aimeat-input.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-input/libs/aimeat-input.js"></script>'],
     requires: [],
-    version: '1.1.0',
+    version: '1.2.0',
     license: 'MIT',
     apiSurface: 'AIMEAT.input',
     apiCaveat: 'Use tappable() for buttons, cards and rows — it is built on `click`, so a tap, a mouse and Enter/Space all arrive once. A hand-rolled touchstart listener fires twice, triggers mid-scroll, and cannot be reached by keyboard.',
@@ -329,6 +331,8 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'EVERY GESTURE HAS A DESKTOP EQUIVALENT, on by default: arrows fire swipe, Enter/Space fire tap, a',
       'right click fires longPress. The synthetic click after a consumed gesture is suppressed for',
       '400ms, so a handler runs once.',
+      'A press on a control INSIDE the element (button, link, field, label, an ARIA control role) is not a tap:',
+      'the control gets its own click, and the press becomes a swipe or a drag only once it moves past the slop.',
       'AIMEAT.input.pad(host, { mode:"stick"|"dpad", floating, deadZone, keyboard, onChange }) →',
       '{ value(), destroy() } is a virtual thumbstick for a game; WASD and the arrows drive the same',
       'vector. The host needs a SIZE, and the pad renders unpainted geometry only (.ai-pad-base,',
@@ -339,6 +343,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'return, because a laptop with a touchscreen answers true to both.',
     ].join('\n'),
     changelog: [
+      { version: '1.2.0', date: '2026-11-25', summary: 'A real mouse click on a button inside a gesture surface (on()) or inside the pad\'s host reaches the button. Both captured every pointer at pointerdown, and the browser sends a captured pointer\'s click to the capturing element, so a button in a card or a row heard nothing and only element.click() worked. A press that starts on a control inside the element is now captured only once it moves past the slop; one that stays put is the control\'s click, so tap no longer fires for it and the click is not suppressed. A drag or a swipe that starts on a control still works.' },
       { version: '1.1.0', date: '2026-11-21', summary: 'info carries startX and startY, where the press began, so a drag measures its grab offset from the pointer-down point and not from dragStart\'s event, which is already past the slop. Additive.' },
       { version: '1.0.0', date: '2026-08-12', summary: 'Initial release. Written because mobile INPUT was the gap in an otherwise covered mobile story: the layout rules (overflow, viewport, the bottom chrome strip) live in the build-app prompt and in fifteen appdev pitfalls, while touch handling was hand-rolled per app and duplicated across aimeat-viewport, -dag, -flow and -canvas, and aimeat-game listened for `click` alone. One Pointer Events state machine, keyboard equivalence on by default, touch-action derived from the registered handlers, and the trailing synthetic click suppressed once a gesture has consumed the interaction.' },
     ],

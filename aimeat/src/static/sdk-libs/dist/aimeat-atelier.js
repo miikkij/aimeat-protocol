@@ -253,6 +253,22 @@
     if (typeof target === "string") return $(target) || fallback || document.body;
     return target;
   }
+  var CONTROL_SELECTOR = 'button, a[href], input, select, textarea, label, summary, [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"]';
+  function pressedControl(target, root) {
+    const t2 = (
+      /** @type {Element|null} */
+      target
+    );
+    const hit = t2 && typeof t2.closest === "function" ? t2.closest(CONTROL_SELECTOR) : null;
+    return !!hit && hit !== root && root.contains(hit);
+  }
+  function capturePointer(node, pointerId) {
+    try {
+      node.setPointerCapture(pointerId);
+    } catch (err) {
+      console.debug("[aimeat-atelier] the pointer could not be captured:", err);
+    }
+  }
   function injectStyle(opts) {
     const o = opts || {};
     const head = document.head || document.getElementsByTagName("head")[0];
@@ -7195,15 +7211,13 @@
     const down = function(e) {
       if (e.button !== void 0 && e.button !== 0) return;
       const s = stateOf(node);
-      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+      const lazy = pressedControl(e.target, node);
+      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, captured: !lazy, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
       if (
         /** @type {any} */
         node.__akSpring
       ) node.__akSpring.cancel();
-      try {
-        node.setPointerCapture(e.pointerId);
-      } catch {
-      }
+      if (!lazy) capturePointer(node, e.pointerId);
     };
     const move = function(e) {
       if (!active || e.pointerId !== active.id) return;
@@ -7212,6 +7226,10 @@
       if (!active.moved) {
         if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
         active.moved = true;
+        if (!active.captured) {
+          active.captured = true;
+          capturePointer(node, active.id);
+        }
         node.classList.add("ak-dragging");
         if (h.onStart) h.onStart(node);
       }
@@ -21259,23 +21277,34 @@ Known schemas:
       if (s.onChange) s.onChange(pct2);
     }
     let dragging = false;
+    let press = null;
     function at3(e) {
       const r = root.getBoundingClientRect();
       set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
     }
     root.addEventListener("pointerdown", function(e) {
+      press = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      if (e.target !== handle2 && pressedControl(e.target, root)) return;
       dragging = true;
-      root.setPointerCapture(e.pointerId);
+      capturePointer(root, e.pointerId);
       at3(e);
     });
     root.addEventListener("pointermove", function(e) {
-      if (dragging) at3(e);
+      if (!press || e.pointerId !== press.id) return;
+      if (!dragging) {
+        if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) <= 4) return;
+        dragging = true;
+        capturePointer(root, e.pointerId);
+      }
+      at3(e);
     });
     root.addEventListener("pointerup", function() {
       dragging = false;
+      press = null;
     });
     root.addEventListener("pointercancel", function() {
       dragging = false;
+      press = null;
     });
     handle2.addEventListener("keydown", function(e) {
       if (e.key === "ArrowLeft") {
@@ -35627,7 +35656,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.72.3",
+    version: "0.72.4",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

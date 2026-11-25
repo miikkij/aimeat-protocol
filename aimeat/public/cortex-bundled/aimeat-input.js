@@ -23,6 +23,13 @@
  *     longPress: () => menu(),
  *   }, { axis: 'x' });                                             // vertical scrolling survives
  * @version-history
+ *   v1.2.0 — 2026-11-25 — A real mouse click on a control inside a gesture surface or a pad reaches
+ *     the control. on() and pad() captured every pointer at pointerdown, and the browser sends a
+ *     captured pointer's click to the capturing element, so a button in a card, a row or the pad's
+ *     area heard nothing; only element.click() worked. A press that starts on a control inside the
+ *     element (button, link, field, label, an ARIA control role; never the element itself) is now
+ *     captured only once it moves past the slop, and a press on one that stays put is the control's
+ *     click: no tap, and the click is not suppressed. aimeat-viewport 1.2.0 made the same change.
  *   v1.1.0 — 2026-11-21 — A gesture's info carries startX and startY, where the press began. A drag
  *     that grabbed an object measured its offset from dragStart's ev.clientX, which is already past
  *     the slop, so the object jumped by that much (appdev pitfall ui/input-drag-grab-point-is-pointer-down).
@@ -41,7 +48,7 @@
   // Idempotent, in case a pack embeds a copy the way aimeat-dag embeds the viewport.
   if (AIMEAT.input) return;
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
 
   // Defaults chosen from the platform conventions rather than invented: 44px is the touch target
   // the mobile checklist already asks for, 500ms is the long-press users bring from the OS, and a
@@ -70,6 +77,26 @@
 
   function resolveEl(elOrSelector) {
     return typeof elOrSelector === 'string' ? document.querySelector(elOrSelector) : elOrSelector;
+  }
+
+  // What a press may land on that answers a click of its own: the same list as aimeat-viewport's
+  // CONTROL. test/unit/pointer-capture-controls.test.ts holds the copies equal.
+  var CONTROL = 'button, a[href], input, select, textarea, label, summary, [contenteditable]:not([contenteditable="false"]), ' +
+    '[role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"]';
+
+  /* The browser sends a captured pointer's click to the capturing element, so an element that
+     captures every pointerdown takes the click away from each button inside it. A press on a
+     control INSIDE the element (never the element itself) is therefore captured only once it
+     moves into a gesture; a press that stays put is the control's. */
+  function onInnerControl(root, t) {
+    var hit = t && t.closest ? t.closest(CONTROL) : null;
+    return !!hit && hit !== root && root.contains(hit);
+  }
+
+  // Best-effort, for the same reason aimeat-viewport does it: a synthetic PointerEvent has no
+  // active pointer and setPointerCapture throws NotFoundError, swallowing the whole pointerdown.
+  function capture(node, pointerId) {
+    try { node.setPointerCapture && node.setPointerCapture(pointerId); } catch (e) { /* noop */ }
   }
 
   // Structural CSS only — no colour, no spacing, no font. The app owns every cosmetic, so injection
@@ -304,16 +331,19 @@
     }
 
     function onPointerDown(ev) {
+      // A press on a control is not captured until it moves, so it can lift outside the element
+      // and its pointerup never arrives: a primary pointer going down means that press is gone.
+      if (g && !g.captured && ev.isPrimary) { clearLongTimer(); g = null; }
       if (g) return;                       // a second finger never corrupts a gesture in flight
       if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-      // Best-effort, for the same reason aimeat-viewport does it: a synthetic PointerEvent has no
-      // active pointer and setPointerCapture throws NotFoundError, swallowing the whole pointerdown.
-      try { el.setPointerCapture && el.setPointerCapture(ev.pointerId); } catch (e) { /* noop */ }
+      var lazy = onInnerControl(el, ev.target);
+      if (!lazy) capture(el, ev.pointerId);
 
       g = {
         id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, x: ev.clientX, y: ev.clientY,
         px: ev.clientX, py: ev.clientY, t0: nowMs(), moved: false, dragging: false,
         longFired: false, pointerType: ev.pointerType || 'mouse',
+        onControl: lazy, captured: !lazy,
       };
 
       if (h.longPress) {
@@ -335,6 +365,7 @@
       if (!g.moved && Math.abs(g.x - g.sx) + Math.abs(g.y - g.sy) > slop) {
         g.moved = true;
         clearLongTimer();
+        if (!g.captured) { g.captured = true; capture(el, g.id); }
         if (h.dragStart || h.dragMove || h.dragEnd) {
           g.dragging = true;
           if (h.dragStart) h.dragStart(ev, info());
@@ -362,7 +393,9 @@
           consumeClick();
           h.swipe(dir, info({ velocity: dt > 0 ? dist / dt : 0 }));
         }
-      } else if (!cur.moved && !cur.longFired) {
+      } else if (!cur.moved && !cur.longFired && !cur.onControl) {
+        // A press on a control inside the element that stayed put is the control's click, not a
+        // tap on the surface: no tap, and the click is not suppressed.
         var at = nowMs();
         if (h.doubleTap && at - lastTapAt < dblMs) {
           lastTapAt = 0;
@@ -491,7 +524,7 @@
     host.appendChild(base);
     host.appendChild(stick);
 
-    var radius = 0, originX = 0, originY = 0, pointerId = null;
+    var radius = 0, originX = 0, originY = 0, pointerId = null, held = null;
     var vec = { x: 0, y: 0, angle: 0, distance: 0, active: false, source: 'none' };
     var keys = {};
 
@@ -529,21 +562,31 @@
     }
 
     function onDown(ev) {
-      if (pointerId !== null) return;
+      // An uncaptured press can lift outside the host, and its pointerup never arrives; a primary
+      // pointer going down means it is gone.
+      if (pointerId !== null && !(held && ev.isPrimary)) return;
       pointerId = ev.pointerId;
-      try { host.setPointerCapture && host.setPointerCapture(ev.pointerId); } catch (e) { /* noop */ }
+      // A button the app put in the pad's area (pause, fire) keeps its click: its press is
+      // captured only once the thumb moves past the slop, as on any other surface here.
+      held = onInnerControl(host, ev.target) ? { x: ev.clientX, y: ev.clientY } : null;
+      if (!held) capture(host, ev.pointerId);
       if (floating) place(ev.clientX, ev.clientY);
       else if (!radius) { var r = host.getBoundingClientRect(); place(r.left + r.width / 2, r.top + r.height / 2); }
       emit(0, 0, 'pointer');
     }
     function onMove(ev) {
       if (ev.pointerId !== pointerId) return;
+      if (held && Math.abs(ev.clientX - held.x) + Math.abs(ev.clientY - held.y) > TAP_SLOP) {
+        held = null;
+        capture(host, ev.pointerId);
+      }
       var r = host.getBoundingClientRect();
       emit((ev.clientX - r.left - originX) / radius, (ev.clientY - r.top - originY) / radius, 'pointer');
     }
     function onUp(ev) {
       if (ev.pointerId !== pointerId) return;
       pointerId = null;
+      held = null;
       emit(0, 0, 'pointer');
     }
 

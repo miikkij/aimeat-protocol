@@ -28,6 +28,9 @@
  *   AIMEAT.atelier.scrollLink(hero, [{ opacity: 1 }, { opacity: 0 }], { range: [0, 0.6] });
  *   AIMEAT.atelier.drag(handle, { onEnd(dx, dy) { if (dx > 80) accept(); } });
  * @version-history
+ *   v0.72.4 — 2026-11-25 — drag() leaves a press on a control inside the element (a button on the
+ *     card, a link, a field) uncaptured until it moves past the threshold, so a real mouse click
+ *     reaches the control; the browser sends a captured pointer's click to the dragged element.
  *   v0.45.1 — 2026-09-02 — THE LOOK'S OWN HAND: springFrames, spring, drag and the springy
  *     stagger read stiffness, damping and mass off the element's --ak-spring-* tokens when the
  *     call names none, so an author tunes the LOOK instead of every call site. springFrames
@@ -36,7 +39,7 @@
  *     frozen in the primitive, and a look that means "no bounce" was overruled by them.
  *   v0.44.0 — 2026-09-02 — Initial.
  */
-import { resolve, reducedMotion } from './dom.js';
+import { resolve, reducedMotion, pressedControl, capturePointer } from './dom.js';
 
 /** The transform state the spring keeps per element (a transform string cannot be read back). */
 const STATE = new WeakMap();
@@ -311,7 +314,8 @@ export function scrollLink(target, frames, opts) {
  * Pointer drag on one element: it follows the hand (translate, on the axis named), the handlers
  * hear how far and how fast, and on release it springs back unless `back` is false — the swipe
  * to accept, the card you pull out, the row you carry. Touch, mouse and pen alike, through
- * pointer capture. Drag is under the hand, so it runs under reduced motion too; only the return
+ * pointer capture; a press on a control inside the element is captured only once it moves past
+ * the threshold, so the control keeps its click. Drag is under the hand, so it runs under reduced motion too; only the return
  * travel is skipped there.
  * @param {Element|string} target
  * @param {{ onStart?: (el: Element) => void, onMove?: (dx: number, dy: number, el: Element) => void,
@@ -334,9 +338,12 @@ export function drag(target, handlers, opts) {
   const down = function (e) {
     if (e.button !== undefined && e.button !== 0) return;
     const s = stateOf(node);
-    active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+    // A press on a button (a link, a field) inside the card is the control's click until it moves
+    // past the threshold: a captured pointer's click goes to the card, never to the button.
+    const lazy = pressedControl(e.target, node);
+    active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, captured: !lazy, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
     if (/** @type {any} */ (node).__akSpring) /** @type {any} */ (node).__akSpring.cancel();
-    try { node.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
+    if (!lazy) capturePointer(node, e.pointerId);
   };
   const move = function (e) {
     if (!active || e.pointerId !== active.id) return;
@@ -345,6 +352,7 @@ export function drag(target, handlers, opts) {
     if (!active.moved) {
       if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
       active.moved = true;
+      if (!active.captured) { active.captured = true; capturePointer(node, active.id); }
       node.classList.add('ak-dragging');
       if (h.onStart) h.onStart(node);
     }

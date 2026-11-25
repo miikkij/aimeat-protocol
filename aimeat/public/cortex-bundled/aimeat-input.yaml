@@ -10,7 +10,7 @@ metadata:
     domain: ui
 
 spec:
-  version: "1.1.0"
+  version: "1.2.0"
   license: MIT
   components:
     - type: prompt
@@ -74,6 +74,11 @@ spec:
 
         THE DOUBLE-FIRE IS ALREADY HANDLED: once a gesture consumes an interaction, the synthetic
         click that follows a tap is swallowed for 400ms, so a handler runs once.
+
+        BUTTONS INSIDE THE ELEMENT KEEP THEIR CLICK. A press that starts on a control inside it
+        (button, link, field, label, an ARIA control role) is not a tap: the control gets its own
+        click, and the press becomes a swipe or a drag only once it moves past the slop. The same
+        holds for a button inside the pad's host.
 
         A GAME PAD, for a game that needs continuous direction:
 

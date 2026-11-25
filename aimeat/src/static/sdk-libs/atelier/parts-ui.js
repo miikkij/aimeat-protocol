@@ -13,6 +13,9 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.72.4 — 2026-11-25 — compare() leaves a press on a control in a layer (the app's own button
+ *     or link) uncaptured until it moves into a drag, so a real mouse click reaches it. The handle
+ *     still drags at once.
  *   v0.72.0 — 2026-11-22 — tour() moved to its own module, tour.js, where it became the app's guided
  *     tour; this file re-exports it, so imports of parts-ui.js are unchanged.
  *   v0.63.1 — 2026-10-02 — The tour's note follows its element on every scroll (once a frame, in
@@ -35,7 +38,7 @@
  *     reads as a bug rather than as a message ending.
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
-import { el, resolve, enter, motionOff, wearLook } from './dom.js';
+import { el, resolve, enter, motionOff, wearLook, pressedControl, capturePointer } from './dom.js';
 import { fadeIn, paceOf, settle } from './arrive.js';
 import { springFrames } from './motion.js';
 import { ink } from './ink.js';
@@ -299,14 +302,30 @@ export function compare(spec) {
     if (s.onChange) s.onChange(pct);
   }
   let dragging = false;
+  /** @type {{ id: number, x: number, y: number }|null} */
+  let press = null;
   function at(e) {
     const r = root.getBoundingClientRect();
     set(((e.clientX - r.left) / Math.max(r.width, 1)) * 100);
   }
-  root.addEventListener('pointerdown', function (e) { dragging = true; root.setPointerCapture(e.pointerId); at(e); });
-  root.addEventListener('pointermove', function (e) { if (dragging) at(e); });
-  root.addEventListener('pointerup', function () { dragging = false; });
-  root.addEventListener('pointercancel', function () { dragging = false; });
+  // A layer may hold a control of the app's own (a button, a link). A press on it stays its click
+  // until it moves past a few pixels: a captured pointer's click goes to the slider, not to the
+  // button. The handle is the slider's own part and drags at once.
+  root.addEventListener('pointerdown', function (e) {
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    if (e.target !== handle && pressedControl(e.target, root)) return;
+    dragging = true; capturePointer(root, e.pointerId); at(e);
+  });
+  root.addEventListener('pointermove', function (e) {
+    if (!press || e.pointerId !== press.id) return;
+    if (!dragging) {
+      if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) <= 4) return;
+      dragging = true; capturePointer(root, e.pointerId);
+    }
+    at(e);
+  });
+  root.addEventListener('pointerup', function () { dragging = false; press = null; });
+  root.addEventListener('pointercancel', function () { dragging = false; press = null; });
   handle.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowLeft') { e.preventDefault(); set(pct - 5); }
     if (e.key === 'ArrowRight') { e.preventDefault(); set(pct + 5); }

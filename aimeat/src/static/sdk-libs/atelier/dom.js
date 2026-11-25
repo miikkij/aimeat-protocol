@@ -15,8 +15,8 @@
  *   prefers-reduced-motion. Finished WAAPI animations leave nothing running, so an idle Atelier
  *   surface repaints zero times — the finish gate measures exactly that.
  * @structure el · append · $ · $$ · clear · uid · reducedMotion · setMotion · motionOff ·
- *   setMotionDefaults · resolve · injectStyle · busy · guardButtons · whileBusy · enter ·
- *   kinetic · countUp · attention · wearLook
+ *   setMotionDefaults · resolve · CONTROL_SELECTOR · pressedControl · capturePointer ·
+ *   injectStyle · busy · guardButtons · whileBusy · enter · kinetic · countUp · attention · wearLook
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  *
@@ -26,6 +26,8 @@
  *   on <html> win over the kit's own :root values (aimeat-atelier.css). Inside an app frame the
  *   frame's own look still wins.
  * @version-history
+ *   v0.72.4 — 2026-11-25 — pressedControl and capturePointer: a part that captures a pointer asks
+ *     whether the press landed on a control inside it, and captures that press only once it drags.
  *   v0.65.2 — 2026-10-05 — el and append come from _core/dom.js, shared with the game kit
  *     (secaudit 2026-10, M7).
  *   v0.65.1 — 2026-10-03 — injectStyle arms added-faces.js: once the kit's stylesheet has loaded, a
@@ -245,6 +247,42 @@ export function resolve(target, fallback) {
   if (!target) return fallback || document.body;
   if (typeof target === 'string') return $(target) || fallback || document.body;
   return target;
+}
+
+/**
+ * What a press may land on that answers a click of its own. The same list as aimeat-viewport's
+ * CONTROL (public/cortex-bundled/aimeat-viewport.js); test/unit/pointer-capture-controls.test.ts
+ * holds the copies equal.
+ */
+export const CONTROL_SELECTOR = 'button, a[href], input, select, textarea, label, summary, [contenteditable]:not([contenteditable="false"]), ' +
+  '[role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"]';
+
+/**
+ * Whether a press on `target` landed on a control INSIDE `root` (never `root` itself, never one
+ * around it). The browser sends a captured pointer's click to the capturing element, so a part
+ * that captures such a press at pointerdown takes the click away from the control: the part
+ * captures it only once the press moves into a drag.
+ * @param {EventTarget|null} target
+ * @param {Element} root
+ * @returns {boolean}
+ */
+export function pressedControl(target, root) {
+  const t = /** @type {Element|null} */ (target);
+  const hit = t && typeof t.closest === 'function' ? t.closest(CONTROL_SELECTOR) : null;
+  return !!hit && hit !== root && root.contains(hit);
+}
+
+/**
+ * Capture a pointer on `node`, best-effort: a synthetic pointer (tests, automation) or one already
+ * released has no active pointer, and setPointerCapture throws NotFoundError.
+ * @param {Element} node
+ * @param {number} pointerId
+ */
+export function capturePointer(node, pointerId) {
+  try { node.setPointerCapture(pointerId); } catch (err) {
+    // The drag still runs; without capture it follows the pointer only while it is over the node.
+    console.debug('[aimeat-atelier] the pointer could not be captured:', err);
+  }
 }
 
 /**

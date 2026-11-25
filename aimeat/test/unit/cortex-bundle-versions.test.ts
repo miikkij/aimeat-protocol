@@ -15,6 +15,8 @@
  *   version recorded here alongside a hash of the pack's bytes. Change the code and the hash moves,
  *   and this fails until the version is bumped with it.
  * @version-history
+ *   v1.1.6 -- 2026-11-25 -- aimeat-input 1.2.0 recorded, bumped with the same capture fix for on()
+ *     and pad().
  *   v1.1.5 -- 2026-11-25 -- aimeat-viewport 1.2.0 and aimeat-dag 1.1.6 recorded, bumped with the
  *     capture fix (a real mouse click reaches a button inside the host).
  *   v1.1.4 -- 2026-11-21 -- aimeat-input 1.1.0, aimeat-viewport 1.1.0 and aimeat-dag 1.1.5 recorded,
@@ -67,7 +69,7 @@ const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-dag': { version: '1.1.6', sha256: '15be159d4ce1f0b9' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },
     'aimeat-i18n': { version: '1.4.1', sha256: '6e2e000475bd87f4' },
-    'aimeat-input': { version: '1.1.0', sha256: '802605f5fe1b616d' },
+    'aimeat-input': { version: '1.2.0', sha256: '05f87a3d51e5b993' },
     'aimeat-surface': { version: '1.2.0', sha256: 'baad6d81ddbc1f3e' },
     'aimeat-ui-dialogs': { version: '1.0.1', sha256: '70a017c3b69a64ce' },
     'aimeat-ui-forms': { version: '1.0.0', sha256: 'edc35e2d8441c1a0' },

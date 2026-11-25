@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:0183b761dc866086938623d8"
+      "digest": "sha256:a26df0c13db37bae3199284a"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-23",
@@ -774,7 +774,7 @@
       "aimeat/src/services/dependency-map.ts": "376c0e1e7ccf2e18"
     },
     "11. Served libraries and the Design Book": {
-      "aimeat/src/data/library-packs/cortex.ts": "aa7b5282bafb1d90",
+      "aimeat/src/data/library-packs/cortex.ts": "c3249dd149ece481",
       "aimeat/src/data/library-packs/sdk-ai.ts": "5cc0de78620b488e",
       "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
       "aimeat/src/data/library-packs/sdk-datapackage.ts": "7a3d4cea84ada9e1",
@@ -786,7 +786,7 @@
       "aimeat/src/data/library-packs/sdk-parties.ts": "d2838f150aa66604",
       "aimeat/src/data/library-packs/sdk-prompt.ts": "206aa7682b3c2ba0",
       "aimeat/src/data/library-packs/sdk-refinery.ts": "021747beff86728b",
-      "aimeat/src/data/library-packs/sdk-ui.ts": "8716fae932f3ce87",
+      "aimeat/src/data/library-packs/sdk-ui.ts": "0aaca5c26357d3c3",
       "aimeat/src/data/library-packs/sdk-validate.ts": "f5d19d902b3f8c86",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "f4a79e184d275a7e",
