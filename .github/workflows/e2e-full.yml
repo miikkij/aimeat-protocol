@@ -15,8 +15,9 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      # pnpm ready sets it (2026-11-19): a suite red in its shard runs once more alone, and one that
-      # passes alone is named [e2e-flaky] instead of stopping the merge. The nightly leaves it off, so
+      # Added for pnpm ready's runs on GitHub (2026-11-19; pnpm ready runs locally since 2026-11-22
+      # with the same rule, test/run-e2e-retry.ts): a suite red in its shard runs once more alone, and
+      # one that passes alone is named [e2e-flaky] instead of stopping the merge. The nightly leaves it off, so
       # a suite that fails for timing stays red there, where it is seen and fixed.
       retry_red:
         description: 'Run a red suite once more, alone; green alone is named flaky, not red'
@@ -531,8 +532,9 @@ jobs:
   # and does what the sweep's own last two steps did: a red leg opens or updates its issue, a green
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
-  # ONLY FOR MAIN. A run on a ready/<session> branch (`pnpm ready`, 2026-11-15) tests work before it
-  # reaches main; its red belongs to that session, not to main, so it opens and closes nothing.
+  # ONLY FOR MAIN. A run dispatched on any other ref (from 2026-11-15 to 2026-11-22 `pnpm ready`
+  # dispatched one on its ready/<session> branch) tests work that is not on main; its red is not
+  # main's, so it opens and closes nothing.
   issue:
     needs: [sweep, pack-smoke, stripe-testmode, upgrade-from-release, docker-image]
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}

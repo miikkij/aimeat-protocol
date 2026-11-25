@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    # ready/<session>: `pnpm ready` pushes finished work there and merges it to main only when this
-    # and the full E2E run are green (2026-11-15). ci-state and release-ready read main's runs only.
-    branches: [main, 'ready/**']
+    # Main only. From 2026-11-15 to 2026-11-22 `pnpm ready` pushed a ready/<session> branch here and
+    # this ran on it too; since then `pnpm ready` runs on the developer's machine and the public origin
+    # takes no branch but main. ci-state and release-ready read main's runs only.
+    branches: [main]
   pull_request:
     branches: [main]
 

@@ -36,8 +36,9 @@
 # and the guard tier on both backends, fifteen minutes a push. A day of iterative work is twenty
 # commits and several pushes, and a push that costs a quarter of an hour turns a thirty-minute
 # change into a day; the developer's VS Code Sync Changes became a button that did nothing visible.
-# Those checks now live in `pnpm gate` (and `pnpm gate:full` with Postgres), run once when a piece
-# of work is finished, and in CI after every push. CI blocks no push: work goes straight to main,
+# Those checks now live in `pnpm ready`, which runs what the change reaches on both backends before
+# the commits reach main (CLAUDE.md, Git, since 2026-11-15), in `pnpm gate` as a local look, and in
+# CI after every push. CI blocks no push: work goes straight to main,
 # so a red CI run is a report that the session-start hook, `pnpm gate` and step 3 above print.
 
 set -e
