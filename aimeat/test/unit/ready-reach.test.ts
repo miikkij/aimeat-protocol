@@ -6,16 +6,17 @@
  *   against this repository's own source and suites: a change picks the suites that call what it
  *   reaches and leaves the rest, and a change on every request's path runs the whole sweep.
  * @version-history
+ *   v1.3.0 — 2026-11-25 — A tool definition change names the tools on its changed lines.
  *   v1.2.0 — 2026-11-25 — An openapi.yaml change is placed on the paths it changed.
  *   v1.1.0 — 2026-11-25 — The suites without the e2e- prefix are reachable.
  *   v1.0.0 — 2026-11-24 — Initial.
  */
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { describe, it, expect } from 'vitest';
-import { codeReach, FULL_SWEEP, openapiChangedRoutes, registeredSuites } from '../../scripts/lib/ready-reach.js';
+import { changedToolNames, codeReach, FULL_SWEEP, openapiChangedRoutes, registeredSuites } from '../../scripts/lib/ready-reach.js';
 
 const repo = path.resolve(process.cwd(), '..');
 
@@ -88,6 +89,33 @@ describe('codeReach', () => {
       expect(openapiChangedRoutes(dir, 'HEAD')).toEqual(['/v1/orders/:id']);
       writeFileSync(path.join(dir, 'openapi.yaml'), doc('integer', 'basic'));
       expect(openapiChangedRoutes(dir, 'HEAD')).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('names the tools on a definition file\'s changed lines, not every tool in the file', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'aimeat-tooldefs-'));
+    try {
+      const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
+      const file = 'aimeat/src/tool-catalog/definitions/demo.ts';
+      const doc = (second: string) => [
+        '// header',
+        'export const DEMO = [',
+        "  { name: 'aimeat_demo_list',",
+        "    description: 'Lists the demos.' },",
+        "  { name: 'aimeat_demo_get',",
+        `    description: '${second}' },`,
+        '];',
+        '',
+      ].join('\n');
+      git('init', '-q');
+      mkdirSync(path.join(dir, 'aimeat/src/tool-catalog/definitions'), { recursive: true });
+      writeFileSync(path.join(dir, file), doc('Reads one demo.'));
+      git('add', '.');
+      git('-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'base');
+      writeFileSync(path.join(dir, file), doc('Reads one demo by its id.'));
+      expect(changedToolNames(dir, file, 'HEAD')).toEqual(['aimeat_demo_get']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

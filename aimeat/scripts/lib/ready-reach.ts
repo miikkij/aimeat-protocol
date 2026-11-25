@@ -26,6 +26,10 @@
  *   request passes through (middleware, auth, storage, config, the generated types, the
  *   dependencies) cannot be narrowed this way and runs the whole sweep.
  *
+ *   THE TOOL CATALOG. Nearly every route imports it, so a definition under src/tool-catalog/definitions/
+ *   is not followed through importers: it reaches the suites that call the tools on its changed lines
+ *   by name. A changed MCP module picks the suites that call the tools it names.
+ *
  *   THE CONTRACT. openapi.yaml changes with every route change, and the body guard checks a request
  *   only against its own route's schema, so a change there reaches the paths it changed (directly or
  *   through a component they refer to) and the suites that read the contract; only a change of its
@@ -34,9 +38,12 @@
  *   OUTSIDE src/. A served browser library (src/static/sdk-libs/, public/lib/) or a page under
  *   public/ is reached by a suite that names its file. The Python package (python/) has its own tests
  *   and reaches no node suite.
- * @structure FULL_SWEEP · openapiChangedRoutes(repo, base) · registeredSuites(aimeat) · codeReach(repo, files)
+ * @structure FULL_SWEEP · changedToolNames(repo, file, base) · openapiChangedRoutes(repo, base) · registeredSuites(aimeat) · codeReach(repo, files)
  * @usage const reach = codeReach(repo, codeFiles);   // scripts/lib/ready-scope.ts readyScope()
  * @version-history
+ *   v1.4.0 — 2026-11-25 — A tool definition reaches the suites that call its changed tools by name
+ *     (changedToolNames), not every suite through the catalog's importers; a changed MCP module also
+ *     picks the suites that call the tools it names.
  *   v1.3.0 — 2026-11-25 — openapi.yaml runs the suites that call the paths it changed, not the whole
  *     sweep (openapiChangedRoutes).
  *   v1.2.0 — 2026-11-25 — The suites are the runner's ALL_SUITES list, not the files named e2e-*.ts,
@@ -62,6 +69,40 @@ export const FULL_SWEEP = /^(?:aimeat\/src\/(?:middleware|auth|storage|generated
  * (test/helpers/wait-for-server.ts).
  */
 const CONTRACT_READERS = [/\/openapi\.json/, /'openapi\.yaml'\)/];
+
+/**
+ * The tool definitions. Nearly every route imports the tool catalog, so following importers from a
+ * definition reaches every suite; what a definition decides is how its own tools are described and
+ * what input they take, so a change reaches the suites that call those tools by name.
+ */
+const TOOL_DEFS = /^aimeat\/src\/tool-catalog\/definitions\//;
+
+/**
+ * The tools a change to a definition file touched: for each changed line, the tool whose
+ * `name: 'aimeat_…'` comes last at or before it. A file added or removed touches every tool it names.
+ */
+export function changedToolNames(repo: string, file: string, base: string): string[] {
+  const NAME = /name:\s*['"](aimeat_[a-z0-9_]+)['"]/;
+  const abs = path.join(repo, file);
+  const run = (args: string[]): string => {
+    try { return execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); } catch { return ''; }
+  };
+  if (!existsSync(abs)) return [...run(['show', `${base}:${file}`]).matchAll(new RegExp(NAME, 'g'))].map(m => m[1]!);
+  const lines = readFileSync(abs, 'utf8').split('\n');
+  const touched = new Set<number>();
+  for (const h of run(['diff', '-U0', base, '--', file]).matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gm)) {
+    const start = Number(h[1]), count = h[2] === undefined ? 1 : Number(h[2]);
+    for (let i = start; i < start + Math.max(count, 1); i++) touched.add(i);
+  }
+  const names = new Set<string>();
+  let current: string | null = null;
+  lines.forEach((line, i) => {
+    const m = NAME.exec(line);
+    if (m) current = m[1]!;
+    if (current && touched.has(i + 1)) names.add(current);
+  });
+  return [...names];
+}
 
 /**
  * The API paths whose contract changed in openapi.yaml since `base`, in Express form (`/v1/x/:id`),
@@ -250,7 +291,7 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
   // imports it is a changed file the map knows: their suites are the ones that call it.
   const aimeatDir = path.join(repo, 'aimeat');
   const covered = new Map<string, string[]>();
-  const srcTs = files.filter(f => /^aimeat\/src\/.+\.ts$/.test(f) && !f.startsWith('aimeat/src/static/') && !f.startsWith('aimeat/src/data/library-packs/'));
+  const srcTs = files.filter(f => /^aimeat\/src\/.+\.ts$/.test(f) && !f.startsWith('aimeat/src/static/') && !f.startsWith('aimeat/src/data/library-packs/') && !TOOL_DEFS.test(f));
   for (const f of srcTs) {
     const c = coverageSelection(repo, aimeatDir, [f], base, { refresh: true });
     if (c.suites === null) break;            // no map on this machine: every file goes the import way
@@ -263,6 +304,7 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
 
   const reached = new Set<string>();
   const names = new Set<string>();     // served files a suite may name (a browser library, a page)
+  const tools = new Set<string>();     // MCP tools whose definition changed, which a suite calls by name
   for (const f of files) {
     if (NO_NODE.test(f)) continue;
     if (covered.has(f) || (covered.size && newOnlyCalledByCovered(f))) continue;
@@ -279,6 +321,10 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
     // the suites that name a library. Many modules import the registry for one field, so its
     // importers would pick every package suite for a changelog line.
     if (f.startsWith('aimeat/src/data/library-packs/')) { names.add('/v1/libs'); continue; }
+    if (TOOL_DEFS.test(f)) { for (const n of changedToolNames(repo, f, base)) tools.add(n); continue; }
+    // An MCP module names the tools it serves; the suites that call them are its suites, beside the
+    // few that the shared /mcp route picks.
+    if (f.startsWith('aimeat/src/mcp/') && existsSync(abs)) for (const m of readFileSync(abs, 'utf8').matchAll(/['"](aimeat_[a-z0-9_]+)['"]/g)) tools.add(m[1]!);
     if (!f.startsWith('aimeat/src/')) continue;
     // A configuration file: start from the code that reads the settings it changed.
     const starts = CONFIG.test(f) ? settingReaders(repo, f, base, srcDir) : [abs];
@@ -312,6 +358,7 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
     for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) addRoute(m[1]!);
   }
   for (const n of names) matchers.push([new RegExp(esc(n))]);
+  for (const t of tools) matchers.push([new RegExp(esc(t) + '(?![a-z0-9_])')]);
   // A contract change: the routes it changed, and the suites that read the contract itself.
   if (files.includes('openapi.yaml')) {
     for (const r of contract) addRoute(r);
