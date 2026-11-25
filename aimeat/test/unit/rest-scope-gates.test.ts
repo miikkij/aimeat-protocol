@@ -19,6 +19,7 @@
  *   The version is mocked as test/unit/removals-4-0-0.test.ts mocks it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-gates.test.ts
  * @version-history
+ *   2026-11-25 — The inventory reads a gate passed to checkoutGate (routes/commerce.ts) as declared on the route.
  *   2026-11-06 — PATCH and DELETE /v1/schedules/:id each keep their word and name the other as orScope
  *     (decision 13a of 2026-11-05, verb parity).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -160,7 +161,10 @@ function declaredGate(row: Row): { word: string; orScope?: string; self: boolean
         if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
             && n.expression.name.text.toUpperCase() === row.method
             && n.arguments[0] && ts.isStringLiteral(n.arguments[0]) && n.arguments[0].text === row.path) {
-            for (const a of n.arguments.slice(1, -1)) {
+            // A gate passed to a wrapper in the argument list counts as declared there: the checkout
+            // routes write checkoutGate(config, storage, requireRestScope(...), cart) (routes/commerce.ts).
+            const wrapped = (a: ts.Expression): ts.Expression => (ts.isCallExpression(a) && ts.isIdentifier(a.expression) && a.expression.text === 'checkoutGate' && a.arguments[2]) ? a.arguments[2] : a;
+            for (const a of n.arguments.slice(1, -1).map(wrapped)) {
                 if (!ts.isCallExpression(a) || !ts.isIdentifier(a.expression) || a.expression.text !== 'requireRestScope') continue;
                 const word = ts.isStringLiteral(a.arguments[0]!) ? (a.arguments[0] as ts.StringLiteral).text : '';
                 let orScope: string | undefined;

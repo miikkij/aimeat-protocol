@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:a26df0c13db37bae3199284a"
+      "digest": "sha256:e38c0cbc37c526293489fd78"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-23",
@@ -273,7 +273,7 @@
       "digest": "sha256:a25475ab9664d3dd3af45d43"
     },
     "14. Economy, marketplace and payments": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/tool-catalog/definitions/commerce.ts",
         "aimeat/src/tool-catalog/definitions/exchange.ts",
@@ -287,7 +287,7 @@
         "aimeat/src/services/trust.ts",
         "aimeat/src/routes/agents/purchase-limit.ts"
       ],
-      "digest": "sha256:aa034c82d7043eaf239e52e9"
+      "digest": "sha256:6418a820fb6b53999757ebf1"
     },
     "15. Bookkeeping and business": {
       "reviewedOn": "2026-11-22",
@@ -790,7 +790,7 @@
       "aimeat/src/data/library-packs/sdk-validate.ts": "f5d19d902b3f8c86",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "f4a79e184d275a7e",
-      "aimeat/src/data/library-packs/sdk.ts": "fbae13ddd6de8589",
+      "aimeat/src/data/library-packs/sdk.ts": "876f719b16c5b211",
       "aimeat/src/data/library-packs/translations.ts": "0ac856a462e2a886",
       "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
       "aimeat/src/data/library-packs/vendored-creative.ts": "5c1eacfebbd695a9",
@@ -862,7 +862,7 @@
       "aimeat/src/tool-catalog/definitions/exchange.ts": "c3c1c9721aefc495",
       "aimeat/src/routes/commerce-webhooks.ts": "82408169bd101b2f",
       "aimeat/src/services/morsel.ts": "3d5e33c362495127",
-      "aimeat/src/routes/commerce.ts": "9d0033ec4b60dce7",
+      "aimeat/src/routes/commerce.ts": "e3cb7552ae367645",
       "aimeat/src/routes/exchange.ts": "24b56cee74596649",
       "aimeat/src/routes/commerce-beneficiaries.ts": "275433a2ba59d0c5",
       "aimeat/src/routes/disputes.ts": "3c507796d3ddbacb",
