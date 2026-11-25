@@ -28,6 +28,9 @@
  *   AN aimeat-scopes WORD NO APP GRANT CAN HOLD blocks too (2026-11-21), on the proof ground: one
  *   such word refuses the whole sign-in, so the app cannot work for anyone, its owner included.
  *
+ *   A KEY IN THE PAGE blocks too (2026-11-26), on the proof ground: the published page is readable by
+ *   every visitor, so the publish itself is the leak (services/app/generated-code-lint.ts).
+ *
  *   THE PROBE FAILS OPEN ON INFRASTRUCTURE AND CLOSED ON EVIDENCE. Only a completed HTTP exchange
  *   answering 404/410 blocks. A timeout, a refused connection, a 5xx or a disabled probe produces
  *   NO finding: the node then has no evidence about that URL, and blocking a publish on the node's
@@ -44,6 +47,10 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-26) Two checks for the faults of generated code (services/app/generated-code-lint.ts): an
+ *     API key, token or private key in the page refuses the publish (key-in-page-source), on the proof
+ *     ground, because the page is public once published; values written into HTML with nothing
+ *     escaped while the page reads outside data warns (html-built-from-values).
  *   (2026-11-21) An aimeat-scopes word no app grant can hold refuses the publish (checkScopeVocabulary);
  *     it warned before. Apps already published are not checked again.
  *   (2026-11-21) Six page-code warnings join from services/app/page-code-lint.ts (pitfall round A8).
@@ -125,6 +132,7 @@ import { readTextCapped } from '../../utils/read-capped.js';
 import { tagAttributes } from '../../utils/html-tag-scan.js';
 import { kitCalledButNotLoaded, KIT_NOT_LOADED_MESSAGE } from './lint-kit-loaded.js';
 import { pageCodeFindings } from './page-code-lint.js';
+import { generatedCodeFindings } from './generated-code-lint.js';
 
 /** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
 const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
@@ -177,6 +185,11 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   blocking.push(...await probeNodeAssets(refs.nodePaths, config));
   blocking.push(...checkRegister(html));
   blocking.push(...checkScopeVocabulary(html));
+  // A key in the page is public once the page is, and markup built from read values with nothing
+  // escaped is the commonest fault of generated code (services/app/generated-code-lint.ts).
+  const generated = generatedCodeFindings(html);
+  blocking.push(...generated.blocking);
+  warnings.push(...generated.warnings);
 
   warnings.push(...checkUnparsedModules(html));
   warnings.push(...checkTheme(html));

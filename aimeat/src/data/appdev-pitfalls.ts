@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-26 — +key-in-page-source (the publish refuses a key in the page) and
+ *     +html-built-from-values (warns on values written into HTML with nothing escaped), both read by
+ *     services/app/generated-code-lint.ts.
  *   2026-11-25 — undeclared-scope-words: subscribe() for the app's own plan needs no spend word when
  *     the extension names the app in config.app (commerce/app-checkout-reach.ts).
  *   2026-11-21 — app-meta-declarations says a publish asking for an ungrantable scope word is refused.
@@ -729,6 +732,33 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-11-21',
     verifiedAt: '2026-11-21',
+    verifiedVersion: '4.3.1',
+  }),
+  // ---- faults of generated code (wish-publish-lint-checks-for-the-faults-of-generated-code) ----
+  E({
+    id: 'key-in-page-source',
+    enforcedBy: 'generated-code-lint:secretFindings',
+    title: 'An API key in the page is public: the publish refuses it',
+    symptom: 'A page carries an API key, a token or a private key (sk-…, AKIA…, ghp_…, xoxb-…, sk_live_…, a PEM private key) so it can call a service from the browser. Every visitor can read the published page, so the key would be public at publish, and the publish is refused with APP_ARTIFACT_BROKEN.',
+    fix: 'Store the key as a secret (aimeat_secret_set, bound to the host it is for) and call the service through an extension action that names {{secret:NAME}}, so the key stays on the node. Revoke the key at its provider, because it already left your machine in the file.',
+    appliesTo: ['app', 'publish'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-11-26',
+    verifiedAt: '2026-11-26',
+    verifiedVersion: '4.3.1',
+  }),
+  E({
+    id: 'html-built-from-values',
+    enforcedBy: 'generated-code-lint:htmlSinkFindings',
+    title: 'Build markup from values with textContent or AIMEAT.escapeHtml, never raw',
+    symptom: 'The page reads data from outside itself (AIMEAT.data, a fetch, a form field, the address) and writes values into innerHTML, outerHTML, insertAdjacentHTML or document.write with no escape anywhere. A value that holds markup, such as a record another member wrote, then runs as part of the page (cross-site scripting). The publish answer warns.',
+    fix: 'Set text with textContent, build elements with createElement, or wrap every value in AIMEAT.escapeHtml(value) before it goes into a template string.',
+    appliesTo: ['app'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-26',
+    verifiedAt: '2026-11-26',
     verifiedVersion: '4.3.1',
   }),
 ];

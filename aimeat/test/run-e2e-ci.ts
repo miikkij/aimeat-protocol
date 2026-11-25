@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-26 -- Add e2e-app-publish-generated-code.ts: a key in the page refuses the publish, and
+ *     values written into HTML unescaped warn.
  *   2026-11-25 -- e2e-home-waiting.ts joins the list (not the guard tier): GET /v1/home/waiting and aimeat_home_waiting.
  *   2026-11-23 -- `--workers` reads the last value given, so a caller of a package script can add its
  *     own after the script's (pnpm ready names the lanes its machine carries). `--stop-on-lost-lane`:
@@ -685,6 +687,8 @@ const ALL_SUITES = [
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
+    // A key in the page refuses the publish; values written into HTML unescaped warn (2026-11-26).
+    'test/e2e-app-publish-generated-code.ts',
     // An aimeat-scopes word no app grant can hold refuses the publish (2026-11-21).
     'test/e2e-app-publish-scope-words.ts',
     'test/e2e-app-ai-path.ts',

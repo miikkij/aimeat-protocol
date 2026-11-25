@@ -13,6 +13,8 @@
  *   check, the overview lists it under `enforced`, and the finding carries the entry's id and url.
  * @version-history
  *   v1.0.0 — 2026-11-21 — Initial (pitfall round B3).
+ *   v1.1.0 — 2026-11-26 — ENFORCED names all 28 enforced entries (six were missing), with
+ *     key-in-page-source and html-built-from-values, and a fixture for each new one.
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -47,6 +49,14 @@ const ENFORCED: Record<string, string> = {
   'bundled-agent-block': 'bundled-crews:decideBundledCrews',
   'bundled-agent-permissions': 'bundled-crews:crewPermissionFindings',
   'grid-track-blowout': 'app-mobile-lint:gridTrackFindings',
+  'display-version-carried': 'version-label:versionLabelFindings',
+  'html-comment-closes-early': 'page-code-lint:commentCloseFindings',
+  'offline-parts-other-origin': 'page-code-lint:offlineOriginFindings',
+  'leaflet-l-shadowed': 'page-code-lint:leafletFindings',
+  'keyframe-hides-under-less-motion': 'page-code-lint:keyframeHideFindings',
+  'body-first-child-is-node-block': 'page-code-lint:bodyPositionFindings',
+  'key-in-page-source': 'generated-code-lint:secretFindings',
+  'html-built-from-values': 'generated-code-lint:htmlSinkFindings',
 };
 
 /** Entries that stay in the research list: no check covers what they say. */
@@ -106,6 +116,9 @@ describe('a publish finding carries the curated pitfall it enforces', () => {
     'inline-js-does-not-parse': APP('<script>const a = = 1;</script>'),
     'atelier-kit-not-loaded': APP('<script>AIMEAT.atelier.app({});</script>'),
     'cdn-libs-blocked': APP('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'),
+    // Put together at run time, so the source holds no whole key (push protection reads it).
+    'key-in-page-source': APP(`<script>const KEY = "${'sk-proj-' + '4fQ9xT2LmZ7bW1cV8nR3kJ6h'}";</script>`),
+    'html-built-from-values': APP('<script>AIMEAT.data.get("notes").then(n => { document.getElementById("o").innerHTML = `<p>${n.text}</p>`; });</script>'),
     // Its own page: the platform theme the other fixtures load is what silences this check.
     'hardcoded-theme-colors': `<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1">
       <meta name="aimeat-app" content="x.html"><meta name="aimeat-scopes" content="memory:read"><meta name="aimeat-locales" content="en">
