@@ -245,6 +245,27 @@ function themeCss(): string {
    and it wraps between its words. The boards list sizes its visibility column to the tag in every
    theme (css/components/listing.css, name-state-count-last-doors). */
 :root .listing-row .poster-chip { box-sizing: border-box; white-space: normal; }
+
+/* The home. A band is a white card like a section of a Settings page, and its headline says the
+   contents rail's number in the same sun tile (ContentsRail.js writes data-rail-n). */
+.poster-band, .poster-chooser, .open-items { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--shape-corner); padding: 24px; margin-top: 20px; }
+.poster-band .poster-band, .poster-chooser .poster-band, .poster-band .open-items { border: 0; border-radius: 0; padding: 0; background: transparent; }
+:root .poster-section-title[data-rail-n]::before { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; min-width: 40px; height: 40px; padding: 0 10px; margin: 0; border-radius: var(--shape-corner-control); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .95rem; font-weight: 500; }
+:root .open-items-title[data-rail-n]::before { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 40px; height: 40px; padding: 0 10px; margin: 0 12px 0 0; border-radius: var(--shape-corner-control); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .95rem; font-weight: 500; vertical-align: middle; }
+/* The sentence that says where a band stands (how many things wait) is the dark state band of a
+   Settings page: ink ground, light words, never a pale tint. */
+.poster-band > .state-line { margin: 0; padding: 12px 16px; border-radius: var(--shape-corner); background: var(--ink-ground); color: var(--on-ink-ground); font-size: 1.05rem; font-weight: 700; }
+.poster-band > .state-line.state-line--attention { box-shadow: inset 6px 0 0 var(--sun); }
+/* The block that starts the chat is the home's one loud box: the ink frame and the sun's offset shadow that a
+   Settings page gives its page start. */
+.poster-chooser { border: 2px solid var(--text); box-shadow: 6px 6px 0 var(--sun); }
+/* The person's name on the home is a heading beside a small picture, not a poster's headline. */
+.poster-masthead-name { font-size: 2.25rem; }
+.poster-masthead-avatar { width: 64px; height: 64px; }
+@media (max-width: 720px) {
+  .poster-band, .poster-chooser, .open-items { padding: 14px 12px; }
+  .poster-chooser { box-shadow: 4px 4px 0 var(--sun); }
+}
 `;
 }
 
