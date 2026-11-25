@@ -6,6 +6,7 @@
  *   against this repository's own source and suites: a change picks the suites that call what it
  *   reaches and leaves the rest, and a change on every request's path runs the whole sweep.
  * @version-history
+ *   v1.4.0 — 2026-11-25 — A file most suites reach runs a sample.
  *   v1.3.0 — 2026-11-25 — A tool definition change names the tools on its changed lines.
  *   v1.2.0 — 2026-11-25 — An openapi.yaml change is placed on the paths it changed.
  *   v1.1.0 — 2026-11-25 — The suites without the e2e- prefix are reachable.
@@ -119,6 +120,14 @@ describe('codeReach', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('runs a sample for a file that most suites reach, not every suite of every route it reaches', () => {
+    // owed-gate.ts runs on every app publish, which hundreds of suites do (474 before the file share).
+    const r = codeReach(repo, ['aimeat/src/services/app/owed-gate.ts']);
+    expect(r.full).toBeNull();
+    expect(r.suites.length).toBeGreaterThan(0);
+    expect(r.suites.length).toBeLessThan(100);
   });
 
   it('runs no node suite for the Python package', () => {

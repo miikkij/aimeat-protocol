@@ -41,6 +41,8 @@
  * @structure FULL_SWEEP · changedToolNames(repo, file, base) · openapiChangedRoutes(repo, base) · registeredSuites(aimeat) · codeReach(repo, files)
  * @usage const reach = codeReach(repo, codeFiles);   // scripts/lib/ready-scope.ts readyScope()
  * @version-history
+ *   v1.5.0 — 2026-11-25 — Without the map, a changed file is held to COMMON_SHARE as a whole: the
+ *     suites of all the routes it reaches, past the share, run COMMON_SAMPLE of them.
  *   v1.4.0 — 2026-11-25 — A tool definition reaches the suites that call its changed tools by name
  *     (changedToolNames), not every suite through the catalog's importers; a changed MCP module also
  *     picks the suites that call the tools it names.
@@ -302,7 +304,7 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
     return importers.length > 0 && importers.every(i => covered.has(i));
   };
 
-  const reached = new Set<string>();
+  const walks: Array<Set<string>> = [];  // per changed source file, the files its importers reach
   const names = new Set<string>();     // served files a suite may name (a browser library, a page)
   const tools = new Set<string>();     // MCP tools whose definition changed, which a suite calls by name
   for (const f of files) {
@@ -329,6 +331,8 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
     // A configuration file: start from the code that reads the settings it changed.
     const starts = CONFIG.test(f) ? settingReaders(repo, f, base, srcDir) : [abs];
     // Follow the importers, not through the bootstrap and not through the configuration's type.
+    const reached = new Set<string>();
+    walks.push(reached);
     const queue = [...starts];
     while (queue.length) {
       const cur = queue.pop()!;
@@ -342,26 +346,31 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
 
   // What a suite must contain to call each reached route: its fixed parts, the last one ending where
   // the path ends, so `/v1/ghii` is not found inside `/v1/ghii/login`.
-  const matchers: RegExp[][] = [];
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const addRoute = (route: string) => {
+  const routeMatcher = (route: string): RegExp[] | null => {
     const parts = routeParts(route);
     // The root (`/`, the discovery document or an app's subdomain page) is a prefix of every path.
-    if (parts.join('').length < 4) return;
+    if (parts.join('').length < 4) return null;
     const open = /[:*)]\??$/.test(route);   // ends in a parameter: the last part is followed by one
-    matchers.push(parts.map((p, i) => new RegExp(esc(p) + (i === parts.length - 1 && !open ? '(?![A-Za-z0-9_/-])' : ''))));
+    return parts.map((p, i) => new RegExp(esc(p) + (i === parts.length - 1 && !open ? '(?![A-Za-z0-9_/-])' : '')));
   };
-  for (const f of reached) {
-    const rel = path.relative(srcDir, f).split(path.sep).join('/');
-    if (rel.startsWith('mcp/')) { for (const p of ['/mcp', '/v1/mcp', '/v2/mcp']) addRoute(p); continue; }
-    if (!rel.startsWith('routes/') || !existsSync(f)) continue;
-    for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) addRoute(m[1]!);
-  }
+  const routesOf = (reached: Set<string>): RegExp[][] => {
+    const out: RegExp[][] = [];
+    const add = (route: string) => { const m = routeMatcher(route); if (m) out.push(m); };
+    for (const f of reached) {
+      const rel = path.relative(srcDir, f).split(path.sep).join('/');
+      if (rel.startsWith('mcp/')) { for (const p of ['/mcp', '/v1/mcp', '/v2/mcp']) add(p); continue; }
+      if (!rel.startsWith('routes/') || !existsSync(f)) continue;
+      for (const m of readFileSync(f, 'utf8').matchAll(ROUTE_RE)) add(m[1]!);
+    }
+    return out;
+  };
+  const matchers: RegExp[][] = [];
   for (const n of names) matchers.push([new RegExp(esc(n))]);
   for (const t of tools) matchers.push([new RegExp(esc(t) + '(?![a-z0-9_])')]);
   // A contract change: the routes it changed, and the suites that read the contract itself.
   if (files.includes('openapi.yaml')) {
-    for (const r of contract) addRoute(r);
+    for (const r of contract) { const m = routeMatcher(r); if (m) matchers.push(m); }
     for (const re of CONTRACT_READERS) matchers.push([re]);
   }
 
@@ -380,18 +389,25 @@ export function codeReach(repo: string, files: string[], base = 'origin/main'): 
   }));
 
   // A route (or a source file) that more than COMMON_SHARE of the suites call is what every suite
-  // goes through (signing up, signing in, the readiness read): any suite proves it still works, so
-  // COMMON_SAMPLE of them run for it. Every other route runs every suite that calls it.
+  // goes through (signing up, signing in, the readiness read, publishing an app): any suite proves it
+  // still works, so COMMON_SAMPLE of them run for it. Every other route runs every suite that calls it.
+  // A source file is held to the same share as a whole: the suites of all the routes its importers
+  // reach, each route already narrowed, are its group (publish-finish.ts picked 479 suites through
+  // a hundred routes that each stayed under the share).
   const picked = new Set<string>();
-  const take = (group: string[]) => {
-    const list = group.length > suiteFiles.length * COMMON_SHARE ? group.sort().slice(0, COMMON_SAMPLE) : group;
-    for (const n of list) picked.add(n);
-  };
+  const sample = (group: string[]): string[] => group.length > suiteFiles.length * COMMON_SHARE ? [...group].sort().slice(0, COMMON_SAMPLE) : group;
+  const callers = (parts: RegExp[]): string[] => texts.filter(t => parts.every(re => re.test(t.text))).map(t => t.name);
+  const take = (group: string[]) => { for (const n of sample(group)) picked.add(n); };
   for (const suites of covered.values()) take([...suites]);
-  for (const parts of matchers) take(texts.filter(t => parts.every(re => re.test(t.text))).map(t => t.name));
-  // A suite that imports a reached source file, itself or through a helper.
-  const importers = new Set([...reached].filter(f => f.startsWith(testDir)));
-  take(suiteFiles.filter(s => importers.has(path.normalize(s)) || [...helpersOf(s)].some(h => importers.has(path.normalize(h)))).map(s => path.basename(s, '.ts')));
+  for (const parts of matchers) take(callers(parts));
+  for (const reached of walks) {
+    const group = new Set<string>();
+    for (const parts of routesOf(reached)) for (const n of sample(callers(parts))) group.add(n);
+    take([...group]);
+    // A suite that imports a reached source file, itself or through a helper.
+    const importers = new Set([...reached].filter(f => f.startsWith(testDir)));
+    take(suiteFiles.filter(s => importers.has(path.normalize(s)) || [...helpersOf(s)].some(h => importers.has(path.normalize(h)))).map(s => path.basename(s, '.ts')));
+  }
   // A boot change: a few suites prove the node still starts and serves.
   if (files.some(f => BOOT.test(f))) for (const s of suiteFiles.map(f => path.basename(f, '.ts')).sort().slice(0, COMMON_SAMPLE)) picked.add(s);
   return { full: null, suites: [...picked].sort() };
