@@ -568,7 +568,7 @@
         "aimeat/src/services/themes/tiilitaivas.ts",
         "aimeat/src/services/themes/selkea.ts"
       ],
-      "digest": "sha256:fa5a07f218039e96043bd2ea",
+      "digest": "sha256:f3b88571d6685f51963cb0f8",
       "note": "The repo copy is the source of node:aimeat-design-language; security/design-language-publish.json and pnpm check:design-language-publish say whether the node holds this text."
     },
     "project:aimeat-frontend-verify": {
@@ -857,7 +857,7 @@
       "aimeat/src/services/themes/tokens.ts": "7178b915f0c271ee",
       "aimeat/src/services/app-ui/signature-tokens.ts": "3e2b6b25cc6e44d8",
       "aimeat/src/services/themes/tiilitaivas.ts": "5b4513bcfaeaa121",
-      "aimeat/src/services/themes/selkea.ts": "743c443a661b7e07"
+      "aimeat/src/services/themes/selkea.ts": "b3a3292f42df127f"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "88614dc4dc280ecc",
