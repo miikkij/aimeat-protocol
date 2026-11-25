@@ -17,6 +17,9 @@
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  *   - PUT    /v1/commerce/payout/invoice               invoice credit for items delivered at once
  * @version-history
+ *   2026-11-25 — An app grant holding neither checkout word opens, reads, changes, pays on the card
+ *     page and completes a checkout for its own subscription, and cancels its renewal (checkoutGate,
+ *     commerce/app-checkout-reach.ts); a plan of another app's extension answers NOT_THIS_APPS_PRODUCT.
  *   2026-11-21 — Opening, listing, reading and changing a checkout session take contract:spend as well
  *     as commerce:buy (CHECKOUT_SCOPES). An app grant cannot hold commerce:buy, so the library's
  *     openCheckout, subscribe and buyOffer were refused for every app, while the card page and the
@@ -64,7 +67,7 @@
  *   v1.0.0 — 2026-07-13 — Initial native checkout adapter (TARGET-033 phase 1)
  */
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -92,8 +95,8 @@ import { getEncryptionKey } from '../services/encryption.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
 import { rememberCardPage } from '../commerce/session-claim.js';
-import { appSpendRefusal } from '../services/metered/access.js';
 import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
+import { appCheckoutReach, checkoutSpendRefusal, notOwnMessage, NOT_OWN_CODE, type CartLine } from '../commerce/app-checkout-reach.js';
 
 /**
  * The words that open, read and change a checkout: commerce:buy (an agent, a person's session) or
@@ -101,6 +104,32 @@ import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions
  * leaves only at completion, which asks contract:spend of an app and its per-app ceiling.
  */
 const CHECKOUT_SCOPES = ['commerce:buy', 'contract:spend'] as const;
+
+/**
+ * `gate`, or an app's own subscription (commerce/app-checkout-reach.ts): an app grant holding neither
+ * checkout word passes when every line of `cartOf` is a subscription plan of the extension that
+ * serves this app, and is refused NOT_THIS_APPS_PRODUCT when a plan is another app's. Every other
+ * caller and cart meets `gate` unchanged.
+ */
+function checkoutGate(config: AimeatConfig, storage: Storage, gate: RequestHandler, cartOf: (req: Request) => Promise<CartLine[] | null>): RequestHandler {
+  return async (req, res, next) => {
+    if (!req.auth?.app_grant || !req.auth.roles.includes('app')) return gate(req, res, next);
+    const caller = callerOf(req, config.nodeId, storage);
+    if (CHECKOUT_SCOPES.some(w => caller.has(w))) return gate(req, res, next);
+    let cart: CartLine[] | null;
+    try {
+      cart = await cartOf(req);
+    } catch (err) {
+      // A session that is not this buyer's meets the scope gate, as it did before this rule.
+      if (err instanceof CommerceError && err.code === 'SESSION_NOT_FOUND') return gate(req, res, next);
+      return next(err);
+    }
+    const reach = await appCheckoutReach(storage, req.auth.app_grant, cart ?? []);
+    if (reach.kind === 'own') return next();
+    if (reach.kind === 'foreign') { res.status(403).json(error(config.nodeId, NOT_OWN_CODE, notOwnMessage(reach))); return; }
+    return gate(req, res, next);
+  };
+}
 
 const ItemsSchema = z.array(z.object({
   kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription']).optional(),
@@ -188,6 +217,13 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
     return session;
   }
+
+  // The carts checkoutGate reads: the lines a create sends, a stored session's lines (with the lines a
+  // change sends), and the one plan a cancel names. A cart that cannot be read meets the scope gate.
+  const sentCart = async (req: Request) => CreateSchema.safeParse(req.body).data?.items ?? null;
+  const storedCart = async (req: Request) => (await loadOwnSession(req)).items;
+  const changedCart = async (req: Request) => [...(await loadOwnSession(req)).items, ...(PatchSchema.safeParse(req.body).data?.items ?? [])];
+  const planCart = async (req: Request) => [{ kind: 'subscription', app: req.params.ext as string }];
 
   // POST /v1/commerce/checkout-sessions — open a session against one seller's offers.
   /* ── Seller payout settings ────────────────────────────────────────────────────────────────────
@@ -375,7 +411,8 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
 
   // commerce:buy, or contract:spend: an app grant cannot hold commerce:buy, and the card page and the
   // completion already take contract:spend, so an app that may pay could not open what it pays for.
-  router.post('/v1/commerce/checkout-sessions', requireAuth(), requireAnyScope(...CHECKOUT_SCOPES), async (req, res) => {
+  // An app with neither opens a checkout for its own subscription (checkoutGate).
+  router.post('/v1/commerce/checkout-sessions', requireAuth(), checkoutGate(config, storage, requireAnyScope(...CHECKOUT_SCOPES),sentCart), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
@@ -416,7 +453,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/checkout-sessions/:id — buyer reads their session (lazy expiry applies).
-  router.get('/v1/commerce/checkout-sessions/:id', requireAuth(), requireAnyScope(...CHECKOUT_SCOPES), async (req, res) => {
+  router.get('/v1/commerce/checkout-sessions/:id', requireAuth(), checkoutGate(config, storage, requireAnyScope(...CHECKOUT_SCOPES),storedCart), async (req, res) => {
     try {
       const session = await loadOwnSession(req);
       res.json(success(config.nodeId, { session }));
@@ -424,7 +461,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/commerce/checkout-sessions/:id — replace the cart, or cancel.
-  router.patch('/v1/commerce/checkout-sessions/:id', requireAuth(), requireAnyScope(...CHECKOUT_SCOPES), async (req, res) => {
+  router.patch('/v1/commerce/checkout-sessions/:id', requireAuth(), checkoutGate(config, storage, requireAnyScope(...CHECKOUT_SCOPES),changedCart), async (req, res) => {
     const parsed = PatchSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
@@ -517,7 +554,8 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/subscriptions/:ext/:plan/cancel — stop the renewal; the paid period runs to its end.
-  router.post('/v1/commerce/subscriptions/:ext/:plan/cancel', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
+  // An app with neither word cancels the renewal of a plan of its own extension (checkoutGate).
+  router.post('/v1/commerce/subscriptions/:ext/:plan/cancel', requireAuth(), checkoutGate(config, storage, requireRestScope('commerce:buy', { orScope: 'contract:spend' }),planCart), async (req, res) => {
     const out = await cancelSubscription(storage, `${req.auth!.owner}@${config.nodeId}`, req.params.ext as string, req.params.plan as string);
     if (!out) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'You have no such subscription.')); return; }
     res.json(success(config.nodeId, { subscription: out }));
@@ -528,8 +566,9 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   // `return_url` with stripe_session, and completing with handler com.stripe.checkout and that id as
   // the instrument finishes the purchase; the Stripe webhook finishes it when they never come back.
   // An agent has no card to type in and pays with a saved card or x402, so it is refused here; an
-  // app is asked the spend permission before any page is opened, as completion asks it.
-  router.post('/v1/commerce/checkout-sessions/:id/card', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
+  // app is asked the spend permission before any page is opened, as completion asks it, and an app
+  // paying its own subscription here needs none (commerce/app-checkout-reach.ts).
+  router.post('/v1/commerce/checkout-sessions/:id/card', requireAuth(), checkoutGate(config, storage, requireRestScope('commerce:buy', { orScope: 'contract:spend' }),storedCart), async (req, res) => {
     const returnUrl = typeof req.body?.return_url === 'string' ? req.body.return_url : '';
     if (!/^https?:\/\//.test(returnUrl) || returnUrl.length > 2000) {
       res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', 'The address to come back to after paying is missing or is not a web address. Send the address of the page the person pays from.'));
@@ -542,11 +581,8 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     }
     try {
       const session = await loadOwnSession(req);
-      const spend = await appSpendRefusal(storage, { roles: [...caller.roles], scopes: [...caller.scopes], appGrantId: req.auth!.app_grant ?? null });
-      if (spend) {
-        res.status(403).json(error(config.nodeId, 'SCOPE_REQUIRED', 'This app was not allowed to spend on your behalf.'));
-        return;
-      }
+      const spend = await checkoutSpendRefusal(storage, { roles: [...caller.roles], scopes: [...caller.scopes], appGrantId: req.auth!.app_grant ?? null }, session, STRIPE_CHECKOUT_HANDLER_ID);
+      if (spend) throw spend;
       const page = await openStripeCheckout(config, session, await readPsp(storage, session.sellerGhii), returnUrl);
       // The webhook completes the checkout only from a page the node opened (stripe-checkout-complete.ts).
       await rememberCardPage(storage, session, page.stripeSession);
@@ -557,7 +593,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     } catch (err) { sendCommerceError(res, config, err); }
   });
 
-  router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
+  router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), checkoutGate(config, storage, requireRestScope('commerce:buy', { orScope: 'contract:spend' }),storedCart), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     let session: CheckoutSessionRecord | undefined;

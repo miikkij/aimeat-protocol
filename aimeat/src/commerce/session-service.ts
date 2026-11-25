@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-11-25 -- The spend question is checkoutSpendRefusal (app-checkout-reach.ts): an app without contract:spend completes its own subscription on the card page.
  *   2026-11-15 -- completeSession asks the team approval gate after the agent's own limit (services/team/action-gate.ts, T7).
  *   2026-11-04 -- completeSession writes the completed session and the seller's order copy in one transaction with the sale's fee and beneficiary bookings (commerce/settle-purchase.ts; the line step moved to checkout-shares.ts); bookSessionlessSale books through settlePurchase, and settleSessionlessSale books with the caller's last write (codebase analysis 2026-11-03, item B2).
  *   2026-10-27 -- updateSessionItems and cancelSession write the stored session only while it is open (session-claim.ts changeOpenSession; secaudit2026oct26).
@@ -87,7 +88,7 @@ import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
-import { appSpendRefusal } from '../services/metered/access.js';
+import { checkoutSpendRefusal } from './app-checkout-reach.js';
 import { isMoneyCurrency, percentFee, MONEY_CURRENCIES } from './money.js';
 import { recordAccountEvent } from '../services/account/events.js';
 import { logger } from '../utils/logger.js';
@@ -500,13 +501,10 @@ async function completeSessionInner(
   // actually charges" — yet the four completion doors (REST, UCP, ACP, MCP) went straight to
   // handler.collect(), which debits the buyer GHII. Because an app-grant token resolves to the
   // owner's GHII, an app the owner approved for reading their notes could spend their balance.
-  // Asking here rather than in each door is deliberate: a fifth door cannot forget it.
-  const spendRefusal = await appSpendRefusal(storage, caller ?? null);
-  if (spendRefusal) {
-    throw spendRefusal.kind === 'scope_required'
-      ? new CommerceError('SCOPE_REQUIRED', 403, `This app was not granted the "${spendRefusal.scope}" permission, so it cannot spend on your behalf.`)
-      : new CommerceError('APP_SPEND_CAP_REACHED', 403, `This app has reached the spending limit you set for it (${spendRefusal.capMorsels} morsels).`);
-  }
+  // Asking here rather than in each door is deliberate: a fifth door cannot forget it. An app's own
+  // subscription paid on the card page passes without contract:spend (app-checkout-reach.ts).
+  const spendRefusal = await checkoutSpendRefusal(storage, caller ?? null, session, handlerId);
+  if (spendRefusal) throw spendRefusal;
   // The same question for an AGENT: money only within the daily limit its owner set on its card.
   const agentRefusal = await agentPurchaseRefusal(storage, config, session, caller);
   if (agentRefusal) throw agentRefusal;

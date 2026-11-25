@@ -1905,6 +1905,8 @@ const ALL_SUITES = [
     'test/e2e-skill-bound-public.ts',
     // An app grant with contract:spend opens, reads, changes and completes a checkout (routes/commerce.ts).
     'test/e2e-app-checkout-scope.ts',
+    // An app without the spend permission sells its own subscription; another app's plan is refused.
+    'test/e2e-app-subscription-checkout.ts',
     'test/e2e-presigned-meta.ts',
     'test/e2e-memory-file-presigned.ts',
     'test/e2e-storage-visibility.ts',

@@ -31,6 +31,8 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   2026-11-25 — subscribe and cancelSubscription no longer name contract:spend: an app sells its own
+ *     plans without it (commerce/app-checkout-reach.ts).
  *   2026-11-21 — PUBLISH_RULES, read by the publish warning only (scanScopeNeeds `publish`): a delete
  *     (AIMEAT.data.delete) needs memory:delete, an AI call (AIMEAT.ai.*, /v1/ai/...) ai:use, and an
  *     opened checkout (openCheckout, buyOffer, subscribe, ...) contract:spend. The keep-working steps
@@ -154,8 +156,11 @@ const PUBLISH_RULES: Rule[] = [
   { word: 'ai:use', re: /\bAIMEAT\.ai\.(?:complete|completeJson|stream|speak|image|transcribe|embed|capabilities|models|roles|genRules|job\.start)\s*\(/g },
   { word: 'ai:use', re: new RegExp(`${LIT}/v1/ai/(?:complete|stream|speak|image|transcribe|embed|jobs|capabilities|models|roles|gen-rules)\\b`, 'g') },
   // Opening, reading and changing a checkout ask commerce:buy or contract:spend (routes/commerce.ts);
-  // an app grant can hold only the second. subscribe and buyOffer open one inside the library.
-  { word: 'contract:spend', alternatives: ['commerce:buy'], re: /\bAIMEAT\.commerce\.(?:openCheckout|buyOffer|subscribe|payByCard|getCheckout|listCheckouts|updateCheckout|cancelCheckout|cancelSubscription)\s*\(/g },
+  // an app grant can hold only the second. buyOffer opens one inside the library. subscribe and
+  // cancelSubscription are not named: an app sells its own plans without either word
+  // (commerce/app-checkout-reach.ts), and asking every subscription app for the spend permission
+  // would ask the person for more than the app needs.
+  { word: 'contract:spend', alternatives: ['commerce:buy'], re: /\bAIMEAT\.commerce\.(?:openCheckout|buyOffer|payByCard|getCheckout|listCheckouts|updateCheckout|cancelCheckout)\s*\(/g },
 ];
 
 /** Whether only PUBLISH_RULES name the word, so no keep-working step ever gave it. */

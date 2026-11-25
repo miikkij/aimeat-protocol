@@ -37085,6 +37085,11 @@ paths:
         MEMBERS_ONLY for a buyer who is not a member, before any session opens or anything is
         collected. Scope: commerce:buy or contract:spend (the scope an app grant can hold; an app
         declares it in aimeat-scopes). The same holds for listing, reading and changing a session.
+        An app's own subscription needs neither: an app grant holding no checkout scope opens,
+        reads, changes, pays on the card page and completes a checkout whose every line is a
+        `subscription` plan of an extension that names this app in its manifest `config.app` (the
+        app of the extension's own installer). A plan of an extension that names another app, or no
+        app, answers 403 NOT_THIS_APPS_PRODUCT; a line of another kind answers 403 SCOPE_DENIED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -37126,6 +37131,8 @@ paths:
             money code, `total` is money micro-units (0 = free), `pacingMorsels` is the pacing charged
             on complete.
           content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } }
+        '403':
+          description: SCOPE_DENIED (no checkout scope) / NOT_THIS_APPS_PRODUCT (an app without a checkout scope, for a plan that is not its own) / MEMBERS_ONLY
         '404':
           description: Agent or offer not found / PACING_PACK_UNAVAILABLE
         '422':
@@ -37135,7 +37142,7 @@ paths:
     get:
       operationId: getCheckoutSession
       summary: Read a checkout session (buyer only)
-      description: Scope commerce:buy or contract:spend (an app grant holds the second).
+      description: Scope commerce:buy or contract:spend (an app grant holds the second). An app grant with neither reads a session of its own subscription plans; another app's answers 403 NOT_THIS_APPS_PRODUCT.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -37152,7 +37159,7 @@ paths:
     patch:
       operationId: updateCheckoutSession
       summary: Update items or cancel a checkout session
-      description: Scope commerce:buy or contract:spend (an app grant holds the second).
+      description: Scope commerce:buy or contract:spend (an app grant holds the second). An app grant with neither changes or cancels a session of its own subscription plans, and its new items must be its own plans too; another app's answers 403 NOT_THIS_APPS_PRODUCT.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -37635,7 +37642,9 @@ paths:
         purchase, and the seller's Stripe webhook finishes it when the person never comes back. The
         node reads the payment back from Stripe before it takes it. A line with `auto_renew` keeps the
         card for renewals. A credit card records the buyer as a verified adult. An agent is refused
-        (it pays with x402 or a saved card); an app needs the spend permission.
+        (it pays with x402 or a saved card); an app needs the spend permission, except for a checkout
+        of its own subscription plans (an extension that names the app in `config.app`), which it
+        opens here with no checkout scope. Another app's plan answers 403 NOT_THIS_APPS_PRODUCT.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -37736,7 +37745,7 @@ paths:
       x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
       operationId: cancelSubscription
       summary: Stop a subscription's renewal
-      description: The period already paid runs to its end; nothing is refunded.
+      description: The period already paid runs to its end; nothing is refunded. An app grant with no checkout scope stops the renewal of a plan of its own extension (one that names the app in `config.app`); another extension's plan answers 403 NOT_THIS_APPS_PRODUCT.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -37793,6 +37802,10 @@ paths:
         the seller's own USDC address, never the node's). Without a proof, a money session answers
         402 whose accepts[] has the real x402 `exact` scheme (network, payTo, asset,
         maxAmountRequired) alongside the AIMEAT-native schemes.
+        An app grant with no checkout scope completes a checkout of its own subscription plans
+        only with the card page handler `com.stripe.checkout`, so the person paid on Stripe's page;
+        another handler answers 403 CARD_PAGE_ONLY, and another app's plan 403
+        NOT_THIS_APPS_PRODUCT.
       tags: [Commerce]
       security:
         - BearerAuth: []

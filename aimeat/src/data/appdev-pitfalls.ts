@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-25 — undeclared-scope-words: subscribe() for the app's own plan needs no spend word when
+ *     the extension names the app in config.app (commerce/app-checkout-reach.ts).
  *   2026-11-21 — app-meta-declarations says a publish asking for an ungrantable scope word is refused.
  *   2026-11-21 — login-is-silent-only, long-ai-calls-timeout and ext-manifest-strict say what the
  *     platform now tells the builder (a console line naming signIn(), `jobHint`, every manifest
@@ -626,11 +628,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     enforcedBy: 'scope-needs:undeclaredScopeFindings',
     title: 'From 4.0 a route the app calls refuses a scope its aimeat-scopes does not name',
     symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule), a schedule edit (PATCH /v1/schedules/:id), or an image or file that is not public read from /v1/pub with the visitor\'s token (a workspace document\'s images stay empty). The publish answer warns with the word and the line that needs it.',
-    fix: 'Name every scope the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these scopes by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept. Three more scopes are refused on every node and no app ever kept them, so the publish answer names them too: memory:delete for AIMEAT.data.delete, ai:use for an AI call (AIMEAT.ai.complete, stream, job.start, a /v1/ai/... route), and contract:spend for a checkout (openCheckout, buyOffer, subscribe, payByCard).',
+    fix: 'Name every scope the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these scopes by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept. Three more scopes are refused on every node and no app ever kept them, so the publish answer names them too: memory:delete for AIMEAT.data.delete, ai:use for an AI call (AIMEAT.ai.complete, stream, job.start, a /v1/ai/... route), and contract:spend for a checkout (openCheckout, buyOffer, payByCard). An app that sells its OWN subscription with AIMEAT.commerce.subscribe(ext, plan) needs no spend word when the extension `ext` names the app in its manifest (`"config": { "app": { "default": "<owner>/<app file>" } }`); without that line, or for another app\'s plan, the open answers 403 NOT_THIS_APPS_PRODUCT.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-11-21',
+    updatedAt: '2026-11-25',
     ...CHECKED,
   }),
 

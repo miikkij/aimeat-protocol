@@ -167,10 +167,12 @@ describe('the calls only the publish answer names (PUBLISH_RULES)', () => {
         ['an AI job started by SDK', "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k' })", ['ai:use']],
         ['an AI completion by route', "session.fetch('/v1/ai/complete', { method: 'POST', body })", ['ai:use']],
         ['a checkout opened by SDK', 'const s = await AIMEAT.commerce.openCheckout(items)', ['contract:spend']],
-        ['a subscription bought by SDK', "AIMEAT.commerce.subscribe('ext', 'monthly')", ['contract:spend']],
+        ['a card payment by SDK', 'AIMEAT.commerce.payByCard(session.id)', ['contract:spend']],
+        // An app sells its own plans without the spend permission (commerce/app-checkout-reach.ts).
+        ['a subscription bought by SDK', "AIMEAT.commerce.subscribe('ext', 'monthly'); AIMEAT.commerce.cancelSubscription('ext', 'monthly')", []],
     ];
     for (const [name, code, expected] of cases) {
-        it(`${name} needs ${expected.join(', ')}`, () => {
+        it(`${name} needs ${expected.join(', ') || 'no word'}`, () => {
             expect(publishWords(code)).toEqual(expected);
         });
     }
