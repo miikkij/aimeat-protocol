@@ -1123,6 +1123,7 @@
     "src/routes/apps/roadmap.ts:GET:/v1/apps/:owner/:filename/roadmap": [],
     "src/routes/apps/roadmap.ts:PATCH:/v1/apps/:owner/:filename/roadmap": ["app:write"],
     "src/routes/apps/roadmap.ts:POST:/v1/apps/:owner/:filename/roadmap": ["social:write"],
+    "src/routes/apps/rollback.ts:POST:/v1/apps/:owner/:filename/rollback": ["app:write"],
     "src/routes/apps/scope-allowance.ts:DELETE:/v1/apps/:owner/:filename/scope-allowance": ["app:manage"],
     "src/routes/apps/scope-allowance.ts:GET:/v1/apps/:owner/:filename/scope-allowance": ["app:write"],
     "src/routes/apps/structure.ts:GET:/v1/app-plans": ["app:write"],

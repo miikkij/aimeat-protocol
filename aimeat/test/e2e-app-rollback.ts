@@ -83,7 +83,10 @@ const page = (filename: string, word: string) => [
 
     await test('another owner cannot roll back this owner\'s app', async () => {
         const bob = await registerOwner(BASE, `rollbackb${Date.now()}`);
-        expectRefusal(await rollback({ version: 1, note: 'not mine' }, { Authorization: `Bearer ${bob.token}` }), 403);
+        const r = await json(`/v1/apps/${encodeURIComponent(alice.name)}/${encodeURIComponent(f)}/rollback`, {
+            method: 'POST', headers: { Authorization: `Bearer ${bob.token}` }, body: JSON.stringify({ version: 1, note: 'not mine' }),
+        });
+        expectRefusal(r, 403);
     });
 
     await test('version 1 comes back as version 3 with its own bytes, and the answer names what the app owes', async () => {
