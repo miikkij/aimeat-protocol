@@ -12,6 +12,10 @@
  *   (mcp.tool_answer_chars, models/answer-budget.ts) could be 250 000 and an answer of 60 000 would
  *   still reach the model as a file path. A client that does not know the key ignores it.
  *
+ *   NOT ON THE CHAT SURFACE. The node's own chat sends its listed tools with every model call and
+ *   holds that list under a size (mcp/chat-tool-text.ts); the declaration is 52 characters a tool and
+ *   the node chat does not read it, so mcp/index.ts leaves it out there.
+ *
  *   The value is read when the tool registers: a session that is open keeps the value it started
  *   with, and one opened after the setting changed declares the new value.
  * @structure RESULT_SIZE_META_KEY · withDeclaredAnswerSize(register, chars)

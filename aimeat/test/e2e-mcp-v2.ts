@@ -23,6 +23,8 @@
 // 2026-11-14: the size failure names the eight largest start tools. Red in the nightly sweep at
 // 28 276 because the source grew (aimeat_task_create gained five fields on 2026-11-13); green again
 // once chat-tool-text.ts lists them off the chat surface.
+// 2026-11-25: the chat list carries no declared answer size (mcp/declared-answer-size.ts) and the
+// full surface carries it. Red at 26 997 when every surface declared it: 52 characters a tool.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
@@ -250,11 +252,16 @@ await test('chat lists its start tools in short words, and a bad call is still r
     const largest = listed.map((t: any) => `${t.name} ${JSON.stringify(t).length}`)
         .sort((a: string, b: string) => Number(b.split(' ')[1]) - Number(a.split(' ')[1])).slice(0, 8).join(', ');
     assert(size < 26_000, `the start set is listed in under 26 000 characters (45 769 before): ${size}; largest: ${largest}`);
+    // The answer size a tool declares to a client (mcp/declared-answer-size.ts) is 52 characters a
+    // tool; the chat list leaves it out, and the full surface carries it (checked below).
+    const declaring = listed.filter((t: any) => t._meta?.['anthropic/maxResultSizeChars'] !== undefined).map((t: any) => t.name);
+    assert(declaring.length === 0, `the chat list declares no answer size: ${declaring.slice(0, 5).join(', ')}`);
     const bad = await s.call('aimeat_memory_write', { value: 'no key' });
     assert(bad.isError === true, `a call without the required key is still refused: ${JSON.stringify(bad).slice(0, 200)}`);
     const full = await openSession(agent.gaii, agent.key, 'full');
     const fullWrite = ((await full.rpc('tools/list', {})).result?.tools ?? []).find((t: any) => t.name === 'aimeat_memory_write');
     assert(fullWrite && !fullWrite.description.startsWith('Save a memory entry'), 'another surface keeps the full text');
+    assert(fullWrite._meta?.['anthropic/maxResultSizeChars'] > 0, `another surface declares the answer size: ${JSON.stringify(fullWrite._meta)}`);
 });
 
 await test('on chat, aimeat_tools_find adds the tools for a purpose to this session', async () => {

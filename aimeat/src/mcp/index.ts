@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-11-25 — Every surface but chat declares the size of a text answer on each tool
+ *     (declareAnswerSize, mcp/tool-registrar.ts).
  *   2026-11-21 — SECURITY: resource:listChanged and resource:updated reach the 2026-07-28 listen
  *     streams of the event's principal only (modern.notify takes it); a guard comment on why
  *     resources.subscribe stays undeclared.
@@ -365,7 +367,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/deferred-scope-notice.ts, auth/rest-scope-gate.ts). Innermost, so it sees the call itself.
         // A tool that throws, or returns a caught internal error, is logged, reported to the operator
         // and answered with a sentence (mcp/tool-fault.ts). The whole chain and its order: mcp/tool-registrar.ts.
-        const registrarDeps = { scopes: () => scopes, principal: () => agentGaii, storage, config };
+        // The chat surface lists its tools on every model call inside a size it must stay under, so
+        // it leaves the declared answer size out (mcp/declared-answer-size.ts).
+        const registrarDeps = { scopes: () => scopes, principal: () => agentGaii, storage, config, declareAnswerSize: role !== 'chat' };
         const measuredRegisterTool = toolRegistrar(originalRegisterTool, registrarDeps);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.

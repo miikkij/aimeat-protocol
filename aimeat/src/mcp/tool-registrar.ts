@@ -8,7 +8,7 @@
  *   ORDER, from the SDK inward to the tool's own handler:
  *     0. declared answer size (mcp/declared-answer-size.ts) adds the size of a text answer the
  *        client may pass to the model to the tool's `_meta`; it changes the entry in tools/list and
- *        leaves the handler as it is.
+ *        leaves the handler as it is. Not on the chat surface (`declareAnswerSize: false`).
  *     1. deferred-scope notice (mcp/deferred-scope-notice.ts) counts a call made without a word the
  *        tool names for a later release; outermost, so it sees the call itself.
  *     2. next step (mcp/error-next-step.ts) appends what to do next to every failing result.
@@ -47,10 +47,18 @@ export interface ToolRegistrarDeps {
   principal: () => string;
   storage: Storage;
   config: AimeatConfig;
+  /**
+   * False leaves the declared answer size out of the tools' `_meta`. The node's own chat surface
+   * passes false: its model call carries the listed tools on every round, the node chat reads a
+   * tool result itself, and the list has a size it must stay under (mcp/chat-tool-text.ts).
+   */
+  declareAnswerSize?: boolean;
 }
 
 export function toolRegistrar(register: AnyFn, deps: ToolRegistrarDeps): AnyFn {
-  const declared = withDeclaredAnswerSize(register, () => declaredResultChars(deps.config));
+  const declared = deps.declareAnswerSize === false
+    ? register
+    : withDeclaredAnswerSize(register, () => declaredResultChars(deps.config));
   const noticed = withDeferredScopeNotice(declared, deps.scopes);
   const stepped = withErrorNextStep(noticed);
   const faulted = withToolFault(stepped, { storage: deps.storage, config: deps.config, principal: deps.principal });
