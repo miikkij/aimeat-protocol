@@ -1403,6 +1403,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-knowledge.ts',
     // An agent creates a knowledge package over MCP (aimeat_knowledge_create), and what it is refused.
     'test/e2e-knowledge-create-mcp.ts',
+    // A knowledge package entry over REST (POST /v1/knowledge/:id/entries), and a manifest written as
+    // plain memory checked against the import's schema.
+    'test/e2e-knowledge-entry-rest.ts',
     'test/e2e-mcp-appdev-pitfalls.ts',
     'test/e2e-app-template-proposals.ts',
     'test/e2e-appdev-proofs.ts',

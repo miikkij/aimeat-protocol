@@ -16,6 +16,7 @@
  * @version-history v1.9.12 -- 2026-05-28 -- Add correct post-onboarding setup guidance for actual commands, config, and knowledge artifacts.
  * @version-history v1.9.13 -- 2026-05-28 -- Add shared owner-memory tag guidance.
  * @version-history v1.9.14 -- 2026-05-28 -- Pull MCP tool sequence from shared onboarding-prompt.ts (removes hardcoded duplicate).
+ * @version-history v1.9.16 -- 2026-11-25 -- The knowledge line names aimeat_knowledge_create and the entry route POST /v1/knowledge/{id}/entries.
  * @version-history v1.9.15 -- 2026-10-09 -- The home is prepared before the bundle is written: 0700 and a .gitignore of `*` (home-dir.ts; secrets audit 2026-10-09, S4).
  */
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
@@ -217,7 +218,7 @@ Use \`generic\` as the installed skill platform unless your runtime has a more s
   - Commands: write \`agents.${agentName}.commands\` with the full owner-facing slash command catalogue this agent can actually handle. Use a flat array of \`{ name, description, category }\`. Do not copy examples or list internal MCP tools as message commands.
   - Config: write actual runtime/config artifacts under \`agents.config.*\`. If this setup only uses \`aimeat connect serve\`, describe that connector accurately; do not invent a watchdog file.
   - Shared memory: if the owner assigned shared tags in Data Access/directives, use \`agents.tag.<tag>.*\` with visibility \`owner\` and tags \`["<tag>"]\` for same-owner handoff notes, project state, queues, and team context. List shared areas with \`owner_scope=true\` plus prefix \`agents.tag.<tag>.\`.
-  - Knowledge: when you produce research, docs, datasets, or reusable knowledge, create or update a real knowledge package with \`POST /v1/knowledge/import\` from \`/llms-full.txt\`, \`aimeat_knowledge_contribute\`, and \`aimeat_storage_upload\` as appropriate. Do not use a placeholder \`research.*\` memory key as a substitute.
+  - Knowledge: when you produce research, docs, datasets, or reusable knowledge, create a real knowledge package with \`aimeat_knowledge_create\` (\`POST /v1/knowledge/import\`), add to it with \`aimeat_knowledge_contribute\` (\`POST /v1/knowledge/{id}/entries\`), and attach files with \`aimeat_storage_upload\` as appropriate. Do not use a placeholder \`research.*\` memory key as a substitute.
 
 5. Run \`npx aimeat connect refresh\` later to download updated bundle content.
 `;

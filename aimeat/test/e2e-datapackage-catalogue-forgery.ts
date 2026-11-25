@@ -20,6 +20,8 @@
  *   F1, F2 and F3 fail on the code before round 13; U1 passes before and after.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-datapackage-catalogue-forgery
  * @version-history
+ *   v1.0.1 — 2026-11-25 — The forged manifest meets the knowledge manifest schema, which a memory write
+ *     now checks, so the write still lands and the catalogues' refusal stays what is proved.
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
 import { createHash } from 'node:crypto';
@@ -64,11 +66,18 @@ const pkgOf = (name: string) => `pkg:${A.name}/${name}`;
 const rootOf = (packageId: string) => `packages/${createHash('sha256').update(packageId, 'utf8').digest('hex').slice(0, 32)}`;
 const rows = (label: string) => [{ name: 'items', rows: [{ id: 1, label }, { id: 2, label: `${label}-2` }] }];
 
-/** A manifest value as the service writes it, saying public. */
+/**
+ * A manifest value as the service writes it, saying public. It also carries what the knowledge
+ * manifest schema requires (version, author, entries, synthesis), so a memory write stores it
+ * (services/knowledge/manifest-write.ts) and the catalogues' own refusal is what these tests prove.
+ */
 function forgedManifest(name: string, contentHash: string): Body {
     const packageId = pkgOf(name);
     return {
         type: 'knowledge-package', name: `Forged ${name}`, content_type: 'dataset', tags: ['data-package'],
+        version: '1.0.0', author: 'forger',
+        entries: [{ key: `packages/${packageId}/items`, title: 'items', visibility: 'public' }],
+        synthesis: { level: 'original', description: 'A forged record.' },
         created: new Date().toISOString(), updated: new Date().toISOString(),
         sharing: { catalog_listed: true, allow_clone: false, toll_morsels: 0, audience: 'public' },
         x_aimeat_datapackage: {

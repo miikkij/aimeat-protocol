@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, discovery, work, wallet, storage, admin, compliance, capabilities, catalogue, consent, flag, group, share, instance and knowledge connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @structure
- *   - knowledgeContributeUnreachable() -- the one refusal both connector doors serve for the knowledge
- *     entry write, which this node exposes over MCP only
  *   - coreTools[] -- the shell handler table registered by tool-call.ts
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-25 -- aimeat_knowledge_contribute: a proxy over POST /v1/knowledge/:id/entries (entry_key,
+ *     content, model, ai_provenance, ai_provenance_id). It served a NO_HTTP_ROUTE refusal while the
+ *     capability had no route.
  *   2026-11-25 -- aimeat_knowledge_create: a proxy over POST /v1/knowledge/import (package, overrides,
  *     entry_data, ai_provenance), so a fleet agent creates a knowledge package over the connector too.
  *   2026-11-15 -- aimeat_action_execute forwards input as given, so the route refuses one that is not a
@@ -82,7 +83,6 @@ import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.j
 import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord, withProvenanceFields } from './tool-call-helpers.js';
 import { dataMapCliTools } from './tool-call-defs-data-map.js';
 import { memoryWriteMode } from '../utils/memory-write-mode.js';
-import type { ApiResponse } from './api-client.js';
 import { complianceCliTools } from './tool-call-defs-compliance.js';
 
 /**
@@ -98,48 +98,6 @@ function copyCapabilityRecordFields(input: JsonObject, body: JsonObject): void {
     }
     if (input.webhookUrl === null || typeof input.webhookUrl === 'string') body.webhookUrl = input.webhookUrl;
     if (input.trustRequired === null || typeof input.trustRequired === 'number') body.trustRequired = input.trustRequired;
-}
-
-/**
- * Appended to the catalog description on both connector doors. An agent that learns this from the
- * tool list spends no call finding it out, and the sentence is short enough that it does not bury
- * what the tool is for.
- */
-export const KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE =
-    ' CONNECTOR LIMIT: this write has no HTTP route, so calling it here refuses and tells you where to '
-    + 'run it instead. The knowledge read tools (list, get, links) work normally, and so does '
-    + 'aimeat_knowledge_create, which takes every entry of a new package in one call.';
-
-/**
- * Adding an entry to a knowledge package, from a connector that speaks HTTP and nothing else.
- *
- * The capability is services/knowledge/package-entry.ts, reachable through the node's MCP tool
- * `aimeat_knowledge_contribute` and through no route at all. The name collides with one that does
- * exist: POST /v1/knowledge/:id/contribute shares a WHOLE package with an organism and requires
- * `organism_id`, which is why both connector doors posted `{entry_key, content}` at it and got
- * 400 MISSING_FIELDS every time since the day they were written.
- *
- * Emulating the capability here (write the entry record, then append the manifest's index line over
- * POST /v1/memory) would put the reserved-package guard, the JSON-or-text decision, the tag and
- * visibility inheritance and the index line in a published npm package, second copies of rules that
- * live in the service. That is the drift this whole exercise is undoing. So the tool says what is
- * true, and the door itself is the developer's call.
- */
-export function knowledgeContributeUnreachable(): ApiResponse {
-    return {
-        ok: false,
-        error: {
-            code: 'NO_HTTP_ROUTE',
-            message: 'Adding an entry to a knowledge package is not reachable over HTTP on this node, '
-                + 'and the connector only speaks HTTP. POST /v1/knowledge/{id}/contribute is a different '
-                + 'capability: it shares a whole package with an organism and requires organism_id. '
-                + 'Run aimeat_knowledge_contribute against the node MCP endpoint ({node_url}/v1/mcp) to '
-                + 'add the entry; for a new package, aimeat_knowledge_create works here and takes every '
-                + 'entry in one call. Or write the entry record yourself with aimeat_memory_write under '
-                + 'packages/{package_id}/{entry_key}, which stores the content but leaves the package '
-                + 'manifest without an index line for it.',
-        },
-    };
 }
 
 export const coreTools: ConnectCliToolDefinition[] = [
@@ -831,13 +789,15 @@ export const coreTools: ConnectCliToolDefinition[] = [
         }, input)),
     },
     {
-        // No HTTP door for the entry write on this node. See knowledgeContributeUnreachable() above:
-        // the route of the same name is the organism-sharing capability and rejected this body.
-        // (`description` and `input` here are documentation: `connect tools` and `connect schema`
-        // both read the shared catalog, which is also where this tool's real input schema lives.)
+        // A proxy over POST /v1/knowledge/:id/entries, which calls services/knowledge/package-entry.ts as
+        // the node MCP tool does. Not POST /v1/knowledge/:id/contribute: that route shares a whole
+        // package with an organism and requires organism_id.
         name: 'aimeat_knowledge_contribute',
-        description: 'Add or update an entry in an existing knowledge package.' + KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE,
-        handler: () => Promise.resolve(knowledgeContributeUnreachable()),
+        handler: ({ client }, input) => client.post(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}/entries`, withProvenanceFields({
+            entry_key: requiredString(input, 'entry_key'),
+            content: requiredString(input, 'content'),
+            ...(optionalString(input, 'model') ? { model: optionalString(input, 'model') } : {}),
+        }, input)),
     },
     {
         name: 'aimeat_knowledge_links',

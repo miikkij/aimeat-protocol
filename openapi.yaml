@@ -20262,7 +20262,10 @@ paths:
             not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
             components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the value does not match the
-            key's schema. PERSON_DECIDES: an app tool manifest (`apps.{app}.tools`, also as written by
+            key's schema, or it is a knowledge package manifest (`packages/{id}/manifest` whose value says
+            `type: knowledge-package` or whose tags hold `knowledge-package`) the manifest schema of
+            POST /v1/knowledge/import refuses; `error.details` holds the first schema error, and a
+            manifest already stored that fails the schema stays writable. PERSON_DECIDES: an app tool manifest (`apps.{app}.tools`, also as written by
             aimeat_app_tools_publish) binds a tool to an extension action marked `decision: person`, which
             only the person decides; `error.details.tools` names each tool and its `action_id`.
           content:
@@ -21467,7 +21470,8 @@ paths:
             not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
             components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the new value does not match
-            the key's schema. PERSON_DECIDES: an app tool manifest binds a tool to an extension action
+            the key's schema, or is a knowledge package manifest the manifest schema refuses, as on
+            POST /v1/memory. PERSON_DECIDES: an app tool manifest binds a tool to an extension action
             marked `decision: person`, as on POST /v1/memory.
           content:
             application/json:
@@ -21636,7 +21640,8 @@ paths:
         '422':
           description: >
             Nothing was written. SCHEMA_VALIDATION_FAILED: the merged value does not match the key's
-            schema. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does not
+            schema, or is a knowledge package manifest the manifest schema refuses, as on
+            POST /v1/memory. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does not
             declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
             source whose changed text would publish an ODPS document past a schema maxLength (see
             components/responses/OdpsFieldTooLong). PERSON_DECIDES: the merged app tool manifest binds a
@@ -61507,11 +61512,20 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /v1/knowledge/{id}/contribute:
+  /v1/knowledge/{id}/entries:
     post:
       x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
-      operationId: contributeToPackage
-      summary: Contribute to a knowledge package
+      operationId: addKnowledgePackageEntry
+      summary: Add or update one entry of a knowledge package
+      description: >
+        The REST form of the MCP tool aimeat_knowledge_contribute, with the same input. Stores the
+        entry under packages/{id}/{entry_key} in the caller's own memory and adds its line to the
+        package manifest's entries list. The package must exist in the caller's own memory (404
+        otherwise); create one with POST /v1/knowledge/import. The appdev-pitfalls package is 400
+        RESERVED_PACKAGE. `content` is stored as JSON when it parses as JSON, else as text. The
+        entry gets a provenance record from `ai_provenance`, or `ai_provenance_id` is attached, and
+        the answer names it. When the entry is stored but the manifest line is not, the answer is
+        still 201 and carries `manifest_warning`.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -61527,8 +61541,57 @@ paths:
           application/json:
             schema:
               type: object
+              required: [entry_key, content]
+              properties:
+                entry_key: { type: string, description: 'A short entry name ("method") or the full key.' }
+                content: { type: string, description: 'The entry; JSON is parsed if valid, otherwise stored as text.' }
+                model: { type: string, maxLength: 64, description: 'The model this knowledge came from, kept as a model: tag.' }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the entry was made.
+                ai_provenance_id: { type: string, description: 'An existing provenance record of the caller to attach instead.' }
       responses:
-        '200':
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/knowledge/{id}/contribute:
+    post:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
+      operationId: contributeToPackage
+      summary: Share a knowledge package with an organism
+      description: >
+        Grants the organism read access to the whole package (a consent on packages/{id}/*) and tags
+        the manifest with organism:{organism_id}. The caller must be an active member. This route
+        adds no entry: POST /v1/knowledge/{id}/entries does that.
+      tags: [Knowledge]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organism_id]
+              properties:
+                organism_id: { type: string }
+      responses:
+        '201':
           $ref: '#/components/responses/AimeatSuccess'
 
   /v1/knowledge/organism/{id}:

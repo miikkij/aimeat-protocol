@@ -8,6 +8,9 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   2026-11-25 — knowledge.ts is gone: aimeat_knowledge_contribute has a route
+ *     (POST /v1/knowledge/:id/entries) and runs its dispatch definition, so no connector tool keeps a
+ *     handler of its own and the name-recording proxy went with it.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-12 — contacts.ts, companies.ts, portfolio.ts, commerce.ts, exchange.ts, organisms.ts,
  *     dm-messages.ts and agent-telemetry.ts are gone: their 30 tools got a CLI dispatch definition
@@ -37,22 +40,10 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../../agent-registry.js';
 
-import { registerKnowledgeTools } from './knowledge.js';
 import { registerDispatchTools } from './dispatch-tools.js';
 
 export function registerAllTools(server: McpServer, registry: AgentRegistry): void {
-  // The modules register the tools that have a handler of their own; every other connector tool runs
-  // its CLI dispatch definition (dispatch-tools.ts). The names the modules took are recorded on the way.
-  const registered = new Set<string>();
-  const mcp = new Proxy(server, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
-      if ((prop === 'tool' || prop === 'registerTool') && typeof value === 'function') {
-        return (...args: unknown[]) => { registered.add(args[0] as string); return value.apply(target, args); };
-      }
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-  registerKnowledgeTools(mcp, registry);
-  registerDispatchTools(server, registry, registered);
+  // Every connector tool runs its CLI dispatch definition (dispatch-tools.ts). No module registers a
+  // handler of its own any more (security/connector-own-handlers.json is empty), so none is skipped.
+  registerDispatchTools(server, registry, new Set<string>());
 }

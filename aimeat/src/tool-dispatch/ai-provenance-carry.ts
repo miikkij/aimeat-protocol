@@ -57,6 +57,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.9 — 2026-11-25 — aimeat_knowledge_contribute: recorded-by-route, POST /v1/knowledge/:id/entries
+ *     (it was not-carried, naming the organism-sharing route, which takes no entry).
  *   v1.3.8 — 2026-11-25 — aimeat_knowledge_create: recorded-by-route, POST /v1/knowledge/import.
  *   v1.3.7 — 2026-10-31 — toDeclareBody carries `rules_followed` as `rulesFollowed`.
  *   v1.3.6 — 2026-10-21 — aimeat_dm_group_create: recorded-by-route, POST /v1/messages/groups.
@@ -184,7 +186,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // The route records the declaration and attaches an id from the body, refuses a declaration the
   // caller may not make before it settles, and embeds the record in the work it answers (aiprov D2).
   aimeat_exchange_work_deliver: { kind: 'recorded-by-route', route: 'POST /v1/exchange/work/:id/deliver' },
-  aimeat_knowledge_contribute: { kind: 'not-carried', route: 'POST /v1/knowledge/:id/contribute' },
+  // services/knowledge/package-entry.ts writes the entry through the shared memory write, which
+  // records the declaration or attaches the id, and the route names the record in its answer.
+  aimeat_knowledge_contribute: { kind: 'recorded-by-route', route: 'POST /v1/knowledge/:id/entries' },
   // services/knowledge/package-import.ts records the declaration for the manifest and each entry, and
   // refuses one the caller may not make before anything is written.
   aimeat_knowledge_create: { kind: 'recorded-by-route', route: 'POST /v1/knowledge/import' },

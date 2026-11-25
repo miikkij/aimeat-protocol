@@ -2,10 +2,13 @@
  * @file src/routes/knowledge/packages-core.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Core knowledge package routes — import, get manifest, and link CRUD
+ * @description Core knowledge package routes — import, add an entry, get manifest, and link CRUD
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-25 — POST /v1/knowledge/:id/entries adds or updates one entry through
+ *     services/knowledge/package-entry.ts, the service aimeat_knowledge_contribute calls, so the
+ *     connector and the shell reach the capability (wish-tietopaketin-manifesti-tarkistetaan-muistin-kirjoituksessa-j).
  *   2026-11-25 — POST /v1/knowledge/import calls services/knowledge/package-import.ts, where its work
  *     moved unchanged, so the MCP tool aimeat_knowledge_create creates a package the same way.
  *   2026-11-21 — POST /v1/knowledge/import: each entry gets its content risk marks at the intake point.
@@ -84,6 +87,14 @@ import { packageLinksFor } from '../../services/knowledge/package-links.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
 import { importKnowledgePackage } from '../../services/knowledge/package-import.js';
+import { addKnowledgePackageEntry } from '../../services/knowledge/package-entry.js';
+import { toDeclaredProvenance } from '../../services/ai/provenance-input.js';
+import { writeProvenanceEcho } from '../../services/ai/provenance-result.js';
+import { zodShapeFor } from '../../tool-catalog/zod-shape.js';
+import { z } from 'zod';
+
+/** POST /v1/knowledge/:id/entries reads the input of aimeat_knowledge_contribute, its MCP form. */
+const EntryBody = z.object(zodShapeFor('aimeat_knowledge_contribute'));
 
 export function registerPackagesCoreRoutes(
   router: Router,
@@ -107,6 +118,40 @@ export function registerPackagesCoreRoutes(
     res.status(out.status).json(success(config.nodeId, out.data, [
       { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(out.manifestKey)}` },
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },
+    ]));
+  });
+
+  /* ── POST /v1/knowledge/:id/entries — Add or update one entry of a knowledge package ── */
+  // The REST form of aimeat_knowledge_contribute, so the connector and the shell reach it. The work is
+  // services/knowledge/package-entry.ts, which the MCP tool calls too: the reserved-package guard, the
+  // manifest lookup, the entry write and the manifest's index line. The body is the tool's own input,
+  // read with the catalog's schema, with the package id from the path.
+  router.post('/v1/knowledge/:id/entries', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req, res) => {
+    const packageId = req.params.id as string;
+    const parsed = EntryBody.safeParse({ ...(req.body ?? {}), package_id: packageId });
+    if (!parsed.success) {
+      const violations = parsed.error.issues.map(i => ({ path: i.path.join('.'), message: i.message }));
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `The entry does not parse: ${violations.map(v => `${v.path} ${v.message}`).join('; ')}`, undefined, { violations }));
+      return;
+    }
+    const { entry_key, content, model, ai_provenance, ai_provenance_id } = parsed.data;
+    const who = callerOf(req, config.nodeId, storage);
+    const out = await addKnowledgePackageEntry({ storage, config }, { ...who.principalView, targetGaii: who.principal }, {
+      packageId, entryKey: entry_key, content, model,
+      declaredProvenance: toDeclaredProvenance(ai_provenance),
+      declaredProvenanceId: ai_provenance_id,
+      pipeline: 'rest.knowledge_entry',
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.status(201).json(success(config.nodeId, {
+      package_id: packageId, entry_key: out.entryKey, updated: true, manifest_updated: out.manifestUpdated,
+      ...(out.manifestWarning ? { manifest_warning: out.manifestWarning } : {}),
+      ...(await writeProvenanceEcho(storage, config, out.record.aiProvenanceId)),
+    }, [
+      { description: 'Read the package', method: 'GET', url: `/v1/knowledge/${encodeURIComponent(packageId)}` },
     ]));
   });
 

@@ -4,6 +4,7 @@
  *   Tests knowledge package listing, reading, entry contribution, links, and the
  *   knowledge resource template.
  * @version-history
+ *   2026-11-25 — Phase 7's manifests meet the knowledge manifest schema, which a memory write now checks.
  *   2026-10-21 — Test 20b: what the visibility rule left out is named with memory:read-as-owner on
  *     aimeat_knowledge_get, _links, _list (a second text part, the array kept) and the resource; no
  *     note for the agent's own shadowed package or for an agent holding the word (capability-loss review).
@@ -680,8 +681,11 @@ console.log('\nPhase 7 — Private packages of the owner and of a sibling agent'
     const stamp = Date.now().toString(36);
     const o = await registerOwner(BASE, `mcpkwlv56${stamp}`);
     const manifest = (name: string) => ({
+        // The manifest schema a memory write checks (services/knowledge/manifest-write.ts).
         type: 'knowledge-package', name, version: '1.0.0', author: o.name, content_type: 'document',
-        tags: [], entries: [], sharing: { catalog_listed: false, allow_clone: false },
+        tags: [], entries: [{ key: 'intro', title: 'Introduction', visibility: 'private' }],
+        sharing: { catalog_listed: false, allow_clone: false, toll_morsels: 0 },
+        synthesis: { level: 'original', description: 'A test package.' },
     });
     const put = async (bearer: string, key: string, value: unknown, tags: string[] = []) => {
         const r = await json('/v1/memory', {

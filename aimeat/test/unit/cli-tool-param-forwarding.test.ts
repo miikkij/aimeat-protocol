@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-25 — aimeat_knowledge_contribute calls the node (POST /v1/knowledge/:id/entries) and is
+ *     probed like every other tool.
  *   2026-11-21 — aimeat_content_risk's status rides only on action='list'; the probe holds action at release.
  *   2026-11-07 — aimeat_admin_receivers is probed on its decide branch, as the app party registrations are.
  *   2026-11-01 — aimeat_admin_app_party_registrations is probed on its decide branch (WP9b).
@@ -85,8 +87,6 @@ const NOT_FORWARDED_BY_DESIGN = new Set(['response_format', 'agent_name']);
  * uncallable, and this list is the only way to say otherwise.
  */
 const DOES_NOT_CALL_THE_NODE = new Set<string>([
-    // Answers with a refusal by design — see knowledgeContributeUnreachable().
-    'aimeat_knowledge_contribute',
     // Pure local computation: defineAppIam() turns levels + commands into an IAM block and hands it
     // back. There is no route behind it and there is not meant to be one — the caller pastes the
     // result into an app. Verified by reading the handler, which never touches `client`.
@@ -270,12 +270,6 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + 'The list branch is measured in test/unit/dataspace-dispatch.test.ts.',
         waiting: 'Same condition and the same test.',
         auto_agree: "Conditional, not dropped: it rides only on action='settings' with a package; measured in test/unit/dataspace-dispatch.test.ts.",
-    },
-    aimeat_knowledge_contribute: {
-        package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',
-        entry_key: 'Same: the tool answers with a refusal rather than calling the node.',
-        content: 'Same.',
-        model: 'Same.',
     },
 };
 

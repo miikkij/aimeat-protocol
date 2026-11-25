@@ -6,6 +6,9 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.3 — 2026-11-25 — knowledge-packager-mcp's example manifest names sharing.toll_morsels, the one
+ *     field the manifest schema required that it lacked: a manifest written with aimeat_memory_write
+ *     is now checked against that schema (services/knowledge/manifest-write.ts).
  *   v1.1.2 — 2026-10-13 — knowledge-packager-human's example manifest names the pacing amount
  *     sharing.toll_morsels; morsel_price is its deprecated name
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
@@ -388,7 +391,7 @@ You are an AI agent connected to the user's AIMEAT node over MCP. The user wants
   "maturity": "draft",
   "tags": ["topic", "another"],
   "synthesis": { "level": "synthesized", "model": "<your model>", "description": "One sentence on how this package came to be." },
-  "sharing": { "catalog_listed": false, "allow_clone": false, "license": "CC-BY-4.0" },
+  "sharing": { "catalog_listed": false, "allow_clone": false, "license": "CC-BY-4.0", "toll_morsels": 0 },
   "entries": [
     {
       "key": "summary",

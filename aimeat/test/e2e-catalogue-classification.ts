@@ -30,6 +30,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-catalogue-classification
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-catalogue-classification
  * @version-history
+ *   2026-11-25 — The package manifests meet the knowledge manifest schema, which a memory write now checks.
  *   2026-10-20 — Initial (secaudit 2026-10, catalogue.ts:GET-v1-catalogue-knowledge:no-classification-reader).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -158,9 +159,12 @@ try {
             const w = await call('POST', '/v1/memory', alice.token, {
                 key: manifestKey(id),
                 value: {
-                    type: 'knowledge-package', name: `Package ${id}`, author: alice.ghii,
-                    content_type: 'notes', language: 'en', maturity: 'draft',
-                    synthesis: { description: SYNTHESIS_MARKER }, tags: ['catcl'], entries: [], references: [],
+                    // The manifest schema a memory write checks (services/knowledge/manifest-write.ts).
+                    type: 'knowledge-package', name: `Package ${id}`, version: '1.0.0', author: alice.ghii,
+                    content_type: 'document', language: 'en', maturity: 'draft',
+                    synthesis: { level: 'original', description: SYNTHESIS_MARKER }, tags: ['catcl'], references: [],
+                    entries: [{ key: `packages/${id}/summary`, title: 'Summary', visibility: 'public' }],
+                    sharing: { catalog_listed: true, allow_clone: false, toll_morsels: 0 },
                 },
                 visibility: 'public',
                 tags: ['knowledge-package'],

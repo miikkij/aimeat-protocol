@@ -31,6 +31,7 @@
  * @usage
  *   if (isShippedDefaultText(record.id, record)) { ...the stored text is a shipped default... }
  * @version-history
+ *   2026-11-25 — knowledge-packager-mcp's new text (the example manifest names sharing.toll_morsels) joins its list.
  *   2026-11-23 — home-ideas' new text (apps named by kind, none ready) joins its list.
  *   2026-11-22 — sixteen default prompt texts lose their picture words (carries, hands, lives in, node in a person's text) and join their lists.
  *   2026-11-22 — operator-welcome's new text (introduction page for welcome mat) joins its list.
@@ -61,7 +62,7 @@ export const SHIPPED_PROMPT_HASHES: Readonly<Record<string, readonly string[]>> 
     'df426150f52a53552936fc1b66060368', 'a2112b03b78eb5f938d9aff92d33a82e', '00b9926e57e380829f251f60c2f5694b',
     'c3fe82e2ec7c8ad24c73a1afc8cc9514', '66924560ffc336bec8aafaf9480fccef', '9cc73c1d011c9993a784d875b431ce8b',
   ],
-  'knowledge-packager-mcp': ['d5c7f756b311be33a51ff8ab28f8d7dc', '0d7e58d5b0b0255067c119f27c1f39c9'],
+  'knowledge-packager-mcp': ['d5c7f756b311be33a51ff8ab28f8d7dc', '0d7e58d5b0b0255067c119f27c1f39c9', 'e5305a86a22c539c3baa14a15e4edb67'],
   'operator-welcome': ['4a5d75e974259369a49a6e53b24e9801', '6b83bb1c6a497f6ac644dd7015f0a1c2', '5d1c5b8d161386ea42484d0462ff95a6'],
   'playbook-accounts': ['1b167c42a20e484cde35c5f59197a7b1', 'a127315fe2e92a121db5ac180113a88a'],
   'playbook-brain': ['d628640324f90480ef259aebe223926f', '5612b0f509d6fb990801e5e32a237e09'],

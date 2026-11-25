@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-25 — aimeat_knowledge_contribute calls the node and is probed like every other tool.
  *   2026-11-19 — PROBE_SETUP for aimeat_kyc_suspicion_mark (an organism and an observation).
  *   2026-11-12 — PROBE_SETUP for aimeat_access_request (an app ref, <owner>/<filename>).
  *   2026-11-09 — PROBE_SETUP for aimeat_memory_write (a value), whose value is optional now that the
@@ -72,7 +73,6 @@ const REFUSAL = {
  */
 const NEVER_CALLS_THE_NODE = new Map<string, string>([
   ['aimeat_iam_define', 'Pure local computation: levels + commands become an IAM block the caller pastes into an app. There is no route behind it.'],
-  ['aimeat_knowledge_contribute', 'Answers with a refusal by design — see knowledgeContributeUnreachable().'],
 ]);
 
 /**

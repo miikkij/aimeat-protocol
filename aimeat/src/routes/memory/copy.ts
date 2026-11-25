@@ -8,6 +8,8 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   2026-11-25 — A copy of a knowledge package manifest the manifest schema refuses is refused 422
+ *     SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — A copy that writes an app tool manifest binding an action marked `decision: person`
  *     is refused 422 PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   2026-11-08 — The schema lock is asked with the caller: a CSM's own lock does not govern a caller that
@@ -49,6 +51,7 @@ import { carryLabelToCopy, CopyLabelError } from '../../services/classification-
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
+import { knowledgeManifestWriteRefusal } from '../../services/knowledge/manifest-write.js';
 import { decisionToolRefusal } from '../../services/app-tools/decision-binding.js';
 import { crewSitesWriteRefusal } from '../../services/crews/def-store.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
@@ -157,6 +160,8 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
     if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
     const legacyPacing = legacyPacingWriteRefusal(key, sourceRecord.value);
     if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
+    const badManifest = knowledgeManifestWriteRefusal(key, sourceRecord.value, sourceRecord.tags, existing?.value);
+    if (badManifest) { res.status(badManifest.status).json(error(config.nodeId, badManifest.code, badManifest.message, badManifest.status, badManifest.details)); return; }
     const decisionTool = await decisionToolRefusal(storage, callerGaii, key, sourceRecord.value);
     if (decisionTool) { res.status(decisionTool.status).json(error(config.nodeId, decisionTool.code, decisionTool.message, decisionTool.status, decisionTool.details)); return; }
     const sites = await crewSitesWriteRefusal(storage, key, callerGaii, sourceRecord.value, req.auth!);

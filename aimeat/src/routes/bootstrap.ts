@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-25 — tool_to_rest_mapping: aimeat_knowledge_contribute is POST /v1/knowledge/{id}/entries.
  *   2026-11-25 — tool_to_rest_mapping: aimeat_knowledge_create is POST /v1/knowledge/import, and
  *     aimeat_knowledge_contribute, which that line named, has no REST route; a note names the three
  *     kinds of package.
@@ -667,7 +668,7 @@ export function bootstrapRouter(
                 aimeat_knowledge_get: `GET ${base}/v1/knowledge/{package_id}`,
                 aimeat_knowledge_links: `GET ${base}/v1/knowledge/{package_id}/links`,
                 aimeat_knowledge_create: `POST ${base}/v1/knowledge/import with body { "package": { "name": ..., "content_type": "research", "entries": [{ "key": "summary", "value": ... }] } }`,
-                aimeat_knowledge_contribute: `no REST route: call it on ${base}/v1/mcp, or put every entry in the aimeat_knowledge_create call`,
+                aimeat_knowledge_contribute: `POST ${base}/v1/knowledge/{package_id}/entries with body { "entry_key": "method", "content": "..." }`,
                 aimeat_board_list: `GET ${base}/v1/boards`,
                 aimeat_board_post: `POST ${base}/v1/boards/{id}/posts`,
                 aimeat_board_read: `GET ${base}/v1/boards/{id}/posts`,

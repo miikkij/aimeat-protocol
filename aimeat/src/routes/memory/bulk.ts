@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-25 — Both bulk writes refuse a knowledge package manifest entry the manifest schema
+ *     refuses, as the single write does (services/knowledge/manifest-write.ts).
  *   2026-11-21 — Both bulk writes refuse an app tool manifest entry that binds an action marked
  *     `decision: person` (services/app-tools/decision-binding.ts).
  *   2026-11-21 — POST /v1/memory/import: each written record gets its content risk marks at the intake point.
@@ -134,6 +136,7 @@ import { bulkDeleteKeyRefusal } from '../../services/memory/bin.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
+import { isPackageManifestKey, knowledgeManifestWriteRefusal } from '../../services/knowledge/manifest-write.js';
 import { decisionToolRefusal } from '../../services/app-tools/decision-binding.js';
 import { crewSitesWriteRefusal } from '../../services/crews/def-store.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
@@ -164,6 +167,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
   // The organism rule for a key this file writes (batch-guards.ts organismWriteRefusalFor).
   const organismWriteRefusal = organismWriteRefusalFor(ctx);
+  // A knowledge package manifest the schema refuses, as the single write refuses it
+  // (services/knowledge/manifest-write.ts). The stored record is read only for a manifest key.
+  const manifestRefusal = async (gaii: string, key: string, value: unknown, tags: string[] | undefined): Promise<string | null> => {
+    if (!isPackageManifestKey(key)) return null;
+    const stored = await storage.getMemory(gaii, key);
+    const refused = knowledgeManifestWriteRefusal(key, value, tags ?? stored?.tags, stored?.value);
+    return refused ? `${refused.code}: ${refused.message}` : null;
+  };
 
   // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
   // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
@@ -235,6 +246,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
       const legacyPacing = legacyPacingWriteRefusal(key, e.value);
       if (legacyPacing) { preFailed.push({ key, status: 'failed', reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
+      const manifest = await manifestRefusal(gaii, key, e.value, (e as { tags?: string[] }).tags);
+      if (manifest) { preFailed.push({ key, status: 'failed', reason: manifest }); continue; }
       const decisionTool = await decisionToolRefusal(storage, gaii, key, e.value);
       if (decisionTool) { preFailed.push({ key, status: 'failed', reason: `${decisionTool.code}: ${decisionTool.message}` }); continue; }
       // The live crew definition's browser site list is the owner's to change, in person (QA audit F07b-02).
@@ -454,6 +467,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
       const legacyPacing = legacyPacingWriteRefusal(key, (entry as { value?: unknown }).value);
       if (legacyPacing) { failed.push({ key, reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
+      const manifest = await manifestRefusal(gaii, key, (entry as { value?: unknown }).value, (entry as { tags?: string[] }).tags);
+      if (manifest) { failed.push({ key, reason: manifest }); continue; }
       const decisionTool = await decisionToolRefusal(storage, gaii, key, (entry as { value?: unknown }).value);
       if (decisionTool) { failed.push({ key, reason: `${decisionTool.code}: ${decisionTool.message}` }); continue; }
       const sites = await crewSitesWriteRefusal(storage, key, gaii, (entry as { value?: unknown }).value, req.auth!);

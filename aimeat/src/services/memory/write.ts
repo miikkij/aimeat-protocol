@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-25 — A knowledge package manifest the manifest schema refuses is refused 422
+ *     SCHEMA_VALIDATION_FAILED, as the import refuses it; one already stored that fails stays writable
+ *     (services/knowledge/manifest-write.ts).
  *   2026-11-21 — An app tool manifest that binds an action marked `decision: person` is refused 422
  *     PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   2026-11-21 — An agent's write into its own namespace under a key prefix an app of its owner keeps in
@@ -184,6 +187,7 @@ import { parseGAII, isForeignPrincipal, localAccountName } from '../../utils/gai
 import { undeclaredSpaceForKey } from '../workspace/write-items.js';
 import { odpsWriteRefusal } from '../exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
+import { knowledgeManifestWriteRefusal } from '../knowledge/manifest-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret/records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
@@ -439,6 +443,10 @@ export async function writeMemoryRecord(
     // The same two sources carrying the old morsel price, on a node at 4.0.0 or later.
     const legacyPacing = legacyPacingWriteRefusal(input.key, input.value);
     if (legacyPacing) return legacyPacing;
+    // A knowledge package manifest the import would refuse (services/knowledge/manifest-write.ts).
+    // An update that names no tags keeps the stored ones, so those are what identify the record.
+    const badManifest = knowledgeManifestWriteRefusal(input.key, input.value, input.tags ?? existing?.tags, existing?.value);
+    if (badManifest) return badManifest;
     // An app tool manifest that binds an action its extension marks as the person's own decision
     // (services/app-tools/decision-binding.ts). Any other key answers null without a read.
     const decisionTool = await decisionToolRefusal(storage, caller.targetGaii, input.key, input.value);

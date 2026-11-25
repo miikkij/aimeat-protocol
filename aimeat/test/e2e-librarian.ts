@@ -22,6 +22,8 @@
  *     agent of the organism's creator, with memory:read and with memory:read-as-owner, gets no snippet
  *     of its record, as GET /v1/memory/:key refuses it; a listed agent and the owner in person still
  *     find it (secaudit 2026-10, the v57 shape on the librarian).
+ *   v1.3.1 — 2026-11-25 — Test 10's package manifest meets the knowledge manifest schema, which a
+ *     memory write now checks.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=librarian
 
@@ -172,7 +174,14 @@ await test('9. Partial term matches (prefix/substring): "qwopdoc" finds the "qwo
 
 await test('10. Public scope finds another user\'s public knowledge package — with producer + kind', async () => {
     const term = 'zubpublicterm';
-    const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: 'packages/zub-pkg/manifest', value: { name: `Public ${term} digest`, content_type: 'news' }, visibility: 'public', tags: ['knowledge-package', 'news'] }) });
+    // A manifest the knowledge manifest schema accepts, which a memory write now checks.
+    const value = {
+        type: 'knowledge-package', name: `Public ${term} digest`, version: '1.0.0', author: A.name, content_type: 'article', tags: ['news'],
+        entries: [{ key: 'packages/zub-pkg/digest', title: 'Digest', visibility: 'public' }],
+        sharing: { catalog_listed: true, allow_clone: false, toll_morsels: 0 },
+        synthesis: { level: 'original', description: 'A test digest.' },
+    };
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: 'packages/zub-pkg/manifest', value, visibility: 'public', tags: ['knowledge-package', 'news'] }) });
     assert(w.status === 201 || w.status === 200, `pkg ${w.status}: ${JSON.stringify(w.body.error)}`);
     const r = await json(`/v1/librarian/search?q=${term}&scope=public`, { headers: auth(B.token) });
     assert(r.status === 200, `search ${r.status}`);

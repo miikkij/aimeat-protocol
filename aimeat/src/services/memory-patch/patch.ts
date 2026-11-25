@@ -23,6 +23,8 @@
  * @usage
  *   const out = await patchMemoryRecord({ storage, config, stats, peers }, { auth: req.auth!, caller, reader, organismChecked: true }, input);
  * @version-history
+ *   2026-11-25 — A merge that turns a knowledge package manifest into one the manifest schema refuses
+ *     is refused 422 SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — A merge that writes an app tool manifest binding an action marked `decision: person`
  *     is refused 422 PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   v1.0.0 — 2026-11-09 — Moved from routes/memory/patch.ts (its history there); a record whose value
@@ -72,6 +74,7 @@ import { isKeyArchived } from '../archive.js';
 import { undeclaredSpaceForKey } from '../workspace/write-items.js';
 import { odpsWriteRefusal } from '../exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
+import { knowledgeManifestWriteRefusal } from '../knowledge/manifest-write.js';
 import { decisionToolRefusal } from '../app-tools/decision-binding.js';
 import { stampAgentWrite, storeHeldProvenance } from '../ai/provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
@@ -289,6 +292,8 @@ export async function patchMemoryRecord(deps: MemoryPatchDeps, who: MemoryPatchW
         if (odps) return fail(odps.status, odps.code, odps.message, odps.details);
         const legacyPacing = legacyPacingWriteRefusal(key, merged);
         if (legacyPacing) return fail(legacyPacing.status, legacyPacing.code, legacyPacing.message);
+        const badManifest = knowledgeManifestWriteRefusal(key, merged, Array.isArray(tags) ? tags : existing?.tags, existing?.value);
+        if (badManifest) return fail(badManifest.status, badManifest.code, badManifest.message, badManifest.details);
         const decisionTool = await decisionToolRefusal(storage, gaii, key, merged);
         if (decisionTool) return fail(decisionTool.status, decisionTool.code, decisionTool.message, decisionTool.details);
         const sites = await crewSitesWriteRefusal(storage, key, gaii, merged, auth as Parameters<typeof crewSitesWriteRefusal>[4]);

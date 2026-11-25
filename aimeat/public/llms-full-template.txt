@@ -1572,6 +1572,12 @@ POST {{BASE_URL}}/v1/knowledge/import — Import a knowledge package
   }
   → 201: { "ok": true, "data": { "package_id": "a1b2c3d4-...", "manifest_key": "packages/a1b2c3d4-.../manifest", "entries_created": 2, "catalog_listed": true } }
 
+POST {{BASE_URL}}/v1/knowledge/:id/entries — Add or update one entry of your package (MCP: aimeat_knowledge_contribute)
+  Authorization: Bearer <jwt>
+  Body: { "entry_key": "method", "content": "Interviews with six users." }
+  → 201: { "ok": true, "data": { "package_id": "a1b2c3d4-...", "entry_key": "packages/a1b2c3d4-.../method", "updated": true, "manifest_updated": true } }
+  A manifest written with POST /v1/memory is checked against the same schema as the import (422 SCHEMA_VALIDATION_FAILED).
+
 GET {{BASE_URL}}/v1/knowledge/:id/links — List typed links
   → 200: { "ok": true, "data": { "links": [{ "source": "packages/abc.../manifest", "target": "packages/def.../manifest", "relation": "extends", "description": "Deeper analysis of federation patterns" }] } }
 
