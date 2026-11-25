@@ -26,6 +26,8 @@
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-11-04 — A bounded listing with values answers the first N items of the unbounded one, with
  *     the same total, quota and truncation fields (codebase analysis 2026-11-03, item C1).
+ *   2026-11-25 — That assertion names the first item that differs and prints both copies, because a
+ *     PostgreSQL run under load was red once with no way to tell which field had changed.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -862,8 +864,8 @@ await test('a bounded listing with values answers the first N items of the unbou
             const part = await json(`${c.path}&limit=${k}`, { headers: c.headers() });
             assert(part.status === 200, `${c.path}&limit=${k}: status ${part.status}`);
             const d = part.body.data;
-            const expected = all.items.slice(0, k);
-            assert(JSON.stringify(d.items) === JSON.stringify(expected), `${c.path}&limit=${k}: items differ from the first ${k} of the unbounded listing`);
+            const expected = all.items.slice(0, k); const at = Array.from({ length: Math.max(expected.length, d.items.length) }, (_, i) => i).find(i => JSON.stringify(expected[i]) !== JSON.stringify(d.items[i]));
+            assert(at === undefined, `${c.path}&limit=${k}: items differ from the first ${k} of the unbounded listing at item ${at} (${expected[at ?? 0]?.key ?? d.items[at ?? 0]?.key}): unbounded ${JSON.stringify(expected[at ?? 0])}, bounded ${JSON.stringify(d.items[at ?? 0])}`);
             assert(d.total === all.total, `${c.path}&limit=${k}: total ${d.total}, unbounded ${all.total}`);
             assert(JSON.stringify(d.quota) === JSON.stringify(all.quota), `${c.path}&limit=${k}: quota ${JSON.stringify(d.quota)}, unbounded ${JSON.stringify(all.quota)}`);
             const cut = k < all.total;
