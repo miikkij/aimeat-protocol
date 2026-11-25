@@ -4,6 +4,16 @@
     {
       "date": "2026-11-25",
       "kind": "feature",
+      "id": "2026-11-25-the-home-starts-with-what-waits-for-you",
+      "highlight": true,
+      "audience": ["user", "agent"],
+      "title": { "en": "The home starts with what waits for you", "fi": "Koti näyttää ensin sen, mikä odottaa sinua" },
+      "body": { "en": "The first list on your home holds everything that waits for you: decisions, answers somebody waits for, and counts to open. You approve or decline an agent proposal or an invitation on its row. Ask your AI what waits for you and it reads the same list in one call. The system updates are now one closed row under the list.", "fi": "Kodin ensimmäinen lista kokoaa kaiken, mikä odottaa sinua: päätökset, vastaukset, joita joku odottaa, ja avattavat määrät. Hyväksyt tai hylkäät agenttiehdotuksen tai kutsun suoraan riviltä. Kysy tekoälyltäsi, mikä odottaa sinua, niin se lukee saman listan yhdellä kutsulla. Järjestelmäpäivitykset ovat nyt yksi suljettu rivi listan alla." },
+      "summary": { "en": "Your home starts with one list of everything that waits for you. Your AI reads the same list.", "fi": "Koti alkaa listalla kaikesta, mikä odottaa sinua. Tekoälysi lukee saman listan." }
+    },
+    {
+      "date": "2026-11-25",
+      "kind": "feature",
       "id": "2026-11-25-new-theme-selkea",
       "highlight": false,
       "audience": ["user", "operator"],
