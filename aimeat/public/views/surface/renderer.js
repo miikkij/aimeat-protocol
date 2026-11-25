@@ -25,6 +25,9 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} placeholders=${true} />`
  * @version-history
+ *   2026-11-25: `lead` and `leadAfter`: a part of the page no layout can remove, drawn after the
+ *     leading blocks the page names and first in any other layout (the home's system updates, which
+ *     now stand under the nameplate and what waits for the person).
  *   2026-11-14: A block's slot carries `data-rail` (its key), so the home's contents rail lists the
  *     blocks that drew something, under their own headings (components/ContentsRail.js); a group is
  *     one section under its heading. A block's height is measured through a child with no box of
@@ -302,11 +305,19 @@ function Block({ block, ctx, freeform, freeformProvenance, locale, placeholders 
  * `ctx` is the only surface-specific input — what a block needs that it cannot fetch for itself,
  * such as the router's navigate. A block that needs data goes and gets it.
  */
-export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProvenance = {}, locale = 'en', placeholders = false }) {
+export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProvenance = {}, locale = 'en', placeholders = false, lead = null, leadAfter = [] }) {
   const blocks = Array.isArray(layout?.blocks) ? layout.blocks : [];
-  if (blocks.length === 0) return null;
+  if (blocks.length === 0) return lead;
 
-  return html`${blocks.filter(b => !b.hidden).map(block => {
+  // `lead` is a part of the page no layout can remove (the home's system updates). It stands after
+  // the leading run of blocks whose ids `leadAfter` names, so on the built-in home the person's name
+  // and what waits for them come before it; a layout that starts with any other block has it first,
+  // where it always stood.
+  const shown = blocks.filter(b => !b.hidden);
+  let leadAt = 0;
+  if (lead) while (leadAt < shown.length && leadAfter.includes(shown[leadAt].id)) leadAt += 1;
+
+  const parts = shown.map(block => {
     if (Array.isArray(block.children)) {
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
@@ -321,7 +332,8 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProve
         </div>`;
     }
     return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} placeholders=${placeholders} />`;
-  })}`;
+  });
+  return lead ? html`${parts.slice(0, leadAt)}${lead}${parts.slice(leadAt)}` : html`${parts}`;
 }
 
 export default SurfaceRenderer;

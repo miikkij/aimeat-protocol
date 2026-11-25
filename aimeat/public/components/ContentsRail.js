@@ -32,6 +32,8 @@
  *   html`${rail && railFold([rail])}
  *     <div class="og-grid"><div class="og-main og-main--flow" ref=${setRoot}>…</div>${rail && html`<${Rail} ...${rail} />`}</div>`
  * @version-history
+ *   v1.2.0 — 2026-11-25 — A listed section's headline carries the rail's number (`data-rail-n`, drawn
+ *     by tab-page.css), so "open 05" names a headline on the page as it does on a Settings page.
  *   v1.1.0 — 2026-11-19 — `kit`: the page kit's own sections (.og-sec) with their own numbers and
  *     counts, for the admin pages' contents rail (admin.js); a section's own number wins over the
  *     running one. Additive: the marker mode reads as before.
@@ -88,7 +90,7 @@ function targetOf(el) {
  * admin pages are read this way: they number their sections already and carry no markers.
  * @param {Element} root
  * @param {{ kit?: boolean }} [opts]
- * @returns {Array<{ key: string, label: string, count: string, num: string, el: Element }>}
+ * @returns {Array<{ key: string, label: string, count: string, num: string, el: Element, heading: Element | null }>}
  */
 export function readSections(root, opts = {}) {
   const selector = opts.kit ? '.og-sec' : '[data-rail]';
@@ -106,9 +108,28 @@ export function readSections(root, opts = {}) {
     const marks = opts.kit ? kitMarks(heading) : { num: '', count: '' };
     const counted = el.hasAttribute('data-rail-count') ? el : el.querySelector('[data-rail-count]');
     const count = counted ? String(counted.getAttribute('data-rail-count') ?? '') : marks.count;
-    out.push({ key: el.getAttribute('data-rail') || el.id || label, label, count, num: marks.num, el: target });
+    out.push({ key: el.getAttribute('data-rail') || el.id || label, label, count, num: marks.num, el: target, heading: heading || null });
   }
   return out;
+}
+
+/**
+ * Writes each listed section's number on its headline (`data-rail-n`), so the number a person reads
+ * on the rail is found on the headline it leads to; tab-page.css draws it. A headline that is no
+ * longer listed loses the number. Marker pages only: a page-kit section draws its own number.
+ * The attribute is not among the ones the observer below watches, so writing it reads nothing again.
+ * @param {Element} root
+ * @param {ReturnType<typeof readSections>} sections
+ */
+function markNumbers(root, sections) {
+  const marked = new Set();
+  sections.forEach((s, i) => {
+    if (!s.heading) return;
+    const n = s.num || String(i + 1).padStart(2, '0');
+    if (s.heading.getAttribute('data-rail-n') !== n) s.heading.setAttribute('data-rail-n', n);
+    marked.add(s.heading);
+  });
+  for (const el of root.querySelectorAll('[data-rail-n]')) if (!marked.has(el)) el.removeAttribute('data-rail-n');
 }
 
 const same = (a, b) => a.length === b.length
@@ -130,6 +151,7 @@ export function useRailSections(root, opts = {}) {
     const read = () => {
       frame = 0;
       const next = readSections(root, { kit });
+      if (!kit) markNumbers(root, next);
       setSections((was) => (same(was, next) ? was : next));
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(read); };

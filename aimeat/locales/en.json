@@ -19582,6 +19582,48 @@
       "controls": "Settings & controls"
     },
     "loadFailed": "Your home could not be loaded just now. Try again in a moment.",
+    "waiting": {
+      "title": "Waiting for you",
+      "lead": {
+        "none": "Nothing waits for you now.",
+        "noneToDecide": "Nothing waits for your decision or your answer.",
+        "one": "One thing waits for you.",
+        "n": "{n} things wait for you."
+      },
+      "group": {
+        "decide": "For you to decide",
+        "answer": "For you to answer",
+        "look": "For you to open"
+      },
+      "kind": {
+        "agentProposalBy": "{from} proposes an agent: {subject}",
+        "agentProposal": "Proposed agent: {subject}",
+        "agentSignIn": "{subject} asks to connect as your agent",
+        "helpQuestionBy": "{from} asks",
+        "helpQuestion": "A question for you",
+        "team": "Waiting for you in this team: {n}",
+        "invitationBy": "{from} invites you to {subject}",
+        "invitation": "Invitation: {subject}",
+        "publishRequestBy": "{from} asks to make public: {subject}",
+        "publishRequest": "Waits for your permission to become public: {subject}",
+        "workflowInput": "The workflow {subject} waits for your answer",
+        "openItem": "Open items: {n}",
+        "unread": "Unread messages: {n}"
+      },
+      "do": {
+        "join": "Join",
+        "refuse": "Decline",
+        "answer": "Answer",
+        "open": "Open"
+      },
+      "done": {
+        "approve": "Approved.",
+        "decline": "Declined.",
+        "failed": "That did not work. Open it and try there."
+      },
+      "more": "{n} more wait for you.",
+      "partial": "A part of the list could not be read just now."
+    },
     "turn": {
       "title": "Waiting for your answer",
       "more": "{n} more are waiting",
@@ -28451,6 +28493,10 @@
           "label": "Setup path for someone new",
           "summary": "The setup path a new person completes before the account does anything. Its own order is not arrangeable."
         },
+        "waiting": {
+          "label": "Waiting for you",
+          "summary": "Everything that waits for them, in one list: decisions, answers and counts to open."
+        },
         "your-turn": {
           "label": "Waiting on an answer",
           "summary": "Which conversations are waiting on an answer from them."
@@ -28593,6 +28639,9 @@
     "moreN": "{n} more system updates are in the history.",
     "read": "Read",
     "history": "All system updates →",
+    "titleClosed": "System updates you have not read: {n}",
+    "showAll": "Show all {n}",
+    "showFewer": "Show fewer",
     "for": "For: {who}",
     "countTitle": "{n} new system updates on your home",
     "who": {
@@ -34571,6 +34620,12 @@
   "admin.compliance.line.recordsOne": "the records of processing leave one item open",
   "admin.compliance.line.drafts": "{n} register drafts wait for a review",
   "admin.compliance.line.draftsOne": "one register draft waits for a review",
+  "explain.home.waiting.title": "Waiting for you",
+  "explain.home.waiting.short": "Everything on this AIMEAT that waits for you, in one list.",
+  "explain.home.waiting.what": "The list has three groups. For you to decide: an agent that someone proposes, an invitation, a request to make something public. You say yes or no on the row. For you to answer: a conversation where the other person wrote last, a question that a member asks you, a workflow that needs your answer. For you to open: counts, such as unread messages and open items. The number at the top counts what you decide and what you answer. The counts to open are not in it, because they can name the same things again. A row leaves the list when you decide, answer or open it. Your AI reads the same list with one tool call.",
+  "explain.home.waiting.ex1": "Your AI proposes an agent that reads your inbox each morning. The row shows its purpose. Press Approve and the agent starts, or press Decline and nothing is made.",
+  "explain.home.waiting.ex2": "Ask your AI: what waits for me? It gets this list and can go through it with you.",
+  "explain.home.waiting.tip": "When the list says that nothing waits, nothing on this AIMEAT needs you now.",
   "explain.home.turn.title": "Waiting for your answer",
   "explain.home.turn.short": "Conversations where someone else wrote the last message, so the next turn is yours.",
   "explain.home.turn.what": "A conversation is here when its newest message is from someone else: another person, their agent, or one of your own agents. It leaves the list when you answer in the same conversation, yourself or through your agent in your name. Your agents' own conversations with other people are not here; they are on the Messages page. You see the five newest, and the line under them says how many more wait. Press a row to open your messages.",

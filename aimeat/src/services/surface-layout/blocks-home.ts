@@ -28,6 +28,7 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   2026-11-25 — home.waiting: everything that waits for the person, in one list (GET /v1/home/waiting).
  *   2026-11-14 — home.teams ("Your teams", team setup T15) on both homes.
  *   2026-11-14 — home.ask ("Who knows?", Ask someone who knows; shown when help.enabled is on), and
  *     home.your-turn's helpFirst: questions first among the waiting threads.
@@ -57,6 +58,27 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         props: {},
         maxPerSurface: 1,
         summary: 'Who the person is: their picture, their name, and the link to their settings.',
+    },
+    {
+        // Everything that waits for the person, in one list, first on the page (GET /v1/home/waiting,
+        // the same answer an AI reads with aimeat_home_waiting). It keeps its place on a quiet day
+        // and says that nothing waits, so the page's first content block never moves.
+        id: 'home.waiting',
+        surfaces: ['home'],
+        presence: { kind: 'always' },
+        localeStem: 'home.waiting',
+        liveDomains: ['agents', 'messages', 'help', 'organisms', 'memory', 'open-items', 'work'],
+        props: {
+            max: {
+                type: 'number',
+                default: 12,
+                min: 1,
+                max: 50,
+                description: 'How many waiting things to name before the rest are counted.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'Everything that waits for them, in one list: decisions, answers and counts to open.',
     },
     {
         // Present on every node and absent from almost every page: it draws only while nothing has

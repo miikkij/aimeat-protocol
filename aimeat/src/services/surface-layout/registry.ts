@@ -28,6 +28,9 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.7.0 — 2026-11-25 — The default home has home.waiting under the nameplate: everything that
+ *     waits for the person in one list. home.mailbox and home.your-turn left the default, because
+ *     that list holds what they said; a stored layout is untouched.
  *   v1.6.0 — 2026-11-14 — Both default homes have home.teams (Your teams): under home.your-turn, and
  *     under home.ask on the onboarding home.
  *   v1.5.0 — 2026-11-14 — Both default homes have home.ask ("Who knows?") under the door to the chat.
@@ -190,6 +193,11 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     ],
     home: [
         b('home.nameplate'),
+        // What waits for the person, first: the one question a person opens the home with. It holds
+        // what home.mailbox and home.your-turn said (the unread count, the threads waiting for an
+        // answer) beside the proposals, invitations and requests, so those two blocks left this
+        // default; both stay in the catalogue for an operator who wants them.
+        b('home.waiting'),
         b('home.chat-door'),
         // Who knows? (Ask someone who knows): under the door to the chat, because asking a colleague
         // is the other way in to an answer. Filtered out on a node with the feature off.
@@ -202,13 +210,7 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // board 2): it is the one place that shows how the rest of the page fits together.
         b('home.overview'),
         b('home.mat'),
-        b('home.mailbox'),
-        // Straight under the unread count, because it answers the question the count raises. The
-        // count says something is waiting; this says which conversations, and it renders nothing on
-        // a day when nobody is waiting.
-        b('home.your-turn'),
-        // The person's teams under what waits for them in conversations: the same question, "what
-        // is mine now", asked of the teams (team setup T15). It renders nothing outside a team.
+        // The person's teams: how each one stands (team setup T15). It renders nothing outside a team.
         b('home.teams'),
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.

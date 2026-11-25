@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.7.0 — 2026-11-25 — home.waiting (Waiting for you: one list of everything that waits).
  *   v1.6.0 — 2026-11-14 — home.teams (Your teams, team setup T15).
  *   v1.5.0 — 2026-11-14 — home.ask (Who knows?, Ask someone who knows).
  *   v1.4.0 — 2026-09-15 — home.own-aimeat.
@@ -35,6 +36,7 @@ export const BLOCKS = {
 
   // ── A member's home ──
   'home.nameplate': () => import('/views/surface/blocks-home.js').then(m => m.NameplateBlock),
+  'home.waiting': () => import('/views/surface/blocks-home.js').then(m => m.WaitingBlock),
   'home.mcp-connect': () => import('/views/surface/blocks-home.js').then(m => m.McpConnectBlock),
   'home.mat': () => import('/views/surface/blocks-home.js').then(m => m.MatBlock),
   'home.mailbox': () => import('/views/surface/blocks-home.js').then(m => m.MailboxBlock),

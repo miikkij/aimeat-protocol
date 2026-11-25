@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-25: WaitingBlock, "Waiting for you" (views/home/waiting-band.js, GET /v1/home/waiting): one
+ *     list of everything that waits for the person, with its count on the contents rail.
  *   2026-11-14: TeamsBlock, "Your teams" (views/home/teams-band.js, GET /v1/teams/status and /v1/teams/waiting).
  *   2026-11-14: AskBlock, "Who knows?" of Ask someone who knows (views/home/ask-band.js, GET /v1/help/inbox);
  *     YourTurnBlock marks a thread a question opened and lists those first (prop helpFirst).
@@ -93,6 +95,7 @@ import { HomeFeed } from '/views/home/feed.js';
 import { AgentsBand } from '/views/home/agents-band.js';
 import { AskBand } from '/views/home/ask-band.js';
 import { TeamsBand } from '/views/home/teams-band.js';
+import { WaitingBand } from '/views/home/waiting-band.js';
 import { OverviewBand } from '/views/home/overview-band.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -230,6 +233,25 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
   return html`<div class="rail-mark" data-rail-count=${waiting ? String(waiting) : ''}>
     <${YourTurn} threads=${threads} total=${data.total} anyTime=${data.anyTime} max=${max}
       days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />
+  </div>`;
+}
+
+/**
+ * Waiting for you: everything that waits for this person in one list (GET /v1/home/waiting, the
+ * answer an AI reads with aimeat_home_waiting). One read, read again when an agent, a message, a
+ * question, an organism or an open item changes. A finished home only: before the first connection
+ * the steps say what comes next. The band stays on a day when nothing waits and says so, so the
+ * first content block of the page keeps its place.
+ */
+export function WaitingBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx, props = {} }) {
+  const max = Number.isFinite(props.max) ? props.max : 12;
+  const { state } = useHomeState();
+  const { data } = useShared(`home-waiting|${max}`, state?.initialized ? `/v1/home/waiting?limit=${max}` : '',
+    ['agents', 'messages', 'help', 'organisms', 'memory', 'open-items', 'work']);
+  if (!state?.initialized || !data) return null;
+  // The count the home's contents rail shows beside this band: everything that waits.
+  return html`<div class="rail-mark" data-rail-count=${data.total ? String(data.total) : ''}>
+    <${WaitingBand} data=${data} navigate=${ctx?.navigate} />
   </div>`;
 }
 

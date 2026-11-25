@@ -16,6 +16,9 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-25: What is new since the last look (news-band.js) stands under the nameplate and what
+ *     waits for the person, when those two lead the layout; in any other layout it is first as before.
+ *     It is still drawn outside the layout's block list, so no layout can remove it.
  *   2026-11-20: The rail's pages lead to the new entry first ("Start something bigger", /v1/goal-start).
  *   2026-11-14: The finished home has the contents rail beside it (components/ContentsRail.js): its
  *     drawn sections as numbered links with their counts, and the ways on (all system updates, the
@@ -111,6 +114,8 @@ import { useRailSections, contentsRail } from '/components/ContentsRail.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const addressAsksForSettings = () => new URLSearchParams(location.search).get('settings') === '1';
+/** The blocks the system updates stand under when they lead the layout: who the person is, then what waits for them. */
+const NEWS_AFTER = ['home.nameplate', 'home.waiting'];
 
 /** Which home an account had when it last opened it in this browser: true (the finished home),
  *  false (the onboarding one), or null (never here, or storage refused). A per-browser convenience:
@@ -256,10 +261,6 @@ export default function HomeView({ navigate }) {
   }) : null;
 
   const page = html`
-      ${/* What is new since the person last looked, on both homes, so the count on the header's Home
-            link always points at something here. Outside the layout, because it goes away by being
-            read rather than by being arranged. */''}
-      <${NewsBand} session=${session} navigate=${navigate} />
       ${/* A buyer back after a while away: what their agents did and what the node said meanwhile
             (away.js); nothing on a first visit or anywhere else. */''}
       <${AwayCard} />
@@ -279,7 +280,9 @@ export default function HomeView({ navigate }) {
         freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
         locale=${getLocale()}
-        placeholders=${true} />`;
+        placeholders=${true}
+        lead=${html`<${NewsBand} key="news" session=${session} navigate=${navigate} />`}
+        leadAfter=${NEWS_AFTER} />`;
 
   return html`
     <${PageFrame} width=${withRail ? 'rail' : 'wide'}>

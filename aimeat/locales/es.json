@@ -18524,6 +18524,48 @@
       "controls": "Configuración y controles"
     },
     "loadFailed": "Tu página de inicio no se ha podido cargar ahora. Inténtalo dentro de un momento.",
+    "waiting": {
+      "title": "Te espera",
+      "lead": {
+        "none": "Nada te espera ahora.",
+        "noneToDecide": "Nada espera tu decisión ni tu respuesta.",
+        "one": "Una cosa te espera.",
+        "n": "{n} cosas te esperan."
+      },
+      "group": {
+        "decide": "Para decidir",
+        "answer": "Para responder",
+        "look": "Para abrir"
+      },
+      "kind": {
+        "agentProposalBy": "{from} propone un agente: {subject}",
+        "agentProposal": "Agente propuesto: {subject}",
+        "agentSignIn": "{subject} pide conectarse como tu agente",
+        "helpQuestionBy": "{from} pregunta",
+        "helpQuestion": "Una pregunta para ti",
+        "team": "Te espera en este equipo: {n}",
+        "invitationBy": "{from} te invita a {subject}",
+        "invitation": "Invitación: {subject}",
+        "publishRequestBy": "{from} pide hacer público: {subject}",
+        "publishRequest": "Espera tu permiso para hacerse público: {subject}",
+        "workflowInput": "El flujo de trabajo {subject} espera tu respuesta",
+        "openItem": "Pendientes: {n}",
+        "unread": "Mensajes sin leer: {n}"
+      },
+      "do": {
+        "join": "Entrar",
+        "refuse": "Rechazar",
+        "answer": "Responder",
+        "open": "Abrir"
+      },
+      "done": {
+        "approve": "Aprobado.",
+        "decline": "Rechazado.",
+        "failed": "No funcionó. Ábrelo e inténtalo allí."
+      },
+      "more": "{n} más te esperan.",
+      "partial": "Una parte de la lista no se pudo leer ahora."
+    },
     "turn": {
       "title": "Esperan tu respuesta",
       "more": "{n} más están esperando",
@@ -27134,6 +27176,10 @@
         "steps": {
           "label": "Recorrido para quien empieza"
         },
+        "waiting": {
+          "label": "Te espera",
+          "summary": "Todo lo que le espera, en una lista: decisiones, respuestas y cantidades para abrir."
+        },
         "your-turn": {
           "label": "Esperan respuesta",
           "summary": "Qué conversaciones esperan una respuesta suya."
@@ -27255,6 +27301,9 @@
     "moreN": "Hay {n} actualizaciones del sistema más en el historial.",
     "read": "Leído",
     "history": "Todas las actualizaciones del sistema →",
+    "titleClosed": "Actualizaciones del sistema sin leer: {n}",
+    "showAll": "Mostrar las {n}",
+    "showFewer": "Mostrar menos",
     "for": "Para: {who}",
     "countTitle": "{n} actualizaciones del sistema nuevas en tu inicio",
     "who": {
@@ -33127,6 +33176,12 @@
   "admin.compliance.line.recordsOne": "el registro de actividades de tratamiento deja un punto pendiente",
   "admin.compliance.line.drafts": "{n} borradores de registro esperan revisión",
   "admin.compliance.line.draftsOne": "un borrador de registro espera revisión",
+  "explain.home.waiting.title": "Te espera",
+  "explain.home.waiting.short": "Todo lo que te espera en este AIMEAT, en una lista.",
+  "explain.home.waiting.what": "La lista tiene tres grupos. Para decidir: un agente que alguien propone, una invitación o una solicitud para hacer algo público. Dices sí o no en la fila. Para responder: una conversación en la que la otra persona escribió la última, una pregunta que te hace un miembro o un flujo de trabajo que necesita tu respuesta. Para abrir: cantidades, como los mensajes sin leer y los pendientes. El número de arriba cuenta lo que decides y lo que respondes. Las cantidades para abrir no están en él, porque pueden nombrar las mismas cosas otra vez. Una fila sale de la lista cuando decides, respondes o la abres. Tu IA lee la misma lista con una sola llamada a una herramienta.",
+  "explain.home.waiting.ex1": "Tu IA propone un agente que lee tu bandeja de entrada cada mañana. La fila muestra para qué sirve. Pulsa Aprobar y el agente empieza, o pulsa Rechazar y no se crea nada.",
+  "explain.home.waiting.ex2": "Pregunta a tu IA: ¿qué me espera? Recibe esta lista y puede repasarla contigo.",
+  "explain.home.waiting.tip": "Cuando la lista dice que nada te espera, nada en este AIMEAT te necesita ahora.",
   "explain.home.turn.title": "Esperan tu respuesta",
   "explain.home.turn.short": "Conversaciones en las que otra persona escribió el último mensaje, así que te toca a ti.",
   "explain.home.turn.what": "Una conversación aparece aquí cuando su mensaje más reciente es de otra persona, de su agente o de uno de tus agentes. Sale de la lista cuando respondes en la misma conversación, tú o tu agente en tu nombre. Las conversaciones de tus agentes con otras personas no están aquí, sino en la página Mensajes. Ves las cinco más recientes, y la línea de debajo dice cuántas más esperan. Presiona una fila para abrir tus mensajes.",

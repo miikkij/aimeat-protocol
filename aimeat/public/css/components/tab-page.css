@@ -10,6 +10,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.10.0 — 2026-11-25 — A headline the contents rail lists shows the rail's number before its
+ *     words (.poster-section-title[data-rail-n]), on the home and the Settings & Controls overview.
  *   v1.9.0 — 2026-11-14 — .og-main--flow (a page column that keeps its parts' own spacing) and
  *     .rail-mark (a section marker with no box), for the contents rail of the home and of the
  *     Settings & Controls overview (components/ContentsRail.js).
@@ -39,6 +41,11 @@
 .og-main--flow { display: block; }
 /* A contents-rail section marker that draws no box of its own (ContentsRail.js). */
 .rail-mark { display: contents; }
+/* The headline of a section the rail lists says the rail's number before its words, in the rail's
+   own typewriter figures and sun colour (ContentsRail.js writes data-rail-n). */
+.poster-section-title[data-rail-n]::before { content: attr(data-rail-n); margin-right: .9rem; font-family: var(--font-mono); font-size: .42em; font-weight: var(--weight-medium); letter-spacing: 0; color: var(--sun); vertical-align: middle; }
+/* The open items' headline stands on the page ground, where the sun does not read: its number is in the accent. */
+.open-items-title[data-rail-n]::before { content: attr(data-rail-n); margin-right: .7rem; font-family: var(--font-mono); font-size: .6em; font-weight: var(--weight-medium); letter-spacing: 0; color: var(--accent); vertical-align: middle; }
 .og-rail { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--ink-ground); color: var(--on-ink-ground); border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-raised); }
 .og-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: var(--shape-case-heading); font-size: .75rem; letter-spacing: calc(var(--shape-tracking-label) * .6); color: var(--sun); margin-bottom: .25rem; }
 .og-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--on-ink-ground); text-decoration: none; opacity: .65; }

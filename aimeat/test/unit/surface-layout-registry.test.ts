@@ -192,6 +192,19 @@ describe('default layouts', () => {
         expect(served).toContain('home.chat-door');
         expect(served).toContain('home.feed');
     });
+
+    it('starts the built-in home with who the person is and then what waits for them', () => {
+        // The first content block answers "what needs me now"; the door to the chat comes after it.
+        const served = defaultLayout('home', {} as AimeatConfig).blocks.map(b => b.id);
+        expect(served.slice(0, 2)).toEqual(['home.nameplate', 'home.waiting']);
+        expect(served.indexOf('home.chat-door')).toBeGreaterThan(served.indexOf('home.waiting'));
+        // The one list holds what these two blocks said, so the built-in home does not say it twice.
+        // Both stay in the catalogue for an operator's own layout.
+        expect(served).not.toContain('home.mailbox');
+        expect(served).not.toContain('home.your-turn');
+        expect(blockById('home.mailbox'), 'home.mailbox stays a declared block').toBeDefined();
+        expect(blockById('home.your-turn'), 'home.your-turn stays a declared block').toBeDefined();
+    });
 });
 
 describe('presence', () => {

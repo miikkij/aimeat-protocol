@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.40.2 -- 2026-11-25 -- Under 560px a large section title breaks a word that is longer than its column (overflow-wrap), so a long compound word no longer makes the page scroll sideways.
  *   v1.40.1 -- 2026-11-22 -- The @app-catalog range markers go with the build that read them (scripts/build-app-catalog.ts, removed with /app-catalog.html). The rules between them stay unchanged.
  *   v1.40.0 -- 2026-10-25 -- Library sizes (Jouni): the Status reads --text-2xs (11px, was .66rem, 10.6px); on a touch screen the action link and the tab take the finger in an area 44px high around their words, with no change to their look. Outside the app-catalog ranges.
  *   v1.39.0 -- 2026-10-21 -- .poster-action--control (Action `control`): the action link in a box as tall as the control cut, a touch target. Additive, outside the app-catalog ranges.
@@ -84,7 +85,9 @@
    .sf-band-title, which carried exactly these values). */
 .poster-section-title--large { font-size: 2.4rem; }
 @media (max-width: 560px) {
-  .poster-section-title--large { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
+  /* A word longer than the phone's column breaks inside the headline: in a wide headline face one
+     long compound word made the whole page scroll sideways. */
+  .poster-section-title--large { font-size: 1.7rem; padding: .45rem .8rem .4rem; overflow-wrap: break-word; }
 }
 .poster-panel { border-left: 4px solid var(--sun); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow); padding-left: 1.25rem; margin: 0 0 1.5rem; }
 
