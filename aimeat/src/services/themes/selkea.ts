@@ -236,6 +236,16 @@ function themeCss(): string {
   :root .poster-action, :root .poster-slab, :root .btn-primary, :root .btn-outline, :root .poster-tab { white-space: normal; flex-shrink: 1; }
   :root .poster-action--row, :root .listing-row .poster-action { white-space: nowrap; flex-shrink: 0; }
 }
+
+/* A tab is a framed button in the body face: no line under its word in any of its cuts. */
+:root .poster-tab { text-decoration: none; font-family: var(--font-body); }
+/* A tag inside a list cell is measured with its frame, so its own max-width keeps it inside the cell,
+   and it wraps between its words. On a narrow screen the boards list gives its visibility column the
+   width of the tag, up to 9rem, so a two-word tag takes two lines and stays clear of the row's button. */
+:root .listing-row .poster-chip { box-sizing: border-box; white-space: normal; }
+@media (max-width: 900px) {
+  :root .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(9rem) minmax(3.5rem, max-content); }
+}
 `;
 }
 
