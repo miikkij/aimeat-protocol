@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-25 -- e2e-home-waiting.ts joins the list (not the guard tier): GET /v1/home/waiting and aimeat_home_waiting.
  *   2026-11-23 -- `--workers` reads the last value given, so a caller of a package script can add its
  *     own after the script's (pnpm ready names the lanes its machine carries). `--stop-on-lost-lane`:
  *     a lane that cannot restart its node ends the run (test/run-e2e-lane.ts LaneOptions.stop).
@@ -927,6 +928,11 @@ const ALL_SUITES = [
     // a workspace and its line, focus and limit, and the refusals (another owner, no agent:read, no
     // organism:read for workspace names).
     'test/e2e-overview.ts',
+    // What waits for the person (GET /v1/home/waiting, aimeat_home_waiting): every kind at zero on a
+    // fresh account, the items with their links after another owner writes and invites, approving
+    // through the item's own link, the limit, and the refusals (another owner, no credential, no
+    // memory:read, the kinds an agent's words do not cover).
+    'test/e2e-home-waiting.ts',
     // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.

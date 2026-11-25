@@ -16,6 +16,7 @@
  * @structure notifyUsageCliTools[] — the handler table, spread by index.ts
  * @usage import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
  * @version-history
+ *   v1.4.0 — 2026-11-25 — aimeat_home_waiting, over GET /v1/home/waiting (src/routes/home/waiting.ts, src/mcp/home-feed.ts).
  *   v1.3.0 — 2026-11-02 — aimeat_home_feed, over GET /v1/home/feed (src/routes/home/feed.ts, src/mcp/home-feed.ts).
  *   v1.2.0 — 2026-10-31 — aimeat_overview, over GET /v1/overview (src/routes/overview.ts, src/mcp/overview.ts).
  *   v1.1.0 — 2026-10-31 — aimeat_notify forwards `email` (v31 K46).
@@ -66,5 +67,11 @@ export const notifyUsageCliTools: ConnectCliToolDefinition[] = [
         //   memory:read and decides which fields of a task row the caller sees.
         name: 'aimeat_home_feed',
         handler: ({ client }) => client.get('/v1/home/feed'),
+    },
+    {
+        // → GET /v1/home/waiting — what waits for the person, every kind; the route gates memory:read
+        //   and each kind's own word, and clamps limit.
+        name: 'aimeat_home_waiting',
+        handler: ({ client }, input) => client.get(`/v1/home/waiting${query({ limit: optionalNumber(input, 'limit') })}`),
     },
 ];

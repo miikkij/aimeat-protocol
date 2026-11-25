@@ -18,9 +18,11 @@
  *     - home/feed.ts        — GET /v1/home/feed, POST /v1/home/room
  *     - home/track.ts       — GET + PUT /v1/home/ui-track (the start page)
  *     - home/agents.ts      — GET /v1/home/agents (the Agents block's read)
+ *     - home/waiting.ts     — GET /v1/home/waiting (what waits for the person, every kind)
  *     - overview.ts         — GET /v1/overview (the Overview page's read)
  * @usage app.use(homeRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-11-25 — GET /v1/home/waiting (routes/home/waiting.ts).
  *   v1.2.0 — 2026-10-31 — GET /v1/overview, mounted here (routes/overview.ts).
  *   v1.1.0 — 2026-10-10 — GET /v1/home/agents.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
@@ -34,6 +36,7 @@ import { registerFirstAgentRoutes } from './home/first-agent.js';
 import { registerHomeFeedRoutes } from './home/feed.js';
 import { registerHomeTrackRoutes } from './home/track.js';
 import { registerHomeAgentsRoutes } from './home/agents.js';
+import { registerHomeWaitingRoutes } from './home/waiting.js';
 import { overviewRouter } from './overview.js';
 
 export function homeRouter(config: AimeatConfig, storage: Storage): Router {
@@ -49,6 +52,7 @@ export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     registerHomeFeedRoutes(router, ctx);
     registerHomeTrackRoutes(router, ctx);
     registerHomeAgentsRoutes(router, ctx);
+    registerHomeWaitingRoutes(router, ctx);
 
     return router;
 }

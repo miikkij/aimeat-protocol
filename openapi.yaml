@@ -19122,6 +19122,110 @@ paths:
         '403':
           description: Not the account holder's own session
 
+  /v1/home/waiting:
+    get:
+      operationId: getHomeWaiting
+      summary: What waits for the person, every kind in one answer
+      description: |
+        Everything that waits for the person, from every place that holds something for them: agent
+        proposals, agents asking to sign in, organism invitations, requests to make something public,
+        message threads whose last message came in, questions asked of them, workflow questions, the
+        waiting work of their teams (one row per team), and one row each for the open items and the
+        unread messages when there are any. The Home page's first block reads it, and the MCP tool
+        `aimeat_home_waiting` gives the same answer from the same function.
+
+        `group` is `decide` (a yes or no), `answer` (someone waits for words) or `look` (a count to
+        open). Items come decide first, then answer, then look, newest first inside a group, and stop
+        at `limit`. `total` counts the decide and answer items before the cap (a team row by its
+        count), `to_open` is the sum of the `look` rows' counts, and `by_kind` has every kind before
+        the cap. The two totals are apart because a count repeats things the other rows name: a
+        proposal also makes an open item, and a thread that waits for an answer holds unread messages.
+        `from`, `subject` and `detail` are data (names, previews), never sentences: a client words a
+        row from its `kind`. `subject` is empty on the two `look` rows. `decide` is present only when
+        the yes and the no need nothing more than a POST to the URL; `act_with` names the MCP tool
+        an AI acts with, and an item without it is the person's own decision on the page at `href`.
+
+        Requires `memory:read`, which the person in person always holds. Each kind is then read only
+        when the caller also holds the word its own route asks (agent proposals `memory:read`,
+        invitations and teams `organism:read`, publish requests `memory:write`, workflow questions
+        `workflow:read`, help questions `help:ask` or `help:answer`, message rows the owner's mailbox
+        read, open items the person in person); a kind it does not hold is named in `withheld` and
+        left out of `by_kind`. A kind whose source failed is named in `partial`, and the rest answers.
+        A visitor from another node is refused.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: How many items to list. 20 when omitted or not a positive number, 50 at most (a larger number is read as 50).
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: What waits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [total, to_open, by_kind, items, note]
+                        properties:
+                          total: { type: integer, description: "What waits for a decision or an answer before the cap: the decide and answer items." }
+                          to_open: { type: integer, description: "The sum of the look rows' counts. It can repeat things that total already counts." }
+                          by_kind:
+                            type: object
+                            additionalProperties: { type: integer }
+                            description: How many of each kind wait, for every kind read, zero included.
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              required: [kind, id, group, subject, href]
+                              properties:
+                                kind:
+                                  type: string
+                                  enum: [agent_proposal, agent_sign_in, reply, help_question, team, invitation, publish_request, workflow_input, open_item, unread]
+                                id: { type: string }
+                                group: { type: string, enum: [decide, answer, look] }
+                                from: { type: string, description: The shown name of who or what asks. }
+                                subject: { type: string, description: "The thing itself (a proposal's name, a thread's subject or first words, an organism's name)." }
+                                detail: { type: string, maxLength: 200 }
+                                at: { type: string, format: date-time, description: When it began to wait. }
+                                count: { type: integer, description: "How many, on look rows and team rows." }
+                                href: { type: string, description: The path on this node where a person opens it. }
+                                decide:
+                                  type: object
+                                  properties:
+                                    approve:
+                                      type: object
+                                      properties:
+                                        method: { type: string, enum: [POST] }
+                                        url: { type: string }
+                                    decline:
+                                      type: object
+                                      properties:
+                                        method: { type: string, enum: [POST] }
+                                        url: { type: string }
+                                act_with: { type: string, description: The MCP tool an AI acts on it with. }
+                          partial:
+                            type: array
+                            items: { type: string }
+                            description: Kinds whose source failed on this read. Absent when none did.
+                          withheld:
+                            type: array
+                            items: { type: string }
+                            description: Kinds the caller's permissions do not let it read. Absent for the person in person.
+                          note: { type: string, description: One sentence for an AI on how to act on the items. }
+        '401':
+          description: No credential
+        '403':
+          description: A caller without memory:read, or a visitor from another node
+
   /v1/account/events:
     get:
       operationId: listAccountEvents

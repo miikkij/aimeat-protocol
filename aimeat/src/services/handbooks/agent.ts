@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.87.0 -- 2026-11-25 -- aimeat_home_waiting: what waits for the person, every kind in one call.
  *   v1.86.2 -- 2026-11-25 -- The knowledge paragraph names aimeat_knowledge_create and the other two
  *     kinds of package.
  *   v1.86.1 -- 2026-11-25 -- The workspace read names the answer's `mode` (index, content), sends the rows
@@ -738,6 +739,10 @@ Say it in their words, then give them the page: \`/v1/home?overview=1&focus=<ite
 
 **What their home shows — \`aimeat_home_feed\`.** When the person asks what is on their home page, what
 has happened lately or what is new: the rows their home lists, newest first. Read it before you answer.
+
+**What waits for them — \`aimeat_home_waiting\`.** When the person asks what waits for them or what needs
+them now: one call lists every kind, yes-or-no decisions first, then people waiting for their words, then
+counts to open. Act on an item with the tool in its \`act_with\`; without one, give them the page in \`href\`.
 
 **Ask the operators — \`support@operators\`.** When something here does not work, when a step will
 not complete, or when you need a decision only a human can make, send it:

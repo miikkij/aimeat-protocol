@@ -15,6 +15,7 @@
  *   KNOWN lists a request that still reads per agent, with its measured rise; its entry may only
  *   shrink, and a request that stops rising fails until its entry is removed.
  * @version-history
+ *   v1.1.0 — 2026-11-25 — GET /v1/home/waiting: in the first-load list, and measured at 3 and 30 agent proposals.
  *   v1.0.0 — 2026-11-10 — Initial (performance work, architecture item 2).
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -45,7 +46,15 @@ const REQUESTS = [
   '/v1/memory/files',
   '/v1/classification/audit',
   '/v1/agents',
+  '/v1/home/waiting',
 ];
+
+/**
+ * What waits for the person (GET /v1/home/waiting) must not read once per item of one kind either:
+ * the owner with WAITING_LARGE agent proposals runs the same statements as the one with WAITING_SMALL.
+ */
+const WAITING_SMALL = 3;
+const WAITING_LARGE = 30;
 
 /**
  * A request that still reads once per agent: its measured rise from 3 to 80 agents, and why it is
@@ -159,6 +168,20 @@ await test(`Each request runs the same statements for ${LARGE} agents as for ${S
   }
   console.log(measured.map(m => `      ${String(m.small).padStart(4)} → ${String(m.large).padStart(4)}  ${m.path}`).join('\n'));
   assert(over.length === 0, over.join('; '));
+});
+
+await test(`GET /v1/home/waiting runs the same statements for ${WAITING_LARGE} agent proposals as for ${WAITING_SMALL}, within ${SLACK}`, async () => {
+  for (const [who, n] of [[owners.small, WAITING_SMALL], [owners.large, WAITING_LARGE]] as const) {
+    for (let i = 0; i < n; i++) {
+      const r = await json('/v1/agents/v2/agent-proposals', { method: 'POST', headers: auth(who.token), body: JSON.stringify({ name: `qbp-${i}`, display_name: `Proposal ${i}`, purpose: 'Counts the statements of the waiting list.', scopes: ['memory:read'] }) });
+      assert(r.status === 201, `proposal ${i} of ${who.name}: ${r.status} ${JSON.stringify(r.body.error ?? '').slice(0, 200)}`);
+    }
+  }
+  const path = '/v1/home/waiting';
+  const small = await statementsOf(path, owners.small.token);
+  const large = await statementsOf(path, owners.large.token);
+  console.log(`      ${String(small).padStart(4)} → ${String(large).padStart(4)}  ${path} (${WAITING_SMALL} → ${WAITING_LARGE} proposals)`);
+  assert(large - small <= SLACK, `${path}: ${small} statements at ${WAITING_SMALL} proposals, ${large} at ${WAITING_LARGE}`);
 });
 
 await test("Another owner naming the large owner's identity to list its memory is refused", async () => {
