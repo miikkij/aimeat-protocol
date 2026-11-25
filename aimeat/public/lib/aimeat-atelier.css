@@ -56,6 +56,8 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.72.3 — 2026-11-25 — No change to the styles: the kit's board answers a real mouse click on
+ *     its buttons (board.js with aimeat-viewport 1.2.0). The line keeps the kit's version here.
  *   v0.72.2 — 2026-11-24 — --ak-grain-paper: the grain material's own noise at opacity 0.5. At 0.16
  *     (--ak-grain) it darkened the surface by about 2 %, so the paper grain could not be seen.
  *     --ak-grain itself is unchanged, so no hero and no look's page changes.
