@@ -231,5 +231,95 @@ await test('FAILURE: a redirect URI longer than 2048 characters, or one that is 
     assert(notText.status === 400, `object uri: expected 400, got ${notText.status} ${short(notText.body)}`);
 });
 
+// ─── Phase 5 ───
+// A native client that registers as a public client (token_endpoint_auth_method "none", RFC 7591
+// §2) keeps no client secret, so its refresh after a restart carries none. Codex's MCP client
+// (rmcp) registers that way and persists only the client_id, and every refresh it made after a
+// restart was refused `invalid_client: Invalid client credentials`.
+console.log('\nPhase 5 — a public client: registered with "none", it signs in and refreshes with no secret');
+
+let publicId = '';
+let publicRefresh = '';
+const publicPkce = mcpPkce(BASE);
+
+await test('a registration asking for "none" is a public client: no client_secret, method "none"', async () => {
+    const r = await register({
+        client_name: `Codex-${stamp}`, redirect_uris: ['http://127.0.0.1/callback'],
+        grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none',
+    });
+    assert(r.status === 201 && typeof r.body.client_id === 'string', `register: ${r.status} ${short(r.body)}`);
+    assert(r.body.token_endpoint_auth_method === 'none', `method: ${short(r.body)}`);
+    assert(!('client_secret' in r.body), `a public client was issued a secret: ${short(r.body)}`);
+    publicId = r.body.client_id;
+});
+
+await test('the public client redeems its code with PKCE and no secret', async () => {
+    const c = await json('/v1/mcp/authorize-consent', {
+        method: 'POST',
+        body: JSON.stringify({
+            client_id: publicId, gaii: agent.gaii, owner_token: owner.token, state: 'pub',
+            redirect_uri: 'http://127.0.0.1:53111/callback', ...authorizeParams(publicPkce),
+        }),
+    });
+    assert(c.status === 200 && typeof c.body.redirect_url === 'string', `consent: ${c.status} ${short(c.body)}`);
+    const pubCode = new URL(c.body.redirect_url).searchParams.get('code') ?? '';
+    const t = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            grant_type: 'authorization_code', code: pubCode, client_id: publicId,
+            redirect_uri: 'http://127.0.0.1:53111/callback', ...tokenParams(publicPkce),
+        }),
+    });
+    assert(t.status === 200 && typeof t.body.refresh_token === 'string', `token: ${t.status} ${short(t.body)}`);
+    publicRefresh = t.body.refresh_token;
+});
+
+await test('the public client refreshes with its client_id and no secret, and the token rotates', async () => {
+    const r = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: publicRefresh, client_id: publicId, resource: publicPkce.resource }),
+    });
+    assert(r.status === 200 && typeof r.body.access_token === 'string', `refresh: ${r.status} ${short(r.body)}`);
+    assert(typeof r.body.refresh_token === 'string' && r.body.refresh_token !== publicRefresh, `rotated: ${short(r.body)}`);
+    const again = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: publicRefresh, client_id: publicId, resource: publicPkce.resource }),
+    });
+    assert(again.status === 400 && again.body.error === 'invalid_grant', `the spent token minted again: ${again.status} ${short(again.body)}`);
+    publicRefresh = r.body.refresh_token;
+});
+
+await test('FAILURE: the public client\'s refresh token under another client_id is refused, and stays usable', async () => {
+    const r = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: publicRefresh, client_id: clientId, client_secret: clientSecret, resource: publicPkce.resource }),
+    });
+    assert(r.status === 400 && r.body.error === 'invalid_grant', `another client used it: ${r.status} ${short(r.body)}`);
+});
+
+await test('FAILURE: a confidential client still owes its secret on the refresh grant: 401 invalid_client', async () => {
+    const p = mcpPkce(BASE);
+    const c = await consent(PORTED, p);
+    const fresh = new URL(c.body.redirect_url).searchParams.get('code') ?? '';
+    const t = await token(fresh, PORTED, p);
+    assert(t.status === 200 && typeof t.body.refresh_token === 'string', `token: ${t.status} ${short(t.body)}`);
+    const r = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: t.body.refresh_token, client_id: clientId, resource: p.resource }),
+    });
+    assert(r.status === 401 && r.body.error === 'invalid_client', `a confidential client refreshed with no secret: ${r.status} ${short(r.body)}`);
+});
+
+await test('a registration asking for a method the node does not offer gets client_secret_post and its secret', async () => {
+    const r = await register({ client_name: `basic-${stamp}`, redirect_uris: [LOOPBACK_NAME], token_endpoint_auth_method: 'private_key_jwt' });
+    assert(r.status === 201 && r.body.token_endpoint_auth_method === 'client_secret_post' && typeof r.body.client_secret === 'string', `register: ${r.status} ${short(r.body)}`);
+});
+
+await test('the authorization server metadata lists "none" beside client_secret_post', async () => {
+    const r = await json('/.well-known/oauth-authorization-server');
+    const methods: unknown = r.body.token_endpoint_auth_methods_supported;
+    assert(Array.isArray(methods) && methods.includes('none') && methods.includes('client_secret_post'), `methods: ${short(methods)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

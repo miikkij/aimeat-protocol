@@ -47156,7 +47156,10 @@ paths:
         Dynamic client registration for MCP OAuth 2.1 flow. No credential is needed, so each field
         has a ceiling (since 2026-10-25): `client_name` is text of at most 200 characters,
         `redirect_uris` holds at most 20 addresses of at most 2048 characters each, and the body is
-        read up to 64 kB.
+        read up to 64 kB. A client that sends `token_endpoint_auth_method: "none"` is registered as
+        a public client (since 2026-11-25): it gets no `client_secret`, sends none on either grant of
+        POST /v1/mcp/token, and proves itself with PKCE. Any other method, or none sent, registers a
+        confidential client that authenticates with `client_secret_post`.
       tags: [MCP]
       requestBody:
         required: true
@@ -47174,22 +47177,25 @@ paths:
                   items:
                     type: string
                     maxLength: 2048
+                token_endpoint_auth_method:
+                  type: string
+                  description: '"none" registers a public client with no secret; anything else registers a client_secret_post client.'
       responses:
         '201':
-          description: The registered client, as a bare OAuth object (RFC 7591), not the AIMEAT envelope. `client_secret` is shown once.
+          description: The registered client, as a bare OAuth object (RFC 7591), not the AIMEAT envelope. `client_secret` is shown once, and only to a client_secret_post client.
           content:
             application/json:
               schema:
                 type: object
-                required: [client_id, client_secret, client_name, redirect_uris, token_endpoint_auth_method, grant_types]
+                required: [client_id, client_name, redirect_uris, token_endpoint_auth_method, grant_types]
                 properties:
                   client_id: { type: string }
-                  client_secret: { type: string }
+                  client_secret: { type: string, description: 'Absent for a public client (token_endpoint_auth_method "none").' }
                   client_name: { type: string }
                   redirect_uris:
                     type: array
                     items: { type: string }
-                  token_endpoint_auth_method: { type: string, enum: [client_secret_post] }
+                  token_endpoint_auth_method: { type: string, enum: [client_secret_post, none] }
                   grant_types:
                     type: array
                     items: { type: string, enum: [authorization_code, refresh_token] }
@@ -47292,6 +47298,7 @@ paths:
                   type: string
                 client_secret:
                   type: string
+                  description: The secret a client_secret_post client was issued at registration, on both grants. A public client (registered with token_endpoint_auth_method "none") sends none.
                 refresh_token:
                   type: string
                 code_verifier:

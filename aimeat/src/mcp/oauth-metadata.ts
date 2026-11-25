@@ -9,6 +9,8 @@
  * @structure registerOAuthMetadataRoutes(router, config, storage)
  * @usage registerOAuthMetadataRoutes(router, config, storage) inside registerOAuthRoutes
  * @version-history
+ *   v1.1.0 — 2026-11-25 — token_endpoint_auth_methods_supported lists "none" beside client_secret_post:
+ *     a client that registers as public is one (mcp/oauth-client-auth.ts).
  *   v1.0.0 — 2026-10-27 — Moved from src/mcp/oauth.ts unchanged (max-file-lines; secaudit2026oct26).
  */
 import { type Request, type Response, type Router } from 'express';
@@ -16,6 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
+import { TOKEN_ENDPOINT_AUTH_METHODS } from './oauth-client-auth.js';
 
 export function registerOAuthMetadataRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     // GET /.well-known/oauth-protected-resource — Resource metadata (RFC 9728)
@@ -63,7 +66,8 @@ export function registerOAuthMetadataRoutes(router: Router, config: AimeatConfig
             revocation_endpoint: `${baseUrl}/v1/mcp/token/revoke`,
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code', 'refresh_token'],
-            token_endpoint_auth_methods_supported: ['client_secret_post'],
+            // "none" is a public client: it registered with it, holds no secret and proves itself with PKCE.
+            token_endpoint_auth_methods_supported: [...TOKEN_ENDPOINT_AUTH_METHODS],
             // PKCE with S256, which the MCP authorization spec has a client check for before it starts.
             // Required from 4.0.0, accepted without until then (mcp/oauth-binding.ts).
             code_challenge_methods_supported: ['S256'],

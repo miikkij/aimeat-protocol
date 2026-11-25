@@ -12,6 +12,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   2026-11-25 — POST /v1/mcp/register honours token_endpoint_auth_method "none": a public client gets
+ *     no secret and owes none on either grant (mcp/oauth-client-auth.ts). A native client that keeps
+ *     only its client_id (Codex) was refused `invalid_client` on its first refresh after a restart.
  *   2026-11-04 — Authorization codes are kept in the node's storage (oneTimeStore 'mcp-oauth-code'), so a
  *     code issued on one process is redeemed on another (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-01 — The browser path passes OAuth's ui_locales to the consent page as `lang`, so a
@@ -85,6 +88,7 @@ import { registerOAuthMetadataRoutes } from './oauth-metadata.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth/client-metadata.js';
 import { redirectUriRegistered } from './oauth-redirect.js';
 import { registerOAuthConsentInfo } from './oauth-consent-info.js';
+import { clientAuthFails, PUBLIC_CLIENT_SECRET_HASH, registeredAuthMethod } from './oauth-client-auth.js';
 import { LOCALES } from '../i18n.js';
 import { oneTimeStore } from '../services/ephemeral-claims.js';
 import {
@@ -165,11 +169,13 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
         const clientId = `mcp-client-${randomBytes(16).toString('hex')}`;
-        const clientSecret = randomBytes(32).toString('hex');
+        // A client that registers as public gets no secret (mcp/oauth-client-auth.ts).
+        const authMethod = registeredAuthMethod(req.body?.token_endpoint_auth_method);
+        const clientSecret = authMethod === 'none' ? null : randomBytes(32).toString('hex');
 
         await storage.createOAuthClient({
             clientId,
-            clientSecret: hashToken(clientSecret),
+            clientSecret: clientSecret === null ? PUBLIC_CLIENT_SECRET_HASH : hashToken(clientSecret),
             clientName: client_name,
             redirectUris,
             createdAt: new Date().toISOString(),
@@ -177,10 +183,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
 
         res.status(201).json({
             client_id: clientId,
-            client_secret: clientSecret,
+            ...(clientSecret === null ? {} : { client_secret: clientSecret }),
             client_name,
             redirect_uris: redirectUris,
-            token_endpoint_auth_method: 'client_secret_post',
+            token_endpoint_auth_method: authMethod,
             grant_types: ['authorization_code', 'refresh_token'],
         });
     });
@@ -569,9 +575,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             // issued a secret and TOLD it authenticates with client_secret_post, both in the
             // registration response and in the RFC 8414 metadata, so it owes one. A Client ID
             // Metadata Document client has no row and no secret by design; PKCE carries that case,
-            // and `client` is null for it, so it is untouched here.
+            // and `client` is null for it, so it is untouched here. A client that registered as
+            // public was issued no secret and owes none (mcp/oauth-client-auth.ts).
             const client = await storage.getOAuthClient(client_id);
-            if (client && (!client_secret || client.clientSecret !== hashToken(client_secret))) {
+            if (clientAuthFails(client, client_secret)) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
@@ -669,9 +676,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
-            // Same rule as the authorization_code grant above: a registered client owes its secret.
+            // Same rule as the authorization_code grant above: a registered confidential client owes
+            // its secret, a public one has none.
             const client = await storage.getOAuthClient(client_id);
-            if (client && (!client_secret || client.clientSecret !== hashToken(client_secret))) {
+            if (clientAuthFails(client, client_secret)) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
