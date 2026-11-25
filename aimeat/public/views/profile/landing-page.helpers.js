@@ -108,7 +108,7 @@ export function gotoOrganismsList() {
  * /v1/profile entirely. Tab navigation is internal (no SPA route change), so without
  * this a Back press popped straight out of the profile. `replace` is used on mount to
  * reflect a restored tab without adding a spurious entry; it keeps the link's `open`, `test` and `section`
- * (a link into a tab, such as the AI page's settingsUrl), which the tab reads once it has loaded. */
+ * (a link into a tab, such as the AI models page's settingsUrl), which the tab reads once it has loaded. */
 export function syncTabHistory(tabId, replace) {
   try {
     const q = new URLSearchParams(tabId ? { tab: tabId } : {});

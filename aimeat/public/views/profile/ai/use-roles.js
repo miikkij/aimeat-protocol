@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/use-roles.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The state and handlers behind the AI page's roles section (wish-tekoalyn-roolit): the
+ * @description The state and handlers behind the AI models page's roles section (wish-tekoalyn-roolit): the
  *   read (GET /v1/ai/roles: the owner's roles and the roles apps declare, with the bindings) and the
  *   writes (add or change a role: its title, purpose, and for each capability the providers and models
  *   to try in order; remove a role; bind an app's role to one of the owner's, or unbind it). Every write

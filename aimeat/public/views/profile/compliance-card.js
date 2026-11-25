@@ -19,7 +19,7 @@
  *   (services/compliance-report.ts), because three of the operator's sentences would be false said
  *   to an account. This card renders whatever it is given rather than composing its own.
  * @structure
- *   - ComplianceCard — the collapsible card, mounted in the profile AI tab
+ *   - ComplianceCard — the collapsible card, mounted on the AI models page
  * @usage
  *   import { ComplianceCard } from './compliance-card.js';
  *   html`<${ComplianceCard} />`

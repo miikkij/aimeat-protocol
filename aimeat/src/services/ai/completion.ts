@@ -461,7 +461,7 @@ async function planAiCall(
           ...(appCall ? { app: { address, declared: appMeta?.roles ?? [] } } : {}),
         });
       } catch (e) {
-        // The owner sees the request on the AI page, with what the app needs.
+        // The owner sees the request on the AI models page, with what the app needs.
         const needs = appMeta?.roles?.find((r) => r.name === name);
         if (e instanceof AiCompletionError && e.code === 'AI_ROLE_NOT_BOUND' && needs) noteRoleRequest(storage, gaii, bindingKey(address, name), needs);
         throw e;

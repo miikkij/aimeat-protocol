@@ -59,7 +59,7 @@ import { decideOwnerOf, decideCallerOf } from './ai-decide.js';
 const OWNER_WRITES_RULES =
   'A decision rule decides whether an agent may act, so only the account holder writes one. '
   + 'An agent proposes instead: aimeat_decide_rule_propose (POST /v1/ai/decide/rule-proposals). '
-  + 'It creates nothing, and the owner approves it from their open items or from Settings, AI, Decision model.';
+  + 'It creates nothing, and the owner approves it from their open items or from Settings, AI models, Decision model.';
 
 export function decideRulesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -180,7 +180,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
         proposal_id: out.proposal.id,
         rule_id: out.proposal.rule.id,
         already_waiting: out.alreadyWaiting,
-        next_step: `Nothing has been created. "${out.proposal.rule.title}" is waiting for the owner to approve it: in their open items, or under Settings, AI, Decision model.`,
+        next_step: `Nothing has been created. "${out.proposal.rule.title}" is waiting for the owner to approve it: in their open items, or under Settings, AI models, Decision model.`,
       }));
     } catch (e) { fail(res, e); }
   });

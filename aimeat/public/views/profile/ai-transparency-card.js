@@ -18,7 +18,7 @@
  *   these counts. A total that read as "everything you have ever published" would be the one
  *   misleading number on the page.
  * @structure
- *   - AiTransparencyCard — the collapsible card, mounted in the profile AI tab
+ *   - AiTransparencyCard — the collapsible card, mounted on the AI models page
  * @usage
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`

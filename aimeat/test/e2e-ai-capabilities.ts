@@ -237,7 +237,7 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       const agent = await connectAgent(b, 'capbot', ['ai:use']);
       const out = toolJson(await mcpCall(agent, 'aimeat_ai_capabilities', {}));
       const img = out.capabilities?.image;
-      assert(img?.on === false && /AI settings page/.test(img.agentFix) && /AI settings/.test(img.fix) && img.settingsUrl === `${BASE}/v1/profile?tab=ai&open=ai-providers`, `tool answer: ${JSON.stringify(img)}`);
+      assert(img?.on === false && /AI models page/.test(img.agentFix) && /AI settings/.test(img.fix) && img.settingsUrl === `${BASE}/v1/profile?tab=ai&open=ai-providers`, `tool answer: ${JSON.stringify(img)}`);
     });
 
     await test('3. an owner provider that is not tested yet: UNTESTED, and the provider test of speech and embeddings works', async () => {

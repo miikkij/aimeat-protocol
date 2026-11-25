@@ -511,7 +511,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
         } else {
           const message = p.type === 'openrouter'
             ? 'No OpenRouter API key configured. Set one in Settings.'
-            : `No API key is set for your provider '${p.title}'. Set it on the AI settings page.`;
+            : `No API key is set for your provider '${p.title}'. Set it on the AI models page.`;
           reject(p, 'no-key', message, { error: new AiCompletionError('NO_API_KEY', 400, message) });
         }
         continue;
@@ -525,7 +525,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     const nodeChose = by !== 'call-model' && by !== 'call-provider' && by !== 'role';
     const status = statusOf(hk) ?? p.health.byCapability[capability]?.status ?? 'untested';
     if (rules.onlyTested && nodeChose && p.source === 'owner' && status === 'untested') {
-      reject(p, 'untested', `${p.title}'s ${capability} has not been tested. Test it on the AI settings page, or name it in the call.`);
+      reject(p, 'untested', `${p.title}'s ${capability} has not been tested. Test it on the AI models page, or name it in the call.`);
       continue;
     }
     // ── data does not leave this machine on a fallback from a local provider ──

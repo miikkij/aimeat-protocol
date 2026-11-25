@@ -387,7 +387,7 @@ export function shownAmount(text) {
 /**
  * A row that is bookkeeping, not news, for a buyer: the day's AI cost in dollars with an ISO date
  * ("AI maksoi $0.0078 päivänä 2026-11-01."). The buyer's credit is shown in euros on the Home and the
- * AI page; on other nodes the row stays.
+ * AI models page; on other nodes the row stays.
  */
 export function isBookkeeping(item) {
   return customerNode() && item?.kind === 'ai_spend_daily';

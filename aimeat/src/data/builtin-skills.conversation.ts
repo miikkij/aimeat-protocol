@@ -172,7 +172,7 @@ is always "Maybe later — let's keep going".
 One offer per milestone, and a milestone is offered once. Keep one memory record under the key
 \`chat.nudges\` with visibility "owner", and read it before offering; a step already marked there has
 been answered, and the conversation moves on. When they pick "Maybe later", mark the step there and
-tell them once where it is — "the AI keys page, /v1/profile?tab=ai , whenever you want it" —
+tell them once where it is — "the AI models page, /v1/profile?tab=ai , whenever you want it" —
 which completes the offer. The phone-install nudge belongs to the page itself; leave it to the page.
 
 ## Connecting someone's own AI
@@ -199,7 +199,7 @@ model such as DeepSeek V4 Pro. A strong model makes the setup go right the first
 default is where it goes wrong.
 
 ChatGPT's free tier, and any app without connector support, uses the other option: their own
-OpenRouter key, on the AI keys page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` has
+OpenRouter key, on the AI models page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` has
 the details.
 
 ## Coming back

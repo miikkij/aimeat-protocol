@@ -763,7 +763,7 @@ def rule_tools_data(
         raise DecideError(
             f"The crew asked for decision rule(s) {missing} that this agent may not run. "
             f"It may run: {sorted(by_id) or '(none -- the owner has written no rules for agents)'}. "
-            "The owner writes a rule under Settings, AI, Decision model and sets its `use` to admit "
+            "The owner writes a rule under Settings, AI models, Decision model and sets its `use` to admit "
             "an agent."
         )
     return [by_id[r] for r in only]

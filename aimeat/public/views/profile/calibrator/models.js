@@ -3,9 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Section 03 of a calibration: the judge (this calibration's own choice, or the AI
- *   page's reasoning model) and the models under test, as rows, and the picker that opens under
- *   a row: the same catalogue, the same search and the same recommended group as the AI page, so
- *   a model is chosen the same way everywhere. Without a key on the AI page the rows say so and
+ *   models page's reasoning model) and the models under test, as rows, and the picker that opens under
+ *   a row: the same catalogue, the same search and the same recommended group as the AI models page, so
+ *   a model is chosen the same way everywhere. Without a key on the AI models page the rows say so and
  *   point there.
  * @structure secModels · judgeRow · candidateRow · picker
  * @usage import { secModels } from './models.js';

@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/gen-rules-section.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The AI page's section for the generation rules (wish
+ * @description The AI models page's section for the generation rules (wish
  *   wish-image-and-video-generation-people-only-in-an-artistic-non-ph): rules the node gives to every
  *   AI picture and video made for this person, such as people only in an artistic style. One switch
  *   per rule, locked when the node requires it, and the person's exceptions for one app or one agent,

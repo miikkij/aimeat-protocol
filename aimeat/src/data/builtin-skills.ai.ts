@@ -419,7 +419,7 @@ The applied change leaves a line on the owner's account events (\`ai_settings_ch
 who applied it.
 \`gen_rules\` is \`{ rules?: { "people-artistic": true | false | null }, exceptions?: [{ rule, app:
 "<owner>/<app>" (or an ecosystem app's "eco:<name>") | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
-and a given \`exceptions\` replaces the list. The owner also switches them on the AI settings page.
+and a given \`exceptions\` replaces the list. The owner also switches them on the AI models page.
 
 ## Refusals
 

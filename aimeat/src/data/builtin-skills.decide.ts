@@ -207,7 +207,7 @@ the rule, its version and the outcome. A rule bound to an action that cannot be 
 
 **Everything is set up in one order, and each step needs the one before it:**
 
-1. **Provider.** Choose a decision provider (Settings, AI, Decision model, Decision providers). A
+1. **Provider.** Choose a decision provider (Settings, AI models, Decision model, Decision providers). A
    local decision model on this machine needs no key. For TypeSafe, set a key: the owner's own (the
    same card), or one for a single agent (the agent's page, AI keys). The order a call pays in is the
    agent's own key, then the owner's, then the server's, and every decision records which one paid.

@@ -93,7 +93,7 @@ export function appSpentToday(perApp: PerApp | undefined, appId: string, ownerGh
 /**
  * True when an owner's setting entry (a cap's or an allowlist's key) names this app. A signed app
  * reference (`author/file.html`, from an app grant) also matches an entry under the name the app
- * called itself in the body (`file`), the name the owner saw on the AI page before the call was
+ * called itself in the body (`file`), the name the owner saw on the AI models page before the call was
  * attributed to the signed app (secaudit2026oct22).
  */
 function entryNamesApp(entry: unknown, appId: string, ownerGhii?: string): boolean {

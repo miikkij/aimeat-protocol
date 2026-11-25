@@ -138,7 +138,7 @@ words ("I found recipes. Shall I start a Recipe class with dish and servings?"),
 To find items of a class: \`aimeat_content_facts { class: "invoice" }\` pages through them, newest
 first; each item's \`entities.invoice.entity\` holds the extracted fields. Each membership in
 \`classes\` says who decided it (\`by\`: model, owner, rule), how sure (\`confidence\`) and, for the
-model, its \`decisionId\` (the decision record, which the person sees on their AI page).
+model, its \`decisionId\` (the decision record, which the person sees on their AI models page).
 
 ## The fingerprint: what kind of material it is
 

@@ -21,7 +21,7 @@
  *
  *   The read side applies the same test (ai-model-defaults.ts holdsImplicitFreeModel), so a record
  *   this has not reached resolves the same way; this rewrite is what makes GET /v1/openrouter/settings
- *   and the AI page stop showing a model the node does not serve.
+ *   and the AI models page stop showing a model the node does not serve.
  * @structure migrateImplicitFreeModelOnce()
  * @usage
  *   migrateImplicitFreeModelOnce(storage, config.nodeId).catch(err => logger.error(…));

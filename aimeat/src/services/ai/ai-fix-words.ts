@@ -73,9 +73,9 @@ function rejectedOf(e: AiCompletionError): Rejected[] {
 /** The fix written for an AI that can act on it, or pass it to the owner. */
 export function agentFixFor(reason: CapabilityReason, cap: AiCapability, providersThatCan: string[]): string {
   switch (reason) {
-    case 'NO_MODEL': return `Set a model for ${cap} on one of the owner's AI providers (the owner does it on the AI settings page), or ask the operator for a node default.`;
-    case 'NO_PROVIDER_SUPPORTS': return `None of the owner's providers serves ${cap}. The owner adds a provider of type ${providersThatCan.join(', ') || '(none allowed on this node)'} on the AI settings page and turns ${cap} on.`;
-    case 'NO_KEY': return 'The provider has no key. The owner sets it on the AI settings page; never ask for a key in chat.';
+    case 'NO_MODEL': return `Set a model for ${cap} on one of the owner's AI providers (the owner does it on the AI models page), or ask the operator for a node default.`;
+    case 'NO_PROVIDER_SUPPORTS': return `None of the owner's providers serves ${cap}. The owner adds a provider of type ${providersThatCan.join(', ') || '(none allowed on this node)'} on the AI models page and turns ${cap} on.`;
+    case 'NO_KEY': return 'The provider has no key. The owner sets it on the AI models page; never ask for a key in chat.';
     case 'POLICY_EMPTY': return `The owner's model policy allows no model for ${cap} here. Propose a change with aimeat_ai_policy_set; the owner confirms it.`;
     case 'BUDGET_EXHAUSTED': return 'Today\'s AI budget is spent. The owner raises it in Settings, or it resets at midnight UTC.';
     case 'BALANCE_SPENT': return 'The AI allowance the owner bought is used up. Give the owner the choices in details.choices: buy more (topupUrl), their own key (settingsUrl), or the free model, which the owner turns on with aimeat_ai_routing_set { rules: { freeModelLastResort: true } } and which answers less well.';
@@ -87,7 +87,7 @@ export function agentFixFor(reason: CapabilityReason, cap: AiCapability, provide
 }
 
 /**
- * The AI settings page, opened at one provider with its test chosen (`open=ai-provider-<id>`,
+ * The AI models page, opened at one provider with its test chosen (`open=ai-provider-<id>`,
  * `test=<capability>`), or at the providers section. Absolute, so an app on its own subdomain can
  * link to it.
  */
@@ -111,7 +111,7 @@ export async function personLocale(storage: Storage, gaii: string, lang?: Reques
 
 /**
  * The sentences a person reads, in their language: what is off (`aipage.off.<reason>`), then what to
- * do (`aipage.offDo.<reason>`). The AI page shows the first alone beside its own button, since the
+ * do (`aipage.offDo.<reason>`). The AI models page shows the first alone beside its own button, since the
  * person is already where the second sends them. The SPA's keys use single braces.
  */
 export function personFixFor(locale: Locale, reason: CapabilityReason, cap: AiCapability, provider?: string): string {

@@ -11,7 +11,7 @@ reach, and the two bands. The crew sends only the state. Nothing in this file ca
 question, move a threshold or shift a band, and that is the feature rather than a limitation of the
 example -- a rule the agent can rewrite is not a rule.
 
-BEFORE IT RUNS the owner needs: a TypeSafe key (Settings, AI, Decision model, or one for this agent
+BEFORE IT RUNS the owner needs: a TypeSafe key (Settings, AI models, Decision model, or one for this agent
 on its own page), and two rules whose `use` admits an agent. This file names `sort-a-message` and
 `send-a-reply`; change RULES below to whatever the owner actually wrote, or run with none and let
 `decide_tools` hand the crew every rule it is allowed.
@@ -108,7 +108,7 @@ def main() -> int:
     if not tools:
         print(
             "The owner has written no decision rules this agent may run. They write one under "
-            "Settings, AI, Decision model, with `use` set to admit an agent."
+            "Settings, AI models, Decision model, with `use` set to admit an agent."
         )
         return 1
     print("Tools this agent now holds, one per rule the owner allows it:")

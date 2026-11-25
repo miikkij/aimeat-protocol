@@ -13,7 +13,7 @@
  *   There is no tool that CHANGES the settings, on purpose. The settings are the owner's own key and
  *   the switch that tells the scrubber what may leave unscrubbed; an agent that could change them could
  *   turn off the cleaning of its own traffic, and a key typed into a chat is a key in a transcript.
- *   The owner changes them on the AI settings page. The read tool says so.
+ *   The owner changes them on the AI models page. The read tool says so.
  *
  *   DECISION RULES. `rule` on aimeat_decide and aimeat_decide_run names one of the owner's rules, which
  *   then holds the questions, thresholds and bands: the caller sends only the state. aimeat_decide_rules
@@ -133,7 +133,7 @@ export const decideTools = [
     },
     {
         name: 'aimeat_decide_settings',
-        description: 'Read the owner\'s decision-model settings: whether the operator has it on, the pinned model version, whether the owner has their own TypeSafe key or the node\'s key pays, and which classes of personal data the owner lets leave unscrubbed. It never shows a key. For an agent it also says whether the owner gave THIS agent a key of its own, the NAME of the environment variable that holds that key where the agent runs its own calls (never the key), its daily cap, and whether its gate is on. When the model cannot be used the answer says what to set and where, and `setup_order` gives the one order everything is set up in. `providers` lists every decision provider the owner may use, each with where it runs (`kind`: hosted or local), what it can handle (`limits`), its price, whether the data leaves the machine and a sentence saying where it goes; `default` is the owner\'s choice and `this_agent` the one you get. Nothing here can change them: the owner changes the key and the data policy on the AI settings page, because they decide what the scrubber lets through.',
+        description: 'Read the owner\'s decision-model settings: whether the operator has it on, the pinned model version, whether the owner has their own TypeSafe key or the node\'s key pays, and which classes of personal data the owner lets leave unscrubbed. It never shows a key. For an agent it also says whether the owner gave THIS agent a key of its own, the NAME of the environment variable that holds that key where the agent runs its own calls (never the key), its daily cap, and whether its gate is on. When the model cannot be used the answer says what to set and where, and `setup_order` gives the one order everything is set up in. `providers` lists every decision provider the owner may use, each with where it runs (`kind`: hosted or local), what it can handle (`limits`), its price, whether the data leaves the machine and a sentence saying where it goes; `default` is the owner\'s choice and `this_agent` the one you get. Nothing here can change them: the owner changes the key and the data policy on the AI models page, because they decide what the scrubber lets through.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Decision Settings', readOnlyHint: true },

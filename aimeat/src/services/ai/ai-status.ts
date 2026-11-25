@@ -137,7 +137,7 @@ export function appNeedsOf(
     const s = states[cap];
     const on = !!s?.on && naming.every(r => r.bound !== false);
     // Off because the capability is off: its own sentence. Off because a role is not connected yet:
-    // the AI page, where the person connects it (the pill says the words).
+    // the AI models page, where the person connects it (the pill says the words).
     out.push({
       capability: cap, on,
       ...(on ? {} : { ...(!s?.on && s?.fix ? { fix: s.fix } : {}), settingsUrl: s?.settingsUrl ?? aiSettingsUrl }),

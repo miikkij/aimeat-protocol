@@ -247,7 +247,7 @@ export function registerDecideTools(
       try {
         return text({
           ...(await decideSettingsView(storage, config, ownerGhii, agentNameOf(agentGaii, ownerGhii))),
-          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai), an agent\'s own key, cap and gate on that agent\'s page, and the decision providers (their own, their default, the one each agent uses) in person through PUT /v1/ai/decide/providers/{id} and PUT /v1/ai/decide/settings. No tool changes them.',
+          change_them: 'The owner changes the key and the data policy on the AI models page (/v1/profile?tab=ai), an agent\'s own key, cap and gate on that agent\'s page, and the decision providers (their own, their default, the one each agent uses) in person through PUT /v1/ai/decide/providers/{id} and PUT /v1/ai/decide/settings. No tool changes them.',
         });
       } catch (e) {
         return failed(e);
@@ -306,7 +306,7 @@ export function registerDecideTools(
           proposal_id: out.proposal.id,
           rule_id: out.proposal.rule.id,
           already_waiting: out.alreadyWaiting,
-          next_step: `Nothing has been created. "${out.proposal.rule.title}" is waiting for the owner to approve it: in their open items, or under Settings, AI, Decision model.`,
+          next_step: `Nothing has been created. "${out.proposal.rule.title}" is waiting for the owner to approve it: in their open items, or under Settings, AI models, Decision model.`,
         });
       } catch (e) {
         return failed(e);

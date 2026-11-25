@@ -178,7 +178,7 @@ export const decideTools: ConnectCliToolDefinition[] = [
   {
     // → GET /v1/ai/decide/settings
     name: 'aimeat_decide_settings',
-    description: 'Read the owner\'s decision-model settings (never the key). The owner changes them on the AI settings page.',
+    description: 'Read the owner\'s decision-model settings (never the key). The owner changes them on the AI models page.',
     input: {},
     handler: ({ client }) => client.get('/v1/ai/decide/settings'),
   },

@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/use-providers.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The state and handlers behind the AI page's providers, routing and model policy
+ * @description The state and handlers behind the AI models page's Providers, Models and Model policy
  *   sections: the reads (GET /v1/ai/providers, GET /v1/ai/policy, and the Content Classifier's state
  *   from GET /v1/ai/capabilities, the decision providers from GET /v1/ai/decide/providers) and the
  *   writes (add or change a provider, set or remove its key, test it for one capability, delete it;

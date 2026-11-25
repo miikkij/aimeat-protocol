@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The AI credit a buyer paid for, in euros, and whether their AI is ready, read from
  *   GET /v1/chat/status. One place for the sum, so every page that shows the credit (the Home's
- *   nameplate, the chat's status line, the AI page and the profile's usage card) says the same
+ *   nameplate, the chat's status line, the AI models page and the profile's usage card) says the same
  *   number (Jouni v27 P6 and v28 finding 9, 2026-10-31: the credit in euros, and consistent).
  *
  *   HOW EUROS ARE COUNTED. The store takes its 20 % fee from what the buyer paid, converts the rest

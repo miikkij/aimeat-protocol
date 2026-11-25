@@ -129,13 +129,13 @@ export function secretRecordBinRefusal(key: string, act: 'delete' | 'restore'): 
   const door = key.startsWith(`${DECIDE_KEY_RECORD_KEY}.provider.`)
     ? 'DELETE /v1/ai/decide/providers/{id} (the owner in person)'
     : key.startsWith(`${AI_KEY_PREFIX}provider.`)
-    ? 'DELETE /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
+    ? 'DELETE /v1/ai/providers/{id}/key (the AI models page, the owner in person)'
     : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'DELETE /v1/agents/{name}/ai-keys/{model} (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD
-      ? 'DELETE /v1/ai/providers/{id} on the provider this key became, openrouter, lmstudio or custom (the AI settings page, the owner in person)'
+      ? 'DELETE /v1/ai/providers/{id} on the provider this key became, openrouter, lmstudio or custom (the AI models page, the owner in person)'
       : key === DECIDE_KEY_RECORD_KEY
-        ? 'DELETE /v1/ai/decide/settings/key (the AI settings page, Decision model)'
+        ? 'DELETE /v1/ai/decide/settings/key (the AI models page, Decision model)'
         : 'DELETE /v1/commerce/payout/stripe (Wallet, Selling and payments)';
   return {
     code: 'SECRET_RECORD',
@@ -148,15 +148,15 @@ export function secretRecordWriteRefusal(key: string): { code: string; message: 
   const door = key.startsWith(`${DECIDE_KEY_RECORD_KEY}.provider.`)
     ? 'PUT /v1/ai/decide/providers/{id} (the owner in person)'
     : key.startsWith(`${AI_KEY_PREFIX}provider.`)
-    ? 'PUT /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
+    ? 'PUT /v1/ai/providers/{id}/key (the AI models page, the owner in person)'
     : key.startsWith(`${AI_KEY_PREFIX}agent.`)
     ? 'PUT /v1/agents/{name}/ai-keys with a provider (the agent\'s page)'
     : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'PUT /v1/agents/{name}/ai-keys (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD
-      ? 'PUT /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
+      ? 'PUT /v1/ai/providers/{id}/key (the AI models page, the owner in person)'
       : key === DECIDE_KEY_RECORD_KEY
-        ? 'PUT /v1/ai/decide/settings (the AI settings page, Decision model)'
+        ? 'PUT /v1/ai/decide/settings (the AI models page, Decision model)'
         : 'PUT /v1/commerce/payout/stripe (Wallet, Selling and payments) or aimeat_commerce_psp_set';
   return {
     code: 'SECRET_RECORD',

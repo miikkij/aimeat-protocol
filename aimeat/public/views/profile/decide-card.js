@@ -16,7 +16,7 @@
  *
  *   AND IT SHOWS WHAT HAPPENED. The last decisions, newest first, each with what it was about, what it
  *   decided, the model version and whether a person reviewed it.
- * @structure DecideCard — the collapsible card, mounted in the profile AI tab
+ * @structure DecideCard — the collapsible card, mounted on the AI models page
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
  *   v1.18.0 — 2026-10-02 — The question marks that explain the two policy switches: decide.store_state, decide.public_opt_out on their Checks (components/HelpTip.js). The policy's description stays.

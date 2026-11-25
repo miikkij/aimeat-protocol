@@ -162,7 +162,7 @@ function legacyRecord(
   const type = name === 'openrouter' && atOpenRouter ? 'openrouter'
     : name === 'lmstudio' && isLoopbackHost(host) ? 'local' : 'openai-compatible';
   let problem: string | undefined;
-  if (!baseUrl || !URL.canParse(baseUrl)) problem = 'The saved AI provider has no usable address. Set one on the AI settings page.';
+  if (!baseUrl || !URL.canParse(baseUrl)) problem = 'The saved AI provider has no usable address. Set one on the AI models page.';
   else if (isLoopbackHost(host) && config.securityProfile === 'public') {
     problem = 'Your saved AI provider is on this public node\'s own machine, which an owner\'s provider cannot be. Your own computer connects through the desktop app.';
   } else if (!isLoopbackHost(host) && new URL(baseUrl).protocol !== 'https:') {
@@ -171,7 +171,7 @@ function legacyRecord(
   }
   const capabilities: Partial<Record<AiCapability, ProviderCapabilityConfig>> = {};
   // The fine-tuning the legacy page set for every call is this provider's default for text now, where
-  // the AI page shows it (AI roles, 2026-09-28).
+  // the AI models page shows it (AI roles, 2026-09-28).
   const params = readProviderParams({
     temperature: prefs.temperature, top_p: prefs.top_p, max_tokens: prefs.max_tokens,
     reasoning: isObj(prefs.reasoning) ? (prefs.reasoning.enabled === false ? 'off' : prefs.reasoning.effort) : undefined,

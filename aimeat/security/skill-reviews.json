@@ -34,7 +34,7 @@
       "digest": "sha256:792d84fd8ecd8516433d9731"
     },
     "node:aimeat-decide": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -42,7 +42,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app/decide-posture.ts"
       ],
-      "digest": "sha256:5200c4bf7e36704d9a8cd99f"
+      "digest": "sha256:3553f1a6541943af15083baf"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-11-23",
@@ -178,11 +178,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:dce4daeef58035a2b8b5764f"
+      "digest": "sha256:36989ea5aa06f7c0eadc3224"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-11-22",
@@ -531,7 +531,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:3ce2c0eac0362c701a6fde4f"
+      "digest": "sha256:d939ded4d09e99edfcd6ce48"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-11-22",
@@ -713,7 +713,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "31daba738978f16b"
+      "aimeat/src/services/ai/completion.ts": "aa23868aec620d0d"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "5780713bac3393b5",
@@ -833,7 +833,7 @@
       "aimeat/src/models/workflow-schemas.ts": "1302f1e385f459ff",
       "aimeat/src/mcp/agent-schedules.ts": "6859d64c0491fabf",
       "aimeat/src/services/scheduler.ts": "21cc22025a2336b1",
-      "aimeat/src/services/ai/route-plan.ts": "fa1fbdab7bbf6420"
+      "aimeat/src/services/ai/route-plan.ts": "076c117e7ab342ab"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "5c1eacfebbd695a9",
@@ -899,10 +899,10 @@
       "aimeat/src/services/schedule/write.ts": "e964d8ddc942e30d"
     },
     "node:aimeat-decide": {
-      "aimeat/src/static/sdk-libs/decide/index.js": "85e9d5908358eb28",
-      "aimeat/src/services/decide/service.ts": "c927af2217184abf",
+      "aimeat/src/static/sdk-libs/decide/index.js": "27d1df484c0eb0ed",
+      "aimeat/src/services/decide/service.ts": "81c78cab3dfbda9e",
       "aimeat/src/services/decide/limits.ts": "cd7cbc969ff9c8da",
-      "aimeat/src/services/decide/settings.ts": "8652e8a0fa0878b4",
+      "aimeat/src/services/decide/settings.ts": "ac8a62f2a2d7a2a9",
       "aimeat/src/services/app/decide-posture.ts": "c5332eca35226463"
     },
     "node:aimeat-ai-model-policy": {

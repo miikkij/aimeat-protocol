@@ -5,7 +5,7 @@
  * @description What the calibrator's views share: the words (x), the four steps of a run in order,
  *   the date, time and duration words, which runs are empty and which are scored, the average of a
  *   run, the checkpoints that did not pass in words, the judge a calibration actually uses (its own
- *   or the AI page's choice), the crumb and the cross-page rail links.
+ *   or the AI models page's choice), the crumb and the cross-page rail links.
  * @structure x · STEPS · dateWord · timeWord · durationWords · isEmptyRun · runAverage · runsInOrder ·
  *   labelWords · failedWords · stepsDone · judgeOf · candidatesOf · crumb · pageLinks
  * @usage import { x, STEPS, judgeOf } from './frame.js';

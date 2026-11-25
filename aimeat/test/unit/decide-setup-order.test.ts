@@ -74,7 +74,7 @@ describe('the one order the decision model is set up in', () => {
     const m = /'NO_API_KEY', 400, agent\s*\?\s*`([^`]+)`\s*:\s*'([^']+)'/.exec(src);
     expect(m, 'the NO_API_KEY refusal is still where this test reads it').not.toBeNull();
     for (const said of [m![1], m![2]]) {
-      expect(said).toMatch(/Settings, AI, Decision model/);
+      expect(said).toMatch(/Settings, AI models, Decision model/);
       expect(said).toMatch(/\btest/i);
     }
   });

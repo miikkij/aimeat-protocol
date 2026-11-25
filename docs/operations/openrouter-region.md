@@ -40,8 +40,8 @@ restart, except the shared chat key below. The same names work in `.env`.
   us.openrouter.ai. `any` tries us.openrouter.ai and then openrouter.ai.
 - **The allowed regions** are the only ones used at all: as your choice, as a person's choice, or
   as a fallback. Leave `any` out to make sure no call on your key goes to any country.
-- **Person choice** lets each person choose their own region and fallback on their AI page
-  (Settings & Controls, AI, Routing) or from their chat, among the regions you allow. Off, everyone gets yours.
+- **Person choice** lets each person choose their own region and fallback on their AI models page
+  (Settings & Controls, AI models, Models) or from their chat, among the regions you allow. Off, everyone gets yours.
 
 A person who brings their own OpenRouter key chooses for that key alone; with no choice it stays on
 `any`, because their key may not be on the Business plan.

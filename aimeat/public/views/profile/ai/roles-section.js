@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/roles-section.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The roles section of the AI page (wish-tekoalyn-roolit). A capability says what a model
+ * @description The roles section of the AI models page (wish-tekoalyn-roolit). A capability says what a model
  *   does; a role says what it is used for. The owner's roles, a row each (what it is for, which
  *   providers answer each capability, when it was last used); a role opens to its title, purpose, for
  *   each capability its providers and models in order, this-machine-only and a price ceiling. Below

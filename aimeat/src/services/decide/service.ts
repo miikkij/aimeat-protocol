@@ -339,8 +339,8 @@ async function resolveDecideKey(
   const nodeKey = config.decideInstanceKey.trim();
   if (!nodeKey) {
     throw new DecideError('NO_API_KEY', 400, agent
-      ? `No TypeSafe key is set for this call. The owner sets one for the agent "${agent}" on the agent's page (Profile, Agents, ${agent}, AI keys), or their own under Settings, AI, Decision model, and tests it there. Then run this again.`
-      : 'No TypeSafe key is set. Add your own under Settings, AI, Decision model and press Test, or ask the operator to give the node one.');
+      ? `No TypeSafe key is set for this call. The owner sets one for the agent "${agent}" on the agent's page (Profile, Agents, ${agent}, AI keys), or their own under Settings, AI models, Decision model, and tests it there. Then run this again.`
+      : 'No TypeSafe key is set. Add your own under Settings, AI models, Decision model and press Test, or ask the operator to give the node one.');
   }
   // The same answer as every other call on the node's key: the allowance, then the operator's mode
   // and daily limits once it is spent (ai-allowance.ts nodeKeyStanding; secaudit 2026-10, AI-1).

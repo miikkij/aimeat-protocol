@@ -128,7 +128,7 @@ export async function resolveOwnerModel(
 /** The refusal for a person no key can pay for. The code is the one clients branch on. */
 function noKeyError(message?: string): NotebookAiError {
   return new NotebookAiError('NO_OPENROUTER_KEY',
-    message || 'No AI key can pay for this. Add your own key on the AI settings page, or ask the operator to give this server a shared key.', 400);
+    message || 'No AI key can pay for this. Add your own key on the AI models page, or ask the operator to give this server a shared key.', 400);
 }
 
 /** A chokepoint refusal as this surface's stable codes: NO_API_KEY keeps its long-standing name. */

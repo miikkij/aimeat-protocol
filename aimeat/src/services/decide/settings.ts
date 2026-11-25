@@ -211,7 +211,7 @@ export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean, key
   // A provider that takes no key (a local decision model) answers without anyone's key.
   if (keylessProvider || hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
   // An instruction, not a bare error: what to set, where, and what comes next.
-  return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI, Decision model (or one for a single agent on that agent\'s page under AI keys), presses Test, and then writes a decision rule.' };
+  return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI models, Decision model (or one for a single agent on that agent\'s page under AI keys), presses Test, and then writes a decision rule.' };
 }
 
 /**

@@ -1,6 +1,6 @@
 # 06 AI and models
 
-> Checked against AIMEAT node 4.3.1 (commit 6ad8b6759) on 2026-11-22. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 3bacfcdc5) on 2026-11-24. Maintained with the code: see the README for how.
 
 This page is for the architect and the security officer who decide which AI model sources the node may use, and for the administrator who connects them. It answers: which provider types exist and what each can do, who holds the keys, how the node limits where a key and a prompt may go, what data reaches a model and when, how data is kept to a local model, how spend is limited and measured, what the node does for EU AI Act transparency, and what IT prepares for each model source.
 
@@ -163,7 +163,7 @@ The questionnaire is an engineering aid and serves a not-legal-advice note with 
 
 The project has not tested AIMEAT against any of the services in this section: no test or document in the repository shows a run against Azure, AWS Bedrock, vLLM, TGI, Ollama or LM Studio. The tables say what the code accepts and what the vendor documents.
 
-How an operator adds a provider in all cases below: a record in `AIMEAT_AI_PROVIDERS` with `type`, `baseUrl`, `auth: { "type": "env", "env": "AIMEAT_AI_KEY_<NAME>" }` and `capabilities` with a model per capability, the key in that variable, and the host in `AIMEAT_AI_PROVIDER_ALLOWLIST` when the allowlist is set. Test it with `aimeat_ai_provider_test`. A person may add the same kind of provider for themselves on their AI settings page, with an `https` address only.
+How an operator adds a provider in all cases below: a record in `AIMEAT_AI_PROVIDERS` with `type`, `baseUrl`, `auth: { "type": "env", "env": "AIMEAT_AI_KEY_<NAME>" }` and `capabilities` with a model per capability, the key in that variable, and the host in `AIMEAT_AI_PROVIDER_ALLOWLIST` when the allowlist is set. Test it with `aimeat_ai_provider_test`. A person may add the same kind of provider for themselves on their AI models page, with an `https` address only.
 
 ### 1. Azure OpenAI or Azure AI Foundry
 

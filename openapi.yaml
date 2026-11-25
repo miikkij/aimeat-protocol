@@ -32203,7 +32203,7 @@ paths:
         decided against the audience the product would have, so a page can show the AI label when one
         is owed. With no AI to ask, the AI call's refusal (for example 424 NO_API_KEY, 402
         QUOTA_EXHAUSTED) with `details.reason` (NO_KEY, NO_MODEL, BUDGET_EXHAUSTED ...) and
-        `details.settings_url`, the AI settings page. Needs `storage:read` and `ai:use` from a
+        `details.settings_url`, the AI models page. Needs `storage:read` and `ai:use` from a
         principal other than the owner in person. MCP: aimeat_dataproduct action "describe".
       tags: [Data Packages]
       security: [{ BearerAuth: [] }]

@@ -258,7 +258,7 @@ async function writeRoles(storage: Storage, gaii: string, change: CheckedRolesIn
 /**
  * A binding the owner's role cannot meet: the app's role needs a capability the owner's role has no
  * provider for. Refused when the binding is made, rather than found by the app's first call. A model
- * too small for the app's context is shown on the AI page and passed over in the call (roles-fit.ts).
+ * too small for the app's context is shown on the AI models page and passed over in the call (roles-fit.ts).
  */
 async function unmetBindings(storage: Storage, gaii: string, change: CheckedRolesInput, current: RolesRecord): Promise<string[]> {
   const problems: string[] = [];
@@ -356,8 +356,8 @@ export function resolveRole(args: {
     if (!role) {
       throw new AiCompletionError('AI_ROLE_NOT_BOUND', 409,
         `The owner has not connected this app's AI role '${name}' to one of their roles yet, so it does not run. `
-        + 'The owner connects it on the AI page, or their AI proposes it with aimeat_ai_role_set and the owner confirms.',
-        { role: name, app: app.address, binding: key, needs: declared, fix: `Connect '${name}' to one of your roles on the AI page.`, next: listRoles });
+        + 'The owner connects it on the AI models page, or their AI proposes it with aimeat_ai_role_set and the owner confirms.',
+        { role: name, app: app.address, binding: key, needs: declared, fix: `Connect '${name}' to one of your roles on the AI models page.`, next: listRoles });
     }
     assertServes(role, capability, listRoles);
     return { role, declared, binding: key };
@@ -373,7 +373,7 @@ export function resolveRole(args: {
 function assertServes(role: OwnerRole, capability: AiCapability, next: Record<string, string>): void {
   if (!role.capabilities[capability]?.length) {
     throw new AiCompletionError('AI_ROLE_LACKS_CAPABILITY', 400,
-      `The role '${role.title}' has no provider for ${capability}. Add one to the role on the AI page, or call without the role.`,
+      `The role '${role.title}' has no provider for ${capability}. Add one to the role on the AI models page, or call without the role.`,
       { role: role.id, capability, fix: `Add a provider for ${capability} to the role '${role.title}'.`, next });
   }
 }
@@ -404,7 +404,7 @@ export function noteRoleUsed(storage: Storage, gaii: string, ids: string[]): voi
 export const ROLES_REQUESTS_KEY = 'ai.roles.requests';
 
 /**
- * Note that an app asked for a role the owner has not bound, so the AI page can show the request
+ * Note that an app asked for a role the owner has not bound, so the AI models page can show the request
  * with what the app needs. At most once a day per binding, never in the way of the refusal.
  */
 export function noteRoleRequest(storage: Storage, gaii: string, binding: string, needs: AppAiRole): void {

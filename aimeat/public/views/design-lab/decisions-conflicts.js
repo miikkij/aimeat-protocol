@@ -268,7 +268,7 @@ export const CONFLICT_DECISIONS = [
       { id: 'poster-coral', name: 'Small coral headline letters', code: '.stat-panel-h4', becomes: 'small ink headline letters: the coral goes', look: 'Fjalla .9rem 700, coral', where: 'Settings & Controls: Node stats', crop: { url: '/v1/profile?tab=nodes', click: '.tab-row--bar .poster-tab:nth-child(2)', selector: '.card-section .card-header h4.sub-heading' } },
     ],
     changes: [
-      { page: 'Security, Agents, Access and 2 more', what: 'The small coral capitals over a card become small ink headline letters, as on the AI page.' },
+      { page: 'Security, Agents, Access and 2 more', what: 'The small coral capitals over a card become small ink headline letters, as on the AI models page.' },
       { page: 'Security, Chat sessions and 1 more', what: 'The bold card titles become small ink headline letters.' },
       { page: 'Node stats', what: 'The coral panel headings turn ink.' },
       { page: 'AI', what: 'Nothing.' },

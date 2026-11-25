@@ -93,7 +93,7 @@ import SignedOutDoor from './profile/door.js';
 // === Tab modules: each is imported when its tab first opens (LazyTab below), not with this file ===
 const byDefault = (m) => m.default;
 
-// The AI tab (route id 'ai'; 'generator' is its old name and still resolves, because the chat, the
+// The AI models page (route id 'ai'; 'generator' is its old name and still resolves, because the chat, the
 // home cards and two account-event links point at it): the provider settings in the poster face
 // AND, below them, the owner's own transparency view: what they published with a model in it, how
 // much of it carries a label, and what this node records about a model call (TARGET-058 Phase 8).

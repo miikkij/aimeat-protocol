@@ -331,7 +331,7 @@ export function regionsInUse(config: AimeatConfig): OpenRouterRegion[] {
 export const REGION_MODE_LIMITS: Readonly<Record<Exclude<RegionMode, ''>, string>> = {
   eu: 'Calls go to eu.openrouter.ai first. A model the EU does not offer, or offers without the tool calling the call needs, runs at us.openrouter.ai and then openrouter.ai, and the answer records where it ran.',
   'eu-only': `Every call on the node's key stays at eu.openrouter.ai. A model the EU does not offer is replaced by ${EU_ONLY_TEXT_MODEL} for text and pictures; speech-to-text, speech, image generation, embeddings and the free models are off, because the EU list offers none of them.`,
-  own: 'The node has no shared AI key. Each person adds their own OpenRouter key on the AI settings page and answers for it under their own contract with OpenRouter; nothing falls back to a shared key.',
+  own: 'The node has no shared AI key. Each person adds their own OpenRouter key on the AI models page and answers for it under their own contract with OpenRouter; nothing falls back to a shared key.',
 };
 
 /** Where each region processes a prompt, as the records of processing write a country. */

@@ -688,7 +688,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'capabilities', labelKey: 'capabilities.tabLabel' },
     { id: 'skills', labelKey: 'skills.tabLabel' },
     { id: 'portfolio', labelKey: 'portfolio.tabLabel' },
-    /* The AI page: which model answers, on whose key, within what daily budget. Route id 'ai'
+    /* The AI models page: which model answers, on whose key, within what daily budget. Route id 'ai'
      * since 2026-09-03; 'generator' (the tab it grew out of) still resolves through profile.js. */
     { id: 'ai', labelKey: 'profile.generator.openrouter.title' },
     { id: 'calibrator', labelKey: 'profile.calibrator.tabLabel' },

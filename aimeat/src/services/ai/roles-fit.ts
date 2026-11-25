@@ -8,7 +8,7 @@
  *   the context the app's role asks for. A model the catalogue does not know is given the benefit of
  *   the doubt, as the owner chose it.
  *
- *   Used where the owner binds (a missing capability refuses the binding), on the AI page (a model too
+ *   Used where the owner binds (a missing capability refuses the binding), on the AI models page (a model too
  *   small is shown), and in the call (such a model is passed over, services/ai/route-plan.ts).
  * @structure roleFit · contextOf
  * @version-history

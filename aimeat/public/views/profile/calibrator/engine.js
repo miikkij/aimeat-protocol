@@ -59,7 +59,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * One completion through the owner's key. `model` names a model outright; `modelRole` lets the
- * server pick the model the owner set for that role on the AI page. Retries once on a gateway
+ * server pick the model the owner set for that role on the AI models page. Retries once on a gateway
  * error or an empty answer; gives up after thirty minutes.
  * @param {string} projectId
  * @param {string} prompt
@@ -170,7 +170,7 @@ export function optionProposals(synth, key) {
 
 /* ── The steps ────────────────────────────────────────────────────────────────────────────────── */
 
-/** The judge's call: the calibration's own model, or the AI page's reasoning role. */
+/** The judge's call: the calibration's own model, or the AI models page's reasoning role. */
 const judgeCall = (ctx, temperature) => (ctx.judge?.own && ctx.judge.modelId ? { model: ctx.judge.modelId, temperature } : { modelRole: 'reasoning', temperature });
 const hasJudge = (ctx) => !!(ctx.judge && (ctx.judge.own ? ctx.judge.modelId : true));
 const say = (ctx, text) => { try { ctx.onProgress?.(text); } catch (err) { swallowed('calibrator engine: progress', err); } };

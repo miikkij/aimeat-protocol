@@ -180,7 +180,7 @@ async function questionSet(key) {
 
 /**
  * One of the owner's DECISION RULES: a named set of questions, thresholds and bands the owner wrote
- * once under Settings, AI, Decision model, and that an app and an agent both run by id. Resolves with
+ * once under Settings, AI models, Decision model, and that an app and an agent both run by id. Resolves with
  * the rule's own fields (`title`, `decides`, `sends`, `questions`, `thresholds`, `bands`, `version`)
  * plus `ask(state, opts)`, which runs it. A rule the owner made for agents only is not found here.
  *
@@ -299,7 +299,7 @@ async function isAvailable() {
 /** Why isAvailable() said false, in words to show the person, or null. Call after isAvailable(). */
 function unavailableReason() { return _availCache ? _availCache.reason : null; }
 
-/** The owner's AI settings page, opened at the decision model card. */
+/** The owner's AI models page, opened at the decision model card. */
 function settingsUrl() { return String(APEX_URL || NODE_URL || '') + '/v1/profile?tab=ai&open=decide-card'; }
 
 export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason, settingsUrl };

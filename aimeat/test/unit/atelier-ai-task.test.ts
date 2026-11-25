@@ -173,9 +173,9 @@ describe('aiTask', () => {
 
   it('says each error code in words, and nothing for a cancelled spend', async () => {
     const expected: Record<string, string> = {
-      NO_API_KEY: 'No AI is set up for your account yet. Add one on the AI page of your AIMEAT profile.',
-      QUOTA_EXHAUSTED: 'You used all of today\'s AI budget. It starts again tomorrow, or you can make it larger on the AI page.',
-      APP_QUOTA_EXHAUSTED: 'This app used all of its AI share for today. It starts again tomorrow, or you can make it larger on the AI page.',
+      NO_API_KEY: 'No AI is set up for your account yet. Add one on the AI models page of your AIMEAT profile.',
+      QUOTA_EXHAUSTED: 'You used all of today\'s AI budget. It starts again tomorrow, or you can make it larger on the AI models page.',
+      APP_QUOTA_EXHAUSTED: 'This app used all of its AI share for today. It starts again tomorrow, or you can make it larger on the AI models page.',
       RATE_LIMITED: 'Your AI provider is busy now. Wait a moment and try again.',
       JSON_SCHEMA_MISMATCH: 'The AI answered, but not in the form this app needs. Try again.',
       PROVIDER_ERROR: 'The AI request did not go through: upstream 502',

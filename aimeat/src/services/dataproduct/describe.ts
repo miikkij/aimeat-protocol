@@ -20,7 +20,7 @@
  *   owner to change. The provenance record of the call (services/ai/provenance-marks.ts), decided
  *   against the audience the product would have, so the page shows the AI label when one is owed. No
  *   AI to ask (no key, no model, the budget spent): the refusal of the AI call, with `details.reason`
- *   (NO_KEY, NO_MODEL, BUDGET_EXHAUSTED ...) and `details.settings_url`, the AI settings page.
+ *   (NO_KEY, NO_MODEL, BUDGET_EXHAUSTED ...) and `details.settings_url`, the AI models page.
  * @structure DESCRIBE_LANGS · describeProduct · describePrompt
  * @usage const out = await describeProduct(ctx, name, body);
  * @version-history

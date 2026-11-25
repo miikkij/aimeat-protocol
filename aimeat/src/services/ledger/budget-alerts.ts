@@ -77,7 +77,7 @@ export async function evaluateBudgetAlerts(storage: Storage, ownerGhii: string):
       title: `AI budget ${pct} used ($${status.spentUsd.toFixed(4)} / $${status.dailyBudgetUsd})`,
       body: `Today's LLM spend reached ${pct} of the daily budget.`
         + (top ? ` Top consumers: ${top}.` : ''),
-      // The daily AI budget and its top consumers are on the AI page (profile/ai/page.js), not on Agents.
+      // The daily AI budget and its top consumers are on the AI models page (profile/ai/page.js), not on Agents.
       link: '/v1/profile?tab=ai',
       i18n: {
         key: top ? 'budget_alert_top' : 'budget_alert',

@@ -61,7 +61,7 @@ export async function noticeBareNameMatch(
       body: `Your list of apps that may use AI names "${entry}". The app ${app} belongs to another author but has that file name, `
         + `so it may use AI too. If you meant a different app, write its full name (author/app) in the list in place of "${entry}".`,
       i18n: { key: APP_NAME_NOTICE_TYPE, vars: { app, entry } },
-      // The AI page holds the person's AI settings; without a link a press did nothing.
+      // The AI models page holds the person's AI settings; without a link a press did nothing.
       link: '/v1/profile?tab=ai',
     });
   } catch (err) {

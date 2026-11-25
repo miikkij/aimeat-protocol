@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/rows.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description One app in the AI page's spend table: 30-day cost, today, the cap written on the row,
+ * @description One app in the AI models page's spend table: 30-day cost, today, the cap written on the row,
  *   calls.
  * @structure appRow
  * @usage import { appRow } from './rows.js';

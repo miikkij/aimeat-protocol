@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The decision behind one content class of a stored file, shown in the file's fold
- *   (memory-tab/file-facts-classes.js) instead of a link to the AI page: the link changed the address
- *   and left the dialog open, and on a cold load the AI page's card did not say which decision was
+ *   (memory-tab/file-facts-classes.js) instead of a link to the AI models page: the link changed the address
+ *   and left the dialog open, and on a cold load the AI models page's card did not say which decision was
  *   this file's (browser check of 2026-10-21). Opened, the fold reads GET /v1/ai/decisions/{id} and
  *   shows the model, when it answered, the provider, the review when there is one (confirmed or
  *   overridden, by whom, when), and the probability of yes for each content class it was asked

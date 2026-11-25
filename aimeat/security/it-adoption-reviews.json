@@ -25,7 +25,7 @@
       "digest": "sha256:c62aee7cd720b2be37df70a6"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-23",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:76605cd9e58f56f1916a3308"
+      "digest": "sha256:dced159d1ca8d2dcb1e38b38"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-22",
@@ -80,7 +80,7 @@
       "digest": "sha256:6a21de7cb7d01442836ae173"
     },
     "06-ai-and-models.md": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-24",
       "watches": [
         "aimeat/src/services/ai/adapters",
         "aimeat/src/services/ai/types.ts",
@@ -88,7 +88,7 @@
         "aimeat/src/services/ai/openrouter-region.ts",
         "aimeat/src/services/ai/node-model-rules.ts"
       ],
-      "digest": "sha256:9268cd70f8a07ccfaef4fa64"
+      "digest": "sha256:64fbf69f68e450fe5aaced0e"
     },
     "07-security.md": {
       "reviewedOn": "2026-11-22",
@@ -247,12 +247,12 @@
       "digest": "sha256:56156e4304b4175162d4cbf0"
     },
     "templates/application-register-entry.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-24",
       "watches": [
         ".github/SECURITY.md",
         "docs/operations/openrouter-region.md"
       ],
-      "digest": "sha256:cae517e0bf1f4b1b82afe2ce"
+      "digest": "sha256:9ca2a39b3dc17dc4b0e4829a"
     },
     "templates/approval-checklist.md": {
       "reviewedOn": "2026-11-14",
@@ -310,7 +310,7 @@
       "aimeat/src/storage/storage-factory.ts": "fd01b973fcdeec83",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "ef8fcf55b8d35181",
-      "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
+      "aimeat/src/services/ai/openrouter-region.ts": "35855149762a3935",
       "docs/operations/production-deployment.md": "a8eb2dedd66b37e6",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52"
@@ -354,7 +354,7 @@
       "aimeat/src/services/ai/adapters/sdk.ts": "b7c86872fb7946c4",
       "aimeat/src/services/ai/types.ts": "0f3be25098513231",
       "aimeat/src/services/ai/providers.ts": "1da009cde00f6d09",
-      "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
+      "aimeat/src/services/ai/openrouter-region.ts": "35855149762a3935",
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61"
     },
     "07-security.md": {
@@ -445,7 +445,7 @@
     },
     "templates/application-register-entry.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
-      "docs/operations/openrouter-region.md": "fe81be2404b72b7c"
+      "docs/operations/openrouter-region.md": "dbd7b37332bdcdac"
     },
     "templates/approval-checklist.md": {
       "docs/security/deployment-checklist.md": "a75670933a112543"

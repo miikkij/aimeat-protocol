@@ -218,7 +218,7 @@ describe('aiChat', () => {
     expect(await h.ask('When do bids close?')).toBeNull();
     const failure = part(host, 'failure')[0];
     expect(failure.attrs.role).toBe('alert');
-    expect(failure.textContent).toBe('You used all of today\'s AI budget. It starts again tomorrow, or you can make it larger on the AI page.');
+    expect(failure.textContent).toBe('You used all of today\'s AI budget. It starts again tomorrow, or you can make it larger on the AI models page.');
     expect(part(host, 'input')[0].value).toBe('When do bids close?');
     expect(part(host, 'turn')).toEqual([]);
     expect(turns).toBe(0);

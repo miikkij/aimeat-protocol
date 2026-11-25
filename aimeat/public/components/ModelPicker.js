@@ -10,7 +10,7 @@
  *   with "show all" and how many there are. A page passes the models and what a row says as data; it
  *   never writes a class.
  *
- *   ModelList is the list itself (the AI page's roles, a calibration's models):
+ *   ModelList is the list itself (the AI models page's roles, a calibration's models):
  *   `models` (the pool), `recommended` (what shows before a search; the first 8 when not given),
  *   `value` (the chosen id), `taken` (ids that cannot be picked again), `onPick(model)`,
  *   `describe(model)` → { name, trait, note, price, context, href, hrefLabel } (what a row says; the id

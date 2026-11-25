@@ -465,7 +465,7 @@ export default function ChatView() {
     }, [draft, busy, thread, startThread, loadThreads, attachments, status, reloadStatus]);
 
     // The free model is the person's own choice once the AI allowance is spent (A1, 2026-10-29): it
-    // is turned on in their routing rules, the same rule the AI page sets, and the question is sent again.
+    // is turned on in their routing rules, the same rule the AI models page sets, and the question is sent again.
     const switchToFreeModel = useCallback(async (text) => {
         try {
             await apiPut('/v1/ai/routing', { routing: { rules: { freeModelLastResort: true } } });

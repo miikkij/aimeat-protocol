@@ -25,11 +25,11 @@ export interface SetupStep { step: number; id: string; what: string; where: stri
 
 export const DECIDE_SETUP_ORDER: readonly SetupStep[] = Object.freeze([
   { step: 1, id: 'provider', what: 'Choose a decision provider. A local decision model on this machine needs no key; for TypeSafe, set a key: the owner\'s own, or one for a single agent.',
-    where: 'Settings, AI, Decision model, Decision providers; the key under the same card, or Profile, Agents, the agent, AI keys.' },
+    where: 'Settings, AI models, Decision model, Decision providers; the key under the same card, or Profile, Agents, the agent, AI keys.' },
   { step: 2, id: 'test', what: 'Test it when it takes a key: one tiny real call that says which key paid. A provider without a key needs no test.',
     where: 'The Test button beside the key.' },
   { step: 3, id: 'rule', what: 'Write a decision rule and try it on its sample.',
-    where: 'Settings, AI, Decision model, Rules. An agent may propose one with aimeat_decide_rule_propose; the owner approves it.' },
+    where: 'Settings, AI models, Decision model, Rules. An agent may propose one with aimeat_decide_rule_propose; the owner approves it.' },
   { step: 4, id: 'give', what: 'Give the rule to an agent.',
     where: 'The Crew tab\'s tool picker: the row decide:<rule>. The rule\'s `use` must allow agents.' },
   { step: 5, id: 'gate', what: 'Decide about the gate: off, the agent acts and every decision is still recorded; on, an answer under the act band becomes a task for the owner.',

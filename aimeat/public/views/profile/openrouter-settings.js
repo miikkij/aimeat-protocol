@@ -13,7 +13,7 @@
  *   no server change.
  *
  *   NODE 4.0.0 removes /v1/openrouter/settings, /models and /test. The panel reads the old route
- *   first (js/services/ai-connection.js legacyOr, the switch the AI page, the calibrator and the inbox
+ *   first (js/services/ai-connection.js legacyOr, the switch the AI models page, the calibrator and the inbox
  *   share, so a 410 one of them met is known to all); its 410 GONE switches the panel onto the owner's provider:
  *   the connection and key through /v1/ai/providers, the default, vision and transcription models,
  *   the language and the fine-tuning into that provider's capabilities, the model lists from the

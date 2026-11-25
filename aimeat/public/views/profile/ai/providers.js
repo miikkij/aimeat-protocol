@@ -2,9 +2,9 @@
  * @file public/views/profile/ai/providers.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Three sections of the AI page: the providers (every provider the owner can use, a row
+ * @description Three sections of the AI models page: the providers (every provider the owner can use, a row
  *   each with what it serves, its key and whether it works; an owner's own opens to its key, its
- *   capabilities with a model each, a real test and delete; the form that adds one), the routing
+ *   capabilities with a model each, a real test and delete; the form that adds one), the Models section
  *   (which provider answers each capability, first and then the ones to fall back to, and the rules
  *   for moving on) and the model policy (open, the recommended models, or the owner's own list, and
  *   whose calls it covers). Pure render over ctx.pv (ai/use-providers.js), on the page's existing

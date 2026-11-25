@@ -133,7 +133,7 @@ export async function models(opts) {
  * A capability says what a model does; a role says what it is used for. An app declares its roles in
  * its aimeat-ai meta (role.<name>=text+image) and names one as `role` in a call; the call runs only
  * once the owner bound that role to one of theirs (boundTo). Until then it is refused with
- * AI_ROLE_NOT_BOUND, and the owner sees the request on the AI page. Not cached: a binding the owner
+ * AI_ROLE_NOT_BOUND, and the owner sees the request on the AI models page. Not cached: a binding the owner
  * just made should show at once.
  * @returns {Promise<any>}
  */

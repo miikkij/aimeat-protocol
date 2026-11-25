@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/page.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The AI page in the poster face: which model answers, on whose key, within what
+ * @description The AI models page in the poster face: which model answers, on whose key, within what
  *   daily budget. The mast and the strip say who pays and what it has cost; then 01 the connection
  *   (the provider, the key, a real test), 02 the six model roles as rows, 03 the budget and what
  *   spent it (the daily figure in words, the apps that spent most with the cap written on the row,

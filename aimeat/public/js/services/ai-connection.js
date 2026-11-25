@@ -25,7 +25,7 @@
  *   in the owner's pool with a model, and, under the rule "only tested providers", only once that
  *   capability was tested (services/ai/route-plan.ts inPool, modelOf and 'untested'). The migration
  *   gives a migrated provider all three. A provider written here gets them the same way: each
- *   capability with a model joins the pool, as the AI page's providers section does; an OpenRouter
+ *   capability with a model joins the pool, as the AI models page's providers section does; an OpenRouter
  *   connection the person gave no model takes the model the node uses for them now (GET
  *   /v1/ai/capabilities), as the old setting did; and every capability left untested is tested once
  *   (POST /v1/ai/providers/:id/test), so the person's own key pays at once, as it did after a save on
@@ -151,7 +151,7 @@ function capConfigOf(v) {
   return cfg;
 }
 
-/** A capability with a model joins the owner's pool, as the AI page's providers section does; the node refuses a pool entry with no model. */
+/** A capability with a model joins the owner's pool, as the AI models page's providers section does; the node refuses a pool entry with no model. */
 function pooled(cfg) {
   return { ...cfg, pool: !!cfg.model && cfg.enabled !== false };
 }

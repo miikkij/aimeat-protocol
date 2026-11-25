@@ -2,7 +2,7 @@
  * @file public/views/profile/ai/frame.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What the AI page's views share: the words (x), the six model roles (which
+ * @description What the AI models page's views share: the words (x), the six model roles (which
  *   preference field each one is, which pool of the catalogue it picks from, what it does), the
  *   price and context words a person can read, the money and number formats, the 30-day rollup of
  *   the usage history per app, the crumb and the cross-page rail links.

@@ -116,7 +116,7 @@ export const aiModelTools = [
       + 'whether a key is set (never the key). Also the owner\'s routing: the ordered providers per capability and the '
       + 'rules, and openrouter_region: where OpenRouter calls are processed (EU, US or any country), what the operator '
       + 'allows and what applies to the owner now. Read this before naming a provider or model in a call, and to explain a refusal. A key is set only by the '
-      + 'owner on the AI settings page, never through a tool.',
+      + 'owner on the AI models page, never through a tool.',
     input: {},
   },
   {
@@ -186,7 +186,7 @@ export const aiModelTools = [
       + 'serve the capability (INVALID_PROVIDER), and when the model rules (the operator\'s list and the owner\'s '
       + 'policy) allow it for nobody (AI_MODEL_NOT_ALLOWED, with the allowed models). A model some callers may not use '
       + 'is saved with a warning naming them. Find the models with aimeat_ai_models { capability, type, allowed: true }. '
-      + 'The provider\'s key stays on the AI settings page; this tool never sees it. Test the new model with '
+      + 'The provider\'s key stays on the AI models page; this tool never sees it. Test the new model with '
       + 'aimeat_ai_provider_test.',
     input: {
       provider: { type: 'string', description: 'The id of one of the owner\'s own providers, from aimeat_ai_providers.', required: true },

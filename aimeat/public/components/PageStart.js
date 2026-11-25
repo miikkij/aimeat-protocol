@@ -18,7 +18,7 @@
  *   - vars: the values the prompt's {placeholders} take (an address).
  *   - action: { onClick | href | copy, label? }: the page's own button for the same first action;
  *     its words are `pageStart.<id>.action` unless `label` is given.
- *   - link: { onClick | href, label? }: a way on after the purpose sentence (the AI page's link to
+ *   - link: { onClick | href, label? }: a way on after the purpose sentence (the AI models page's link to
  *     the page where the person's chat AI is connected); its words are `pageStart.<id>.link`.
  *   - done: true when the page knows the first action is done (the block starts folded), null while
  *     it does not know yet (folded until it knows), false or absent: open. The person's own choice
