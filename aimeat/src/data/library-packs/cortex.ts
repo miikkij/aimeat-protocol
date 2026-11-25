@@ -27,6 +27,8 @@
  *     take the event first), aimeat-viewport 1.1.0 (onTap(ev, target)) and aimeat-dag 1.1.5 (the
  *     camera it embeds). Appdev pitfalls ui/input-drag-grab-point-is-pointer-down,
  *     aimeat-input/gesture-event-and-info-arguments-before-flight-math, ui/viewport-tap-target-is-host.
+ *   v1.5.1 — 2026-11-25 — aimeat-viewport 1.2.0 and aimeat-dag 1.1.6: a press on a control is captured
+ *     only once it becomes a drag, so a real mouse click reaches a button inside the host.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -355,7 +357,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js"></script>'],
     requires: [],
-    version: '1.1.0',
+    version: '1.2.0',
     license: 'MIT',
     apiSurface: 'AIMEAT.viewport',
     apiCaveat: 'The host must have a SIZE. A full-screen board is `position: fixed; inset: 0` on the host itself — the viewport only promotes a STATIC host to relative, so your positioning is never overwritten.',
@@ -378,6 +380,9 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'worldDy, ev, cam), onEnd(moved, ev) } to drive the drag (deltas arrive already divided by the',
       'zoom), or null to let the viewport pan. Keep your own "did it move" flag in the handle closure',
       'when your rule differs from the viewport threshold.',
+      'A press on a control (button, link, field, label, an ARIA control role) is captured only once it moves past',
+      'dragThreshold, so its click reaches it. A handle with capture: false never takes the pointer: return it for',
+      'content that answers clicks without being a control (a card with a click handler, selectable text).',
       'NAVIGATE/INTERACT is only needed when children swallow pointer events (iframes). Pass',
       'captureSelector: in navigate mode each match gets a transparent overlay so panning works over',
       'it; setMode("interact") removes them so the child behaves normally. Space-hold = temporary',
@@ -388,6 +393,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'key and pass it back as `initial` on the next mount.',
     ].join('\n'),
     changelog: [
+      { version: '1.2.0', date: '2026-11-25', summary: 'A real mouse click on a button inside the host reaches the button. The host captured every pointer at pointerdown, and the browser sends a captured pointer\'s click to the capturing element, so a button in the world heard nothing and only element.click() worked. A press that starts on a control is now captured only once it moves past dragThreshold; a claim handle may return capture: false to leave the pointer with the content; a primary pointerdown drops a pointer whose pointerup the host never saw. Additive: an app that dragged from a control still drags.' },
       { version: '1.1.0', date: '2026-11-21', summary: 'onTap(ev, target): the element under the pointer is the second argument; ev.target is the host, where the pointer was captured. Additive.' },
       { version: '1.0.0', date: '2026-07-25', summary: 'Initial release (TARGET-051). Extracted from aimeat-dag v1.0.1 so a second consumer does not mean a third pan/zoom implementation. Behaviour-preserving for dag; new here are classPrefix, configurable zoom bounds, the pointer-claim delegate, clientToWorld/worldToClient as public API (dead code in dag), and the navigate/interact capture overlays. aimeat-dag embeds a byte-identical copy so it keeps shipping as one script tag — loading both packs is safe (idempotent namespace guard).' },
       { version: '1.0.1', date: '2026-07-25', summary: 'Fix: the injected CSS no longer forces position:relative on the host. Same-specificity, it silently beat a consumer’s own position:fixed, and a full-screen board (position:fixed; inset:0) collapsed to ZERO height — fit() then clamped to minZoom and every pointer event landed on nothing. create() now promotes the host only when its computed position is static, so an existing fixed/absolute/sticky host is left alone. Found by the first real consumer of the two-mode model.' },
@@ -448,7 +454,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-dag/libs/aimeat-dag.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-dag/libs/aimeat-dag.js"></script>'],
     requires: [],
-    version: '1.1.5',
+    version: '1.1.6',
     license: 'MIT',
     apiSurface: 'AIMEAT.dag',
     aiDoc: [
@@ -466,6 +472,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'dag.viewport exposes the underlying aimeat-viewport camera; prefer fit()/zoomTo() over it.',
     ].join('\n'),
     changelog: [
+      { version: '1.1.6', date: '2026-11-25', summary: 'Picks up aimeat-viewport 1.2.0: a real mouse click on a button inside a node card (renderNode) reaches the button instead of the canvas. No change to the dag API.' },
       { version: '1.1.5', date: '2026-11-21', summary: 'Picks up aimeat-viewport 1.1.0: the camera\'s onTap(ev, target) names the element under the pointer. No change to the dag API.' },
       { version: '1.0.0', date: '2026-07-16', summary: 'Initial release: layered auto-layout (longest-path + barycenter), pointer-events pan/zoom/pinch, selection, node drag with position persistence hook, live state layer, prefers-reduced-motion support.' },
       { version: '1.0.1', date: '2026-07-16', summary: 'Fix: setPointerCapture is now best-effort (try/catch) — synthetic PointerEvents (tests/automation) and pointers released mid-dispatch threw NotFoundError and swallowed the whole pointerdown, breaking selection.' },

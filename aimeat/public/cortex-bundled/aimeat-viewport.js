@@ -23,6 +23,13 @@
  *   });
  *   vp.world.appendChild(frameEl);   // children live in world space
  * @version-history
+ *   v1.2.0 — 2026-11-25 — A real mouse click on a control inside the host reaches the control.
+ *     The host captured every pointer at pointerdown, and the browser sends a captured pointer's
+ *     click to the capturing element, so a button in the world heard nothing; only element.click()
+ *     worked. A press that starts on a control (button, link, field, label, an ARIA control role)
+ *     is now captured only once it moves into a drag, a claim handle may say `capture: false` to
+ *     leave the pointer with the content, and a primary pointerdown drops pointers whose
+ *     pointerup the host never saw.
  *   v1.1.0 — 2026-11-21 — onTap(ev, target): the element under the pointer is the second argument.
  *     ev.target is the host, where the pointer was captured, so an app's onTap could not tell what
  *     was tapped (appdev pitfall ui/viewport-tap-target-is-host).
@@ -88,6 +95,10 @@
   function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
+  // What a press may land on that answers a click of its own.
+  var CONTROL = 'button, a[href], input, select, textarea, label, summary, [contenteditable]:not([contenteditable="false"]), ' +
+    '[role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"]';
+
   function isTextEntry(el) {
     if (!el) return false;
     var tag = (el.tagName || '').toLowerCase();
@@ -109,7 +120,9 @@
    * @param {number}   [opts.dragThreshold=4] client px before a claimed pointer counts as moved
    * @param {Function} [opts.contentBBox] () → {x,y,w,h} in world units; required for fit()
    * @param {Function} [opts.onClaimPointer] (ev) → null (viewport pans) | drag handle
-   *   { onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev) }
+   *   { onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev), capture? }; with
+   *   `capture: false` the pointer stays with the element pressed (its click, its text selection).
+   *   A press on a control is captured only once it moves past dragThreshold.
    * @param {Function} [opts.onTap] (ev, target) fired when a pan gesture ends without moving;
    *   ev.target is the host, `target` is the element under the pointer
    * @param {Function} [opts.onCameraChange] (cam) after any camera change
@@ -217,15 +230,27 @@
       host.classList.add(P + '-panning');
     }
 
+    // Capture is best-effort: synthetic PointerEvents (tests, automation) and pointers released
+    // mid-dispatch have no active pointer and would throw NotFoundError, swallowing the whole
+    // pointerdown. (aimeat-dag v1.0.1 shipped this as a real bug fix.)
+    function capture(pointerId) {
+      try { host.setPointerCapture && host.setPointerCapture(pointerId); } catch (e) { /* noop */ }
+    }
+    /* A captured pointer's click is dispatched to the host, not to the element pressed, so a
+       button under a captured press never hears its click. A press that starts on a control is
+       therefore captured only once it moves into a drag; a press that stays put is the control's. */
+    function onControl(t) { return !!(t && t.closest && t.closest(CONTROL)); }
+
     function onPointerDown(ev) {
-      // Capture is best-effort: synthetic PointerEvents (tests, automation) and pointers released
-      // mid-dispatch have no active pointer and would throw NotFoundError, swallowing the whole
-      // pointerdown. (aimeat-dag v1.0.1 shipped this as a real bug fix.)
-      try { host.setPointerCapture && host.setPointerCapture(ev.pointerId); } catch (e) { /* noop */ }
+      // A pointer the viewport did not capture can lift outside the host, and its pointerup never
+      // arrives here. A primary pointer going down means no other pointer of its kind is down, so
+      // whatever is left over is dropped rather than read as a second finger.
+      if (ev.isPrimary) { pointers = {}; gesture = null; host.classList.remove(P + '-panning'); }
       pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
 
       if (Object.keys(pointers).length === 2) {
         var pts = Object.keys(pointers).map(function (id) { return pointers[id]; });
+        Object.keys(pointers).forEach(function (id) { capture(Number(id)); });
         gesture = {
           mode: 'pinch', d0: dist(pts[0], pts[1]), k0: cam.k,
           mid0: mid(pts[0], pts[1]), cam0: { x: cam.x, y: cam.y },
@@ -235,14 +260,35 @@
 
       // Middle mouse always pans, and holding space is a temporary navigate — both are the
       // conventions users bring from other canvas tools.
-      if (twoMode && (ev.button === 1 || spaceHeld)) { beginPan(ev); return; }
+      if (twoMode && (ev.button === 1 || spaceHeld)) {
+        beginPan(ev);
+        capture(ev.pointerId);
+        gesture.captured = true;
+        return;
+      }
 
+      var lazy = onControl(ev.target);
       var handle = opts.onClaimPointer ? opts.onClaimPointer(ev) : null;
       if (handle) {
-        gesture = { mode: 'claim', handle: handle, sx: ev.clientX, sy: ev.clientY, moved: false };
+        // A handle with capture: false leaves the pointer with the content (its clicks, its text
+        // selection): the viewport then never captures it, not even when it moves.
+        var mayCapture = handle.capture !== false;
+        gesture = { mode: 'claim', handle: handle, sx: ev.clientX, sy: ev.clientY, moved: false, id: ev.pointerId, mayCapture: mayCapture, captured: false };
+        if (mayCapture && !lazy) { capture(ev.pointerId); gesture.captured = true; }
         return;
       }
       beginPan(ev);
+      gesture.id = ev.pointerId;
+      gesture.mayCapture = true;
+      gesture.onControl = lazy;
+      if (!lazy) { capture(ev.pointerId); gesture.captured = true; }
+    }
+
+    /** A gesture that became a drag takes the pointer it deferred. */
+    function captureOnDrag(g) {
+      if (g.captured || !g.mayCapture) return;
+      g.captured = true;
+      capture(g.id);
     }
 
     function onPointerMove(ev) {
@@ -268,6 +314,7 @@
 
       if (gesture.mode === 'pan') {
         gesture.moved = gesture.moved || Math.abs(ev.clientX - gesture.sx) + Math.abs(ev.clientY - gesture.sy) > 3;
+        if (gesture.moved) captureOnDrag(gesture);
         cam.x = gesture.cam0.x + (ev.clientX - gesture.sx);
         cam.y = gesture.cam0.y + (ev.clientY - gesture.sy);
         applyCam(false);
@@ -279,6 +326,7 @@
         var dy = (ev.clientY - gesture.sy) / cam.k;
         if (!gesture.moved && Math.abs(dx) + Math.abs(dy) < dragThreshold / cam.k) return;
         gesture.moved = true;
+        captureOnDrag(gesture);
         if (gesture.handle.onMove) gesture.handle.onMove(dx, dy, ev, { x: cam.x, y: cam.y, k: cam.k });
       }
     }
@@ -300,9 +348,10 @@
       gesture = null;
       if (g.mode === 'claim') {
         if (g.handle.onEnd) g.handle.onEnd(g.moved, ev);
-      } else if (g.mode === 'pan' && !g.moved) {
+      } else if (g.mode === 'pan' && !g.moved && !g.onControl) {
         // The event's target is the host (the pointer was captured there), so the element under
-        // the pointer goes with it as the second argument.
+        // the pointer goes with it as the second argument. A press on a control is the control's
+        // click, not a tap on the canvas.
         if (opts.onTap) opts.onTap(ev, tapTarget(ev));
       }
     }
@@ -413,6 +462,6 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.1.0' };
+  AIMEAT.viewport = { create: create, VERSION: '1.2.0' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);

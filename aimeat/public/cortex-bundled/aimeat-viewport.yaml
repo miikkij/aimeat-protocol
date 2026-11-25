@@ -10,7 +10,7 @@ metadata:
     domain: canvas
 
 spec:
-  version: "1.1.0"
+  version: "1.2.0"
   license: MIT
   components:
     - type: prompt
@@ -36,7 +36,8 @@ spec:
           fitPadding?: 36, fitMaxZoom?: 1.4, centerMinZoom?: 1, dragThreshold?: 4,
           contentBBox?: () => ({ x, y, w, h }),      // world units; fit() asks for this
           onClaimPointer?: (ev) => null | {          // null => the viewport pans
-            onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev) },
+            onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev),
+            capture?: false },                       // false: the pointer stays with the element pressed
           onTap?: (ev, target) => {},                // pan gesture that never moved; target is the element under the pointer (ev.target is the host)
           onCameraChange?: (cam) => {},
           captureSelector?: '[data-frame]',          // opts in to the navigate/interact model
@@ -61,6 +62,13 @@ spec:
         (deltas arrive in WORLD units, already divided by the zoom); return null and the viewport
         pans. Keep any "did it actually move" state in the handle closure when your own rule for
         that differs from the viewport's threshold.
+
+        CLICKS INSIDE THE HOST. The browser sends a captured pointer's click to the capturing
+        element, so the viewport takes the pointer only when the press becomes a drag: a press on
+        a control (button, link, field, label, an ARIA control role) stays the control's click
+        until it moves past dragThreshold. For content that answers clicks without being a control
+        (a card with its own click handler, selectable text), return a handle with
+        capture: false and the viewport never takes that pointer.
 
         NAVIGATE VS INTERACT — only needed when children swallow pointer events (iframes, or
         anything with its own handlers). Pass captureSelector and in navigate mode each matching

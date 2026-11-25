@@ -57,6 +57,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.72.3 — 2026-11-25 — The board's head actions, its Move/Use switch and the buttons in a frame
+ *     body answer a real mouse click (with aimeat-viewport 1.2.0).
  *   v0.72.2 — 2026-11-24 — The grain material (.ak-mat--grain) reads --ak-grain-paper, strong enough to see.
  *   v0.72.1 — 2026-11-22 — The composition grid stops at 100rem (--ak-main-max in aimeat-atelier.css),
  *     so a wide window no longer draws a main card far wider than its fields.
@@ -518,7 +520,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.72.2',
+  version: '0.72.3',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

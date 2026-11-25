@@ -6,6 +6,7 @@
  *   the Move/Use switch, the keyboard nudge, the sample state, and the static layout when the
  *   viewport library is absent.
  * @version-history
+ *   v1.1.0 - 2026-11-25 - A press the board leaves to a control or the content declines capture.
  *   v1.0.0 - 2026-10-02 - Initial (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -158,6 +159,23 @@ describe('board', () => {
     expect(part(frameEl(b.el, 'c'), 'act')[1].attrs['aria-pressed']).toBe('true');
     actsA[0].click();
     expect(pressed).toEqual([['remove', 'a']]);
+  });
+
+  it('leaves a press on a head action, the Move/Use switch and Use-mode content uncaptured, and a head press drags', () => {
+    // A captured pointer's click goes to the board host, so a press the board does not drag must
+    // tell the viewport to keep its hands off (capture: false); element.click() never showed it.
+    const host = document.createElement('div');
+    const b = kit.board({ target: host, frames: frames(), actions: [{ id: 'comments', glyph: '☰', label: 'Comments' }] });
+    const act = part(frameEl(b.el, 'a'), 'act')[0];
+    expect(vpOpts.onClaimPointer({ target: act }).capture).toBe(false);
+    const tool = part(b.el, 'tool')[0];
+    expect(vpOpts.onClaimPointer({ target: tool }).capture).toBe(false);
+    const head = part(frameEl(b.el, 'a'), 'title')[0];
+    expect(vpOpts.onClaimPointer({ target: head }).capture).not.toBe(false);
+    b.setMode('use');
+    expect(vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'a'), 'body')[0] }).capture).toBe(false);
+    expect(vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'c'), 'body')[0] }).capture).toBe(false);
+    expect(vpOpts.onClaimPointer({ target: head }).capture).not.toBe(false);
   });
 
   it('selects on a head click, marks the frame and tells the app', () => {

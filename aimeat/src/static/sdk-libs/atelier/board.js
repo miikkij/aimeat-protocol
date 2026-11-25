@@ -33,6 +33,10 @@
  *     onMove: save, onAction: act, onSelect: show });
  *   b.set({ frames: frames });        // keyed: adds, moves, removes; re-renders on frame.rev
  * @version-history
+ *   v0.72.3 — 2026-11-25 — A press the board leaves to a control or to the content is not captured
+ *     (capture: false on the claim handle, aimeat-viewport 1.2.0), so a real mouse click on a head
+ *     action, the Move/Use switch or a button in a body reaches it. Before, the click went to the
+ *     board and only element.click() worked.
  *   v0.64.0 — 2026-10-02 — Initial, from ORIGAMI 1.2.0's board (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-):
  *     keyed frames, rings with an anchor, `tow`, a drop asked only on new ground, centerOn a frame
  *     or a rectangle, set({ camera, animate }).
@@ -210,8 +214,10 @@ export function board(spec) {
   }
 
   // A pointer that lands on a control is the control's; a frame's head or grip is ours; a frame's
-  // body is ours in Move mode and the content's in Use mode or on a live frame.
-  function swallow() { return { onMove: function () {}, onEnd: function () {} }; }
+  // body is ours in Move mode and the content's in Use mode or on a live frame. A press we leave
+  // to the content keeps its pointer (capture: false): a captured pointer's click goes to the
+  // board, so a button in the head or the body would never hear it.
+  function swallow() { return { capture: false, onMove: function () {}, onEnd: function () {} }; }
   function claim(ev) {
     const t = /** @type {Element} */ (ev.target);
     if (!t || !t.closest) return null;
