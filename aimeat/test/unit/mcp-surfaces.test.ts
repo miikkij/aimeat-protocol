@@ -4,6 +4,7 @@
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
+ *   v1.5.0 -- 2026-11-25 -- The chat starts with aimeat_home_waiting too; at most 24 start tools.
  *   v1.4.0 -- 2026-11-24 -- appdev carries the data map, the component catalogue and the app tools.
  *   v1.3.0 -- 2026-11-15 -- Audit M222: no admin tool outside admin/full, no memory or wallet write
  *     tool on appdev, asserted over every listed tool.
@@ -169,10 +170,12 @@ describe('v2 MCP surfaces', () => {
         // looking for them (v31 K35). The token cost is cut in the descriptions instead (K63).
         // 23 since 2026-11-02: aimeat_home_feed, which a test model asked "what is on my home" spent
         // its turn looking for (crew70 on guestkoey3wfwk); it takes no input and one sentence.
-        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(23);
+        // 24 since 2026-11-25: aimeat_home_waiting, what waits for the person in one call, the
+        // question the home's first block answers (Jouni, 2026-11-25).
+        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(24);
         for (const name of ['aimeat_tools_find', 'aimeat_invoke', 'aimeat_handbook_get', 'aimeat_discover',
             'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_agent_propose', 'aimeat_memory_write',
-            'aimeat_app_template_get', 'aimeat_app_publish', 'aimeat_home_feed']) {
+            'aimeat_app_template_get', 'aimeat_app_publish', 'aimeat_home_feed', 'aimeat_home_waiting']) {
             expect(chat.has(name), name).toBe(true);
         }
         const registered = toolsRegisteredOn('chat');

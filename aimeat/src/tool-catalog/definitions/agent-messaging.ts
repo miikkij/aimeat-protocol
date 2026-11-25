@@ -5,7 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
- *   2026-11-25 — aimeat_home_waiting: what waits for the person, every kind in one answer (GET /v1/home/waiting), on all three surfaces.
+ *   2026-11-25 — aimeat_home_waiting: what waits for the person, every kind in one answer (GET /v1/home/waiting), on all three surfaces, and a start tool of the node's chat.
  *   2026-11-20 — aimeat_usage_report: report value, what the person's AI made and what happened to it.
  *   2026-11-19 — aimeat_handbook_get: the Atelier specification is the one build guide, with its
  *     platform sections; the Classic "build-app" tier is no longer offered.
@@ -263,10 +263,13 @@ export const agentMessagingTools = [
         description: 'What waits for the person you act for, every kind in one call: agent proposals and agents asking to sign in, invitations to organisms, requests to make something public, message threads where someone waits for their reply, questions people asked them, workflow questions, their teams\' waiting work, and how many open items and unread messages they have. Each item has a `group`: decide is a yes or no, answer is someone waiting for their words, look is a count to open. Act on an item with the MCP tool its `act_with` names; an item without one is the person\'s own decision on the page at its `href`, so tell them what waits and give them that page. `total` counts the decide and answer items, `to_open` sums the look counts (which can repeat those items), `by_kind` has every kind, and `items` are the first `limit`. `withheld` names kinds your permissions do not cover; `partial` names kinds that could not be read this time. Use it when the person asks what waits for them, what needs them now or what they should look at first.',
         caller: 'agent',
         visibility: agentEverywhere,
-        annotations: { title: 'What Waits for the Person', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Two annotations, as aimeat_home_feed has: the chat lists them on every model round.
+        annotations: { title: 'What Waits for the Person', readOnlyHint: true },
         // The word GET /v1/home/waiting asks; each kind inside also asks the word of its own route.
         scope: 'memory:read',
-        surfaces: ['agent', 'service'],
+        // A start tool of the node's chat since 2026-11-25: "what waits for me" is the question the
+        // home's first block answers, and the chat answers it from the same list in one call.
+        surfaces: ['agent', 'service', 'chat'],
         input: {
             limit: { type: 'number', description: 'The first n items, 1 to 50. Default 20. total, to_open and by_kind always count all of them.', zod: z.number().int().min(1).max(50).optional() },
         },

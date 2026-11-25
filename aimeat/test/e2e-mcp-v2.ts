@@ -25,6 +25,8 @@
 // once chat-tool-text.ts lists them off the chat surface.
 // 2026-11-25: the chat list carries no declared answer size (mcp/declared-answer-size.ts) and the
 // full surface carries it. Red at 26 997 when every surface declared it: 52 characters a tool.
+// 2026-11-25: the start set is held under 26 300 (26 000 before): aimeat_home_waiting joined it as
+// its 24th tool, listed in about 330 characters, when the 23 before it took 25 903.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
@@ -251,7 +253,10 @@ await test('chat lists its start tools in short words, and a bad call is still r
     // The failure names the largest tools, so the one that grew is in the message.
     const largest = listed.map((t: any) => `${t.name} ${JSON.stringify(t).length}`)
         .sort((a: string, b: string) => Number(b.split(' ')[1]) - Number(a.split(' ')[1])).slice(0, 8).join(', ');
-    assert(size < 26_000, `the start set is listed in under 26 000 characters (45 769 before): ${size}; largest: ${largest}`);
+    // 26 300 since 2026-11-25: the 24th start tool, aimeat_home_waiting, is listed in about 330
+    // characters, and the 23 before it took 25 903 of the 26 000 (Jouni, 2026-11-25: the tool joins
+    // the chat's start set).
+    assert(size < 26_300, `the start set is listed in under 26 300 characters (45 769 before): ${size}; largest: ${largest}`);
     // The answer size a tool declares to a client (mcp/declared-answer-size.ts) is 52 characters a
     // tool; the chat list leaves it out, and the full surface carries it (checked below).
     const declaring = listed.filter((t: any) => t._meta?.['anthropic/maxResultSizeChars'] !== undefined).map((t: any) => t.name);

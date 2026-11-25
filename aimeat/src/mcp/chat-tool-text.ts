@@ -18,6 +18,9 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
+ *   2026-11-25 — aimeat_home_waiting, a start tool: what waits for the person, with a short text and
+ *     `limit` off the chat listing. The start set is 26 230 characters with it, and its limit in
+ *     test/e2e-mcp-v2.ts is 26 300 (26 000 before): the 23 tools before it took 25 903.
  *   2026-11-24 — aimeat_workspace_read's text says the index is one page per space, with `counts`,
  *     `page.more` and `q`. Its three new parameters took the start set to 26 467 characters, over
  *     26 000, so its parameters get short words and `limit` stays off the chat listing.
@@ -112,6 +115,11 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
     },
     aimeat_home_feed: {
         description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new. Name an agent by `data.agent_shown_name` and give a time as `at_local` when a row has them.',
+    },
+    // The page's own cap is what a chat reads, so `limit` stays off the chat listing.
+    aimeat_home_waiting: {
+        description: 'What waits for the person: decisions, answers owed, counts to open. Read it when they ask what waits. Act with an item\'s `act_with` tool, else give its `href`.',
+        unlisted: ['limit'],
     },
     aimeat_discover: {
         description: 'Find what exists on this AIMEAT in one call: apps, memory, workspaces, knowledge, capabilities. `scope`: own (default), shared (the organisms the person belongs to) or public. `mode: "map"` gives counts first.',
