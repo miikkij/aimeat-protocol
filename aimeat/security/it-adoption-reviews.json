@@ -210,7 +210,7 @@
       "digest": "sha256:99a08baa2840444c88662167"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-23",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/schedule/fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -237,7 +237,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:3281305123a49d05474a8da5"
+      "digest": "sha256:111aaabd9642da5822fa6ec1"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -466,7 +466,7 @@
       "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
       "aimeat/src/services/once-only-step.ts": "afaf629df6d5f1cc",
       "aimeat/src/services/event-bus.ts": "fa4303b35386f9f8",
-      "aimeat/src/mcp/oauth.ts": "aa06ed227468977b",
+      "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/services/passkeys.ts": "91ed59b8f3c114cc",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",

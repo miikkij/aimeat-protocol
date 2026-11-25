@@ -2,7 +2,7 @@
   "about": "When each section of docs/AIMEAT-Feature-List.md was last read against the code it describes, which files or folders that code is (a folder means every file git tracks under it), and which promises of a refusal or a limit a test holds. pnpm check:feature-list fails when a watched file changes after the review, so whoever changed the code re-reads the section; and when a promise's sentence, its test file or the string the test must contain is gone. The watches are the folders and files the section's rows describe: the routes, services and tool catalog entries behind them, chosen so that the code under one section changes on at most about four days a week (measured with git log over 30 days on 2026-11-19), with a specific subfolder or file preferred to a whole services folder. Re-stamp after reading with: pnpm check:feature-list --record \"<section heading>\". A promise no test holds is rewritten in the list to what the code does, never listed here. Reasoning: aimeat/scripts/check-feature-list.ts.",
   "sections": {
     "1. Connecting an AI": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/mcp/oauth.ts",
         "aimeat/src/mcp/oauth-consent-info.ts",
@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:6b23a152aca660cb9c888a0a"
+      "digest": "sha256:2f37fada8c539d33e8d6fe92"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-24",
@@ -106,7 +106,7 @@
       "digest": "sha256:4610951cc82a67fd257b52dc"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:807750f7b7801e6a2ff3e9f3"
+      "digest": "sha256:d4903ec05847771b9f3b5217"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-22",
@@ -197,7 +197,7 @@
       "digest": "sha256:e6af7b237ae23df0b701ba55"
     },
     "10. Apps": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/src/services/app/config.ts",
         "aimeat/src/routes/apps/read.ts",
@@ -217,7 +217,7 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:206bfd33753a0940910a718d"
+      "digest": "sha256:89985b130d8d7554be45ada2"
     },
     "11. Served libraries and the Design Book": {
       "reviewedOn": "2026-11-25",
@@ -386,7 +386,7 @@
       "digest": "sha256:a03f17769e92b8aa75381a12"
     },
     "21. Standards the node speaks": {
-      "reviewedOn": "2026-11-21",
+      "reviewedOn": "2026-11-25",
       "watches": [
         "aimeat/security/protocol-versions.json",
         "aimeat/src/routes/wellknown.ts",
@@ -397,7 +397,7 @@
         "aimeat/src/mcp/oauth-metadata.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:8d964b7e88361dba3229efcb"
+      "digest": "sha256:8972009a6f06f760858f4bc7"
     },
     "22. Companion projects": {
       "reviewedOn": "2026-11-23",
@@ -508,7 +508,7 @@
   ],
   "fileDigests": {
     "1. Connecting an AI": {
-      "aimeat/src/mcp/oauth.ts": "aa06ed227468977b",
+      "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
       "aimeat/src/mcp/oauth-consent-info.ts": "36d3fc455b40c6ee",
       "aimeat/src/mcp/protocol-version.ts": "f57eb3836e14df1e",
       "aimeat/src/routes/bootstrap.ts": "1456a200b4c5d174",
@@ -638,7 +638,7 @@
       "aimeat/src/services/open-items.ts": "7f41fc9dab8fd03a"
     },
     "6. Organisms, workspaces and knowledge": {
-      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "b6d52a1355fc78d3",
+      "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "45ed95295a63a921",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "56d1206ca672b86d",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
       "aimeat/src/services/organism-join-requests/requests.ts": "7ff2859806cceb04",
@@ -757,7 +757,7 @@
     "10. Apps": {
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
       "aimeat/src/routes/apps/read.ts": "accd2534f58f083c",
-      "aimeat/src/tool-catalog/definitions/app-manage.ts": "d30c92e5ebb0464d",
+      "aimeat/src/tool-catalog/definitions/app-manage.ts": "a0a4e29f57dd20d6",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "b5f0f65b06e21760",
       "aimeat/src/services/app/fork-gate.ts": "532f9095f35a4de8",
       "aimeat/src/services/design-book/grown-genre.ts": "0d632fb12ce38db0",
@@ -997,7 +997,7 @@
       "aimeat/src/routes/agui.ts": "2331f91b0ce3eb0b",
       "aimeat/src/routes/ard-manifest.ts": "36edb39d7da3d3fc",
       "aimeat/src/services/oasf-projection.ts": "6fc5ca010c15aac5",
-      "aimeat/src/mcp/oauth-metadata.ts": "8dd1400c3c8d340a",
+      "aimeat/src/mcp/oauth-metadata.ts": "2e4475d626e61e31",
       "aimeat/src/routes/odata.ts": "adb0ec05fc647d8f"
     },
     "22. Companion projects": {
