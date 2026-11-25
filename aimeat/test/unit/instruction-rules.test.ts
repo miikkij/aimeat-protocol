@@ -8,7 +8,7 @@
  *   v1.0.0 -- 2026-11-15 -- Initial.
  */
 import { describe, expect, it } from 'vitest';
-import { instructionPathProblems, liveCountProblems, missingAgentsRules } from '../../scripts/lib/instruction-rules.mjs';
+import { instructionPathProblems, liveCountProblems, missingAgentsRules, supersededProblems } from '../../scripts/lib/instruction-rules.mjs';
 
 describe('a live count in CLAUDE.md', () => {
     it('refuses the counts that went stale', () => {
@@ -30,12 +30,42 @@ describe('a live count in CLAUDE.md', () => {
 
 describe('what AGENTS.md has to carry', () => {
     it('names each rule it leaves out', () => {
-        expect(missingAgentsRules('# AGENTS.md\nRead CLAUDE.md.')).toHaveLength(2);
+        expect(missingAgentsRules('# AGENTS.md\nRead CLAUDE.md.')).toHaveLength(3);
     });
 
-    it('passes when both rules are there', () => {
-        const text = '## This repository is public\nNothing names an organisation node.\nAsk first: release tags and CI builds.';
+    it('passes when every rule is there', () => {
+        const text = '## This repository is public\nNothing names an organisation node.\nAsk first: release tags and CI builds.\n'
+            + 'Finished work reaches `main` through `pnpm ready`, and nobody is asked.';
         expect(missingAgentsRules(text)).toEqual([]);
+    });
+});
+
+describe('a rule CLAUDE.md has replaced', () => {
+    it('refuses the sentences that stood in AGENTS.md and the guides on 2026-11-25', () => {
+        const old = [
+            'then `pnpm ready` from `aimeat/`, which runs the full E2E sweep and the builds on GitHub on a',
+            '`ready/<session>` branch and puts the work on `main` only when green.',
+            '- **Ask first** before release tags, CI builds and the full E2E sweep (about two hours; it runs only',
+            'Run `pnpm gate` once on the finished change. A green gate is what "done" needs; do not wait for',
+            '| The full E2E sweep | Only when the maintainer asks for it |',
+            ' *   work is finished, `pnpm gate` is what says whether it holds.',
+        ].join('\n');
+        const problems = supersededProblems(old, 'AGENTS.md');
+        expect(problems.map((p) => p.split(' ')[0])).toEqual([
+            'AGENTS.md:1', 'AGENTS.md:2', 'AGENTS.md:3', 'AGENTS.md:4', 'AGENTS.md:4', 'AGENTS.md:5', 'AGENTS.md:6',
+        ]);
+        expect(problems[0]).toContain('Now: `pnpm ready` runs on this machine');
+    });
+
+    it('passes the rule as CLAUDE.md states it, and `pnpm gate` as the local picture', () => {
+        const now = [
+            'Finished work reaches `main` through `pnpm ready`, and nobody is asked.',
+            'A green `pnpm ready` is what "done" needs; never run `pnpm gate` or a sweep beside it.',
+            '| The full E2E sweep | Never by hand: `pnpm ready` runs it when the change needs it |',
+            '`pnpm gate` is the same picture without the push, for a look of your own.',
+            'Never the full sweep: `pnpm ready` runs it when the change needs it, and the nightly runs it every night.',
+        ].join('\n');
+        expect(supersededProblems(now, 'docs/coding-guidelines/x.md')).toEqual([]);
     });
 });
 

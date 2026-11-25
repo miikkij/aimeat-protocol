@@ -41,15 +41,19 @@
  *     that holds only for some work moved into the rule files and guides.
  *   v1.2.1 -- 2026-11-15 -- The em-dash ban also reads every skill's references/*.md, where the
  *     skill splits of the same day had moved text that nothing checked.
+ *   v1.3.0 -- 2026-11-26 -- AGENTS.md must carry the merge rule (`pnpm ready`, nobody is asked), and
+ *     AGENTS.md, the coding guides, the agent files and the skills are refused a line that states a
+ *     rule CLAUDE.md has replaced (supersededProblems).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
-import { instructionPathProblems, liveCountProblems, missingAgentsRules } from './lib/instruction-rules.mjs';
+import { instructionPathProblems, liveCountProblems, missingAgentsRules, supersededProblems } from './lib/instruction-rules.mjs';
 
 const REPO = join(process.cwd(), '..');
 const CLAUDE_MD = join(REPO, 'CLAUDE.md');
 const AGENTS_MD = join(REPO, 'AGENTS.md');
+const GUIDES_DIR = join(REPO, 'docs', 'coding-guidelines');
 const RULES_DIR = join(REPO, '.claude', 'rules');
 const SKILLS_DIR = join(REPO, '.claude', 'skills');
 
@@ -227,10 +231,17 @@ function main(): void {
     if (agentsMd.length) problems.push(...missingAgentsRules(readFileSync(AGENTS_MD, 'utf-8')));
     // 6. No live count that grows by design in the files every session or agent reads first.
     for (const file of [CLAUDE_MD, ...agentsMd]) problems.push(...liveCountProblems(readFileSync(file, 'utf-8'), rel(file)));
+    // 7. No rule CLAUDE.md has replaced, in the files an agent reads instead of it or beside it:
+    //    AGENTS.md, the coding guides, the agent files and the skills with their references. The rule
+    //    files are left out: they describe `pnpm gate` as the local picture it still is.
+    const guides = markdownFiles(GUIDES_DIR, (n) => n.endsWith('.md'));
+    const readFirst = [...agentsMd, ...guides, ...agents, ...skills, ...skillReferences];
+    for (const file of readFirst) problems.push(...supersededProblems(readFileSync(file, 'utf-8'), rel(file)));
+    console.log(`  ${readFirst.length} file(s) an agent reads first checked for rules CLAUDE.md has replaced`);
     console.log('');
 
     if (!problems.length) {
-        console.log('  ✓ under the ceiling; every paths pattern names real files; every rule is in the table; no em-dash; every pnpm command and path exists; AGENTS.md carries its rules; no live count');
+        console.log('  ✓ under the ceiling; every paths pattern names real files; every rule is in the table; no em-dash; every pnpm command and path exists; AGENTS.md carries its rules; no live count; no replaced rule');
         return;
     }
     for (const p of problems) console.log(`  ✗ ${p}`);

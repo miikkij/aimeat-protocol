@@ -39,12 +39,18 @@ Use a private `pnpm sandbox` for interactive checks. Initialize the checkout's o
 test environment with `pnpm test:env:init` (a maintainer session applies the port
 from its claim with `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`).
 
-Run the targeted suites the change requires and `pnpm gate` once on the finished
-change. A green gate is what "done" needs; do not wait for GitHub CI. The full E2E
-sweep requires the developer's approval.
+While developing, run only the suites of the area the change reaches. When the work
+looks done, run `pnpm check:fast` once, after the last commit, with
+`pnpm exec vitest run --changed origin/main` beside it. Then run `pnpm ready` from
+`aimeat/`: it runs, on this machine, the checks and the unit and E2E suites the change
+can reach on both backends, and puts the commits on `main` when they are green. A green
+`pnpm ready` is what "done" needs; do not wait for GitHub CI, and never run `pnpm gate`
+or a sweep beside it. The nightly runs the full sweep. `CLAUDE.md` (Git) is the source
+of this rule.
 
 The actual checks are defined in
 [check-registry.mjs](../../aimeat/scripts/lib/check-registry.mjs),
+[ready.ts](../../aimeat/scripts/ready.ts),
 [gate.ts](../../aimeat/scripts/gate.ts) and
 [the Git hooks](../../.githooks).
 

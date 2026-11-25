@@ -21,7 +21,7 @@ Since 2026-11-15 the project's order is the area's suites, then `pnpm check:fast
 
 1. Static: `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:sdk`, `pnpm check:sdk`, plus every `check:*` the change touches (licences for anything under public/lib, changelog for the changelog, openapi with a route, mcp-tools and mcp-schemas with a tool).
 2. Unit: `pnpm test`.
-3. E2E on both backends (`.env.test.sqlite`, `.env.test.postgres-kysely`), one suite at a time, freshly. The paths are relative to `aimeat/`, so: `cd aimeat && pnpm exec node --env-file=<env> --import tsx test/run-e2e-ci.ts --test=<suite>`. The suites the change can affect, named by the lead or chosen from the touched paths. Never the full sweep: it runs only when the developer asks for it.
+3. E2E on both backends (`.env.test.sqlite`, `.env.test.postgres-kysely`), one suite at a time, freshly. The paths are relative to `aimeat/`, so: `cd aimeat && pnpm exec node --env-file=<env> --import tsx test/run-e2e-ci.ts --test=<suite>`. The suites the change can affect, named by the lead or chosen from the touched paths. Never the full sweep: `pnpm ready` runs it when the change needs it, and the nightly runs it every night.
 4. The guard tier and the purpose tier on both backends when server source moved (anything under `src/` but `src/static`, the dependency manifests or the E2E machinery; the plan `pnpm gate` prints names the trigger): `pnpm test:e2e:guards:sqlite`, `pnpm test:e2e:guards:postgres-kysely`, `pnpm test:e2e:purpose:sqlite`, `pnpm test:e2e:purpose:postgres-kysely`, from `aimeat/`. The guard tier proves a hole stays closed; the purpose tier proves a designed use still works.
 
 ## Reading a result

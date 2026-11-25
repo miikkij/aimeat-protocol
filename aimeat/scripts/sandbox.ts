@@ -25,10 +25,11 @@
  *
  *   HOW IT IS USED. `pnpm sandbox` prints the base URL and every credential, and writes the same
  *   into `.sandbox.json` beside the log, so a browser, a curl and a second command all address the
- *   same node. Run it again and it reuses the node that is up and refreshes the tokens (a JWT is
- *   good for an hour). After six hours with no request the node and its mailbox stop themselves,
- *   and the next `pnpm sandbox` starts them again on the same data. Nothing here is a test: no assertion, no cleanup between looks. When the
- *   work is finished, `pnpm gate` is what says whether it holds.
+ *   same node. Run it again and it reuses the node that is up and refreshes the tokens (a token is
+ *   good for a day: AIMEAT_JWT_TTL and AIMEAT_ACCESS_TTL in SANDBOX_ENV). After six hours with no
+ *   request the node and its mailbox stop themselves, and the next `pnpm sandbox` starts them again
+ *   on the same data. Nothing here is a test: no assertion, no cleanup between looks. When the
+ *   work is finished, `pnpm ready` is what says whether it holds.
  *
  *   SAFE BY CONSTRUCTION. Every credential that could reach a third party is pinned EMPTY, the same
  *   list the E2E runner pins (test/run-e2e-server.ts, `pinnedEnv`) and for the same reason: the
@@ -52,6 +53,8 @@
  *                                          # the same node on PostgreSQL, with its own state file
  *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
  * @version-history
+ *   v1.11.2 — 2026-11-25 — Header only: a token lasts a day (it said an hour), and `pnpm ready`, not
+ *     `pnpm gate`, says whether finished work holds, as CLAUDE.md has said since 2026-11-15.
  *   v1.11.1 — 2026-11-23 — The start waits up to three minutes for the node, not one. With other
  *     sessions' suites running on the machine the node took longer than 60 s to answer, so the run
  *     stopped before seeding and left an unseeded node on the port. The wait ends as soon as the node

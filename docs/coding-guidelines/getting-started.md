@@ -123,11 +123,12 @@ pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci
 `<suite>` is a file name from `aimeat/test/` with or without the `e2e-` prefix, for example
 `--test=agent-onboarding`. Without `--test=` the runner starts every suite.
 
-Run `pnpm gate` once on the finished change. A green gate is what "done" needs; do not wait for
-GitHub CI. The gate adds the production backend by itself when the change touches storage, the
-identity layer, the routes, the MCP tools or the test runner; `pnpm gate --postgres` forces it for
-any change. The full E2E sweep takes about two hours and runs only with the developer's
-approval. See [testing requirements](testing-requirements.md).
+When the work looks done, commit it and run `pnpm check:fast` once. Then run `pnpm ready` from
+`aimeat/`: it runs the checks and the unit and E2E suites the change can reach on both backends,
+on this machine, and puts the commits on `main` when they are green. A green `pnpm ready` is what
+"done" needs; do not wait for GitHub CI, and never run `pnpm gate` or a sweep beside it. The
+nightly runs the full sweep. `CLAUDE.md` (Git) is the source of this rule; see also
+[testing requirements](testing-requirements.md).
 
 ## Find the implementation
 

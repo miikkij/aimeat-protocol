@@ -14,10 +14,15 @@
  *     it could name an organisation node in a commit or tag a release.
  *   - PATHS THAT MOVED. A rule pointed at `withDeclaredInputOnly` in a file it had left; agent files
  *     named paths nobody checked.
+ *   - REPLACED RULES STAYED. On 2026-11-25 AGENTS.md still said `pnpm ready` ran on GitHub on a
+ *     ready/<session> branch and that the full sweep waited for approval, and three guides still
+ *     named `pnpm gate` as the last step, ten days after CLAUDE.md replaced both.
  * @structure liveCountProblems(text, file) · missingAgentsRules(text) ·
- *   instructionPathProblems(text, file, exists)
+ *   supersededProblems(text, file) · instructionPathProblems(text, file, exists)
  * @version-history
  *   v1.0.0 -- 2026-11-15 -- Initial (instruction review 2026-11-14, TP8.1 and TP8.5).
+ *   v1.1.0 -- 2026-11-26 -- AGENTS.md must carry the merge rule, and supersededProblems() refuses a
+ *     line that states a rule CLAUDE.md has replaced (wish-same-repo-tooling-for-codex-and-claude-code-agents-md-held-t).
  */
 
 /**
@@ -50,7 +55,40 @@ export function liveCountProblems(text, file) {
 const AGENTS_RULES = [
     { what: 'the public-repository rule ("This repository is public" and that no organisation node is named)', test: (t) => /this repository is public/i.test(t) && /organisation node/i.test(t) },
     { what: 'the release-tag rule (release tags and CI builds wait for the developer)', test: (t) => /release tags?/i.test(t) && /CI builds?/i.test(t) },
+    { what: 'the merge rule (finished work reaches main through `pnpm ready`, and nobody is asked)', test: (t) => /`pnpm ready`/.test(t) && /nobody is asked/i.test(t) },
 ];
+
+/**
+ * Statements CLAUDE.md has replaced. Each one stood in AGENTS.md or a guide for days after the rule
+ * moved, and an agent that read it there did the old thing: asked before a sweep nobody runs by hand,
+ * or ran `pnpm gate` as the last step. Matched per line, so a sentence that names the old command in
+ * another sense (`pnpm gate` as a local picture) passes.
+ */
+const SUPERSEDED = [
+    { re: /ready\/<session>/i, now: '`pnpm ready` runs on this machine, and the public origin takes no branch but main (CLAUDE.md, Git, 2026-11-22)' },
+    { re: /`pnpm ready`[^.\n]*\bon GitHub\b/i, now: '`pnpm ready` runs on this machine, and the public origin takes no branch but main (CLAUDE.md, Git, 2026-11-22)' },
+    { re: /\bgreen (?:`pnpm )?gate`? is what\b/i, now: 'a green `pnpm ready` is what "done" needs (CLAUDE.md, Git, 2026-11-15)' },
+    { re: /`pnpm gate` (?:once|is what says)/i, now: 'finished work runs `pnpm check:fast` once, then `pnpm ready` (CLAUDE.md, Git, 2026-11-15)' },
+    { re: /\bfull (?:E2E )?sweep\b[^.\n]*(?:approv|asks for it)/i, now: 'nobody starts the full sweep by hand: `pnpm ready` runs it when the change needs it and the nightly every night (CLAUDE.md, Git and Gates)' },
+    { re: /\bask first\b[^.\n]*\bfull (?:E2E )?sweep\b/i, now: 'nobody starts the full sweep by hand: `pnpm ready` runs it when the change needs it and the nightly every night (CLAUDE.md, Git and Gates)' },
+];
+
+/**
+ * Lines that still state a rule CLAUDE.md has replaced.
+ * @param {string} text
+ * @param {string} file
+ * @returns {string[]}
+ */
+export function supersededProblems(text, file) {
+    const out = [];
+    text.split('\n').forEach((line, i) => {
+        for (const s of SUPERSEDED) {
+            const m = s.re.exec(line);
+            if (m) out.push(`${file}:${i + 1} states a replaced rule ("${m[0]}"). Now: ${s.now}.`);
+        }
+    });
+    return out;
+}
 
 /**
  * The rules AGENTS.md leaves out.

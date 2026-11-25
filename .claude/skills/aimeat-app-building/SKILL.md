@@ -56,7 +56,7 @@ An app is not done when it is published and works. It is done when these six exi
 | **Data map** | what the app is for, and per family of keys or files where it lives, who owns and reads it, and why there | `aimeat_datamap_set { app, data_map }` | `next_steps.data_map_present` |
 | **Design spec** | purpose, screens, data, decisions and why, AI and agents, open questions, traps | `aimeat_app_manage { action: "spec_set", filename, markdown }` (`spec` answers the outline) | `next_steps.design_spec_present` |
 | **Text about the app** | for a person who finds the app: what it does, for whom, how it is used; 150 to 400 words of checkable facts, no instructions to an AI | `aimeat_app_manage { action: "settings", filename, about, about_lang }` | `own_words` in the `seo` answer |
-| **App Development Note** | how it was built: commits, prod ids, what broke, what is open | a document in `ws-mslr8u99kzk` (the `note-writer` agent) | not in the answer: it is ours, not the node's |
+| **App Development Note** | how it was built: commits, prod ids, what broke, what is open | a document in `ws-mslr8u99kzk` (the note-writer role, `.claude/agents/note-writer.md`: a subagent in Claude Code, instructions you follow yourself in another tool) | not in the answer: it is ours, not the node's |
 
 The node holds the first four: from an app's second version on, a publish is refused (`APP_OWES_ITEMS`, every route, a script's too) while the design spec, the data map of an app that keeps data, or the bound skill and agent face of an app that is not a quick prototype or a presentation is missing, or the update has no `roadmap` line. The refusal names each item; nothing is stored (`services/app/owed-gate.ts`, setting `apps.owed_on_publish`).
 

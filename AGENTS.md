@@ -20,10 +20,10 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
 
 ## The rules that bite first
 
-- **Ask first** before release tags, CI builds and the full E2E sweep (about two hours; it runs only
-  when Jouni asks or has approved the work). When he asks for a release, the full run its check
-  needs is part of that request (`pnpm nightly:preflight --dispatch`); the tag and the publish stay
-  his. Ask also before a new entry in `docs/known_gaps.md`, before publishing a roadmap item or a
+- **Ask first** before release tags and CI builds. When he asks for a release, the full run its
+  check needs is part of that request (`pnpm nightly:preflight --dispatch`); the tag and the publish
+  stay his. Finished work reaches `main` through `pnpm ready`, and nobody is asked (see "Working in
+  this repository"). Ask also before a new entry in `docs/known_gaps.md`, before publishing a roadmap item or a
   ruling, and at the end of every feature with the proposed `aimeat/public/changelog.json` entry.
 - **A fix covers the whole defect**, not the reported symptom: a delete that leaves data behind is
   checked in every table and store that holds the id.
@@ -133,9 +133,15 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
   `aimeat-dev-session` on the node has the ritual. With `AIMEAT_SESSION` set, the git hooks treat
   you as a session: they stamp the `Session:`, `Project:` and `Wish:` trailers and hold your commits and
   pushes to the session rules below.
-- Look at a change on your own node: `pnpm sandbox` from `aimeat/`. Run the E2E suites the change
-  can reach, one at a time with `--test=<suite>`. Never start the full sweep on your own: it takes
-  about two hours and runs only when Jouni asks for it.
+- Look at a change on your own node: `pnpm sandbox` from `aimeat/`. A look is a browser reload or
+  one curl against it, never a restart of the shared dev server. While developing, run only the E2E
+  suites of the area the change reaches, one at a time with `--test=<suite>`. Never start a sweep
+  or `pnpm gate` by hand: `pnpm ready` decides what runs, and the nightly runs everything.
+- **The roles in `.claude/agents/` are instructions, not Claude Code features.** Claude Code runs
+  them as subagents: module-builder, browser-verifier, gatekeeper, note-writer, ui-conformance and
+  ui-design-review. In another tool, read the role's file and do the role yourself, or give the
+  file to a second session as its brief. Where `CLAUDE.md` or a skill says "the note-writer agent"
+  or "spawn a browser-verifier", that is the role you follow.
 - Never `git add -A`. Stage files by name. No `Co-Authored-By` trailer.
 - A multi-line commit message goes in a file: `bash scripts/git-commit.sh <file>`. On Windows that
   `bash` is Git Bash (`"C:\Program Files\Git\bin\bash.exe"` from PowerShell), never the WSL one.
@@ -145,13 +151,27 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
 - Edit files with your editing tool, never with `sed`, a heredoc or an inline script.
 - Reuse what exists. A new MCP tool, route, table or page type needs a reason that a memory record
   and a prompt could not cover.
-- Finished work reaches `main` in three steps (2026-11-15): while developing, only the suites of the
-  area the change reaches; when it looks done, `pnpm check:fast` once (fix every red line in one go);
-  then `pnpm ready` from `aimeat/`, which runs the full E2E sweep and the builds on GitHub on a
-  `ready/<session>` branch and puts the work on `main` only when green. The origin is public: push no
-  other branch.
+- Finished work reaches `main` through `pnpm ready`, and nobody is asked. Three steps, in the
+  session that did the work (2026-11-15):
+  1. While developing, only the suites of the area the change reaches.
+  2. When the work looks done, `git add` every new file (`check:imports-tracked` reads git's index),
+     commit, then run `pnpm check:fast` once with `pnpm exec vitest run --changed origin/main` beside
+     it, and search the tests for every string the change rewrote. Red: read every red line, fix
+     them all in one go, run it once more. A commit after these checks means running them again.
+  3. `pnpm ready` from `aimeat/`. It runs on this machine, one run at a time, in its own worktree
+     (`.worktrees/ready-train`): every check but CodeQL, and the unit files and E2E suites the
+     change can reach, on both backends; the full sweep only when the change reaches what every
+     request passes through. It tests the commits of every session waiting at that moment together,
+     and each session gets its own verdict. Green, it pushes the commits to `main` (rebased, under
+     new ids). Red, it says what is red and where the log is, and leaves `main` untouched. Start it
+     once and wait; never run a sweep or `pnpm gate` beside it.
+
+  The origin is public and takes no branch but `main`.
 - Answer in Finnish when Jouni writes Finnish, composed in Finnish, plain and short. The answer
   first, the evidence after it: a status question is answered in the first sentence as "done",
   "done, except X, which needs your decision" or "not done, it is at X". No em-dashes.
-- Ask before spending money, changing AI settings, touching infrastructure, deleting anything, or
-  building something that was not agreed, and before everything in "The rules that bite first".
+- Ask before spending money or changing AI settings, importing data automatically, touching
+  infrastructure (WSL and Docker are off limits), or building something that was not agreed, and
+  before everything in "The rules that bite first". Your sandbox gets the developer's OpenRouter
+  test key and model without a question (`docs/internal/TESTING.md`, Model keys). Name the exact
+  scope of a deletion before you delete.
