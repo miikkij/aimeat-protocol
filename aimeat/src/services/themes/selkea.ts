@@ -24,6 +24,8 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.0.1 — 2026-11-25 — The boards list's visibility column rule left the theme: listing.css now
+ *     sizes that column to its tag in every theme.
  *   v1.0.0 — 2026-11-25 — Initial.
  */
 import type { Style } from './styles.js';
@@ -240,14 +242,9 @@ function themeCss(): string {
 /* A tab is a framed button in the body face: no line under its word in any of its cuts. */
 :root .poster-tab { text-decoration: none; font-family: var(--font-body); }
 /* A tag inside a list cell is measured with its frame, so its own max-width keeps it inside the cell,
-   and it wraps between its words. The boards list gives its visibility column the width of the tag:
-   up to 13rem on a wide screen, where a two-word tag then takes one line, and up to 9rem on a narrow
-   one, where it takes two lines and stays clear of the row's button. */
+   and it wraps between its words. The boards list sizes its visibility column to the tag in every
+   theme (css/components/listing.css, name-state-count-last-doors). */
 :root .listing-row .poster-chip { box-sizing: border-box; white-space: normal; }
-:root .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(13rem) minmax(0, 8rem) minmax(0, 11rem) minmax(3.5rem, max-content); }
-@media (max-width: 900px) {
-  :root .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(9rem) minmax(3.5rem, max-content); }
-}
 `;
 }
 

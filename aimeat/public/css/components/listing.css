@@ -12,6 +12,9 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.39.0 — 2026-11-25 — name-state-count-last-doors (Boards): the visibility column is the width of
+ *     its badge, at most 13rem and 9rem under 900px, in every theme. It was a fixed 6.5rem and 5rem,
+ *     where a badge that names an organism broke onto three lines.
  *   v1.38.0 — 2026-11-25 — The cut name-n-n-n-n-n (Usage's report on tools, which gained the column Largest answer), with the widths of name-n-n-n-n and one more figure column.
  *   v1.37.0 — 2026-11-24 — The action column of a list grows to its content: its fixed width is now its
  *     minimum (`3rem` is `minmax(3rem, max-content)`, in 36 layouts). A theme that draws a row's action as
@@ -403,10 +406,11 @@
   :is(.listing--n-name-where-doors, .listing--when-name-where-doors) > .listing-row--head > div { display: grid; }
 }
 /* Boards: the board, its visibility, its notices, the latest, a door. At 900px the heading row, the
-   notices and the latest went. */
-.listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) 6.5rem minmax(0, 8rem) minmax(0, 11rem) minmax(3.5rem, max-content); }
+   notices and the latest went. The visibility column takes its badge's width up to a ceiling: at a
+   fixed 6.5rem a badge that names an organism broke onto three lines. */
+.listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(13rem) minmax(0, 8rem) minmax(0, 11rem) minmax(3.5rem, max-content); }
 @media (max-width: 900px) {
-  .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) 5rem minmax(3.5rem, max-content); }
+  .listing--name-state-count-last-doors { grid-template-columns: minmax(0, 1fr) fit-content(9rem) minmax(3.5rem, max-content); }
   .listing--name-state-count-last-doors > .listing-row--head > div, .listing--name-state-count-last-doors > .listing-row > :nth-child(3), .listing--name-state-count-last-doors > .listing-row > :nth-child(4) { display: none; }
 }
 /* Knowledge: the packages (name, entries, sharing, changed, a door), the organisms' packages (name,
