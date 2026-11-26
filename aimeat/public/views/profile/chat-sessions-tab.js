@@ -8,6 +8,9 @@
  *   that connects the person's AI over MCP with this server's address) and the title's question
  *   mark (concept.connect). How the page explains itself: .claude/rules/page-guidance.md.
  * @version-history
+ *   v1.18.0 -- 2026-11-26 -- The page leads with where things stand: a figure strip (how many tools,
+ *     when one was last here, how many nobody has used in 30 days), then the tools as section 01 and
+ *     how to add one as section 02, with the contents rail. The create card stood above the list.
  *   v1.17.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart and the title's question mark concept.connect; the head's paragraph is two sentences.
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so names with a quote or an ampersand showed as &quot; / &amp;.
@@ -58,19 +61,22 @@ import { LoadingLine } from './shared.js';
 import { PageSection } from '/components/PageSection.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Card } from '/components/Card.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row as ListRow, Name, Desc, Doors } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
 import { Action, Loud, Icon } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Row, Space } from '/components/Layout.js';
+import { Row } from '/components/Layout.js';
 import { listChatSessions, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { PageStart } from '/components/PageStart.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
+
+/** A tool nobody has used for this long is counted as one the person may remove. */
+const STALE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export default function ChatSessionsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -136,37 +142,36 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
   }, [showToast]);
 
   if (!chatSessions) return html`<${LoadingLine} text=${t('profile.chatSessions.loading')} />`;
+  const x = (key) => t('profile.chatSessions.' + key);
+  // The figures under the head: how many tools there are, when one was last here, and how many
+  // nobody has used in 30 days (the ones a person may remove).
+  const seen = chatSessions.filter(s => s.last_seen).sort((a, b) => String(b.last_seen).localeCompare(String(a.last_seen)));
+  const stale = chatSessions.filter(s => !s.last_seen || Date.now() - new Date(s.last_seen).getTime() > STALE_MS).length;
+  const strip = [
+    { key: 'n', n: chatSessions.length, label: x('stripSessions'), sub: x('stripSessionsSub') },
+    { key: 'seen', n: seen.length ? timeAgo(seen[0].last_seen) : x('stripSeenNone'), tone: seen.length ? 'coral' : 'dim',
+      label: x('stripSeen'), sub: seen.length ? (seen[0].display_name || seen[0].name) : undefined },
+    { key: 'stale', n: stale, tone: stale ? 'notice' : undefined, label: x('stripStale'), sub: stale ? x('stripStaleSub') : undefined },
+  ];
   return html`
-    <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuActivity'), t('profile.tabs.chatSessions')]}
+    <${SettingsPage} name="chatsessions" crumb=${[t('nav.profile'), t('profile.landing.menuActivity'), t('profile.tabs.chatSessions')]}
       title=${t('profile.chatSessions.title')} help="concept.connect" desc=${t('profile.chatSessions.desc')}
-      start=${html`<${PageStart} id="chatsessions" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${chatSessions.length > 0} />`}>
+      strip=${html`<${FigureStrip} wrap items=${strip} />`}
+      start=${html`<${PageStart} id="chatsessions" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${chatSessions.length > 0} />`}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${[
+        { id: 'cs-list', num: '01', label: x('startedByYou'), count: chatSessions.length },
+        { id: 'cs-create', num: '02', label: x('createTitle') },
+      ]}
+      after=${html`<${ConfirmUI} />`}>
 
-    <${Space} below="large">
-      <${Card} tone="section" title=${t('profile.chatSessions.createTitle')}>
-        <${Note}>
-          ${t('profile.chatSessions.createDesc')}
-        <//>
-        <${Row} wrap below="small">
-          <${Loud} control onClick=${() => copyPrompt('quick')}
-            disabled=${copying === 'quick'}>
-            ${copying === 'quick' ? '...' : t('profile.chatSessions.copyQuickPrompt')}
-          <//>
-          <${Action} small onClick=${() => copyPrompt('detailed')}
-            disabled=${copying === 'detailed'}>
-            ${copying === 'detailed' ? '...' : t('profile.chatSessions.copyDetailedPrompt')}
-          <//>
-        <//>
-        <${Note}>
-          ${t('profile.chatSessions.createHint')}
-        <//>
-      <//>
-    <//>
-
+    ${/* The tools the person has come first: they are what the page is opened for. How to add one
+          follows, as the second section. */''}
+    <${PageSection} id="cs-list" num="01" title=${x('startedByYou')} count=${chatSessions.length}>
+    <${Note} kind="lead">${x('startedByYouDesc')}<//>
     ${chatSessions.length === 0
       ? html`<${Note} kind="quiet">${t('profile.chatSessions.empty')}<//>`
       : html`
-        <${PageSection} band title=${t('profile.chatSessions.startedByYou')}>
-        <${Note} kind="lead">${t('profile.chatSessions.startedByYouDesc')}<//>
         <${List} cols="name-desc-doors">
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
@@ -194,9 +199,23 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
           `;
         })}
         <//>
-        <//>
       `
     }
     <//>
-    <${ConfirmUI} />`;
+
+    <${PageSection} id="cs-create" num="02" title=${x('createTitle')}>
+      <${Note}>${x('createDesc')}<//>
+      <${Row} wrap below="small">
+        <${Loud} control onClick=${() => copyPrompt('quick')}
+          disabled=${copying === 'quick'}>
+          ${copying === 'quick' ? '...' : x('copyQuickPrompt')}
+        <//>
+        <${Action} small onClick=${() => copyPrompt('detailed')}
+          disabled=${copying === 'detailed'}>
+          ${copying === 'detailed' ? '...' : x('copyDetailedPrompt')}
+        <//>
+      <//>
+      <${Note}>${x('createHint')}<//>
+    <//>
+    <//>`;
 }

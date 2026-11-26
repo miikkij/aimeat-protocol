@@ -9,6 +9,9 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   v1.16.0 -- 2026-11-26 -- IncomingInvitations takes `id`, `num` and `onCount`: the Organisms page
+ *     numbers its sections and lists them in its contents rail, so it is told how many invitations
+ *     there are. With a number the section is the kit's numbered section, with its count. Additive.
  *   v1.15.0 -- 2026-10-08 -- The board preview's messages hand their ai_provenance block to
  *     BoardNotice, which shows the AI label when one is owed (aiprov D10).
  *   v1.14.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the search is the Search line with its loading mark and Clear, its hits the List under a Group heading per workspace (a hit's name opens it, its space a tag, its snippet the line under); the invitations the List with "invited by" as the small grey words beside the name; the board preview a Split with the Row of its description, the copy Icon and Open in Boards (openTab), and its composer the TextField with Send beside it (Enter sends). The page writes no class.
@@ -121,9 +124,12 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
  * organisms, with Accept / Decline. Invited organisms are not in the member's active list, so
  * this is how an invitee discovers them. Backend: GET /v1/organisms/invitations/mine.
  */
-export function IncomingInvitations({ showToast, onChanged }) {
+export function IncomingInvitations({ showToast, onChanged, id, num, onCount }) {
   const [invites, setInvites] = useState([]);
   const [busy, setBusy] = useState(false);
+  // The page numbers its sections and lists them in its contents rail, so it is told how many
+  // invitations there are; with none this part draws nothing.
+  useEffect(() => { onCount?.(invites.length); }, [invites.length, onCount]);
   const load = useCallback(async () => {
     const r = await orgService.listMyInvitations().catch(err => { swallowed('panels: IncomingInvitations', err); return null; });
     setInvites(r?.data?.invitations || []);
@@ -143,7 +149,7 @@ export function IncomingInvitations({ showToast, onChanged }) {
   };
   if (!invites.length) return null;
   return html`
-    <${PageSection} band title=${t('organisms.youAreInvited') || 'You’re invited'}>
+    <${PageSection} id=${id} num=${num} band=${!num} count=${num ? invites.length : undefined} title=${t('organisms.youAreInvited') || 'You’re invited'}>
       <${List} cols="name-doors" keepCols>
         ${invites.map(({ membership, organism }) => html`
           <${ListRow} key=${organism.id}>

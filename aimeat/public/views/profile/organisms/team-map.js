@@ -11,6 +11,8 @@
  * @structure TeamMap
  * @usage html`<${TeamMap} onOpen=${(orgId) => …} />` (views/profile/organisms-tab.js)
  * @version-history
+ *   v1.1.0 — 2026-11-26 — `id`, `num` and `onShown`: the Organisms page numbers its sections and lists
+ *     them in its contents rail, so it is told whether the map is drawn. Additive.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T21).
  */
 import { h } from 'preact';
@@ -28,9 +30,15 @@ import { Note } from '/components/Note.js';
 const html = htm.bind(h);
 const x = (key, vars) => t(`organisms.teamMap.${key}`, vars);
 
-/** @param {{ onOpen: (orgId: string) => void }} p */
-export function TeamMap({ onOpen }) {
+/**
+ * `id` and `num` are the section's place on the page that draws it, and `onShown` tells that page
+ * whether the map is drawn, so its section numbers and its contents rail leave no gap.
+ * @param {{ onOpen: (orgId: string) => void, id?: string, num?: string, onShown?: (shown: boolean) => void }} p
+ */
+export function TeamMap({ onOpen, id, num, onShown }) {
   const [teams, setTeams] = useState(null);
+  const shown = !!teams && teams.length >= 2;
+  useEffect(() => { onShown?.(shown); }, [shown, onShown]);
   useEffect(() => {
     let cancelled = false;
     const load = () => apiGet('/v1/teams/status')
@@ -52,7 +60,7 @@ export function TeamMap({ onOpen }) {
     .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
 
   return html`
-    <${Section} band title=${x('title')}>
+    <${Section} id=${id} num=${num} band=${!num} title=${x('title')}>
       <${Note}>${x('lead')}<//>
       <${CardGrid}>
         ${teams.map((tm) => {

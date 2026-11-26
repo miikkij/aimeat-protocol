@@ -13,9 +13,14 @@
  *   The words a person may not know carry their question mark (explain.concept.*). The list starts
  *   with PageStart "goals" under the head, beside the title's question mark concept.goal
  *   (.claude/rules/page-guidance.md). Composed from library components only; it has no sheet of its own.
- * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast })
+ * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast }) · goalSections(goal)
  * @usage Registered in profile.js TABS as { id: 'goals', component: GoalsTab }.
  * @version-history
+ *   v1.5.0 — 2026-11-26 — The page is the SettingsPage and leads with where things stand. The list has
+ *     a figure strip (how many goals run, how many wait for the person, how many are done, what they
+ *     spent), the full crumb and the contents rail; every goal is read once and the filter is applied
+ *     in the page. An opened goal has its own figures (state, works done, spent against its limit,
+ *     when it ends) and its rules as numbered sections with the rail, whose first row leads back.
  *   v1.4.0 — 2026-11-09 — PageStart gets the page's title and concept, for "Explain this page to me".
  *   v1.3.0 — 2026-11-08 — The Rounds save sends the cron (and the condition) even when emptied, so the
  *     server refuses an empty cron on a clock round instead of keeping the old one; the server now keeps
@@ -40,10 +45,10 @@ import { ago, date, money } from '/js/format.js';
 import { useConfirm } from '/components/Modal.js';
 import { useOpenItem } from '/js/open-item.js';
 import { listAgents } from '/js/services/agents.js';
-import { PageHead } from '/components/PageHead.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { PageStart } from '/components/PageStart.js';
 import { PageSection } from '/components/PageSection.js';
-import { BackLink } from '/components/BackLink.js';
 import { Fields } from '/components/Field.js';
 import { DataTable } from '/components/DataTable.js';
 import { Choice } from '/components/Choice.js';
@@ -125,11 +130,13 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
 
   const agentOptions = [['', g('pick', 'Pick an agent')], ...agents.map((a) => [a, a])];
   const label = (term, words) => html`<${HelpLabel} term=${term} label=${words}>${words}<//>`;
+  // Each section's number, from the list the contents rail reads (goalSections).
+  const num = Object.fromEntries(goalSections(goal).map((s) => [s.id, s.num]));
 
   return html`
     ${err && html`<${ErrorNote} text=${err} />`}
 
-    <${PageSection} title=${label('concept.coordinator', g('shareTitle', 'How the work is shared, and who takes part'))}>
+    <${PageSection} id="gl-share" num=${num['gl-share']} title=${label('concept.coordinator', g('shareTitle', 'How the work is shared, and who takes part'))}>
       <${Fields}>
       <${Choice} label=${g('mode', 'Way')} help="goals.mode" value=${mode} onChange=${setMode} options=${[
         ['single', g('modeSingle', 'One agent takes the whole goal')], ['coordinator', g('modeCoordinator', 'A coordinator leads')], ['plan', g('modePlan', 'A fixed plan')]]} />
@@ -150,14 +157,14 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <//>
     <//>
 
-    ${goal.mode === 'coordinator' && html`<${PageSection} title=${label('concept.coordinator', g('permsTitle', 'What the coordinator may do without asking'))}>
+    ${goal.mode === 'coordinator' && html`<${PageSection} id="gl-perms" num=${num['gl-perms']} title=${label('concept.coordinator', g('permsTitle', 'What the coordinator may do without asking'))}>
       ${PERMISSIONS.map(([k, key, fallback]) => html`
         <${Check} key=${k} ruled checked=${perms[k]} onChange=${(on) => setPerms((p) => ({ ...p, [k]: on }))}>${g(key, fallback)}<//>`)}
       <${Note} kind="quiet">${g('floor', 'Purchases, mail or posts in your name, and deleting always wait for you. A goal cannot change that.')}<//>
       <${Actions}><${Loud} control disabled=${!!busy} onClick=${() => save('perms', { permissions: perms })}>${g('save', 'Save')}<//><//>
     <//>`}
 
-    <${PageSection} title=${label('concept.follow_up', g('reactionsTitle', 'Reactions: when this is done, who continues'))}>
+    <${PageSection} id="gl-reactions" num=${num['gl-reactions']} title=${label('concept.follow_up', g('reactionsTitle', 'Reactions: when this is done, who continues'))}>
       ${goal.reactions.length === 0 && html`<${Note} kind="quiet">${g('noReactions', 'No reactions. Agents give the next work to each other themselves.')}<//>`}
       <${LineList} rows=${goal.reactions.map((r) => ({
         id: r.id,
@@ -175,7 +182,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <//>
     <//>
 
-    <${PageSection} title=${label('concept.round', g('roundsTitle', 'Rounds'))}>
+    <${PageSection} id="gl-rounds" num=${num['gl-rounds']} title=${label('concept.round', g('roundsTitle', 'Rounds'))}>
       <${Fields}>
       <${Choice} label=${g('trigger', 'A round starts')} value=${trigger} onChange=${setTrigger} options=${[
         ['none', g('tNone', 'No rounds: the goal ends')], ['manual', g('tManual', 'When I start it')], ['clock', g('tClock', 'On a schedule')], ['condition', g('tCondition', 'On a schedule, only when a condition holds (a watch)')]]} />
@@ -195,7 +202,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <//>
     <//>
 
-    <${PageSection} title=${g('limitsTitle', 'Limits')}>
+    <${PageSection} id="gl-limits" num=${num['gl-limits']} title=${g('limitsTitle', 'Limits')}>
       <${Fields}>
       <${TextField} label=${g('usd', 'Spending limit for the whole goal ($, empty = none)')} value=${usd} onInput=${setUsd} inputMode="decimal" help="concept.spending" />
       <${TextField} label=${g('hops', 'Chain length')} value=${hops} onInput=${setHops} inputMode="numeric" help="concept.chain_length" />
@@ -207,7 +214,7 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <//>
     <//>
 
-    <${PageSection} title=${g('chainTitle', 'The whole chain, work by work')}>
+    <${PageSection} id="gl-chain" num=${num['gl-chain']} title=${g('chainTitle', 'The whole chain, work by work')} count=${goal.works.length}>
       <${DataTable} scroll headers=${[g('hWork', 'Work'), g('hLink', 'Link'), g('hLoop', 'Back and forth'), g('hWho', 'Who'), g('hState', 'State'), g('hCost', 'Cost')]}
         rows=${goal.works.map((w) => [
           w.title, String(w.hop), String(w.loop),
@@ -230,10 +237,12 @@ export default function GoalsTab({ showToast }) {
   const [agents, setAgents] = useState([]);
   const [err, setErr] = useState('');
 
+  // One read of every goal, whatever the filter: the node filters the same list in memory, and the
+  // figures need them all.
   const load = useCallback(async () => {
-    try { setGoals((await listGoals(filter === 'all' ? undefined : filter))?.data?.goals ?? []); setErr(''); }
+    try { setGoals((await listGoals())?.data?.goals ?? []); setErr(''); }
     catch (e) { setErr(e?.message || String(e)); setGoals([]); }
-  }, [filter]);
+  }, []);
   const loadOpen = useCallback(async (id) => {
     if (!id) { setOpen(null); return; }
     try { setOpen((await getGoal(id))?.data?.goal ?? null); }
@@ -252,35 +261,97 @@ export default function GoalsTab({ showToast }) {
   liveRef.current = () => { load(); if (openId) loadOpen(openId); };
   useEffect(() => onLiveUpdate(['goals'], () => liveRef.current()), []);
 
-  // An opened goal takes the place of the list; the back link returns to it.
-  if (openId && open) return html`
-    <${ConfirmUI} />
-    <${BackLink} href="/v1/profile?tab=goals" onClick=${(e) => { e.preventDefault(); setOpenId(null); }}>↩ ${g('back', 'All goals')}<//>
-    <${PageHead} title=${open.title} sub=${goalStatusWords(open.status).word} />
-    <${GoalRules} key=${open.id + open.updated_at} goal=${toRuleShape(open)} agents=${agents} onSaved=${() => loadOpen(open.id)} confirm=${confirm} showToast=${showToast} />`;
+  const trail = [t('nav.profile'), t('profile.landing.menuAutomation')];
+  const toList = (e) => { e?.preventDefault?.(); setOpenId(null); };
+
+  // An opened goal takes the place of the list: where it stands as figures, then its rules as
+  // numbered sections beside the contents rail, whose first row is the way back to the list.
+  if (openId && open) {
+    const rules = toRuleShape(open);
+    const state = goalStatusWords(open.status).word;
+    return html`
+      <${SettingsPage} name="goal" page
+        crumb=${[...trail, { label: g('title', 'Goals'), href: '/v1/profile?tab=goals', onClick: toList }, { label: open.title, here: true }]}
+        title=${open.title} desc=${open.statement !== open.title ? open.statement : undefined}
+        strip=${html`<${FigureStrip} wrap items=${[
+          { key: 'state', n: state, tone: 'word', label: g('hState', 'State') },
+          { key: 'done', n: open.progress.done, of: `/${open.progress.total}`, label: g('stripWorksDone', 'works done'),
+            sub: open.progress.waiting_for_you ? g('stripAsksYou', 'wait for you: {n}').replace('{n}', String(open.progress.waiting_for_you)) : undefined },
+          { key: 'spent', n: money(open.spent.usd), label: g('stripSpent', 'spent'),
+            sub: open.limits.usd !== null && open.limits.usd !== undefined ? g('stripLimit', 'limit {m}').replace('{m}', money(open.limits.usd)) : g('stripNoLimit', 'no spending limit') },
+          { key: 'ends', n: open.ends_at ? date(open.ends_at) : '·', tone: open.ends_at ? 'word' : 'dim', label: g('hEnds', 'Ends'),
+            sub: !open.ends_at && open.renew_by ? g('renewBy', 'renew by {d}').replace('{d}', date(open.renew_by)) : undefined },
+        ]} />`}
+        railTitle=${t('profile.landing.railTitle')} back=${{ label: g('back', 'All goals'), href: '/v1/profile?tab=goals', onClick: toList }}
+        sections=${goalSections(rules)}
+        after=${html`<${ConfirmUI} />`}>
+        <${GoalRules} key=${open.id + open.updated_at} goal=${rules} agents=${agents} onSaved=${() => loadOpen(open.id)} confirm=${confirm} showToast=${showToast} />
+      <//>`;
+  }
+
+  // The list. Every goal is read once and the filter is applied here, so the figures can say how
+  // many run, how many wait for the person and how many are done whatever the filter shows.
+  const all = goals ?? [];
+  const running = all.filter((x) => !SETTLED.has(x.status));
+  const asks = all.filter((x) => x.status === 'proposed').length + running.reduce((n, x) => n + (x.progress?.waiting_for_you ?? 0), 0);
+  const doneCount = all.filter((x) => x.status === 'done').length;
+  const spent = all.reduce((n, x) => n + (x.spent?.usd ?? 0), 0);
+  const shown = filter === 'all' ? all : filter === 'running' ? running : all.filter((x) => x.status === filter);
+  const strip = goals === null ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} wrap items=${[
+    { key: 'running', n: running.length, label: g('stripRunning', 'running'), onClick: () => setFilter('running'),
+      sub: g('stripWorking', 'works in progress: {n}').replace('{n}', String(running.reduce((n, x) => n + (x.working_now?.length ?? 0), 0))) },
+    { key: 'asks', n: asks, tone: asks ? 'notice' : undefined, label: g('stripAsks', 'wait for you'), sub: g('stripAsksSub', 'proposals and questions') },
+    { key: 'done', n: doneCount, label: g('stripDone', 'done'), onClick: () => setFilter('done') },
+    { key: 'spent', n: money(spent), label: g('stripSpent', 'spent'), sub: g('stripSpentSub', 'by every goal together') },
+  ]} />`;
 
   return html`
-    <${ConfirmUI} />
-    <${PageHead} title=${g('title', 'Goals')} help="concept.goal"
-      desc=${g('desc', 'Every goal you or your AI gave your agents. Here are the rules the work moves by: who takes part, what the coordinator may do, the reactions, the rounds, the limits and the whole chain.')} />
-    ${/* The start (page-guidance.md) stands under the head; a goal is given on the home or by one's own
-          AI, so it has no button here. It folds once the list has a goal. */''}
-    <${PageStart} id="goals" done=${goals === null ? null : goals.length > 0} title=${g('title', 'Goals')} concept="concept.goal" />
-    <${Choice} tone="filter" ariaLabel=${g('show', 'Show')} value=${filter} onChange=${setFilter} options=${[
-      ['running', g('fRunning', 'Running')], ['done', g('fDone', 'Done')], ['stopped', g('fStopped', 'Stopped')], ['expired', g('fExpired', 'Ended')], ['all', g('fAll', 'All')]]} />
-    ${err && html`<${ErrorNote} text=${err} />`}
-    ${goals === null ? html`<${Spinner} />` : goals.length === 0
-      ? html`<${Note} kind="quiet">${g('none', 'No goals here. Give one on your home, or say it to your own AI.')}<//>`
-      : html`<${DataTable} scroll headers=${[g('hGoal', 'Goal'), g('hState', 'State'), g('hProgress', 'Done'), g('hSpent', 'Spent'), g('hEnds', 'Ends'), g('hCarrier', 'Carried by')]}
-          rows=${goals.map((x) => [
-            html`<${Action} tone="inline" onClick=${() => setOpenId(x.id)}>${x.title}<//>`,
-            goalStatusWords(x.status).word,
-            `${x.progress.done} / ${x.progress.total}`,
-            x.limits.usd !== null ? `${money(x.spent.usd)} / ${money(x.limits.usd)}` : money(x.spent.usd),
-            x.ends_at ? date(x.ends_at) : (x.renew_by ? g('renewBy', 'renew by {d}').replace('{d}', date(x.renew_by)) : '–'),
-            x.mode === 'coordinator' ? x.coordinator : x.mode === 'plan' ? g('plan', 'plan') : g('single', 'one agent'),
-          ])} />`}
-  `;
+    <${SettingsPage} name="goals" crumb=${[...trail, g('title', 'Goals')]}
+      title=${g('title', 'Goals')} help="concept.goal"
+      desc=${g('desc', 'Every goal you or your AI gave your agents. Here are the rules the work moves by: who takes part, what the coordinator may do, the reactions, the rounds, the limits and the whole chain.')}
+      strip=${strip}
+      start=${/* A goal is given on the home or by one's own AI, so the start has no button here. */
+        html`<${PageStart} id="goals" done=${goals === null ? null : all.length > 0} title=${g('title', 'Goals')} concept="concept.goal" />`}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${[{ id: 'gl-list', num: '01', label: g('title', 'Goals'), count: goals === null ? undefined : shown.length }]}
+      pagesLabel=${t('profile.landing.railPages')}
+      pages=${[{ href: '/v1/home', label: t('nav.home'), key: 'home' }, { tab: 'fleet', label: t('profile.tabs.fleet'), key: 'fleet' }, { tab: 'agents', label: t('profile.tabs.agents'), key: 'agents' }]}
+      after=${html`<${ConfirmUI} />`}>
+      <${PageSection} id="gl-list" num="01" title=${g('title', 'Goals')} count=${goals === null ? undefined : shown.length}
+        doors=${html`<${Choice} tone="filter" ariaLabel=${g('show', 'Show')} value=${filter} onChange=${setFilter} options=${[
+          ['running', g('fRunning', 'Running')], ['done', g('fDone', 'Done')], ['stopped', g('fStopped', 'Stopped')], ['expired', g('fExpired', 'Ended')], ['all', g('fAll', 'All')]]} />`}>
+        ${err && html`<${ErrorNote} text=${err} />`}
+        ${goals === null ? html`<${Spinner} />` : shown.length === 0
+          ? html`<${Note} kind="quiet">${all.length === 0 ? g('none', 'No goals here. Give one on your home, or say it to your own AI.') : g('noneShown', 'No goal is in this state.')}<//>`
+          : html`<${DataTable} scroll headers=${[g('hGoal', 'Goal'), g('hState', 'State'), g('hProgress', 'Done'), g('hSpent', 'Spent'), g('hEnds', 'Ends'), g('hCarrier', 'Carried by')]}
+              rows=${shown.map((x) => [
+                html`<${Action} tone="inline" onClick=${() => setOpenId(x.id)}>${x.title}<//>`,
+                goalStatusWords(x.status).word,
+                `${x.progress.done} / ${x.progress.total}`,
+                x.limits.usd !== null ? `${money(x.spent.usd)} / ${money(x.limits.usd)}` : money(x.spent.usd),
+                x.ends_at ? date(x.ends_at) : (x.renew_by ? g('renewBy', 'renew by {d}').replace('{d}', date(x.renew_by)) : '–'),
+                x.mode === 'coordinator' ? x.coordinator : x.mode === 'plan' ? g('plan', 'plan') : g('single', 'one agent'),
+              ])} />`}
+      <//>
+    <//>`;
+}
+
+/** The states a goal no longer moves in. */
+const SETTLED = new Set(['done', 'stopped', 'expired']);
+
+/**
+ * The sections of an opened goal in page order, numbered. The contents rail and GoalRules read the
+ * same list, so a section that a goal does not have (the coordinator's permissions) leaves no gap.
+ */
+function goalSections(goal) {
+  return [
+    ['gl-share', g('shareTitle', 'How the work is shared, and who takes part')],
+    goal.mode === 'coordinator' ? ['gl-perms', g('permsTitle', 'What the coordinator may do without asking')] : null,
+    ['gl-reactions', g('reactionsTitle', 'Reactions: when this is done, who continues'), goal.reactions.length || undefined],
+    ['gl-rounds', g('roundsTitle', 'Rounds')],
+    ['gl-limits', g('limitsTitle', 'Limits')],
+    ['gl-chain', g('chainTitle', 'The whole chain, work by work'), goal.works.length],
+  ].filter(Boolean).map(([id, label, count], i) => ({ id, num: String(i + 1).padStart(2, '0'), label, count }));
 }
 
 /** The goal view's snake_case fields in the shape GoalRules reads. */

@@ -30,6 +30,10 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.5.0 -- 2026-11-26 -- For the Settings page that holds it: `onFigures` reports the agents'
+ *     counts for that page's figure strip, `listId` and `listNum` make the list one numbered section,
+ *     and with agents the starter is drawn after the list (it stood over it, so the page began with
+ *     an offer to make more agents). With no agent the starter still comes first.
  *   v2.4.0 -- 2026-10-19 -- Inside each group the agents stand in alphabetical order of their shown name (sortAgents).
  *   v2.3.0 -- 2026-10-19 -- A row's name starts with the agent's own picture when it has set one.
  *   v2.2.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of the "no
@@ -88,6 +92,7 @@ import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
+import { PageSection } from '/components/PageSection.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -238,9 +243,24 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
  * `embedded` is how one implementation serves both addresses. The standalone page owns the browser
  * tab, so it carries an h1; inside Settings & Controls the section header is already on screen and
  * a second heading of the same words is the thing a reader has to work out is not a mistake.
+ * @param {{ embedded?: boolean, starter?: any,
+ *   onFigures?: ((f: { agents: number, problems: number, connected: number, doneWeek: number }) => void) | null,
+ *   listId?: string, listNum?: string }} [props]
  */
-export default function FleetView({ embedded = false, starter = null } = {}) {
+export default function FleetView({ embedded = false, starter = null, onFigures = null, listId, listNum } = {}) {
   const [agents, setAgents] = useState(null);
+  // The page that holds the fleet draws its figures from the agents this view loaded (how many
+  // there are, how many cannot sign in, how many are connected now, what they finished this week),
+  // so it is told them and asks the node nothing of its own.
+  useEffect(() => {
+    if (!onFigures || !agents) return;
+    onFigures({
+      agents: agents.length,
+      problems: agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state)).length,
+      connected: agents.filter(a => a.credential?.connected).length,
+      doneWeek: agents.reduce((n, a) => n + (a.stats?.tasks?.doneWeek ?? 0), 0),
+    });
+  }, [agents, onFigures]);
   const fleetLoad = useLoadState();
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
@@ -440,6 +460,12 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
     }
   }
 
+  // The agents as one numbered section when the page that holds the fleet numbers its sections
+  // (`listNum`, the Settings page); standing alone the list has no headline of its own.
+  const listed = (body) => (listNum
+    ? html`<${PageSection} id=${listId} num=${listNum} title=${t('profile.tabs.agents')} count=${agents.length}>${body}<//>`
+    : body);
+
   return frame(html`
       ${agents.length === 0
         ? html`${starter}<${EmptyState} title=${t('fleet.emptyTitle')} text=${t('fleet.emptyText')} />`
@@ -465,11 +491,11 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
           `}
           ${/* What the agents did this week, before their sign-in health: the work is why they exist. */''}
           <${Space} below="large"><${WeekBlock} agents=${agents} /><//>
-          ${starter}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
             <${Space} below="large"><${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//><//>
           `}
 
+          ${listed(html`
           <${Line} wrap gap="medium" below="large">
             <${Mark} kind="count" tone="tally">${agents.length === 1
               ? t('fleet.countAgentsOne')
@@ -576,6 +602,12 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
               `}
             <//>
           `)}
+          `)}
+          ${/* THE STARTER COMES AFTER THE AGENTS A PERSON HAS. It stood over the list, so a page
+                opened to see how nineteen agents are doing began with an offer to make two more.
+                With no agent it is the first thing on the page (above), which is where a person
+                with none needs it. */''}
+          ${starter}
         `}
   `);
 }

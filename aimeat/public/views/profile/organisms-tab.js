@@ -19,6 +19,11 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.42.0 -- 2026-11-26 -- The list page leads with where things stand: a figure strip (the shared
+ *     places the person is in, what waits for them there, the archived ones, the ones to discover),
+ *     then its sections numbered as they are drawn (an invitation and the team map are there only for
+ *     some people) beside the contents rail. What waits is the read the top bar and the side menu
+ *     count with (views/home/waiting-data.js).
  *   v2.41.0 -- 2026-11-15 -- ?org=&ws= is read again when a link inside the profile changes the address (aimeat-navigated), so a team page's rows open their workspace.
  *   v2.40.0 -- 2026-11-14 --The team map above My Organisms, for someone in two teams or more (organisms/team-map.js, team setup T21).
  *   v2.39.1 -- 2026-11-14 -- A team's row and the joined banner name the team in the reader's language (orgName, team setup T24).
@@ -106,6 +111,8 @@ const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { useWaiting } from '/views/home/waiting-data.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { List, Row as ListRow, Lead, Name, Cell, Stats, Stat, Doors, Group, SearchLine } from '/components/List.js';
@@ -160,6 +167,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [archivedOpen, setArchivedOpen] = useState(false);   // collapsible "Archived" section (closed by default)
+  // What the two parts that load their own data report, for the figures, the section numbers and the
+  // contents rail: how many invitations wait, and whether the team map is drawn (two teams or more).
+  const [inviteCount, setInviteCount] = useState(0);
+  const [teamsShown, setTeamsShown] = useState(false);
+  // What waits for the person in their shared places (invitations and teams' records): the read the
+  // top bar and the side menu count with (views/home/waiting-data.js).
+  const waiting = useWaiting(true);
   // organism whose workspaces are open, then the specific workspace within it — both restored from
   // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
   // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
@@ -655,12 +669,34 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const chosenShape = shapes.find(x => x.id === formShape) || null;
   const ORG_COLS = 'mark-name-tags-stats-doors';
 
+  // The page's sections in order, numbered as they are drawn: an invitation and the team map are
+  // there only for some people, and a section that is not drawn leaves no gap in the numbers. The
+  // contents rail reads the same list. A search replaces the sections, so it has no rail.
+  const activeCount = sortedMine.filter(o => !o.archived).length;
+  const archivedCount = sortedMine.length - activeCount;
+  const waits = waiting.byTab.organisms || 0;
+  const pageSections = gHits !== null ? [] : [
+    inviteCount > 0 && { id: 'org-invited', label: t('organisms.youAreInvited'), count: inviteCount },
+    teamsShown && { id: 'org-teams', label: t('organisms.teamMap.title') },
+    { id: 'org-mine', label: t('organisms.myOrganisms') || 'My Organisms', count: activeCount },
+    publicOrganisms.length > 0 && { id: 'org-discover', label: t('organisms.discover') || 'Discover', count: publicOrganisms.length },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(pageSections.map(s => [s.id, s.num]));
+
   return html`
-    <${SettingsPage}
+    <${SettingsPage} name="organisms"
       crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.organisms')]}
       title=${t('organisms.title') || 'Organisms'} help="concept.organism"
       desc=${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}
+      strip=${html`<${FigureStrip} wrap items=${[
+        { key: 'mine', n: activeCount, label: t('organisms.stripPlaces'), sub: t('organisms.stripPlacesSub') },
+        { key: 'waits', n: waits, tone: waits ? 'notice' : undefined, label: t('organisms.stripWaiting'), sub: t('organisms.stripWaitingSub') },
+        archivedCount > 0 && { key: 'archived', n: archivedCount, label: t('organisms.stripArchived'), sub: t('organisms.stripArchivedSub') },
+        { key: 'public', n: publicOrganisms.length, label: t('organisms.stripDiscover'), sub: t('organisms.stripDiscoverSub') },
+      ]} />`}
       start=${html`<${PageStart} id="organisms" done=${myOrganisms.length > 0} action=${{ onClick: () => setShowCreate(true) }} />`}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${pageSections}
       after=${html`<${ConfirmUI} />`}>
 
     ${/* Create form (opened from the topbar button) */ ''}
@@ -748,14 +784,15 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <//>`)}
     ` : html`
     ${/* Incoming invitations */ ''}
-    <${IncomingInvitations} showToast=${showToast} onChanged=${loadData} />
+    <${IncomingInvitations} id="org-invited" num=${numOf['org-invited']} onCount=${setInviteCount} showToast=${showToast} onChanged=${loadData} />
 
     ${/* The team map: drawn only for someone in two teams or more (team-map.js). */ ''}
-    <${TeamMap} onOpen=${(id) => { setOpenId(id); setOpenWs(null); setOpenSpace(null); setOpenSettings(false); }} />
+    <${TeamMap} id="org-teams" num=${numOf['org-teams']} onShown=${setTeamsShown}
+      onOpen=${(id) => { setOpenId(id); setOpenWs(null); setOpenSpace(null); setOpenSettings(false); }} />
 
     ${/* My Organisms */ ''}
     <${FileDrop} hidden accept=".zip,application/zip" inputRef=${orgFileRef} onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
-    <${Section} band title=${t('organisms.myOrganisms') || 'My Organisms'} doors=${html`
+    <${Section} id="org-mine" num=${numOf['org-mine']} count=${activeCount} title=${t('organisms.myOrganisms') || 'My Organisms'} doors=${html`
       ${myOrganisms.length > 1 ? html`
         <${Select} fit title=${t('organisms.sortTitle') || 'Sort'} ariaLabel=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
           onChange=${(m) => { setSortMode(m); savePrefs(customOrder, m); }} options=${[
@@ -791,7 +828,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     ${/* Discover */ ''}
     ${publicOrganisms.length > 0 && html`
-      <${Section} band title=${t('organisms.discover') || 'Discover'}>
+      <${Section} id="org-discover" num=${numOf['org-discover']} count=${publicOrganisms.length} title=${t('organisms.discover') || 'Discover'}>
         <${List} cols=${ORG_COLS} keepCols>${publicOrganisms.map(org => renderOrgRow(org, false))}<//>
       <//>
     `}

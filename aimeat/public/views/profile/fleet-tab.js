@@ -26,6 +26,10 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.5.0 — 2026-11-26 — The page leads with where things stand: a figure strip (how many agents,
+ *     how many cannot sign in, how many are connected now, what they finished this week) from the
+ *     counts FleetView reports, then three numbered sections with the contents rail: the agents, the
+ *     two starter agents, the defaults every agent carries.
  *   v1.4.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head (what the page is for, the prompt that asks one's own AI which agents
  *     have gone quiet, what follows) and the title's question mark concept.agent.
@@ -42,9 +46,11 @@
  *   v1.0.0 — 2026-09-03 — Initial: the Agents v2 section moves into Settings & Controls.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import FleetView from '/views/fleet.js';
 import BasicAgentsPanel from '/views/profile/agents/basic-agents-panel.js';
 import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
@@ -52,6 +58,24 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 
 export default function FleetTab({ session, showToast }) {
+  // The agents' counts, which FleetView reports from its own load: the figures under the head.
+  const [fig, setFig] = useState(null);
+  const x = (key) => t('fleet.' + key);
+  const strip = fig === null ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} wrap items=${[
+    { key: 'agents', n: fig.agents, label: x('stripAgents'), sub: x('stripAgentsSub') },
+    { key: 'problems', n: fig.problems, tone: fig.problems ? 'notice' : undefined, label: x('stripProblems'),
+      sub: fig.problems ? x('stripProblemsSub') : x('allFine') },
+    { key: 'connected', n: fig.connected, label: x('stripConnected'), sub: x('stripConnectedSub') },
+    { key: 'week', n: fig.doneWeek, label: x('stripWeek'), sub: x('stripWeekSub') },
+  ]} />`;
+  // The sections in the order FleetView draws them, numbered as they are drawn: a person with no
+  // agent has no list, and the starter is then the first section. The rail reads the same list.
+  const sections = [
+    fig?.agents === 0 ? null : { id: 'fleet-agents', label: t('profile.tabs.agents'), count: fig?.agents },
+    { id: 'agp-basic', label: t('profile.agents.basic.title') },
+    { id: 'fleet-defaults', label: t('profile.access.adTitle') },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(sections.map(s => [s.id, s.num]));
   // Embedded, the fleet draws no page frame of its own: views/fleet.js wraps it in the PageFrame only
   // when it stands alone at /v1/fleet.
   return html`
@@ -59,23 +83,29 @@ export default function FleetTab({ session, showToast }) {
       crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.fleet')]}
       title=${t('profile.tabs.fleet')} help="concept.agent"
       desc=${t('fleet.desc')}
+      strip=${strip}
       start=${/* No `done`: the agent list is FleetView's own load, which this page does not read. */
-        html`<${PageStart} id="fleet" />`}>
+        html`<${PageStart} id="fleet" />`}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${sections}
+      pagesLabel=${t('profile.landing.railPages')}
+      pages=${[{ tab: 'agents', label: t('profile.tabs.agents'), key: 'agents' }, { tab: 'goals', label: t('profile.tabs.goals'), key: 'goals' }]}>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a
             1280x460 screen the whole first view was an invitation to create MORE agents while
-            eighteen were locked out. FleetView places it under the alarm when there is one and at
-            the top when there is not, which is the right order in both cases.
+            eighteen were locked out. FleetView draws it after the agents a person has, and first
+            for a person with none.
 
             `emphasis="secondary"`: two .btn-primary buttons, both disabled because the connector is
             down, made the page's two loudest controls the two that do nothing. The fix is which one
             leads, not what either says. The old Agents tab passes nothing and keeps its primary. */''}
       ${/* `embedded`: the section header above is this view's heading, so it does not bring its own. */''}
-      <${FleetView} embedded starter=${html`<${BasicAgentsPanel} session=${session} showToast=${showToast} emphasis="secondary" />`} />
+      <${FleetView} embedded onFigures=${setFig} listId="fleet-agents" listNum=${numOf['fleet-agents']}
+        starter=${html`<${BasicAgentsPanel} session=${session} showToast=${showToast} emphasis="secondary" num=${numOf['agp-basic']} />`} />
       ${/* The rules every agent carries unless its own directives say otherwise, and the token budget.
             At the foot: a person comes here for the agents first, and the defaults are the one thing
             on this page that is about all of them at once. */''}
-      <${AgentDefaultsSection} showToast=${showToast} />
+      <${AgentDefaultsSection} id="fleet-defaults" num=${numOf['fleet-defaults']} showToast=${showToast} />
     <//>
   `;
 }

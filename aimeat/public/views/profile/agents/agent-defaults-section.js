@@ -5,6 +5,9 @@
  * @description Agent Defaults section — owner-level default rules for agents. Mounted at the foot
  *   of the Your agents page.
  * @version-history
+ *   v1.15.0 -- 2026-11-26 -- `id` and `num`: on a page that numbers its sections (Agent status) this
+ *     part is one numbered section, its description the section's lead. Without them it keeps its
+ *     small heading. Additive.
  *   v1.14.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of "No default
  *     rules set", the editor opens only on loaded defaults, and Save takes the memory areas from a
  *     strict read made just before the PUT, so a failed read saves nothing (QA audit F6-04).
@@ -50,6 +53,8 @@ import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-direct
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed, readForWrite } from '/js/load-state.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { PageSection } from '/components/PageSection.js';
+import { Note } from '/components/Note.js';
 import { Card } from '/components/Card.js';
 import { Row, Space } from '/components/Layout.js';
 import { Action, Loud } from '/components/Action.js';
@@ -61,7 +66,7 @@ import { TextField } from '/components/TextField.js';
  *  Its text is the description. A plain string is still read, in case an older record holds one. */
 const ruleText = (rule) => (typeof rule === 'string' ? rule : (rule?.description || rule?.id || ''));
 
-export function AgentDefaultsSection({ showToast, initial }) {
+export function AgentDefaultsSection({ showToast, initial, id, num }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,11 +146,15 @@ export function AgentDefaultsSection({ showToast, initial }) {
 
   const rules = defaults?.rules || [];
 
-  return html`
-    <${Space} above="section">
-      <${SubHeading} level=${3} desc=${t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.'}>${t('profile.access.adTitle') || 'Agent Defaults'}<//>
-    <//>
+  const title = t('profile.access.adTitle') || 'Agent Defaults';
+  const desc = t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.';
+  // `num`: the page numbers its sections and lists them in its contents rail (the Agent status
+  // page), so this part is one of them. Without it the part keeps its own small heading.
+  const framed = (body) => (num
+    ? html`<${PageSection} id=${id} num=${num} title=${title}><${Note} kind="lead">${desc}<//>${body}<//>`
+    : html`<${Space} above="section"><${SubHeading} level=${3} desc=${desc}>${title}<//><//>${body}`);
 
+  return framed(html`
     ${!editing ? html`
       <${Card} tone="section">
         <${Row} gap="none" justify="between" below="small">
@@ -200,5 +209,5 @@ export function AgentDefaultsSection({ showToast, initial }) {
         <//>
       <//>
     `}
-  `;
+  `);
 }
