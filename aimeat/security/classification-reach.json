@@ -1022,6 +1022,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only whether an icon or screenshot exists."
     },
+    "src/services/app/stray-agent-faces.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1
+      },
+      "why": "Written 2026-11-26, the node's own read: the once-only start step and the operator's decision list the public records under apps.<filename>.agentface without their values, to count the copies of an app's agent face that accounts other than the app's owner hold. Only the key, the holder's identity and the count reach the operator's Security page incident; no value is read or shown."
+    },
     "src/services/app/template-proposals.ts": {
       "reads": {
         "listMemory": 1,
