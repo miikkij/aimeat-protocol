@@ -28048,7 +28048,7 @@ paths:
         - { name: before, in: query, required: false, schema: { type: string, format: date-time }, description: Entries before this time. }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
         - { name: actor, in: query, required: false, schema: { type: string }, description: 'One agent of the account (name or name#owner@node), or me for the account itself.' }
-        - { name: app, in: query, required: false, schema: { type: string }, description: One app of the account, its filename. }
+        - { name: app, in: query, required: false, schema: { type: string }, description: "One app of the account, its filename." }
         - { name: summary, in: query, required: false, schema: { type: boolean }, description: 'true: the summary of the window instead of the entries.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }

@@ -29,7 +29,7 @@ import { connectAgentByDevice } from './helpers/agent-device.js';
             assert(w.status === 201 || w.status === 200, `write ${k}: ${w.status} ${JSON.stringify(w.body?.error)}`);
         }
         const bad = await json('/v1/memory', { method: 'POST', headers: asBot, body: JSON.stringify({ value: { no: 'key' } }) });
-        assert(bad.status >= 400 && bad.status < 500, `the refused write: ${bad.status}`);
+        expectRefusal(bad, 400);
     });
 
     await test('the owner\'s trail narrowed to the agent holds only its calls, each with how long it took', async () => {
@@ -59,10 +59,13 @@ import { connectAgentByDevice } from './helpers/agent-device.js';
     await test('an actor of another account is refused, and another owner may not read the agent\'s activity', async () => {
         expectRefusal(await json('/v1/build-with-you/trail?actor=bot%23someoneelse%40elsewhere', { headers: owner }), 400, 'INVALID_INPUT');
         const bob = await registerOwner(BASE, `trailb${Date.now()}`);
-        const r = await json(`/v1/agents/bot/activity?owner=${encodeURIComponent(alice.name)}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+        // Alice's agent by its full name: `bot` alone would name an agent of bob's own.
+        const node = alice.ghii.slice(alice.ghii.indexOf('@') + 1);
+        const alicesBot = encodeURIComponent(`bot#${alice.name}@${node}`);
+        const r = await json(`/v1/agents/${alicesBot}/activity`, { headers: { Authorization: `Bearer ${bob.token}` } });
         const theirs = await json(`/v1/build-with-you/trail?actor=${encodeURIComponent(`bot#${alice.name}`)}`, { headers: { Authorization: `Bearer ${bob.token}` } });
         assert(theirs.status === 400, `bob cannot name alice's agent: ${theirs.status} ${JSON.stringify(theirs.body?.error)}`);
-        assert(r.status === 403 || r.status === 404, `bob does not get alice's agent: ${r.status}`);
+        assert(r.status === 403, `bob does not get alice's agent: ${r.status} ${JSON.stringify(r.body?.error)}`);
         assert(!JSON.stringify(r.body).includes('trail.a'), 'nothing of alice\'s agent reaches bob');
     });
 
