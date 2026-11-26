@@ -689,12 +689,12 @@
       "note": "It checks pages on the session's sandbox node against the decisions the lead points it at."
     },
     "agent:ui-design-review": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/scripts/sandbox.ts",
         ".claude/rules/page-guidance.md"
       ],
-      "digest": "sha256:45856b461b98785a4e86f7a3",
+      "digest": "sha256:7a8e49324173cc2bc948689c",
       "note": "It looks at pages on the session's sandbox node and judges them by the page-guidance rule and skill aimeat-design-language."
     }
   },
@@ -1080,7 +1080,7 @@
     },
     "agent:ui-design-review": {
       "aimeat/scripts/sandbox.ts": "ff5667f45f677f32",
-      ".claude/rules/page-guidance.md": "72c61fac8b14df0c"
+      ".claude/rules/page-guidance.md": "061f4e40b5ac5723"
     },
     "node:aimeat-goal-recipes": {
       "aimeat/src/tool-catalog/definitions/goals.ts": "15966fd2c695c2ed",

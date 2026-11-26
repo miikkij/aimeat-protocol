@@ -6,8 +6,9 @@
  *   page's head in three parts. "What this is for" says in one sentence what the person gets here.
  *   "Do this first" gives one action: a prompt to paste into their own AI (the PromptCard), and,
  *   where this page has a button that does the same, that button. "What happens next" says in one
- *   sentence what follows. A person who has done the first action folds it to one line; the choice
- *   is kept per page in this browser (localStorage), never on the server.
+ *   sentence what follows. It is one closed row until the person opens it, so the page's own content
+ *   starts on the first screen; the choice is kept per page in this browser (localStorage), never
+ *   on the server.
  *
  *   The words are locale data under `pageStart.<id>.*` (`purpose`, `prompt`, `next`, `action`,
  *   `link`), so a page passes its id and what only it knows: the values the prompt names (`vars`),
@@ -20,9 +21,8 @@
  *     its words are `pageStart.<id>.action` unless `label` is given.
  *   - link: { onClick | href, label? }: a way on after the purpose sentence (the AI models page's link to
  *     the page where the person's chat AI is connected); its words are `pageStart.<id>.link`.
- *   - done: true when the page knows the first action is done (the block starts folded), null while
- *     it does not know yet (folded until it knows), false or absent: open. The person's own choice
- *     wins over it.
+ *   - done: accepted from the pages that pass it and no longer read: since 2026-11-26 the block is
+ *     closed on every page until the person opens it, and their choice is kept.
  *
  *   "Explain this page to me" stands under the purpose: a prompt for the person's own AI that carries
  *   the page's own explanation (the purpose, what follows, the page's concept and its examples) and
@@ -38,6 +38,9 @@
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
+ *   v1.2.0 — 2026-11-26 — The block is closed on every page until the person opens it (it was open
+ *     on a page whose first action was not done). One row stands above the page's own content
+ *     instead of about 400 px (Jouni, 2026-11-26).
  *   v1.1.0 — 2026-11-09 — "Explain this page to me": a prompt with the page's explanation and the
  *     person's role from profile.explain; PageInfo carries the page's title, description and concept
  *     (guidance audit 2026-11-09).
@@ -130,11 +133,14 @@ function ExplainPrompt({ id, title, desc, concept, forWords, nextWords }) {
  *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null,
  *   title?: string, concept?: string }} props
  */
-export function PageStart({ id, vars, purpose, prompt, next, action, link, done, title, concept }) {
+export function PageStart({ id, vars, purpose, prompt, next, action, link, title, concept }) {
   const info = useContext(PageInfo) || {};
   const [choice, setChoice] = useState(() => readChoice(id));
   const part = (name) => words(`pageStart.${id}.${name}`, vars);
-  const folded = choice === '1' || choice === '0' ? choice === '1' : (done === true || done === null);
+  // Closed until the person opens it, on every page. Open, it took about 400 px above the first
+  // section of a page that was not in use yet, so the page's own content began below the first
+  // screen. `done` no longer decides the fold; the person's own choice is kept as before.
+  const folded = choice !== '0';
   const toggle = () => { setChoice(folded ? '0' : '1'); writeChoice(id, !folded); };
 
   const forWords = purpose ?? part('purpose');

@@ -9,6 +9,7 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.8.3 — 2026-11-26 — PageStart is closed until the person opens it; `done` is no longer read.
  *   v1.8.2 — 2026-11-15 — Masthead and SettingsDoor summaries name actions and a link, not doors.
  *   v1.8.1 — 2026-11-03 — PageStart's example identity ends in a node id (alice@aimeat-fi-001-genesis), not
  *     a web host: an identity is name@node-id, and an agent copying alice@aimeat.io sent a DM nowhere.
@@ -159,7 +160,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'page-start', name: 'PageStart', kind: 'component', status: 'active',
-        summary: 'The start of a page for a person who has not used it yet: one quiet block under the head that says what the page is for, gives one first action (a prompt to paste into their own AI, and the page\'s own button for the same) and says what happens next. It folds to one line, and the browser remembers that per page.',
+        summary: 'The start of a page for a person who has not used it yet: one quiet block under the head that says what the page is for, gives one first action (a prompt to paste into their own AI, and the page\'s own button for the same) and says what happens next. It is one closed row until the person opens it, and the browser remembers their choice per page.',
         module: '/components/PageStart.js', sheet: '/css/components/page-start.css',
         data: {
             shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done }) · in a Settings page: SettingsPage({ start })',
@@ -171,11 +172,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
                 next: 'what follows the first action, one sentence (the locale\'s words when omitted)',
                 action: '{ onClick | href | copy, label }: the page\'s own button for the same first action',
                 link: '{ onClick | href, label }: a link after the purpose sentence',
-                done: 'true when the first action is done (it starts folded), null while the page does not know yet, false or absent: open; the person\'s own choice wins',
+                done: 'accepted from the pages that pass it and no longer read: the block is closed on every page until the person opens it',
             },
         },
         useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.'],
-        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'done or the person\'s choice', when: 'the person has done the first action, or folded it: one line with the control to open it' }],
+        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'the person\'s choice', when: 'until the person opens it, and again after they close it: one line with the control to open it' }],
         example: {
             id: 'memory',
             purpose: 'Memory keeps what every AI you connect should know about you and your work.',
