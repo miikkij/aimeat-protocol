@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-26 — registerEvalTools: aimeat_eval_set, _get and _run (mcp/evals.ts).
  *   2026-11-19 — registerCalibratorTools (aimeat_calibrator: the Prompt Calibrator, mcp/calibrator.ts).
  *   2026-11-19 — registerLivingTools (aimeat_living_author: a living document template, mcp/living.ts).
  *   2026-11-19 — registerSiteTemplateTools (aimeat_site_template: the front page per language, mcp/site-template.ts).
@@ -211,6 +212,7 @@ import { registerComplianceAgreementTools } from './compliance-agreements.js';
 import { registerKycTools } from './kyc.js';
 import { registerGoalTools } from './goals.js';
 import { registerBuildWithYouTools } from './build-with-you.js';
+import { registerEvalTools } from './evals.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerEcosystemAppTools } from './ecosystem-apps.js';
@@ -280,6 +282,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerKycTools(mcp, storage, config, caller);
     registerGoalTools(mcp, storage, config, caller);
     registerBuildWithYouTools(mcp, storage, config, caller);
+    registerEvalTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);

@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-26 — evalsRouter (routes/evals.ts): stored eval sets for crews, skills and library packs.
  *   2026-11-21 — The eight routers behind a feature flag (calibrator, portfolio, extensions, cortex,
  *     packages with instances, templates, connector tunnel, personal nodes) mount through
  *     flaggedMounts(): switched off, their paths answer 503 FEATURE_DISABLED naming the setting,
@@ -242,6 +243,7 @@ import { kycRouter } from '../routes/kyc/routes.js';
 import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
 import { goalsRouter } from '../routes/goals.js';
 import { buildWithYouRouter } from '../routes/build-with-you.js';
+import { evalsRouter } from '../routes/evals.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin/capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin/extensions.js';
@@ -800,6 +802,7 @@ export async function mountRoutes(
   app.use(complianceAgreementsRouter(config, storage));
   app.use(goalsRouter(config, storage)); // agent goals: open work, the next work, a person's steps
   app.use(buildWithYouRouter(config, storage)); // the place's one build request, its trail, the operator's relay
+  app.use(evalsRouter(config, storage)); // stored eval sets for crews, skills and library packs (services/evals/)
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));

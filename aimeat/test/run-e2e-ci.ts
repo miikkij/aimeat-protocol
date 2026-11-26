@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-26 -- Add e2e-evals.ts: stored eval sets scored per revision.
  *   2026-11-26 -- Add e2e-trail-recorded.ts: the node's own record of an agent's calls.
  *   2026-11-26 -- Add e2e-app-scenarios.ts: the builder's playtest scenarios, signed in, at every size.
  *   2026-11-26 -- Add e2e-app-freshness.ts: what beside the app is behind it.
@@ -704,6 +705,8 @@ const ALL_SUITES = [
     'test/e2e-app-scenarios.ts',
     // The node's own record of what an agent did: the trail per actor, summed, in the agent's activity (2026-11-26).
     'test/e2e-trail-recorded.ts',
+    // Stored eval sets: a skill scored with and without its text, against the version before (2026-11-26).
+    'test/e2e-evals.ts',
     // An aimeat-scopes word no app grant can hold refuses the publish (2026-11-21).
     'test/e2e-app-publish-scope-words.ts',
     'test/e2e-app-ai-path.ts',

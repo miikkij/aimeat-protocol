@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.33.0 -- 2026-11-26 -- evalCliTools: aimeat_eval_set, _get and _run.
  *   v1.32.0 -- 2026-11-19 -- calibratorCliTools: aimeat_calibrator.
  *   v1.31.0 -- 2026-11-19 -- livingCliTools: aimeat_living_author.
  *   v1.30.0 -- 2026-11-19 -- siteTemplateCliTools: aimeat_site_template.
@@ -86,6 +87,7 @@ import { docsignCliTools } from './tool-call-defs-docsign.js';
 import { complianceAgreementCliTools } from './tool-call-defs-compliance-agreements.js';
 import { goalCliTools } from './tool-call-defs-goals.js';
 import { buildWithYouCliTools } from './tool-call-defs-build-with-you.js';
+import { evalCliTools } from './tool-call-defs-evals.js';
 import { contactCliTools } from './tool-call-defs-contacts.js';
 import { companyCliTools } from './tool-call-defs-companies.js';
 import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
@@ -160,6 +162,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...complianceAgreementCliTools,
     ...goalCliTools,
     ...buildWithYouCliTools,
+    ...evalCliTools,
     ...contactCliTools,
     ...companyCliTools,
     ...beneficiaryCliTools,

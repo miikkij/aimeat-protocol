@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-26 -- evalTools: aimeat_eval_set, _get and _run (definitions/evals.ts).
  *   v1.x -- 2026-11-19 -- CatalogTool is the union of the groups' entry types and CATALOG is typed by
  *     it: the inferred literal type of the whole list passed what a declaration file can hold (TS7056).
  *   v1.x -- 2026-11-19 -- definitions/calibrator.ts: aimeat_calibrator.
@@ -158,6 +159,7 @@ import { dataProductTools } from './definitions/dataproduct.js';
 import { partyTools } from './definitions/party.js';
 import { receiverTools } from './definitions/receivers.js';
 import { buildWithYouTools } from './definitions/build-with-you.js';
+import { evalTools } from './definitions/evals.js';
 import { dataspaceTools } from './definitions/dataspace.js';
 import { datapackageSellTools } from './definitions/datapackage-sell.js';
 import { keyReencryptTools } from './definitions/key-reencrypt.js';
@@ -227,6 +229,7 @@ const CATALOG: CatalogTool[] = [
     ...partyTools,
     ...receiverTools,
     ...buildWithYouTools,
+    ...evalTools,
     ...datapackageSellTools,
     ...dataspaceTools,
     ...keyReencryptTools,
@@ -266,7 +269,7 @@ export type CatalogTool =
     | (typeof aiStandingTools)[number] | (typeof organismAppsTools)[number]
     | (typeof secretAddressTools)[number] | (typeof secretShareTools)[number] | (typeof helpTools)[number]
     | (typeof dataProductTools)[number] | (typeof partyTools)[number] | (typeof receiverTools)[number]
-    | (typeof buildWithYouTools)[number] | (typeof datapackageSellTools)[number] | (typeof dataspaceTools)[number]
+    | (typeof buildWithYouTools)[number] | (typeof evalTools)[number] | (typeof datapackageSellTools)[number] | (typeof dataspaceTools)[number]
     | (typeof keyReencryptTools)[number] | (typeof disputeTools)[number] | (typeof csmTools)[number]
     | (typeof ecosystemAppTools)[number] | (typeof moderationTools)[number] | (typeof broadcastSummaryTools)[number]
     | (typeof siteTemplateTools)[number] | (typeof livingTools)[number] | (typeof calibratorTools)[number]

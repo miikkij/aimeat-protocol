@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-11-26 -- Section 3: a stored eval set (aimeat_eval_set, aimeat_eval_run) scores a new
+ *     revision against the one before; ask the owner first.
  *   2026-11-24 -- Section 2: the record count of a space is read from the index's \`counts\`; the
  *     index lists a space's records a page at a time.
  *   2026-11-15 -- A resident agent suits one that answers whatever arrives, not "a front door".
@@ -303,7 +305,10 @@ definition.
 is online. Edit the document, then \`aimeat_crew_validate\` (the agent's own runtime answers, and
 its messages go to the owner unchanged), \`aimeat_crew_try\` (one run with a prompt, nothing
 stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions stay restorable).
-\`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
+\`aimeat_crew_draft\` keeps half-finished edits. A try proves one run; a stored eval set proves the
+crew holds up: write its cases once with \`aimeat_eval_set { kind: "crew", name }\`, and after a
+publish run them with \`aimeat_eval_run\`, which scores the new revision against the one before. Ask
+the owner first: every model call spends their AI allowance, and \`dry_run: true\` says how many. \`aimeat_crew_llm_set\` chooses the model for one
 agent or the owner's default; \`{kind: "node"}\` makes the crew run its model through this node, so the
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
 only a provider key variable and a public https address. When the owner's model policy leaves a
