@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:f472722f418daa5eeeef829d"
+      "digest": "sha256:6b1788530cda782c9ca9fc7f"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-26",
@@ -793,7 +793,7 @@
       "aimeat/src/data/library-packs/sdk-validate.ts": "f5d19d902b3f8c86",
       "aimeat/src/data/library-packs/sdk-webhook.ts": "e8cd8123c3d9d65a",
       "aimeat/src/data/library-packs/sdk-workflows.ts": "f4a79e184d275a7e",
-      "aimeat/src/data/library-packs/sdk.ts": "2e5a4e1995a75739",
+      "aimeat/src/data/library-packs/sdk.ts": "ded2c4d25abad014",
       "aimeat/src/data/library-packs/translations.ts": "0ac856a462e2a886",
       "aimeat/src/data/library-packs/types.ts": "e9a3a4616aabd40e",
       "aimeat/src/data/library-packs/vendored-creative.ts": "5c1eacfebbd695a9",
