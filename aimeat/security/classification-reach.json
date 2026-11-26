@@ -1004,6 +1004,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership and seen-visit records in system namespaces."
     },
+    "src/services/app/playtest-member.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-26, the node's own read: the list of throwaway playtest accounts (playtest.members in the app-playtest namespace), read to erase the ones a run left behind. No content."
+    },
     "src/services/app/record-keys.ts": {
       "reads": {
         "getMemory": 5,
