@@ -17,6 +17,9 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   2026-11-26 — The stub answers the report's batch reads (getMemoryByKeys, countAppPartiesByApp) and
+ *     the share scan's read of the share records (listAllMemoryByKeyShape, none). The setup no longer
+ *     matched the report's reads; the source was right.
  *   2026-11-19 — The stub answers the cash voucher reads (none): section 13 reads them for AMLR art. 80. The
  *     setup no longer matched the report's reads; the source was right.
  *   2026-11-19 — The stub lists no memory: section 13 now reads the customer due diligence state.
@@ -93,8 +96,14 @@ function storageWith(opts: {
     }),
     getMemory: async (_owner: string, key: string) =>
       (key in memory ? { value: memory[key], version: 1, createdAt: '', updatedAt: '' } : null),
+    // The report reads every app's compliance documents in one batch (services/compliance/report-reads.ts).
+    getMemoryByKeys: async (ownerGaii: string, keys: string[]) =>
+      keys.filter(key => key in memory).map(key => ({ ownerGaii, key, value: memory[key], version: 1, createdAt: '', updatedAt: '' })),
+    // The share scan starts from the stored share records (services/share/provenance.ts): none here.
+    listAllMemoryByKeyShape: async () => [],
     // The people registered to an app are table rows since 2026-11-15: none here.
     countAppParties: async () => 0,
+    countAppPartiesByApp: async () => ({}),
     // Section 13 reads the customer due diligence state (services/kyc/): no lists and no cards here.
     listMemory: async () => [],
     // Section 13 reads the cash vouchers across the node (services/aml/cash.ts): none here.

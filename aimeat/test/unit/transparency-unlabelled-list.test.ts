@@ -15,6 +15,7 @@
  *   The admin report read the facets and the share scan twice.
  * @usage cd aimeat && pnpm exec vitest run test/unit/transparency-unlabelled-list.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-26 — The share scan is counted by its read of the share records.
  *   v1.0.0 — 2026-11-26 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -102,7 +103,11 @@ describe('a report and its detail list', () => {
     expect(report.unlabelled).toBe(UNLABELLED);
     expect(detail.total).toBe(report.unlabelled);
     expect((calls.get('aiProvenanceFacets') ?? []).length).toBe(1);
-    expect((calls.get('workspaceProvenanceLinks') ?? []).length).toBe(1);
+    // The share scan starts by reading the share records (services/share/provenance.ts openShares);
+    // this node has none, so it asks for no candidate.
+    const shareReads = (calls.get('listAllMemoryByKeyShape') ?? []).filter(a => a[1] === '.meta.share');
+    expect(shareReads.length).toBe(1);
+    expect(calls.get('workspaceProvenanceLinks') ?? []).toEqual([]);
   });
 
   it('a different window is a different population', async () => {

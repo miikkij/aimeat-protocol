@@ -20,6 +20,8 @@
  * @usage
  *   import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
  * @version-history
+ *   v1.6.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
+ *     workspaces only, so a report asks about the workspaces whose share is open. No migration.
  *   v1.5.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every share candidate in a report's
  *     population that the SQL rule counts private, for the compliance counts. No migration.
  *   v1.4.0 — 2026-10-08 — workspaceProvenanceLinks(): the candidates for a record a workspace share
@@ -118,11 +120,12 @@ export interface AiProvenanceRepository {
    * `scan` asks for every candidate in a report's population instead: the records of one owner
    * (`ownerGhii`) or of the node, generated since a day (`since`), that the SQL rule does NOT count
    * public, so a report can add those a share opens without counting any twice. At most `limit`
-   * rows, up to 5000.
+   * rows, up to 5000. `keyPrefixes` narrows a scan to the records whose key starts with one of
+   * them (`organism.{org}.w.{ws}.`, at most 200); an empty list matches nothing.
    */
   workspaceProvenanceLinks(query: {
     ids?: string[]; contentHash?: string; limit?: number;
-    scan?: { ownerGhii?: string; since?: string };
+    scan?: { ownerGhii?: string; since?: string; keyPrefixes?: string[] };
   }): Promise<WorkspaceProvenanceLink[]>;
 }
 

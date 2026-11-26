@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
+ *     workspaces only. Mirrors the Postgres provider.
  *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
  *     and a read without the count statement.
  *   v1.7.0 — 2026-10-28 — listAiProvenance({ publicOnly }): public records, reviewed or not.
@@ -54,6 +56,10 @@ import type {
 import type { AiProvenance } from '../../../../models/ai-provenance-schemas.js';
 import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
 import type { SqliteStorage } from '../index.js';
+import { globPrefix } from '../../../key-prefix.js';
+
+/** The most key prefixes one scan names (workspaceProvenanceLinks); the caller asks in groups. */
+const SCAN_PREFIXES = 200;
 
 function deserialize(row: Record<string, unknown>): AiProvenanceRecordRow {
   return {
@@ -244,11 +250,13 @@ export const aiProvenanceMethods = {
   //    whether a share link opens one of these is decided in services/share/provenance.ts. ──
   async workspaceProvenanceLinks(
     this: SqliteStorage,
-    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string } },
+    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string; keyPrefixes?: string[] } },
   ): Promise<WorkspaceProvenanceLink[]> {
     const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
     const scan = query.scan;
     if (ids.length === 0 && !query.contentHash && !scan) return [];
+    const prefixes = scan?.keyPrefixes?.slice(0, SCAN_PREFIXES);
+    if (prefixes && prefixes.length === 0) return [];
     const limit = Math.min(Math.max(query.limit ?? 200, 1), scan ? 5000 : 1000);
     const match: string[] = [];
     const params: unknown[] = [];
@@ -257,6 +265,7 @@ export const aiProvenanceMethods = {
       match.push(`NOT (${PUBLICLY_LINKED})`);
       if (scan.ownerGhii) { match.push('p.ownerGhii = ?'); params.push(scan.ownerGhii); }
       if (scan.since) { match.push('p.generatedAt >= ?'); params.push(scan.since); }
+      if (prefixes) { match.push(`(${prefixes.map(() => 'm.key GLOB ?').join(' OR ')})`); params.push(...prefixes.map(globPrefix)); }
     } else {
       if (ids.length) { match.push(`p.id IN (${ids.map(() => '?').join(',')})`); params.push(...ids); }
       if (query.contentHash) { match.push('p.contentHash = ?'); params.push(query.contentHash); }

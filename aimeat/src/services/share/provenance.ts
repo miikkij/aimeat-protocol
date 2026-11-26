@@ -25,11 +25,16 @@
  *
  *   Classification audit: releasing a classified record to the anonymous reader is refused and the
  *   refusal is audited, exactly as the same visitor's share read would be.
- * @structure shareOpenedProvenanceIds · sharePublicInScope · publiclyResolvableWithShares ·
+ * @structure openShares · openedBy · shareOpenedProvenanceIds · sharePublicInScope · publiclyResolvableWithShares ·
  *   findShareOpenedProvenanceByHash · shareOpenedIdsOf · sharedPublishedProvenanceIds · withItemProvenance
  * @usage
  *   const visible = await publiclyResolvableWithShares(storage, config, [row.id]);
  * @version-history
+ *   v1.4.0 — 2026-11-26 — A workspace whose share hands nothing to anyone is not read (openedBy asks
+ *     shareOpensSomething), and a report's scan asks for candidates in the workspaces with such a
+ *     share only (openShares). The scan took candidates across the node and listed every space of
+ *     each one's workspace, shared or not; on a node with 52 such workspaces, 7 of them shared, that
+ *     was most of a ten-second report, and the unshared ones filled the scan's limit.
  *   2026-11-01 — sharedPublishedProvenanceIds reads a record's id from the end of its key
  *     (spaceRowAt), so a page whose id holds a dot owes its label in the member read when the share
  *     opens it (secaudit2026oct31w2 round 10b, dotted record ids).
@@ -47,23 +52,62 @@
  *     a service may not import a route (check:deps).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow, MemoryRecord } from '../../storage/interface.js';
 import type { WorkspaceProvenanceLink } from '../../storage/repositories/ai-provenance.repository.js';
 import { publiclyResolvable } from '../ai/provenance.js';
 import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from '../ai/provenance-marks.js';
 import { createPublicCollectors } from '../workspace/public-collectors.js';
 import { readerFor } from '../classification/reader.js';
-import { shareIsOpen, isDocPublicAt, readShareMetaOf } from '../workspace/share.js';
+import { shareIsOpen, shareOpensSomething, isDocPublicAt, readShareMetaOf, resolveShare } from '../workspace/share.js';
+import { workspaceMetaReader } from '../workspace/meta-read.js';
 import { servedPageProvenanceIds } from '../served-page-provenance.js';
 import { spacePrefixesOf, spaceRowAt } from '../workspace/record-key.js';
-import type { ResolvedShare } from '../../routes/organisms/share-types.js';
+import type { ResolvedShare, ShareMeta } from '../../routes/organisms/share-types.js';
 
 /** `organism.{org}.w.{ws}.` — the workspace a published record key belongs to. */
 const WS_KEY_RE = /^organism\.([^.]+)\.w\.([^.]+)\./;
 
-/** Of these candidates, the provenance ids an open share link hands out to an anonymous visitor. */
+/** `organism.{org}.w.{ws}.meta.share`: the share record of one workspace. */
+const SHARE_KEY_RE = /^organism\.([^.]+)\.w\.([^.]+)\.meta\.share$/;
+
+/** How many workspaces one candidate scan names (storage takes at most 200 key prefixes). */
+const SCAN_WORKSPACES = 100;
+
+/** A workspace whose share hands something to anyone now. */
+interface OpenShare { org: string; ws: string; share: ResolvedShare }
+
+/**
+ * The workspaces of this node whose share hands something to anyone now: every stored share record,
+ * for each workspace the copy that counts (workspaceMetaReader, one registry read per organism),
+ * kept when its access is open and a target is switched on (shareOpensSomething). Most workspaces
+ * have no share record, and a report's scan has nothing to ask of them.
+ */
+async function openShares(storage: Storage, config: AimeatConfig): Promise<OpenShare[]> {
+  const byOrganism = new Map<string, Map<string, MemoryRecord[]>>();
+  for (const record of await storage.listAllMemoryByKeyShape('organism.', '.meta.share')) {
+    const m = SHARE_KEY_RE.exec(record.key);
+    if (!m) continue;
+    const workspaces = byOrganism.get(m[1]!) ?? new Map<string, MemoryRecord[]>();
+    workspaces.set(m[2]!, [...(workspaces.get(m[2]!) ?? []), record]);
+    byOrganism.set(m[1]!, workspaces);
+  }
+  const out: OpenShare[] = [];
+  for (const [org, workspaces] of byOrganism) {
+    const meta = workspaceMetaReader(storage, org, config.nodeId);
+    for (const [ws, copies] of workspaces) {
+      const share = resolveShare((await meta.pick(ws, 'meta.share', copies))?.value as ShareMeta | undefined);
+      if (shareOpensSomething(share)) out.push({ org, ws, share });
+    }
+  }
+  return out;
+}
+
+/**
+ * Of these candidates, the provenance ids an open share link hands out to an anonymous visitor.
+ * `known` holds shares the caller already read, by `org/ws`.
+ */
 async function openedBy(
-  storage: Storage, config: AimeatConfig, links: WorkspaceProvenanceLink[],
+  storage: Storage, config: AimeatConfig, links: WorkspaceProvenanceLink[], known?: ReadonlyMap<string, ResolvedShare>,
 ): Promise<Set<string>> {
   const opened = new Set<string>();
   if (links.length === 0) return opened;
@@ -80,10 +124,14 @@ async function openedBy(
   const C = createPublicCollectors(storage, config);
   // The visitor the share serves: no session.
   const anonymous = readerFor({ storage, config }, null);
-  for (const { org, ws, ids } of byWorkspace.values()) {
+  for (const [at, { org, ws, ids }] of byWorkspace) {
     if (!(await storage.getOrganism(org))) continue;
-    const share = await readShareMetaOf(storage, config, org, ws);
-    if (!shareIsOpen(share)) continue;
+    const share = known?.get(at) ?? await readShareMetaOf(storage, config, org, ws);
+    // A share that is not open, or is open with nothing switched on, hands nothing to anyone, and a
+    // workspace with no share record reads as the second kind. Its spaces are not read: listing
+    // them to find that out read every published page of every unshared workspace a report's
+    // candidates were in (45 of 52 workspaces on the node this was measured on, 2026-11-26).
+    if (!shareOpensSomething(share)) continue;
     // The share routes' own collectors, then the classification reader's release: what a visitor
     // to /v1/organisms/:id/workspace/public/documents and .../records would be handed.
     const docs = await (await C.collectPublicDocs(org, ws, share)).release(anonymous);
@@ -109,12 +157,22 @@ export const SHARE_SCAN_LIMIT = 5000;
  * share serves to anyone. The SQL rule counts them private, so the transparency roll-up and the
  * compliance report add them to the public counts (services/ai/transparency-report.ts). `capped`
  * says the candidates ran past SHARE_SCAN_LIMIT and some were not asked.
+ *
+ * The candidates are asked for in the workspaces whose share hands something out, and nowhere else.
+ * Asked for across the node, they were mostly records of workspaces that share nothing, and those
+ * filled the scan's limit in no stated order ahead of records an open share does serve.
  */
 export async function sharePublicInScope(
   storage: Storage, config: AimeatConfig, scope: { ownerGhii?: string; since?: string },
 ): Promise<{ ids: Set<string>; capped: boolean }> {
-  const links = await storage.workspaceProvenanceLinks({ scan: scope, limit: SHARE_SCAN_LIMIT });
-  return { ids: await openedBy(storage, config, links), capped: links.length >= SHARE_SCAN_LIMIT };
+  const open = await openShares(storage, config);
+  const links: WorkspaceProvenanceLink[] = [];
+  for (let i = 0; i < open.length && links.length < SHARE_SCAN_LIMIT; i += SCAN_WORKSPACES) {
+    const keyPrefixes = open.slice(i, i + SCAN_WORKSPACES).map(o => `organism.${o.org}.w.${o.ws}.`);
+    links.push(...await storage.workspaceProvenanceLinks({ scan: { ...scope, keyPrefixes }, limit: SHARE_SCAN_LIMIT - links.length }));
+  }
+  const known = new Map(open.map(o => [`${o.org}/${o.ws}`, o.share]));
+  return { ids: await openedBy(storage, config, links, known), capped: links.length >= SHARE_SCAN_LIMIT };
 }
 
 /**

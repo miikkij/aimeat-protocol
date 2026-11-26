@@ -910,6 +910,47 @@ describe('storage providers agree on what they do, not just on their signatures'
         }
     }, 60_000);
 
+    // A report's share scan asks for candidates in the workspaces whose share is open
+    // (services/share/provenance.ts sharePublicInScope): `keyPrefixes` narrows the scan to them.
+    it('workspaceProvenanceLinks scans the named workspaces only, and nothing for an empty list', async () => {
+        for (const { name, storage } of provs) {
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const owner = `confscan${tag}@aimeat-conformance-001`;
+            const now = new Date().toISOString();
+            // An underscore and a percent sign in the ids: a pattern character in a prefix is literal.
+            const rows: Array<[string, string]> = [
+                ['in-a', `organism.orga_${tag}.w.ws%1.doc.one.latest`],
+                ['in-a-draft', `organism.orga_${tag}.w.ws%1.doc.one.draft`],
+                ['in-b', `organism.orgb${tag}.w.ws-1.doc.two.latest`],
+                ['look-alike', `organism.orgaX${tag}.w.wsY1.doc.three.latest`],
+            ];
+            const ids: Record<string, string> = {};
+            for (const [label, key] of rows) {
+                ids[label] = randomUUID();
+                await storage.createAiProvenance({
+                    id: ids[label], ownerGhii: owner, principal: owner, contentHash: null, generatedAt: now, createdAt: now,
+                    record: { spec: 'aimeat.provenance/v1', generatedAt: now, level: 'ai-generated', humanInvolvement: 'none' } as never,
+                });
+                await storage.setMemory({
+                    key, ownerGaii: owner, value: { n: 1 }, visibility: 'private', tags: [], ttlHours: null,
+                    version: 1, createdAt: now, updatedAt: now, aiProvenanceId: ids[label],
+                } as never);
+            }
+            const labelsOf = (links: Array<{ provenanceId: string }>) =>
+                links.map(l => Object.keys(ids).find(k => ids[k] === l.provenanceId)).sort();
+            const scan = { ownerGhii: owner };
+
+            const all = await storage.workspaceProvenanceLinks({ scan, limit: 5000 });
+            expect.soft(labelsOf(all), `${name}: without prefixes, every published candidate`).toEqual(['in-a', 'in-b', 'look-alike']);
+            const one = await storage.workspaceProvenanceLinks({ scan: { ...scan, keyPrefixes: [`organism.orga_${tag}.w.ws%1.`] }, limit: 5000 });
+            expect.soft(labelsOf(one), `${name}: the named workspace only, its pattern characters literal`).toEqual(['in-a']);
+            const two = await storage.workspaceProvenanceLinks({ scan: { ...scan, keyPrefixes: [`organism.orga_${tag}.w.ws%1.`, `organism.orgb${tag}.w.ws-1.`] }, limit: 5000 });
+            expect.soft(labelsOf(two), `${name}: any of the named workspaces`).toEqual(['in-a', 'in-b']);
+            const none = await storage.workspaceProvenanceLinks({ scan: { ...scan, keyPrefixes: [] }, limit: 5000 });
+            expect.soft(none, `${name}: an empty list matches nothing`).toEqual([]);
+        }
+    }, 60_000);
+
     // Open work of an erased account is cancelled and the requesters get their held morsels back;
     // finished work stays for the other party with the name taken out, the rule the purchase receipts
     // follow (secaudit 2026-09: A8-4, N6). Soft assertions, so each provider reports its own result.

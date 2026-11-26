@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
+ *     workspaces only, so a report's scan reads the workspaces whose share is open.
  *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
  *     and a read without the count statement. The statements that evaluate the public test over a
  *     whole population (facets, the public lists, the share scan) run with JIT off (withoutJit).
@@ -59,6 +61,10 @@ import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenanc
 import type { AiProvenance as AiProvenanceRow, Json } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { likePrefix } from '../../../key-prefix.js';
+
+/** The most key prefixes one scan names (workspaceProvenanceLinks); the caller asks in groups. */
+const SCAN_PREFIXES = 200;
 
 function toRecord(r: Selectable<AiProvenanceRow>): AiProvenanceRecordRow {
   return {
@@ -255,11 +261,13 @@ export const aiProvenanceMethods = {
   //    whether a share link opens one of these is decided in services/share/provenance.ts. ──
   async workspaceProvenanceLinks(
     this: PostgresKyselyStorage,
-    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string } },
+    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string; keyPrefixes?: string[] } },
   ): Promise<WorkspaceProvenanceLink[]> {
     const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
     const scan = query.scan;
     if (ids.length === 0 && !query.contentHash && !scan) return [];
+    const prefixes = scan?.keyPrefixes?.slice(0, SCAN_PREFIXES);
+    if (prefixes && prefixes.length === 0) return [];
     const limit = Math.min(Math.max(query.limit ?? 200, 1), scan ? 5000 : 1000);
     // A scan is a report's population that the SQL rule does not count public; ids and a hash match either.
     const match = scan
@@ -267,6 +275,7 @@ export const aiProvenanceMethods = {
         sql`NOT (${publiclyLinked('p."id"')})`,
         ...(scan.ownerGhii ? [sql`p."ownerGhii" = ${scan.ownerGhii}`] : []),
         ...(scan.since ? [sql`p."generatedAt" >= ${scan.since}`] : []),
+        ...(prefixes ? [sql`(${sql.join(prefixes.map(p => sql`m."key" LIKE ${likePrefix(p)}`), sql` OR `)})`] : []),
       ], sql` AND `)})`
       : sql<boolean>`(${sql.join([
         ...(ids.length ? [sql`p."id" IN (${sql.join(ids)})`] : []),

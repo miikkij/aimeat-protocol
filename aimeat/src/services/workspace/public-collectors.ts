@@ -14,6 +14,10 @@
  *   // … the share gate …
  *   const docs = await found.release(readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.6.0 — 2026-11-26 — A space is read by its published rows only (publishedRows, the keys ending
+ *     in `.latest`). The whole space was listed, drafts and version rows with their values, and cut
+ *     at 5 000 rows before the published ones were picked, so a space with a long history stopped
+ *     handing out its later pages.
  *   2026-11-01 — A page's or a record's id is read from the end of its key (spaceRowAt), so one whose
  *     id holds a dot is in the public share and the member read under its whole id; it was skipped
  *     (secaudit2026oct31w2 round 10b, dotted record ids).
@@ -53,6 +57,9 @@ export interface SharePending<O> {
   release(reader: ContentReader): Promise<O[]>;
 }
 
+/** The most published rows of one space a share or a member read hands out. */
+const PUBLISHED_ROWS = 5000;
+
 export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
   // The page's own setting, then its space's, then the workspace's, each with its end date
   // (services/workspace/share.ts, the rule the page frame asks too).
@@ -69,6 +76,17 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
       ...(isHtmlPageValue(v) ? { kind: 'html' as const, namespace, html: v.html } : {}),
     };
   };
+
+  /**
+   * The published rows of one space: the keys that end in `.latest`, at most PUBLISHED_ROWS. The
+   * space was listed whole, with every draft and every version row and their values, and the
+   * published rows were picked out of the first 5 000 in key order. A page's version rows sort
+   * before the next page's published row, so a space with enough history stopped handing out its
+   * later pages, and a share of a workspace read many times what it served (measured 2026-11-26:
+   * 17.7 MB read for 5.3 MB of published rows in the open shares of one node).
+   */
+  const publishedRows = (nsPrefix: string): Promise<MemoryRecord[]> =>
+    storage.listAllMemoryByKeyShape(nsPrefix, '.latest', { limit: PUBLISHED_ROWS });
 
   /** Read a workspace's manifest value, the copy that counts whoever holds it (public path — no auth). */
   const readWsManifestValue = async (id: string, ws: string): Promise<Record<string, unknown> | null> =>
@@ -122,8 +140,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
         continue;
       }
       const nsPrefix = `${root}.${namespace}.`;
-      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
-      for (const r of items) {
+      for (const r of await publishedRows(nsPrefix)) {
         // The id is read from the end of the key, so a page whose id holds a dot is served under
         // its whole id (secaudit2026oct31w2 round 10b).
         const row = spaceRowAt(r.key, nsPrefix, prefixes);
@@ -155,8 +172,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
       if (!name || !namespace || ot.mode !== 'records') continue;
       if (filter?.space && filter.space !== name) continue;
       const nsPrefix = `${root}.${namespace}.`;
-      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
-      for (const r of items) {
+      for (const r of await publishedRows(nsPrefix)) {
         const row = spaceRowAt(r.key, nsPrefix, prefixes);
         if (row?.copy !== 'latest') continue;   // only published
         out.push({ rec: r, out: { type: name, id: row.id, value: r.value ?? null, aiProvenanceId: r.aiProvenanceId ?? null } });

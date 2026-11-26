@@ -16,8 +16,8 @@
  * @structure
  *   - resolveShare() · readShareMetaOf() · redactShareOf() — the share as stored, as decided, as shown
  *   - isDocPublicAt() — does the share open this page now
- *   - shareIsOpen() · shareServedVisibility() — whether what the share opens counts as public for
- *     the AI label (EU AI Act Art. 50(4)) and the compliance counts
+ *   - shareIsOpen() · shareOpensSomething() · shareServedVisibility() — whether what the share opens
+ *     counts as public for the AI label (EU AI Act Art. 50(4)) and the compliance counts
  *   - memberRoleOf() — the caller's active role in the organism (the share routes' membership check)
  *   - publicViewerPath() — the address a person opens a shared workspace or page at
  *   - setWorkspaceShareOp() — validate, merge, default the end dates, store, announce
@@ -25,6 +25,8 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.9.0 — 2026-11-26 — shareOpensSomething: whether a share hands anything to anyone now, so the
+ *     readers that look for what open shares serve skip a workspace that shares nothing.
  *   2026-11-13 — memberRoleOf asks the account's membership before the organism's agent list, so an
  *     attached agent of an active member keeps its owner's role on every surface (developer ruling
  *     2026-11-13; structure programme 2026-11, unit 7).
@@ -126,6 +128,20 @@ export function isDocPublicAt(share: ResolvedShare, typeName: string, docId: str
  */
 export function shareIsOpen(share: Pick<ResolvedShare, 'access'>): boolean {
     return share.access === 'open';
+}
+
+/**
+ * Does this share hand anything to anyone who has the link, now? Its access is open, and the
+ * workspace, a space or a page is switched on with no end date that has passed. False means
+ * isDocPublicAt answers false for every page, so a reader that looks for what a share serves to
+ * anyone need not read the workspace. A workspace with no share record resolves to an open access
+ * with nothing switched on, which is the usual case and shares nothing.
+ */
+export function shareOpensSomething(share: ResolvedShare, nowMs: number = Date.now()): boolean {
+    if (!shareIsOpen(share)) return false;
+    if (share.public && !ended(share.until['*'], nowMs)) return true;
+    if (Object.entries(share.spaces).some(([k, v]) => !!v && !ended(share.until[`space:${k}`], nowMs))) return true;
+    return Object.entries(share.docs).some(([k, v]) => !!v && !ended(share.until[k], nowMs));
 }
 
 /** The visibility a label is decided against for what this share serves. */
