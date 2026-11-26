@@ -1968,6 +1968,12 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of exchange contracts and grants (metered-entitlement, metered-grant) to revoke the records the erased account is a party to. Nothing it reads is shown to anyone."
     },
+    "src/services/evals/eval-sets.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-26, the node's own read: an account's eval set (evalset.* in the eval-sets namespace), read to answer it to that account and to change it on its version. The cases are the account's own test text; nothing of anyone else's content is read."
+    },
     "src/services/exchange/datapackage.ts": {
       "reads": {
         "getStorageFile": 1,

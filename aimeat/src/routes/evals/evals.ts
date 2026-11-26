@@ -1,5 +1,5 @@
 /**
- * @file src/routes/evals.ts
+ * @file src/routes/evals/evals.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Stored eval sets for a crew, a skill or a library pack (services/evals/):
@@ -13,14 +13,14 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
-import { success, error } from '../middleware/envelope.js';
-import { callerOf } from '../middleware/caller.js';
-import { validateBody } from '../models/schemas.js';
-import { safeText } from '../models/input-limits.js';
-import { getEvalFor, runEvalFor, setEvalFor } from '../services/evals/eval-ops.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { callerOf } from '../../middleware/caller.js';
+import { validateBody } from '../../models/schemas.js';
+import { safeText } from '../../models/input-limits.js';
+import { getEvalFor, runEvalFor, setEvalFor } from '../../services/evals/eval-ops.js';
 
 const EvalSetBody = z.object({
   cases: z.array(z.object({

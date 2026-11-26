@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The eval set operations every surface calls: write a set, read it with its runs, and
  *   start a run. REST: PUT /v1/evals/:kind/:name, GET /v1/evals/:kind/:name, POST
- *   /v1/evals/:kind/:name/run (routes/evals.ts); MCP: aimeat_eval_set, aimeat_eval_get,
+ *   /v1/evals/:kind/:name/run (routes/evals/evals.ts); MCP: aimeat_eval_set, aimeat_eval_get,
  *   aimeat_eval_run (mcp/evals.ts). The scope words are on the routes and the tools: memory:write to
  *   write, memory:read to read, ai:use to run.
  *

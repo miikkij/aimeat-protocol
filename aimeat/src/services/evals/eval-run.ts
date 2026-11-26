@@ -21,7 +21,8 @@
  *   it. `dry_run` answers how many model calls a run makes before any is made.
  *
  *   IN THE BACKGROUND. A run is started and answered at once with its id; the set's `runs` shows it
- *   running, then done or failed. One run per set at a time.
+ *   running, then done or failed. One run per set at a time, read from the set itself, so every node
+ *   process sees it; a run left running by a process that stopped stops blocking after 15 minutes.
  * @structure startEvalRun(deps, caller, target, opts) · gradeAnswer(answer, expect, judge)
  * @version-history
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
@@ -44,7 +45,8 @@ export type EvalRefusal = { ok: false; status: number; code: string; message: st
 
 /** The answer a judge's rubric reads, cut so one judge call stays small. */
 const ANSWER_FOR_JUDGE = 6000;
-const running = new Set<string>();
+/** A run still marked running after this long was left by a process that stopped: it no longer blocks. */
+const RUN_STALE_MS = 15 * 60_000;
 
 interface Resolved { revision: string; system?: string; crew?: { name: string; doc: Record<string, unknown> } }
 
@@ -142,9 +144,10 @@ export async function startEvalRun(
     cost: 'Every model call spends this account\'s AI allowance through its own AI settings; a crew trial runs on the agent\'s own machine and model.',
   };
   if (opts.dryRun) return { ok: true, data: { dry_run: true, ...plan } };
-  const lock = `${caller.ownerGhii}|${target.kind}|${target.name}`;
-  if (running.has(lock)) return { ok: false, status: 409, code: 'EVAL_RUNNING', message: 'A run of this set is going on; read it with aimeat_eval_get and start the next when it ends.' };
-  running.add(lock);
+  // One run per set at a time, read from the set itself so every node process sees it.
+  if (set.runs.some(r => r.status === 'running' && Date.now() - Date.parse(r.at) < RUN_STALE_MS)) {
+    return { ok: false, status: 409, code: 'EVAL_RUNNING', message: 'A run of this set is going on; read it with aimeat_eval_get and start the next when it ends.' };
+  }
   const run: EvalRun = { id: `evalrun-${randomBytes(6).toString('hex')}`, at: new Date().toISOString(), by: caller.principal, status: 'running', revision: resolved.revision, repeats: set.repeats };
   await recordEvalRun(deps.storage, caller.ownerGhii, target, run);
   void (async () => {
@@ -177,8 +180,6 @@ export async function startEvalRun(
       logger.warn('eval run failed', { target: `${target.kind}:${target.name}`, error: String(err) });
       await recordEvalRun(deps.storage, caller.ownerGhii, target, { ...run, status: 'failed', error: String((err as Error)?.message ?? err).slice(0, 400), finished_at: new Date().toISOString() })
         .catch(e => logger.warn('eval run: the failure was not recorded', { error: String(e) }));
-    } finally {
-      running.delete(lock);
     }
   })();
   return { ok: true, data: { run_id: run.id, status: 'running', ...plan, read: 'aimeat_eval_get answers the run when it ends.' } };

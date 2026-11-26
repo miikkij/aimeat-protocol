@@ -16,6 +16,7 @@
 import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { connectAgentByDevice } from './helpers/agent-device.js';
+import { openSession, callTool } from './helpers/mcp-session.js';
 import { startFakeAiProvider, chatJson, type RecordedRequest } from './helpers/fake-ai-provider.js';
 
 const SKILL = `evalskill${Date.now().toString(36).slice(-6)}`;
@@ -116,6 +117,23 @@ function reply(r: RecordedRequest) {
     await test('an agent without ai:use may not start a run', async () => {
       const r = await json(`/v1/evals/skill/${ref}/run`, { method: 'POST', headers: { Authorization: `Bearer ${bot.token}` }, body: JSON.stringify({ dry_run: true }) });
       assert(r.status === 403, `refused without ai:use: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('nobody signed in may write or read a set', async () => {
+      const anonPut = await json(`/v1/evals/skill/${ref}`, { method: 'PUT', body: JSON.stringify({ cases: [{ id: 'x', prompt: 'p', expect: [{ kind: 'contains', value: 'v' }] }] }) });
+      assert(anonPut.status === 401, `anonymous write: ${anonPut.status}`);
+      const anonGet = await json(`/v1/evals/skill/${ref}`);
+      assert(anonGet.status === 401, `anonymous read: ${anonGet.status}`);
+    });
+
+    await test('over MCP the agent reads the set, writes one for a pack, and is sent to ask for ai:use before a run', async () => {
+      const session = await openSession(BASE, bot.token, 'evals');
+      const got = await callTool(session, 'aimeat_eval_get', { kind: 'skill', name: `user:${alice.name}/${SKILL}` });
+      assert(!got.isError && JSON.parse(got.text).runs.length === 2, `get: ${got.text.slice(0, 300)}`);
+      const set = await callTool(session, 'aimeat_eval_set', { kind: 'pack', name: 'aimeat-data', repeats: 1, cases: [{ id: 'read', prompt: 'How does an app read a record?', expect: [{ kind: 'contains', value: 'get' }] }] });
+      assert(!set.isError && JSON.parse(set.text).repeats === 1, `set: ${set.text.slice(0, 300)}`);
+      const run = await callTool(session, 'aimeat_eval_run', { kind: 'pack', name: 'aimeat-data', dry_run: true });
+      assert(run.isError, `a run without ai:use is refused over MCP too: ${run.text.slice(0, 300)}`);
     });
   } finally {
     await stub.close();

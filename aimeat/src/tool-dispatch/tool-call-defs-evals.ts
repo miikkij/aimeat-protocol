@@ -15,7 +15,7 @@ const at = (input: Record<string, unknown>) =>
 
 export const evalCliTools: ConnectCliToolDefinition[] = [
   {
-    // → PUT /v1/evals/:kind/:name (routes/evals.ts)
+    // → PUT /v1/evals/:kind/:name (routes/evals/evals.ts)
     name: 'aimeat_eval_set',
     handler: ({ client }, input) => client.put(at(input), { cases: input.cases, ...(input.repeats !== undefined ? { repeats: input.repeats } : {}) }),
   },

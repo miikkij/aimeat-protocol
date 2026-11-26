@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The catalog entries of the stored eval sets (services/evals/): aimeat_eval_set,
- *   aimeat_eval_get, aimeat_eval_run. REST: routes/evals.ts.
+ *   aimeat_eval_get, aimeat_eval_run. REST: routes/evals/evals.ts.
  * @structure evalTools — the three definitions
  * @version-history
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).

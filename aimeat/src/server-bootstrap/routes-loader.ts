@@ -9,7 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
- *   2026-11-26 — evalsRouter (routes/evals.ts): stored eval sets for crews, skills and library packs.
+ *   2026-11-26 — evalsRouter (routes/evals/evals.ts): stored eval sets for crews, skills and library packs.
  *   2026-11-21 — The eight routers behind a feature flag (calibrator, portfolio, extensions, cortex,
  *     packages with instances, templates, connector tunnel, personal nodes) mount through
  *     flaggedMounts(): switched off, their paths answer 503 FEATURE_DISABLED naming the setting,
@@ -243,7 +243,7 @@ import { kycRouter } from '../routes/kyc/routes.js';
 import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
 import { goalsRouter } from '../routes/goals.js';
 import { buildWithYouRouter } from '../routes/build-with-you.js';
-import { evalsRouter } from '../routes/evals.js';
+import { evalsRouter } from '../routes/evals/evals.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin/capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin/extensions.js';
