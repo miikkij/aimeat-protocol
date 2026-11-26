@@ -19,6 +19,10 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.31.0 — 2026-11-26 — The eight sections are four with their parts: 01 who reaches what (01.1 the
+ *     outside parties, 01.2 the grant form), 02 what happened, 03 classification (03.1 what is known
+ *     about the content, 03.2 marked content), 04 everything as one file. The section ids are the old
+ *     ones; the numbers in the description above are the old order's.
  *   v1.30.0 — 2026-11-22 — Section 08, marked content (data-wallet/content-risk.js), the page the content
  *     risk notice links to (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v1.29.0 — 2026-11-09 — Grouped by who (Jouni's choice "Group by who"): 01 opens on the people
@@ -115,14 +119,17 @@ export function renderPage(ctx) {
   if (ctx.federated) return federated(ctx);
   const ov = ctx.ov;
   const sections = [
+    // Four whole-numbered sections, each with its parts under it: who reaches the data (and the
+    // parties and the form that add to it), what happened, what is known about the content, and
+    // the export. The ids are the old ones, so a link to one of them still opens it.
     { id: 'dw-targets', num: '01', label: x('secTargets'), count: ov ? String(ctx.active.length) : '' },
-    { id: 'dw-parties', num: '02', label: t('dataout.party.title'), count: partyCount(ctx.parties) },
-    { id: 'dw-trail', num: '03', label: x('secTrail'), count: ov ? n(ctx.deniedCount) : '' },
-    { id: 'dw-grant', num: '04', label: x('secGrant'), count: ov ? `${ctx.active.length} / ${ctx.quota}` : '' },
-    { id: 'dw-export', num: '05', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
-    { id: 'dw-class', num: '06', label: x('cls.title'), count: classificationCount(ctx.cls) },
-    { id: 'dw-content', num: '07', label: x('cc.title'), count: contentCount(ctx.content) },
-    { id: 'dw-risk', num: '08', label: x('cr.title'), count: riskCount(ctx.risk) },
+    { id: 'dw-parties', num: '01.1', label: t('dataout.party.title'), count: partyCount(ctx.parties) },
+    { id: 'dw-grant', num: '01.2', label: x('secGrant'), count: ov ? `${ctx.active.length} / ${ctx.quota}` : '' },
+    { id: 'dw-trail', num: '02', label: x('secTrail'), count: ov ? n(ctx.deniedCount) : '' },
+    { id: 'dw-class', num: '03', label: x('cls.title'), count: classificationCount(ctx.cls) },
+    { id: 'dw-content', num: '03.1', label: x('cc.title'), count: contentCount(ctx.content) },
+    { id: 'dw-risk', num: '03.2', label: x('cr.title'), count: riskCount(ctx.risk) },
+    { id: 'dw-export', num: '04', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
   ];
   // The start: the page's own list answers the same question, so there is no button and no done.
   const start = html`<${PageStart} id="dataWallet" />`;
@@ -132,13 +139,13 @@ export function renderPage(ctx) {
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!ov ? (ctx.failed ? html`<${Note} kind="quiet">${x('loadFailed')}<//>` : html`<${Note} kind="loading">${x('loading')}<//>`) : html`
         ${secTargets(ctx)}
-        ${secParties(ctx, '02')}
-        ${secTrail(ctx)}
+        ${secParties(ctx, '01.1')}
         ${secGrant(ctx)}
-        ${secExport(ctx)}
-        ${secClassification(ctx, '06')}
-        ${secContentClasses(ctx, '07')}
-        ${secContentRisk(ctx, '08')}`}
+        ${secTrail(ctx)}
+        ${secClassification(ctx, '03')}
+        ${secContentClasses(ctx, '03.1')}
+        ${secContentRisk(ctx, '03.2')}
+        ${secExport(ctx)}`}
     <//>`;
 }
 
@@ -227,7 +234,7 @@ function secTrail(ctx) {
   const shown = items.slice(0, ctx.shownTrail);
   const events = ctx.trailFilter === 'events';
   return html`
-    <${Section} id="dw-trail" num="03" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
+    <${Section} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
       <${Note} kind="lead">${x('trailIntro')}<//>
       <${Tabs} tone="filter" value=${ctx.days} disabled=${ctx.reloading} onSelect=${(d) => ctx.setDays(d)}
         items=${[7, 30, 90].map((d) => ({ value: d, label: x('daysN', { n: d }), count: ctx.days === d ? n(ov.audit.total) : undefined }))}>
@@ -264,7 +271,7 @@ function secGrant(ctx) {
   const whoHint = f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint');
   const whatHint = f.what === 'key' ? undefined : f.what === 'ws' ? x('form.wsHint') : x('form.orgHint');
   return html`
-    <${Section} fold id="dw-grant" num="04" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
+    <${Section} fold id="dw-grant" num="01.2" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
       <${Note} kind="lead">${x('grantIntro')}<//>
       <${Fields}>
         <${Field} label=${x('form.who')} help="dataWallet.who" hint=${whoHint} group>
@@ -316,7 +323,7 @@ function secExport(ctx) {
     ['flags', x('export.flagsSub')],
   ];
   return html`
-    <${Section} id="dw-export" num="05" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
+    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
       <${Note} kind="lead">${x('exportIntro', { mb })}<//>
       <${CardGrid}>${items.map(([k, sub]) => html`<${Card} key=${k} name=${x('export.' + k)} meta=${sub} />`)}<//>
       <${Box}>

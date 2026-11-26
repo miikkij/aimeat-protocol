@@ -44,11 +44,13 @@
       { "titleKey": "profile.landing.menuAutomation", "items": [
         { "id": "fleet", "labelKey": "profile.tabs.fleet" },
         { "id": "agents", "labelKey": "profile.tabs.agents", "sections": [
-          { "id": "agp-guide", "num": "01", "labelKey": "profile.agents.guide.title" },
-          { "id": "agp-basic", "num": "02", "labelKey": "profile.agents.basic.title" },
-          { "id": "agp-new", "num": "03", "labelKey": "profile.agents.new.title" },
-          { "id": "agp-connect", "num": "04", "labelKey": "profile.agents.page.secConnect" },
-          { "id": "agp-list", "num": "05", "labelKey": "profile.agents.page.secAgents" }
+          { "id": "agp-list", "num": "01", "labelKey": "profile.agents.page.secAgents" },
+          { "id": "agp-add", "num": "02", "labelKey": "profile.agents.page.secAdd" },
+          { "id": "agp-guide", "num": "02.1", "labelKey": "profile.agents.guide.title" },
+          { "id": "agp-basic", "num": "02.2", "labelKey": "profile.agents.basic.title" },
+          { "id": "agp-new", "num": "02.3", "labelKey": "profile.agents.new.title" },
+          { "id": "agp-connect", "num": "02.4", "labelKey": "profile.agents.page.secConnect" },
+          { "id": "agp-always", "num": "03", "labelKey": "profile.agents.always.title" }
         ] },
         { "id": "goals", "labelKey": "profile.tabs.goals" },
         { "id": "ecosystem", "labelKey": "profile.tabs.ecosystem" },
@@ -125,8 +127,8 @@
       { "titleKey": "profile.landing.menuBuildShare", "items": [
         { "id": "apps", "labelKey": "profile.tabs.apps", "sections": [
           { "id": "ap-waiting", "num": "", "labelKey": "appspage.secWaiting" },
-          { "id": "ap-kunto", "num": "", "labelKey": "appspage.secKunto" },
           { "id": "ap-newest", "num": "", "labelKey": "appspage.secNewest" },
+          { "id": "ap-kunto", "num": "", "labelKey": "appspage.secKunto" },
           { "id": "ap-agents", "num": "", "labelKey": "appspage.secAgents" },
           { "id": "ap-build", "num": "", "labelKey": "appspage.secBuild" },
           { "id": "ap-builders", "num": "", "labelKey": "appspage.secBuilders" }
@@ -179,12 +181,13 @@
         ] },
         { "id": "ai", "labelKey": "profile.generator.openrouter.title", "sections": [
           { "id": "ai-connection", "num": "01", "labelKey": "aipage.secConnection" },
-          { "id": "ai-providers", "num": "02", "labelKey": "aipage.pv.title" },
+          { "id": "ai-budget", "num": "02", "labelKey": "aipage.secBudget" },
+          { "id": "ai-consumers", "num": "02.1", "labelKey": "aipage.secConsumers" },
           { "id": "ai-routing", "num": "03", "labelKey": "aipage.rt.title" },
-          { "id": "ai-roles", "num": "04", "labelKey": "aipage.rl.title" },
-          { "id": "ai-policy", "num": "05", "labelKey": "aipage.pol.title" },
-          { "id": "ai-budget", "num": "06", "labelKey": "aipage.secBudget" },
-          { "id": "ai-consumers", "num": "07", "labelKey": "aipage.secConsumers" }
+          { "id": "ai-params", "num": "04", "labelKey": "aipage.secParams" },
+          { "id": "ai-providers", "num": "04.1", "labelKey": "aipage.pv.title" },
+          { "id": "ai-roles", "num": "04.2", "labelKey": "aipage.rl.title" },
+          { "id": "ai-policy", "num": "04.3", "labelKey": "aipage.pol.title" }
         ] },
         { "id": "calibrator", "labelKey": "profile.calibrator.tabLabel", "sections": [
           { "id": "cal-runs", "num": "01", "labelKey": "calpage.secRuns" },
@@ -210,12 +213,13 @@
         ] },
         { "id": "dataWallet", "labelKey": "profile.tabs.dataWallet", "sections": [
           { "id": "dw-targets", "num": "01", "labelKey": "dwpage.secTargets" },
-          { "id": "dw-parties", "num": "02", "labelKey": "dataout.party.title" },
-          { "id": "dw-trail", "num": "03", "labelKey": "dwpage.secTrail" },
-          { "id": "dw-grant", "num": "04", "labelKey": "dwpage.secGrant" },
-          { "id": "dw-export", "num": "05", "labelKey": "dwpage.secExport" },
-          { "id": "dw-class", "num": "06", "labelKey": "dwpage.cls.title" },
-          { "id": "dw-content", "num": "07", "labelKey": "dwpage.cc.title" }
+          { "id": "dw-parties", "num": "01.1", "labelKey": "dataout.party.title" },
+          { "id": "dw-grant", "num": "01.2", "labelKey": "dwpage.secGrant" },
+          { "id": "dw-trail", "num": "02", "labelKey": "dwpage.secTrail" },
+          { "id": "dw-class", "num": "03", "labelKey": "dwpage.cls.title" },
+          { "id": "dw-content", "num": "03.1", "labelKey": "dwpage.cc.title" },
+          { "id": "dw-risk", "num": "03.2", "labelKey": "dwpage.cr.title" },
+          { "id": "dw-export", "num": "04", "labelKey": "dwpage.secExport" }
         ] },
         { "id": "kyc", "labelKey": "profile.tabs.kyc" },
         { "id": "storage", "labelKey": "profile.tabs.storage", "sections": [
@@ -227,11 +231,11 @@
           { "id": "ac-signin", "num": "01", "labelKey": "accesspage.secSignIn" },
           { "id": "ac-keys", "num": "02", "labelKey": "accesspage.secKeys" },
           { "id": "ac-accounts", "num": "03", "labelKey": "accesspage.secAccounts" },
-          { "id": "ac-mcp", "num": "04", "labelKey": "accesspage.secMcp" },
-          { "id": "ac-secrets", "num": "05", "labelKey": "accesspage.secSecrets" },
-          { "id": "ac-groups", "num": "06", "labelKey": "accesspage.secGroups" },
-          { "id": "ac-addresses", "num": "07", "labelKey": "accesspage.secAddresses" },
-          { "id": "ac-roads", "num": "08", "labelKey": "accesspage.secRoads" }
+          { "id": "ac-mcp", "num": "03.1", "labelKey": "accesspage.secMcp" },
+          { "id": "ac-secrets", "num": "03.2", "labelKey": "accesspage.secSecrets" },
+          { "id": "ac-groups", "num": "04", "labelKey": "accesspage.secGroups" },
+          { "id": "ac-addresses", "num": "05", "labelKey": "accesspage.secAddresses" },
+          { "id": "ac-roads", "num": "05.1", "labelKey": "accesspage.secRoads" }
         ] },
         { "id": "vault", "labelKey": "profile.tabs.vault", "sections": [
           { "id": "vs-for-me", "num": "01", "labelKey": "secretShares.secForMe" },

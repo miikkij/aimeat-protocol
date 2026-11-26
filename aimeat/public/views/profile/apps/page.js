@@ -12,6 +12,9 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.6.0 -- 2026-11-26 -- For a person with apps the seven sections are three with their parts: 01
+ *     what waits, 02 the newest apps (02.1 health, 02.2 agents), 03 build (03.1 builders, 03.2 the
+ *     style kit). The apps list stands before its health. The section ids are the old ones.
  *   v2.5.0 -- 2026-10-30 -- Section 07 (05 for a person with no apps yet): the style kit a new app starts from (apps/kits.js).
  *   v2.4.0 -- 2026-10-18 -- An app that changed last says who can open it, in words beside its name (AudienceBadge from its access code, open_to and listing) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.3.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry where the loading
@@ -126,8 +129,10 @@ export function renderPage(ctx) {
 
   const sections = none
     ? [{ id: 'ap-first', num: '01', label: a('secFirst'), count: '' }, { id: 'ap-waiting', num: '02', label: a('secWaiting'), count: 0 }, { id: 'ap-kunto', num: '03', label: a('secKunto'), count: '' }, { id: 'ap-build', num: '04', label: a('uploadLabel'), count: '' }]
-    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }, { id: 'ap-kits', num: '07', label: a('secKits'), count: '' }];
-  const kitsSection = html`<${KitsSection} num=${none ? '05' : '07'} gallery=${ctx.gallery} showToast=${ctx.showToast} />`;
+    // Three whole-numbered sections for a person with apps: what waits, the apps (with their health
+    // and what agents do with them as its parts) and building (with the builders and the style kit).
+    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-newest', num: '02', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-kunto', num: '02.1', label: a('secKunto'), count: '' }, { id: 'ap-agents', num: '02.2', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '03', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '03.1', label: a('secBuilders'), count: '' }, { id: 'ap-kits', num: '03.2', label: a('secKits'), count: '' }];
+  const kitsSection = html`<${KitsSection} num=${none ? '05' : '03.2'} gallery=${ctx.gallery} showToast=${ctx.showToast} />`;
   if (none) sections.push({ id: 'ap-kits', num: '05', label: a('secKits'), count: '' });
 
   return html`
@@ -139,7 +144,7 @@ export function renderPage(ctx) {
         ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}`}>
       ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, sharedDrafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}${kitsSection}`
         : loading ? (ctx.appsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />` : html`<${Note} kind="loading">${t('common.loading')}<//>`)
-        : html`${secWaiting(ctx, drafts, sharedDrafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}${kitsSection}`}
+        : html`${secWaiting(ctx, drafts, sharedDrafts, grants, '01')}${secNewest(ctx, apps)}${secKunto(ctx, '02.1')}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '03' })}${secBuilders(ctx)}${kitsSection}`}
     <//>`;
 }
 
@@ -269,7 +274,7 @@ function secNewest(ctx, apps) {
   const grantRefs = new Set((ctx.grants || []).map((g) => g.app));
   const doors = html`<${Action} small soft href=${catalogUrl()} newTab>${a('allInCatalog', { n: apps.length })}<//>`;
   return html`
-    <${Section} id="ap-newest" num="03" title=${a('secNewest')} count=${rows.length} doors=${doors}>
+    <${Section} id="ap-newest" num="02" title=${a('secNewest')} count=${rows.length} doors=${doors}>
       <${List} cols="mark-name-desc-state-n-doors" keepCols
         head=${['', a('colApp'), a('colDesc'), a('colNote'), { label: a('colOpens'), num: true }, '']}
         rows=${rows} render=${(app) => {

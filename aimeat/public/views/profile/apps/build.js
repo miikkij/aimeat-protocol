@@ -10,6 +10,8 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   v2.0.1 -- 2026-11-26 -- The agents section is 02.2, a part of the apps list (02); the page has
+ *     three whole-numbered sections for a person with apps (apps/page.js).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): Section,
  *     the agents and skills Facts (wide) with their Marks, the actions Action (the copies with
  *     `copy`), the crew editor the aside Note with a Select and a TextArea, the upload label a
@@ -63,7 +65,7 @@ export function secAgents(ctx) {
   const withSkill = apps.filter((x) => (bound[appRef(x)] || []).length).length;
   const picked = apps.find((x) => x.filename === ctx.agentPick) || null;
   return html`
-    <${Section} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
+    <${Section} id="ap-agents" num="02.2" title=${a('secAgents')} count=${null}>
       <${Facts} wide flush rows=${[
         {
           k: a('agentsLabel'),

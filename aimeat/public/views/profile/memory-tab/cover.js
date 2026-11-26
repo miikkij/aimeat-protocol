@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.35.0 -- 2026-11-26 -- The seven sections are four with their parts: 01 mine (01.1 the organisms' content, 01.2 the system records), 02 files, 03 what has happened (03.1 stale), 04 who else sees. The section ids are the old ones.
  *   v1.34.0 -- 2026-11-10 -- Files counts every file (ctx.filesTotal) and "show N more" reads the next page from the server; the mount carries the first 12 files, not all of them.
  *   v1.33.0 -- 2026-11-10 -- The cover reads the server's summary until the page has the whole list (storeOf, classifySummary): the same words, without every key. A key space without the list shows its keys a page at a time with "show N more", in the server's order; a record finds its row through memory-tab/key-pages.js. Files shows its first 12 files and "show N more" adds 50 (FILES_MORE): every file at once was 25 507 of the cover's 26 121 elements at 1 700 files.
  *   v1.32.0 -- 2026-11-09 -- Sorting by time parses each key's date once (a WeakMap), and classify() reuses its last result for the same list: 1.6 s less main-thread time per render at 20 000 keys. Nothing on screen changes.
@@ -361,19 +362,24 @@ function renderCover(ctx) {
   }
   if (fedKeys.length) seenRows.push(html`<${ListRow} key="fed"><${Name} meta=${fedKeys.slice(0, 3).join(' · ')}>${tn('profile.memory.cover.fedKeys', fedKeys.length)}<//><${Cell} line><${Mark} tone="dim">${c('federation', 'federation')}<//><//><${Doors} /><//>`);
 
-  let counter = 0; const next = () => String(++counter).padStart(2, '0');
+  // Four whole-numbered sections with their parts: what is in the memory (mine, with the organisms'
+  // content and the system records as its parts), the files, what has happened (with what has gone
+  // stale as its part), and who else sees. `part` numbers a section under the one before it (01.1).
+  let counter = 0; let parts = 0;
+  const next = () => { parts = 0; return String(++counter).padStart(2, '0'); };
+  const nextPart = () => `${String(counter).padStart(2, '0')}.${++parts}`;
   const sections = [];
-  const sec = (id, label, count, open) => { const n = next(); sections.push({ id, num: n, label, count, href: '#' + id, open }); return n; };
+  const sec = (id, label, count, open, part) => { const n = part ? nextPart() : next(); sections.push({ id, num: n, label, count, href: '#' + id, open }); return n; };
   const ownCount = cls.own.reduce((n, s) => n + s.count, 0);
   const orgCount = cls.org.reduce((n, s) => n + s.count, 0);
   const nOwn = sec('mp-own', c('own', 'Mine'), ownCount);
-  const nOrg = sec('mp-org', c('orgs', 'Organisms’'), orgCount);
-  const nSys = sec('mp-sys', c('sys', 'System records'), sysCount, () => setSysOpen(true));
+  const nOrg = sec('mp-org', c('orgs', 'Organisms’'), orgCount, undefined, true);
+  const nSys = sec('mp-sys', c('sys', 'System records'), sysCount, () => setSysOpen(true), true);
   // Every file, of which the page has read the first pages (memory-tab.js loadMoreFiles).
   const filesCount = ctx.filesTotal ?? (files || []).length;
   const nFiles = sec('mp-files', c('files', 'Files'), filesCount);
   const nHist = sec('mp-history', c('happened', 'What has happened'), '→');
-  const nStale = sec('mp-stale', c('stale', 'Stale'), stale.count);
+  const nStale = sec('mp-stale', c('stale', 'Stale'), stale.count, undefined, true);
   const nSeen = sec('mp-seen', c('seen', 'Who else sees'), seenRows.length);
 
   const search = () => runServerSearch(searchInput, ctx.searchScopePrefix);

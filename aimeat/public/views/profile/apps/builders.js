@@ -22,6 +22,7 @@
  * @structure secBuilders(ctx) — the section · rungRow · GrantForm
  * @usage import { secBuilders } from './builders.js';
  * @version-history
+ *   v2.1.1 — 2026-11-26 — The section is 03.1, a part of Build (03) (apps/page.js).
  *   v2.1.0 — 2026-10-02 — The name field is the shared ContactPicker, owners only: typing a name
  *     suggests the owner's contacts and the members who listed themselves in the directory, the
  *     same picker the organism invitation and the sharing forms use. It was a plain text field, so
@@ -143,7 +144,7 @@ export function secBuilders(ctx) {
   };
 
   return html`
-    <${Section} id="ap-builders" num="06" title=${a('secBuilders')}>
+    <${Section} id="ap-builders" num="03.1" title=${a('secBuilders')}>
       <${Note} kind="lead">${a('secBuildersLead')}<//>
       ${loading ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
       ${failed ? html`<${Note} kind="quiet">${a('bldFailed')}<//>` : null}

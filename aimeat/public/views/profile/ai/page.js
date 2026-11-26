@@ -12,6 +12,8 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.44.1 -- 2026-11-26 -- The page no longer asks for its figures first: the page kit puts them
+ *     first on every page (SettingsPage v1.7.0).
  *   v1.44.0 -- 2026-11-24 -- The page is ordered by what a person needs first: the figures over the
  *     page's start, then 01 Connection, 02 Budget and spending with 02.1 What spends your key, 03 Routing,
  *     and 04 Fine-tuning, whose four parts (providers, roles, model policy, the rules for pictures and
@@ -206,7 +208,7 @@ export function renderPage(ctx) {
     <${SettingsPage} name="ai"
       crumb=${crumb()}
       ...${mast(ctx)}
-      strip=${strip(ctx)} stripFirst
+      strip=${strip(ctx)}
       start=${html`<${PageStart} id="ai" done=${loading ? null : !!ctx.keyed} link=${{ onClick: () => openTab('mcp') }}
         action=${ctx.keyed ? null : { onClick: () => scrollToSection('ai-connection') }} />`}
       railTitle=${x('railTitle')}

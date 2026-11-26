@@ -9,6 +9,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-11-26 — .og-sec--sub: a section whose number has a part (02.1) continues the section before
+ *     it, with less air above and a smaller headline (PageSection marks it).
  *   2026-11-01 — .og-sec--step, .og-step-h, .og-step-n, .og-step-body (PageSection `step`): a numbered
  *     step of a procedure, the share link page's three steps (WP9b); additive.
  *   2026-10-11 — .og-sec--ends (PageSection `ends`): more air under the section's body and before
@@ -47,6 +49,14 @@
 /* Folded rows and not-yet-migrated headings retain their existing rule. */
 .og-sec:where(:not(:has(> .og-sec-h > .poster-section-title))) { border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); }
 .og-sec--first { border-top: 0; padding-top: .9rem; }
+/* A section whose number has a part (02.1) continues the whole-numbered section before it
+   (PageSection marks it): less air above it and a smaller headline, so the page reads as its few
+   whole-numbered sections with their parts under them. */
+.og-sec--sub { padding-top: .5rem; }
+/* In a page's column the sections stand 1.4rem apart (tab-page.css .og-main): a part stands closer
+   to the section it continues. */
+.og-main > .og-sec--sub { margin-top: -.8rem; }
+.og-sec--sub > .og-sec-h > .poster-section-title { font-size: calc(var(--poster-section-size, 1.9rem) * .7); }
 .og-sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; flex-wrap: wrap; }
 /* The band cut (PageSection/Section `band`): the headline's dark band spans the column, as the classic
    pages drew their section titles on main (a block .poster-section-title). */

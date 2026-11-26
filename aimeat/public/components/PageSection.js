@@ -9,6 +9,9 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-11-26 — A section whose number has a part ("02.1") and that stands beside its parent is
+ *     marked `og-sec--sub`: page-section.css draws it as a continuation of the section before it. A
+ *     page with eight sections of one weight then reads as its three or four whole-numbered ones.
  *   2026-11-24 — A section with a count shows its number too: the number is `small.og-sec-num` and the
  *     count `small.og-sec-count`, so the contents rail's "02" is found in the headline it leads to.
  *     Until now the count replaced the number (Jouni, 2026-11-24). The classes are new; a headline
@@ -39,10 +42,14 @@
  *   v1.0.0 — 2026-09-25 — Moved out of views/profile/organisms/poster-parts.js (Section) with its markup
  *     unchanged (UI consolidation phase 5, a move).
  */
-import { h } from 'preact';
+import { h, createContext } from 'preact';
+import { useContext } from 'preact/hooks';
 import htm from 'htm';
 
 const html = htm.bind(h);
+
+/** True for everything drawn inside a section's body: a section there is nested, not a sibling. */
+export const InSection = createContext(false);
 
 /**
  * Said, not seen, between a headline and its count: a screen reader read "What is open10" as one
@@ -57,6 +64,7 @@ const saidApart = () => html`<span class="visually-hidden">: </span>`;
  *   foldLabel?: string, foot?: any, spaced?: boolean, part?: boolean, step?: boolean, children?: any }} props
  */
 export function PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, step, children }) {
+  const inside = useContext(InSection);
   // step (added by WP9b, board Vastaanottaja): one numbered step of a procedure a person follows on
   // the page, its number in the ink square before the bold title and the body under the title;
   // `done` would be a later option, so a step says nothing of its state.
@@ -117,13 +125,18 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
   // The number and the count each have an element of their own: a section with both shows both.
   const hasNum = num !== null && num !== undefined && num !== '';
   const hasCount = count !== null && count !== undefined && count !== '';
+  // A section whose number has a part ("02.1") and that stands beside its parent, not inside it,
+  // continues the section before it (og-sec--sub): a smaller headline, drawn as one piece with the
+  // whole-numbered section above. A page then reads as its few whole-numbered sections. A section
+  // that is already inside another one is drawn by that nesting and gets no mark.
+  const sub = !inside && typeof num === 'string' && /^\d+\.\d+/.test(num);
   return html`
-    <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}`} id=${id}>
+    <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}${sub ? ' og-sec--sub' : ''}`} id=${id}>
       <div class=${band || group ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
         <h2 class="poster-section-title">${title}${hasNum ? html`<small class="og-sec-num">${num}</small>` : null}${hasCount ? html`<small class="og-sec-count">${saidApart()}${count}</small>` : null}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>
-      ${children}
+      <${InSection.Provider} value=${true}>${children}<//>
     </section>`;
 }
 

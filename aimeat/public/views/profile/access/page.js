@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.37.0 -- 2026-11-26 -- The eight sections are five with their parts: 01 how you sign in, 02 who acts in your name, 03 your accounts in other services (03.1 the attached MCP servers, 03.2 the secrets), 04 share groups, 05 your address for an AI (05.1 how an AI reads this page). The section ids are the old ones.
  *   v1.36.0 -- 2026-11-07 -- Section 02 ends with the line to the Receivers page and how many receivers the account has: a receiver key is a credential an outside program writes into the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.35.0 -- 2026-11-01 -- On a node the store sold with a build queue (site.build_queue_url), the MCP servers section, with its "Connect to aimeat.io", is section 02 before the "Lisätiedot" fold, so the build code card's link reaches it (commercial's crew52 walk).
  *   v1.34.0 -- 2026-11-01 -- On a node the store sold (the review of v33; Jouni, 2026-11-01): the lead "kuka pääsee tiliisi ja miten"; one button at the top, the fingerprint or face sign-in while there is none; no tags and no counters up front; the sign-in rows are the link, the fingerprint or face, two-step and "Olet kirjautuneena N laitteella" with "Kirjaudu ulos muilta laitteilta", without the other servers' row; everything else, counters included, is in one fold, "Lisätiedot".
@@ -131,12 +132,15 @@ export function renderPage(ctx) {
   const rail = [
     ['01', 'ac-signin', x('rail.signIn'), ov ? (ov.sign_in.two_factor.enabled ? x('twoStep.onShort') : x('twoStep.offShort')) : ''],
     ['02', 'ac-keys', x('rail.keys'), ov ? String(ctx.rows.length) : ''],
+    // Five whole-numbered sections. What this account uses outside itself is one of them, with its
+    // parts: the accounts in other services, the attached MCP servers and the secrets. The address
+    // for an AI has the way an AI reads this page as its part. The ids are the old ones.
     ['03', 'ac-accounts', x('rail.elsewhere'), ov ? String(ov.connections?.connections?.length || 0) : ''],
-    ['04', 'ac-mcp', x('rail.mcp'), ctx.mcpCount == null ? '' : String(ctx.mcpCount)],
-    ['05', 'ac-secrets', x('rail.secrets'), ctx.secrets ? String(ctx.secrets.length) : ''],
-    ['06', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
-    ['07', 'ac-addresses', x('rail.addresses'), ''],
-    ['08', 'ac-roads', x('rail.ai'), ''],
+    ['03.1', 'ac-mcp', x('rail.mcp'), ctx.mcpCount == null ? '' : String(ctx.mcpCount)],
+    ['03.2', 'ac-secrets', x('rail.secrets'), ctx.secrets ? String(ctx.secrets.length) : ''],
+    ['04', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
+    ['05', 'ac-addresses', x('rail.addresses'), ''],
+    ['05.1', 'ac-roads', x('rail.ai'), ''],
   ];
   // On a node the store sold the page leads with how the buyer signs in; the counters, the keys and
   // everything for agents and developers wait in one fold, "Lisätiedot" (Jouni's review of v33).
@@ -419,7 +423,7 @@ function secAccounts(ctx) {
  * is a set of tools, not an account, and it does not follow the accounts switch, so it gets its own
  * number, title and count. The section supplies the title and intro; `inRow` leaves out the panel's own.
  */
-function secMcp(ctx, num = '04') {
+function secMcp(ctx, num = '03.1') {
   return html`
     <${Section} id="ac-mcp" num=${num} title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
       <${Note} kind="lead">${x('mcpIntro')}<//>
@@ -437,7 +441,7 @@ function secMcp(ctx, num = '04') {
 function secSecrets(ctx) {
   const list = ctx.secrets || [];
   return html`
-    <${Section} id="ac-secrets" num="05" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
+    <${Section} id="ac-secrets" num="03.2" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
       <${Note} kind="lead">${x('secretsIntro')}<//>
       ${ctx.secretsFailed ? html`<${Note} kind="quiet">${x('secrets.loadFailed')}<//>` : null}
       ${list.length ? html`
@@ -494,7 +498,7 @@ function secretFold(ctx) {
 function secGroups(ctx) {
   const groups = ctx.ov.groups?.groups || [];
   return html`
-    <${Section} id="ac-groups" num="06" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
+    <${Section} id="ac-groups" num="04" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
       <${Note} kind="lead">${x('groupsIntro')}<//>
       <${SharingGroupsSection} inRow showToast=${ctx.showToast} initial=${ctx.ov.groups} />
       <${SharesIncomingSection} inRow />
@@ -515,7 +519,7 @@ function secAddresses(ctx) {
     customerNode() ? null : ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
   ].filter(Boolean);
   return html`
-    <${Section} id="ac-addresses" num="07" title=${x('secAddresses')} count=${x('secAddressesSub')}>
+    <${Section} id="ac-addresses" num="05" title=${x('secAddresses')} count=${x('secAddressesSub')}>
       <${Note} kind="lead">${x('addressesIntro')}<//>
       <${Facts} rows=${[
         ...rows.map(([k, v, sub]) => ({
@@ -532,7 +536,7 @@ function secAddresses(ctx) {
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="ac-roads" num="08" title=${x('secRoads')}>
+    <${Section} id="ac-roads" num="05.1" title=${x('secRoads')}>
       <${Roads} wide>
         <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
           doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
