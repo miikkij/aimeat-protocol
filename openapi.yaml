@@ -45118,6 +45118,69 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { description: 'APP_ARTIFACT_BROKEN: the version''s bytes would not publish today; details.findings names why.' }
+  /v1/apps/{owner}/{filename}/design-spec/scenarios:
+    put:
+      operationId: appDesignSpecScenariosWrite
+      summary: Write the app's playtest scenarios, the whole list
+      description: >
+        Body `{ scenarios, expected_revision? }`. Each scenario is `{ id, name, criteria?, signed_in?,
+        steps }`; a step is `{ do, target?, value?, ms? }` with `do` one of click, fill, press, wait,
+        expect_text, expect_visible, expect_absent, and `target` a CSS selector or `text=` and the
+        words a person sees. At most 10 scenarios of 25 steps. `criteria` must name acceptance criteria
+        the design spec has; the spec must exist first (409 `NO_DESIGN_SPEC`). GET .../audit with
+        `playtest=true` runs every scenario on the published app at 390x844, 1280x900, 1280x460 and
+        1920x1080 in both themes, signed in as a throwaway member account the run makes and erases
+        (unless `signed_in` is false), and answers `live.scenarios` with pass or fail per size and theme,
+        the failed step, console errors, the node's own failed answers, and `criteria_evidence` lines
+        for criteria_set. Returns `{ app, app_version, scenarios, revision, meaning }`. Needs
+        `app:write` and the owner, one of the owner's agents, or a development right.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scenarios]
+              properties:
+                scenarios:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [id, name, steps]
+                    properties:
+                      id: { type: string, maxLength: 40 }
+                      name: { type: string, maxLength: 400 }
+                      criteria: { type: array, items: { type: string, maxLength: 40 } }
+                      signed_in: { type: boolean }
+                      steps:
+                        type: array
+                        maxItems: 25
+                        items:
+                          type: object
+                          required: [do]
+                          properties:
+                            do: { type: string, enum: [click, fill, press, wait, expect_text, expect_visible, expect_absent] }
+                            target: { type: string, maxLength: 400 }
+                            value: { type: string, maxLength: 400 }
+                            ms: { type: integer, minimum: 0 }
+                expected_revision: { type: integer, minimum: 0, nullable: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/apps/{owner}/{filename}/freshness:
     get:
       operationId: appFreshness
@@ -84098,6 +84161,13 @@ paths:
                             type: object
                             description: Present only with playtest=true. The bytes check and the live run.
                             properties:
+                              scenarios:
+                                type: object
+                                description: >
+                                  Present when the design spec has playtest scenarios (PUT .../design-spec/scenarios).
+                                  { ran, reason?, member, scenarios: [{ id, name, criteria, signed_in, ok, runs:
+                                  [{ size, theme, ok, failed_step?, console_errors, bad_responses }], not_run }],
+                                  criteria_evidence: [{ id, evidence }] }.
                               artifact:
                                 type: object
                                 description: The same check every publish runs on the app's bytes.

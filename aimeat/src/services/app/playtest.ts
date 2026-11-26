@@ -35,6 +35,9 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.3.0 — 2026-11-26 — The audit bundle carries `scenarios`: the builder's own scenarios from the
+ *     design spec, run signed in at four sizes and both themes (playtest-scenarios.ts), in a slot of
+ *     their own that counts against the hourly limit.
  *   v1.2.0 — 2026-10-25 — secaudit2026oct22: at most two playtests run at once on a node and an
  *     account starts at most thirty an hour (takePlaytestSlot, answered ran:false with the reason),
  *     and each browser pass is closed by withHeadlessContext's deadline.
@@ -50,6 +53,8 @@ import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.
 import { serveDocumentOnce, type HeadlessRoutable } from '../headless/network.js';
 import { lintAppArtifact, type AppArtifactLintResult } from './artifact-lint.js';
 import { logger } from '../../utils/logger.js';
+import { readAppDesignSpec } from './design-spec.js';
+import { runAppScenarios, type ScenarioRunResult } from './playtest-scenarios.js';
 
 /** The phone the app has to work on, and the desktop it has to survive being stretched to. */
 const MOBILE = { width: 390, height: 844 };
@@ -663,6 +668,8 @@ export interface AppPlaytestBundle {
   artifact: AppArtifactLintResult;
   /** What the browser saw. */
   playtest: AppPlaytestResult;
+  /** The builder's own scenarios, when the design spec has any (services/app/playtest-scenarios.ts). */
+  scenarios?: ScenarioRunResult;
 }
 
 /**
@@ -677,5 +684,17 @@ export async function auditAppWithPlaytest(
   const html = Buffer.from(record.data).toString('utf8');
   const artifact = await lintAppArtifact(html, config);
   const playtest = await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
-  return { artifact, playtest };
+  // The builder's own scenarios, in the slot and hourly count every playtest takes.
+  const scenarios = (await readAppDesignSpec(storage, `${app.ownerName}/${app.filename}`))?.scenarios ?? [];
+  if (scenarios.length === 0) return { artifact, playtest };
+  const slot = takePlaytestSlot(app.ownerName);
+  if ('reason' in slot) {
+    return { artifact, playtest, scenarios: { ran: false, reason: slot.reason, member: 'Not started.', scenarios: [], criteria_evidence: [] } };
+  }
+  try {
+    const run = await runAppScenarios(storage, config, { ownerName: app.ownerName, filename: app.filename, html, appName: record.manifest?.name ?? app.filename }, scenarios);
+    return { artifact, playtest, scenarios: run };
+  } finally {
+    slot.release();
+  }
 }

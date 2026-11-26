@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.9.0 — 2026-11-26 — scenarios_set calls writeScenariosFor (services/app/design-spec-ops.ts).
  *   v1.8.0 — 2026-11-26 — freshness calls appFreshnessFor (services/app/freshness.ts).
  *   v1.7.0 — 2026-11-26 — criteria_set calls writeCriteriaFor (services/app/design-spec-ops.ts).
  *   v1.6.0 — 2026-11-26 — rollback calls rollbackAppFor (services/app/rollback-ops.ts).
@@ -37,7 +38,7 @@ import {
 } from '../services/app/roster-ops.js';
 import { setCarryPlan, setMember, removeRosterMember } from '../services/app/roster-write.js';
 import { listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app/dev-grant-ops.js';
-import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, clearDesignSpecFor } from '../services/app/design-spec-ops.js';
+import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, writeScenariosFor, clearDesignSpecFor } from '../services/app/design-spec-ops.js';
 import { rollbackAppFor } from '../services/app/rollback-ops.js';
 import { appFreshnessFor } from '../services/app/freshness.js';
 import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app/scope-allowance.js';
@@ -137,6 +138,8 @@ export async function appManageMemberAction(
       return opAnswer(await clearDesignSpecFor(storage, config, caller, ref));
     case 'criteria_set':
       return opAnswer(await writeCriteriaFor(storage, config, caller, ref, pick(args, ['criteria', 'expected_revision'])));
+    case 'scenarios_set':
+      return opAnswer(await writeScenariosFor(storage, config, caller, ref, pick(args, ['scenarios', 'expected_revision'])));
     case 'freshness':
       return opAnswer(await appFreshnessFor(storage, config, caller, ref));
     case 'rollback':

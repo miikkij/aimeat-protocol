@@ -31,13 +31,16 @@
  * @structure
  *   - recordAppAudit(storage, args) — append one entry
  *   - readAppAudit(storage, ownerGhii, filename) — the entries, newest last
- *   - ownerAppAudit(storage, config, { callerGaii, filename, limit, playtest }) — the agent-shaped
+ *   - ownerAppAudit(storage, config, { callerGaii, filename, limit, year }) — the agent-shaped
  *     read, and on request the live run of the app beside it
  *   - archiveAppAuditBefore / applyAppAuditKeep — the owner's archive button and limit
  *   - AppAuditAction — the vocabulary
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-11-26 — ownerAppAudit runs no playtest and answers the owner name: the doors that offer
+ *     playtest call auditAppWithPlaytest beside it, which broke the import cycle the playtest's
+ *     throwaway member would have closed. `design_spec.scenarios` for each write of the scenarios.
  *   2026-11-26 — `version.rollback` (services/app/rollback-ops.ts), and the audit answer carries
  *     `changes`: the versions published and the rollbacks over 90 days, and their rate (changeRecord).
  *   2026-11-06 — `about`: the owner set or took off the text about the app (TARGET-093).
@@ -86,7 +89,6 @@ import type { Storage } from '../../storage/interface.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
 import { logger } from '../../utils/logger.js';
 import { resolveAppOwnerScope } from './lifecycle.js';
-import { auditAppWithPlaytest, type AppPlaytestBundle } from './playtest.js';
 import {
   ACTIVE_ROLL_AT, ACTIVE_KEEP, effectiveKeep, moveToArchive, applyKeep, writeKeep, listArchives, readArchiveYear,
 } from './audit-archive.js';
@@ -118,6 +120,8 @@ export type AppAuditAction =
   | 'design_spec.set' | 'design_spec.cleared'
   // The acceptance criteria inside the spec (services/app/acceptance-criteria.ts): each write of the list.
   | 'design_spec.criteria'
+  // The playtest scenarios inside the spec (services/app/scenarios.ts): each write of the list.
+  | 'design_spec.scenarios'
   // The member roster (routes/app-members.ts): each decision about a person, the plan and the sweep.
   | 'member.approved' | 'member.role_changed' | 'member.removed'
   | 'request.declined' | 'visitor.dismissed'
@@ -175,16 +179,6 @@ export async function readAppAudit(storage: Storage, ownerGhii: string, filename
 }
 
 /**
- * The agent-shaped read: the caller's own identity and an app name, the newest `limit` entries
- * newest first. The lookup and the refusals live here so the MCP door renders what comes back and
- * touches no storage of its own.
- *
- * With `playtest`, the same call also OPENS the app: the publish-time check on its bytes, then the
- * live run in a headless browser (services/app/playtest.ts). It is one door on purpose — "what do
- * we know about this app" is one question, and an agent that has to find a second tool to ask the
- * live half of it asks neither. The run is read-only: nothing about the app changes, and no entry
- * is added to the log, because a playtest is not a change to how the app is offered.
- */
 /** How often the app's changes failed over the window: DORA's change-failure rate, read from what the node recorded. */
 export interface AppChangeRecord {
   window_days: number;
@@ -215,13 +209,24 @@ export function changeRecord(versions: Array<{ createdAt: string }>, log: Readon
   };
 }
 
+/**
+ * The agent-shaped read: the caller's own identity and an app name, the newest `limit` entries
+ * newest first. The lookup and the refusals live here so the MCP door renders what comes back and
+ * touches no storage of its own.
+ *
+ * The playtest is not run here. The doors that offer `playtest` (aimeat_app_manage audit and GET
+ * .../audit?playtest=true) call auditAppWithPlaytest (services/app/playtest.ts) beside this read,
+ * with the owner name it answers: the playtest's scenarios sign in a throwaway account, whose
+ * account code writes this log, so this module reaching the playtest closed an import cycle.
+ */
 export async function ownerAppAudit(
   storage: Storage,
   config: AimeatConfig,
-  args: { callerGaii: string; filename: string; limit?: number; playtest?: boolean; year?: string },
+  args: { callerGaii: string; filename: string; limit?: number; year?: string },
 ): Promise<{
+  ownerName: string;
   total: number; entries: AppAuditEntry[]; archives: Array<{ year: string; entries: number }>;
-  keep: { keep: number; source: 'owner' | 'node' }; year?: string; live?: AppPlaytestBundle;
+  keep: { keep: number; source: 'owner' | 'node' }; year?: string;
   changes?: AppChangeRecord;
 } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
@@ -235,15 +240,13 @@ export async function ownerAppAudit(
     : await readAppAudit(storage, scope.ownerGhii, args.filename);
   const limit = Math.min(APP_AUDIT_MAX, Math.max(1, Math.floor(args.limit ?? 50)));
   const entries = all.slice(Math.max(0, all.length - limit)).reverse();
-  const base = {
+  return {
+    ownerName: scope.ownerName,
     total: all.length, entries,
     archives: await listArchives(storage, scope.ownerGhii, args.filename),
     keep: await effectiveKeep(storage, scope.ownerGhii),
     ...(args.year ? { year: args.year } : { changes: changeRecord(await storage.listAppVersionSummaries(app.ownerGaii, args.filename), all) }),
   };
-  if (!args.playtest) return base;
-  const live = await auditAppWithPlaytest(storage, config, { ownerName: scope.ownerName, filename: args.filename });
-  return live ? { ...base, live } : base;
 }
 
 /**

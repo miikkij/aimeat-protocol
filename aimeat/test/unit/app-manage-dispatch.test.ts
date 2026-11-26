@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-26 — scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 — freshness reaches GET /v1/apps/:owner/:filename/freshness.
  *   2026-11-26 — criteria_set reaches PUT /v1/apps/:owner/:filename/design-spec/criteria.
  *   2026-11-26 — rollback reaches POST /v1/apps/:owner/:filename/rollback with version and note.
@@ -80,6 +81,7 @@ const VALUE: Record<string, unknown> = {
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
     markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
     criteria: [{ id: 'zqxline', text: 'zqxtext', check: 'person', status: 'open' }],
+    scenarios: [{ id: 'zqxscene', name: 'zqxname', steps: [{ do: 'wait', ms: 10 }] }],
     purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',
     proposals: { layout: [{ id: 'zqxproposal', name: 'n', note: 'n', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] },
     party: 'party:alice/ap-zqxparty@node', party_name: 'ap-zqxname', open: true,
@@ -143,6 +145,7 @@ const EXPECT: Record<string, [string, string]> = {
     rollback: ['POST', '/v1/apps/alice/shop.html/rollback'],
     criteria_set: ['PUT', '/v1/apps/alice/shop.html/design-spec/criteria'],
     freshness: ['GET', '/v1/apps/alice/shop.html/freshness'],
+    scenarios_set: ['PUT', '/v1/apps/alice/shop.html/design-spec/scenarios'],
     // The permissions the app kept at the move to 4.0; the words to remove travel in the query.
     scope_allowance: ['GET', '/v1/apps/alice/shop.html/scope-allowance'],
     scope_allowance_remove: ['DELETE', '/v1/apps/alice/shop.html/scope-allowance?words=zqxword'],

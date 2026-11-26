@@ -23,6 +23,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-26 — audit with playtest calls auditAppWithPlaytest beside ownerAppAudit, as the REST door
+ *     does; the bundle carries the builder's scenarios.
  *   2026-11-25 — action face_set writes the app's agent face through the shared memory write
  *     (services/app/agent-face-write.ts): the one owed item the appdev surface had no tool for.
  *   2026-11-15 — action icon_upload calls services/app/icon-store.ts, as POST .../icon does; marks
@@ -87,6 +89,7 @@ import { ownerAppSeo } from '../services/app/seo.js';
 import { ownerAppMarks } from '../services/app/marks.js';
 import { ownerAppLegal } from '../services/app/legal.js';
 import { ownerAppAudit } from '../services/app/audit.js';
+import { auditAppWithPlaytest } from '../services/app/playtest.js';
 import { ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app/settings.js';
 import { listAppVersionsView } from '../services/app/versions.js';
 import { callerAppReader } from '../services/app/read-gate.js';
@@ -223,13 +226,15 @@ export function registerAppManageTool(
             }
             case 'audit': {
                 const out = await ownerAppAudit(storage, config, {
-                    callerGaii, filename, limit: typeof args.limit === 'number' ? args.limit : undefined, playtest: args.playtest === true,
+                    callerGaii, filename, limit: typeof args.limit === 'number' ? args.limit : undefined,
                     year: typeof args.year === 'string' && args.year ? args.year : undefined,
                 });
                 if ('error' in out) return plainRefusal(out.error);
+                // The playtest beside the read, as GET .../audit?playtest=true runs it (services/app/playtest.ts).
+                const live = args.playtest === true ? await auditAppWithPlaytest(storage, config, { ownerName: out.ownerName, filename }) : null;
                 return answer({
                     filename, total: out.total, entries: out.entries, archives: out.archives, keep: out.keep,
-                    ...(out.year ? { year: out.year } : {}), ...(out.changes ? { changes: out.changes } : {}), ...(out.live ? { live: out.live } : {}),
+                    ...(out.year ? { year: out.year } : {}), ...(out.changes ? { changes: out.changes } : {}), ...(live ? { live } : {}),
                 });
             }
             case 'versions': {

@@ -18,7 +18,7 @@ This page is for the architect and the network or firewall owner. It names the c
 | SMTP server | No | Outbound mail (`AIMEAT_SMTP_HOST`). Without it the node sends no notification, invitation or sign-in mail; a company's own SMTP setting and connected mail accounts still send | `aimeat/src/services/email.ts`, `aimeat/src/services/company/company-smtp.ts`, [Bookkeeping](../operations/bookkeeping.md) |
 | TURN server | No | Relay for voice and video between browsers (`AIMEAT_TURN_SERVER`, `AIMEAT_TURN_SECRET`), for example coturn | `aimeat/.env.example` |
 | Consul | No, off by default | Central configuration for a fleet of nodes (`AIMEAT_CONSUL_ENABLED`, `AIMEAT_CONSUL_URL`) | `aimeat/src/config/consul.ts` |
-| Headless browser | No | System Edge or Chrome, if installed, for on-demand screenshots, playtests and Design Book benches; `AIMEAT_SCREENSHOT_AUTO=true` adds automatic screenshots and downloads Chromium when no browser is installed | `aimeat/src/services/screenshot-capture.ts`, `aimeat/src/services/app/playtest.ts`, `aimeat/src/services/design-book/bench.ts` |
+| Headless browser | No | System Edge or Chrome, if installed, for on-demand screenshots, playtests (an app builder's own scenarios among them, which can run signed in as a short-lived account, [Identity and access](04-identity-access.md)) and Design Book benches; `AIMEAT_SCREENSHOT_AUTO=true` adds automatic screenshots and downloads Chromium when no browser is installed | `aimeat/src/services/screenshot-capture.ts`, `aimeat/src/services/app/playtest.ts`, `aimeat/src/services/app/playtest-scenarios.ts`, `aimeat/src/services/design-book/bench.ts` |
 
 There is no Redis, message queue or search cluster. The cache is an in-process map by design (`aimeat/src/services/cache.ts`).
 

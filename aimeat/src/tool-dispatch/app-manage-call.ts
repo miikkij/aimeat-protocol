@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-26 -- scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 -- freshness reaches GET /v1/apps/:owner/:filename/freshness.
  *   2026-11-26 -- criteria_set reaches PUT /v1/apps/:owner/:filename/design-spec/criteria.
  *   2026-11-26 -- rollback reaches POST /v1/apps/:owner/:filename/rollback with version and note.
@@ -242,6 +243,8 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
         case 'criteria_set':
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec/criteria`, pick(input, ['criteria', 'expected_revision']));
+        case 'scenarios_set':
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec/scenarios`, pick(input, ['scenarios', 'expected_revision']));
         case 'freshness':
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/freshness`);
         case 'rollback':

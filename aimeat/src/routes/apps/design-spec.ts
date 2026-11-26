@@ -26,6 +26,7 @@
  *   GET /design-spec · PUT /design-spec · DELETE /design-spec
  * @usage registerDesignSpecRoutes(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-11-26 — PUT .../design-spec/scenarios: the playtest scenarios (services/app/scenarios.ts).
  *   v1.2.0 — 2026-11-26 — PUT .../design-spec/criteria: the acceptance criteria inside the spec
  *     (services/app/acceptance-criteria.ts), checked by schema here and per status in the service.
  *   v1.1.0 — 2026-10-05 — The handlers' logic (the build test, the refusals, the manifest stamp, the
@@ -38,8 +39,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { z } from 'zod';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
-import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, clearDesignSpecFor } from '../../services/app/design-spec-ops.js';
+import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, writeScenariosFor, clearDesignSpecFor } from '../../services/app/design-spec-ops.js';
 import { CRITERIA_MAX, CRITERION_CHECKS, CRITERION_STATUSES } from '../../services/app/acceptance-criteria.js';
+import { SCENARIOS_MAX, SCENARIO_STEPS_MAX, SCENARIO_STEP_KINDS } from '../../services/app/scenarios.js';
 import { validateBody } from '../../models/schemas.js';
 import { safeText } from '../../models/input-limits.js';
 import { sendAppOp } from '../app-op-answer.js';
@@ -54,6 +56,23 @@ const CriteriaWriteSchema = z.object({
         evidence: safeText(400).optional(),
         waived_reason: safeText(400).optional(),
     })).max(CRITERIA_MAX),
+    expected_revision: z.number().int().min(0).nullable().optional(),
+});
+
+/** The shape and bounds of a scenario write; which criteria exist and each step's own fields are the service's. */
+const ScenariosWriteSchema = z.object({
+    scenarios: z.array(z.object({
+        id: safeText(40),
+        name: safeText(400),
+        criteria: z.array(safeText(40)).max(50).optional(),
+        signed_in: z.boolean().optional(),
+        steps: z.array(z.object({
+            do: z.enum(SCENARIO_STEP_KINDS),
+            target: safeText(400).optional(),
+            value: z.string().max(400).optional(),
+            ms: z.number().int().min(0).max(60_000).optional(),
+        })).max(SCENARIO_STEPS_MAX),
+    })).max(SCENARIOS_MAX),
     expected_revision: z.number().int().min(0).nullable().optional(),
 });
 
@@ -75,6 +94,10 @@ export function registerDesignSpecRoutes(router: Router, config: AimeatConfig, s
     // ── PUT .../design-spec/criteria — the whole list of acceptance criteria inside the spec ──
     router.put('/v1/apps/:owner/:filename/design-spec/criteria', requireAuth(), requireScope('app:write'), validateBody(CriteriaWriteSchema, config.nodeId), async (req, res) =>
         sendAppOp(res, config.nodeId, await writeCriteriaFor(storage, config, req.auth!, refOf(req), req.body)));
+
+    // ── PUT .../design-spec/scenarios — the whole list of playtest scenarios inside the spec ──
+    router.put('/v1/apps/:owner/:filename/design-spec/scenarios', requireAuth(), requireScope('app:write'), validateBody(ScenariosWriteSchema, config.nodeId), async (req, res) =>
+        sendAppOp(res, config.nodeId, await writeScenariosFor(storage, config, req.auth!, refOf(req), req.body)));
 
     // ── DELETE .../design-spec — the owner takes the document away ──
     router.delete('/v1/apps/:owner/:filename/design-spec', requireAuth(), requireScope('app:write'), async (req, res) =>

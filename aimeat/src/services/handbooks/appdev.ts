@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-26 — Playtest scenarios: scenarios_set and audit with playtest (services/app/playtest-scenarios.ts).
  *   2026-11-26 — The app's acceptance criteria: criteria_set, the check kinds and statuses, and the
  *     refusal at the finest level (services/app/acceptance-criteria.ts).
  *   2026-11-25 — FINISH says which owed items an app owes at its level, the refusal from the second
@@ -436,7 +437,12 @@ where it stands (\`status\`: open, evidenced with \`evidence\` that says what pr
 empty, error and loading states, the phone width and both themes are where builds fall short. Write
 the whole list with \`aimeat_app_manage\` \`criteria_set\`; the spec must exist first. At the finest
 level an update is refused while a line is open (\`APP_OWES_ITEMS\`, item \`criteria\`); every
-publish answer counts them in \`next_steps\`. Only the owner waives a line. \`freshness\` says in one
+publish answer counts them in \`next_steps\`. Only the owner waives a line. When you have no browser
+of your own, write playtest scenarios with \`scenarios_set\` (steps: click, fill, press, wait,
+expect_text, expect_visible, expect_absent; each scenario names the criteria it proves) and run them
+with \`audit\` \`{ playtest: true }\`: the node opens the published app signed in as a throwaway member
+at four sizes and both themes, and answers pass or fail per size and theme and \`criteria_evidence\`
+lines to write back with \`criteria_set\`. \`freshness\` says in one
 answer what beside the app has fallen behind it: the spec, criteria evidenced at an older version, the
 data map, and a bound skill whose calls the app's tools now refuse.
 

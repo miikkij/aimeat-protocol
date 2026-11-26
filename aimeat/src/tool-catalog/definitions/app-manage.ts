@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-26 — scenarios_set and the `scenarios` field: the builder's playtest scenarios
+ *     (services/app/scenarios.ts), run by audit with playtest.
  *   2026-11-26 — freshness: what beside the app is behind it (services/app/freshness.ts).
  *   2026-11-26 — criteria_set and the `criteria` field: the acceptance criteria inside the design spec
  *     (services/app/acceptance-criteria.ts).
@@ -208,7 +210,23 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
             waived_reason: z.string().max(400).optional(),
         })).max(50),
     },
-    expected_revision: { type: 'number', description: 'For spec_set and criteria_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
+    scenarios: {
+        type: 'array',
+        description: 'For scenarios_set: the WHOLE list of playtest scenarios, at most 10; it replaces what is there. Each: { id (short, lowercase), name (what it does, one sentence), criteria (ids of acceptance criteria it proves), signed_in (default true), steps: [{ do: "click" | "fill" | "press" | "wait" | "expect_text" | "expect_visible" | "expect_absent", target (a CSS selector, or text= and the words a person sees), value (for fill, press and expect_text), ms (a wait, or how long to wait for the target, at most 5000) }] }, at most 25 steps.',
+        zod: z.array(z.object({
+            id: z.string().max(40),
+            name: z.string().max(400),
+            criteria: z.array(z.string().max(40)).max(50).optional(),
+            signed_in: z.boolean().optional(),
+            steps: z.array(z.object({
+                do: z.enum(['click', 'fill', 'press', 'wait', 'expect_text', 'expect_visible', 'expect_absent']),
+                target: z.string().max(400).optional(),
+                value: z.string().max(400).optional(),
+                ms: z.number().int().min(0).max(60_000).optional(),
+            })).max(25),
+        })).max(10),
+    },
+    expected_revision: { type: 'number', description: 'For spec_set, criteria_set and scenarios_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
     // the app's structure and plan (routes/apps/structure.ts)
     purpose: { type: 'string', description: 'For structure_set: who the app is for and the one job it does for them, in the person\'s words, at most 800 characters. An empty string clears it.', zod: z.string().max(800) },
     data: { type: 'object', description: 'For structure_set: the data in short, before the data map can be written: { "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }. Write it once the person has confirmed the data map questions.', zod: z.object({ summary: z.string().max(800), personalData: z.enum(['yes', 'no', 'unstated']).optional() }) },
@@ -301,6 +319,8 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data is stored, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
     spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
+    scenarios_set: { fields: F(['filename', 'scenarios'], ['owner', 'expected_revision']), scope: 'app:write',
+        summary: 'write the app\'s playtest scenarios, the whole list (read it first with spec, where it is design_spec.scenarios): steps the node\'s own browser runs on the published app, signed in as a throwaway member it makes and erases, at four sizes (390x844, 1280x900, 1280x460, 1920x1080) and both themes. Each scenario names the acceptance criteria it proves. audit { playtest: true } runs them and answers pass or fail per size and theme, the step that failed, and evidence lines for criteria_set. Use it when you have no browser of your own. The spec must exist first' },
     freshness: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'what beside the app has fallen behind it, in one answer: the design spec (written against an older version), the acceptance criteria (open, or evidenced at an older version), the data map (missing), and each bound skill whose calls the app\'s tools now refuse. Each item behind says what to do. Read it before you change an app and after you publish one. The owner and everybody who may build the app' },
     criteria_set: { fields: F(['filename', 'criteria'], ['owner', 'expected_revision']), scope: 'app:write',

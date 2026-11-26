@@ -11,9 +11,10 @@
  *   call these.
  *
  *   The document store itself is services/app/design-spec.ts.
- * @structure readDesignSpecFor · writeDesignSpecFor · writeCriteriaFor · clearDesignSpecFor
+ * @structure readDesignSpecFor · writeDesignSpecFor · writeCriteriaFor · writeScenariosFor · clearDesignSpecFor
  * @usage const out = await writeDesignSpecFor(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.2.0 — 2026-11-26 — writeScenariosFor: the playtest scenarios inside the spec (scenarios.ts).
  *   v1.1.0 — 2026-11-26 — writeCriteriaFor: the acceptance criteria inside the spec (acceptance-criteria.ts);
  *     a builder of another account may not newly waive a line.
  *   v1.0.0 — 2026-10-05 — Moved out of the handlers of routes/apps/design-spec.ts by extraction;
@@ -28,9 +29,10 @@ import { recordAppAudit } from './audit.js';
 import { resolveAppTarget } from './dev-grant.js';
 import {
   APP_DESIGN_SPEC_TEMPLATE, checkDesignSpecMarkdown, deleteAppDesignSpec, designSpecMeaning, designSpecStamp,
-  isDesignSpecStale, readAppDesignSpec, writeAppCriteria, writeAppDesignSpec,
+  isDesignSpecStale, readAppDesignSpec, writeAppSpecParts, writeAppDesignSpec,
 } from './design-spec.js';
 import { checkCriteria, criteriaCounts, openCriteriaIds } from './acceptance-criteria.js';
+import { checkScenarios } from './scenarios.js';
 import { done, refuse, type AppOpCaller, type AppOpOutcome, type AppOpRefusal } from './op-outcome.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
@@ -147,8 +149,8 @@ export async function writeCriteriaFor(
   if (found.delegated && checked.newlyWaived.length) {
     return refuse(403, 'FORBIDDEN', `Only the app owner waives a criterion (${checked.newlyWaived.join(', ')}): shipping without it is their call. Leave it open, or evidence it.`);
   }
-  const out = await writeAppCriteria(storage, {
-    appId: found.appId, criteria: checked.criteria, by: accountOf(principal), principal,
+  const out = await writeAppSpecParts(storage, {
+    appId: found.appId, parts: { criteria: checked.criteria }, by: accountOf(principal), principal,
     ...(typeof expected === 'number' ? { expectedRevision: expected } : {}),
   });
   if (!out) return refuse(409, 'NO_DESIGN_SPEC', 'The design spec was removed while this write ran. Write it again first.');
@@ -173,6 +175,53 @@ export async function writeCriteriaFor(
     meaning: counts.open
       ? `${counts.open} of ${counts.total} criteria are open (${openCriteriaIds(out.spec).join(', ')}). At the finest level an update is refused until each is evidenced or the owner waives it.`
       : `All ${counts.total} criteria are evidenced or waived.`,
+  });
+}
+
+/**
+ * PUT .../design-spec/scenarios: write the whole list of playtest scenarios. Everybody inside the
+ * build writes it; each scenario's criteria must be criteria the spec has. `audit { playtest: true }`
+ * runs them (services/app/playtest-scenarios.ts).
+ */
+export async function writeScenariosFor(
+  storage: Storage, config: AimeatConfig, caller: AppOpCaller, ref: SpecRef, rawBody: unknown,
+): Promise<AppOpOutcome> {
+  const found = await specTarget(storage, config, caller, ref);
+  if (!found.ok) return found;
+  const body = (rawBody ?? {}) as Record<string, unknown>;
+  const expected = body.expected_revision;
+  if (expected !== undefined && expected !== null && (!Number.isInteger(expected) || (expected as number) < 0)) {
+    return refuse(400, 'INVALID_INPUT', 'expected_revision is the revision you read, a whole number; omit it to replace whatever is there.');
+  }
+  const live = await readAppDesignSpec(storage, found.appId);
+  if (!live) {
+    return refuse(409, 'NO_DESIGN_SPEC', 'The scenarios live in the design spec, and this app has none yet: write it first with spec_set (PUT .../design-spec).');
+  }
+  const checked = checkScenarios(body.scenarios, new Set((live.criteria ?? []).map(c => c.id)));
+  if (!checked.ok) return refuse(400, 'INVALID_INPUT', checked.message);
+  const principal = resolveIdentity(caller, config.nodeId);
+  const out = await writeAppSpecParts(storage, {
+    appId: found.appId, parts: { scenarios: checked.scenarios }, by: accountOf(principal), principal,
+    ...(typeof expected === 'number' ? { expectedRevision: expected } : {}),
+  });
+  if (!out) return refuse(409, 'NO_DESIGN_SPEC', 'The design spec was removed while this write ran. Write it again first.');
+  if ('conflict' in out) {
+    return refuse(409, 'REVISION_MISMATCH',
+      `The design spec is at revision ${out.conflict.revision}, not ${expected}. Read it again and write from that.`,
+      { design_spec: out.conflict });
+  }
+  await storage.updateAppMeta(found.app.ownerGaii, found.app.filename, { designSpec: designSpecStamp(out.spec) });
+  await recordAppAudit(storage, {
+    ownerGhii: found.app.ownerGaii, filename: found.app.filename, by: principal, action: 'design_spec.scenarios',
+    detail: { revision: out.spec.revision, scenarios: checked.scenarios.length },
+  });
+  emitChange('apps');
+  return done({
+    app: found.appId,
+    app_version: found.app.versionNumber,
+    scenarios: out.spec.scenarios,
+    revision: out.spec.revision,
+    meaning: `${checked.scenarios.length} scenario(s) stored. aimeat_app_manage { action: "audit", playtest: true } runs each on the published app at four sizes and both themes, and answers with evidence lines for the criteria of every scenario that passes.`,
   });
 }
 

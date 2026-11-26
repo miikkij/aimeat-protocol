@@ -38,8 +38,8 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
- *   2026-11-26 — The record carries `criteria` (services/app/acceptance-criteria.ts), written alone by
- *     writeAppCriteria; a write of the prose keeps them.
+ *   2026-11-26 — The record carries `criteria` (services/app/acceptance-criteria.ts) and `scenarios`
+ *     (services/app/scenarios.ts), each written alone by writeAppSpecParts; a write of the prose keeps them.
  *   2026-11-19 — eraseAppDesignSpecsOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
@@ -50,6 +50,7 @@
 import type { Storage } from '../../storage/interface.js';
 import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId } from './record-keys.js';
 import type { AppCriterion } from './acceptance-criteria.js';
+import type { AppScenario } from './scenarios.js';
 
 export const APP_DESIGN_SPEC_SPEC = 'aimeat.appdesignspec/1' as const;
 
@@ -76,6 +77,8 @@ export interface AppDesignSpec {
   createdAt: string;
   /** What "correct" means for the app, one line each (services/app/acceptance-criteria.ts). */
   criteria?: AppCriterion[];
+  /** The builder's playtest scenarios, which prove the criteria they name (services/app/scenarios.ts). */
+  scenarios?: AppScenario[];
 }
 
 /** What the manifest carries, so a listing never has to load the prose. */
@@ -172,8 +175,10 @@ export async function writeAppDesignSpec(
       version: input.appVersion,
       revision: unchanged ? live.revision : (live?.revision ?? 0) + 1,
       createdAt: live?.createdAt ?? now,
-      // The criteria are written on their own (writeAppCriteria); a write of the prose keeps them.
+      // The criteria and the scenarios are written on their own (writeAppSpecParts); a write of the
+      // prose keeps them.
       ...(live?.criteria ? { criteria: live.criteria } : {}),
+      ...(live?.scenarios ? { scenarios: live.scenarios } : {}),
     };
     const record = {
       key: appDesignSpecKey(input.appId), ownerGaii: NS_SPEC, value: spec,
@@ -189,13 +194,13 @@ export async function writeAppDesignSpec(
 }
 
 /**
- * Write the acceptance criteria and nothing else: the prose and its version stay, the revision moves
- * on. Null when there is no spec yet (the criteria live inside it), or the record that is there when
- * the caller named a revision it expected to replace and that is not the one stored.
+ * Write the acceptance criteria or the scenarios and nothing else: the prose and its version stay,
+ * the revision moves on. Null when there is no spec yet (both live inside it), or the record that is
+ * there when the caller named a revision it expected to replace and that is not the one stored.
  */
-export async function writeAppCriteria(
+export async function writeAppSpecParts(
   storage: Storage,
-  input: { appId: string; criteria: AppCriterion[]; by: string; principal: string; expectedRevision?: number },
+  input: { appId: string; parts: { criteria?: AppCriterion[]; scenarios?: AppScenario[] }; by: string; principal: string; expectedRevision?: number },
 ): Promise<{ spec: AppDesignSpec } | { conflict: AppDesignSpec } | null> {
   for (let attempt = 0; attempt < 40; attempt++) {
     const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(input.appId), input.appId);
@@ -204,7 +209,7 @@ export async function writeAppCriteria(
     if (typeof input.expectedRevision === 'number' && current.revision !== input.expectedRevision) return { conflict: current };
     const now = new Date().toISOString();
     const spec: AppDesignSpec = {
-      ...current, criteria: input.criteria, updatedBy: input.by, updatedByPrincipal: input.principal,
+      ...current, ...input.parts, updatedBy: input.by, updatedByPrincipal: input.principal,
       updatedAt: now, revision: current.revision + 1,
     };
     const saved = await storage.setMemoryIfVersion({ ...existing, value: spec, version: existing.version + 1, updatedAt: now }, existing.version);
