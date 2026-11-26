@@ -149,12 +149,13 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'The side menu of Settings & Controls, read as a table of contents: the link home, items as hairline rows with the open one on the sun, a coral count when something waits, a pin, groups under a coral capital word that fold, and "show all tools". As a page\'s own index it has the link home under a heavy rule, the menu\'s name beside its mark in a framed square, bold rows with every count in small grey typewriter letters (on a coral chip for the open row), and on a phone each group as a sideways strip of words.',
         module: '/components/SideMenu.js', sheet: '/css/components/side-menu.css',
         data: {
-            shape: 'SideMenu({ label, index, children }) · SideMenuTitle({ mark, children }) · SideMenuHome({ href, children }) · SideMenuItem({ active, onClick, count, tally, small, tab, pin, children }) · SideMenuGroup({ title, collapsed, onToggle, role, label, children }) · SideMenuLabel({ children }) · SideMenuMore({ onClick, children })',
+            shape: 'SideMenu({ label, index, children }) · SideMenuTitle({ mark, children }) · SideMenuHome({ href, count, countTitle, children }) · SideMenuItem({ active, onClick, count, tally, small, tab, pin, children }) · SideMenuGroup({ title, collapsed, onToggle, role, label, children }) · SideMenuLabel({ children }) · SideMenuMore({ onClick, children })',
             fields: {
                 SideMenu: 'the nav that holds the parts; the Settings frame draws its own and needs none', index: 'SideMenu: the page\'s own index (the look in the summary); under 900px the title and the group words hide and each group is a sideways strip',
                 label: 'SideMenu: names the menu for a screen reader; SideMenuGroup: names the group (with role)',
                 mark: 'SideMenuTitle: the sign in the framed square before the menu\'s name', 'SideMenuTitle children': 'the menu\'s name, hidden on a phone',
-                active: 'the item of the open view', count: 'how many wait there; shown when above 0',
+                active: 'the item of the open view', count: 'how many wait there; shown when above 0 (on SideMenuHome: how many things wait for the person on the home)',
+                countTitle: 'SideMenuHome: what the count says, for a pointer and a screen reader',
                 tally: 'the count only says how many, shown whatever it is (0 too; \'\' says nothing yet) in small grey typewriter letters, on a coral chip while the item is open',
                 small: 'a row of a long list (a tag): smaller and grey', tab: 'the item switches the page\'s view: role tab, selected while active',
                 pin: '{ on, title, onToggle }: the pin that keeps the item under Pinned', title: 'the group\'s word; a group without one draws none',

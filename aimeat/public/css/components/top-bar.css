@@ -7,6 +7,12 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.11.0 — 2026-11-26 — Two strengths for a signed-in person's links (.topnav-menu--member): the
+ *     places they work in at full strength, the places for upkeep and help (.topnav-aside) quieter
+ *     after a hairline rule, which is a rule above them in the folded menu. The home button carries
+ *     the count of what waits (.topnav-home .poster-count). A visitor's links keep their tone. A row of
+ *     the folded menu counts its padding inside its width: each row was 29 px wider than the menu,
+ *     which gave the menu a sideways scroll bar.
  *   v1.10.1 — 2026-11-21 — The bell's "Clear all" turns coral (--accent) on hover; it named --brand,
  *     which no sheet declares, so the hover kept the grey.
  *   v1.10.0 — 2026-11-10 — A bell notice is no longer a button, so its text can be selected; it shows
@@ -262,6 +268,16 @@ button.notif-item-title { cursor: pointer; }
   font-family: var(--font-mono); font-size: 0.76rem; font-weight: var(--weight-medium); letter-spacing: 0;
   background: var(--sun); color: var(--on-sun); border: 0; border-radius: var(--shape-corner-pill); padding: 3px 9px; margin-left: 12px;
 }
+/* Two strengths for a signed-in person (spa.html puts .topnav-menu--member on the menu). The places
+   they work in are in the text colour; the places for upkeep and help are grey and lighter, and a
+   hairline rule stands before the first of them. The open link keeps the coral underline in both. */
+.topnav-menu--member > a { color: var(--text); }
+.topnav-menu--member > a.topnav-aside { color: var(--text-dim); font-weight: var(--weight-medium); }
+.topnav-menu--member > a.topnav-aside:hover, .topnav-menu--member > a.topnav-aside.active { color: var(--text); }
+.topnav-menu--member > a.topnav-aside--first { margin-left: 0.25rem; padding-left: 1rem; border-left: 1px solid var(--border); }
+/* The count of what waits, on the home button of a folded bar: the bell's place for its count. */
+.topnav-right a.topnav-home { position: relative; }
+.topnav-home .poster-count { position: absolute; top: -6px; right: -6px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
 .notif-bell-btn { border-radius: var(--shape-corner-control); }
 .notif-bell-btn:hover { background: var(--sun); }
 .notif-dropdown { border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-dialog); box-shadow: var(--shape-shadow-raised); }
@@ -305,7 +321,10 @@ button.notif-item-title { cursor: pointer; }
     box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
   }
   .topnav-menu.open { display: flex; }
-  .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+  .topnav-menu a { box-sizing: border-box; width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+  /* In the folded menu the links are rows, so the rule before the quieter ones is above the first.
+     It is drawn as a ground, so the row keeps the corners the rows have. */
+  .topnav-menu--member > a.topnav-aside--first { margin: 0.35rem 0 0; padding-left: 0.9rem; border-left: 0; background: linear-gradient(var(--border), var(--border)) top / 100% 1px no-repeat; }
   .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
   /* Compact pill: the name stays, shorter. It is the one place on every width where the person
      sees who is signed in and reaches their home (Jouni, 2026-11-07); the old "logged in" label
@@ -338,7 +357,8 @@ button.notif-item-title { cursor: pointer; }
   box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
 }
 .topnav--compact .topnav-menu.open { display: flex; }
-.topnav--compact .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+.topnav--compact .topnav-menu a { box-sizing: border-box; width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+.topnav--compact .topnav-menu--member > a.topnav-aside--first { margin: 0.35rem 0 0; padding-left: 0.9rem; border-left: 0; background: linear-gradient(var(--border), var(--border)) top / 100% 1px no-repeat; }
 .topnav--compact .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
 .topnav--compact .aimeat-auth-pill .aimeat-auth-label { display: none !important; }
 .topnav--compact .topnav-right,

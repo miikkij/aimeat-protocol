@@ -21967,7 +21967,9 @@
     "lookDarkOnly": "Tällä tyylillä on vain tumma tila.",
     "lookThemes": "Teemat",
     "lookStyles": "Tämän teeman tyylit",
-    "menu": "Valikko"
+    "menu": "Valikko",
+    "waitingTitle": "Odottaa sinua: {n}",
+    "unreadTitle": "Lukemattomia viestejä: {n}"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Sanasto",
@@ -29410,7 +29412,6 @@
     "showAll": "Näytä kaikki {n}",
     "showFewer": "Näytä vähemmän",
     "for": "Kenelle: {who}",
-    "countTitle": "{n} uutta järjestelmäpäivitystä Kodissasi",
     "who": {
       "user": "Sinä",
       "agent": "Tekoälysi ja agenttisi",

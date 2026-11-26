@@ -21200,7 +21200,9 @@
     "lookDarkOnly": "This style has a dark mode only.",
     "lookThemes": "Themes",
     "lookStyles": "Styles in this theme",
-    "menu": "Menu"
+    "menu": "Menu",
+    "waitingTitle": "Waiting for you: {n}",
+    "unreadTitle": "Unread messages: {n}"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glossary",
@@ -28643,7 +28645,6 @@
     "showAll": "Show all {n}",
     "showFewer": "Show fewer",
     "for": "For: {who}",
-    "countTitle": "{n} new system updates on your home",
     "who": {
       "user": "You",
       "agent": "Your AI and agents",

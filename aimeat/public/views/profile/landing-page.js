@@ -17,6 +17,11 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.27.0 — 2026-11-26 — The menu says where something waits: the way home carries the count of
+ *     what waits for the person, and a page where it is acted on (an agent's proposal or sign-in, an
+ *     invitation, a request to publish, a workflow's question) carries its count and is drawn in the basic menu
+ *     too (views/home/waiting-data.js, the home band's read). A short menu has no default pins, and
+ *     the open page is marked on one row.
  *   v3.26.0 — 2026-11-15 — A plain link inside the profile opens its tab: the shell's aimeat-navigated is read as Back is. A team page's rows changed the address and nothing else.
  *   v3.25.0 —2026-11-14 — The overview has a contents rail beside it, as every Settings page does:
  *     its panels as numbered links (Agents with its count), then Home and, for an operator, Admin
@@ -154,6 +159,7 @@ import { StartPageSetting } from '/components/StartPageSetting.js';
 import { CardGrid } from '/components/Card.js';
 import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components/SettingsFrame.js';
 import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
+import { useWaiting } from '/views/home/waiting-data.js';
 import { MenuFind } from '/components/MenuFind.js';
 import { loadPlaces, placeWords, sectionsOf, indexGroups, scrollToSectionSoon } from '/js/services/places.js';
 import { loadYourThings, openYourThing } from '/js/services/your-things.js';
@@ -388,27 +394,34 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
   /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
      `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
-  // A customer's menu is already the eight; default pins would only repeat four of them.
-  const [pins, setPins] = useState(customerNode() ? [] : DEFAULT_PINS);
+  // The person's own list, or null while they never pinned. Without one the long menu ("Show all
+  // tools") gets the default pins and a short menu gets none: a customer's menu is already the
+  // eight and the basic menu the fifteen, and default pins there only repeated four of the rows
+  // under them, with the open page marked twice (2026-11-26).
+  const [ownPins, setOwnPins] = useState(null);
+  const pins = ownPins ?? (customerNode() || !showAllTools ? [] : DEFAULT_PINS);
   // A toggle saves the whole list, so it waits for the stored list: built on the defaults after a
   // failed read, it would replace the person's own pins.
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const loadPins = useCallback(() => getMemory('sidebar.pins', { soft: true })
-    .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); setPinsLoaded(true); })
+    .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setOwnPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); setPinsLoaded(true); })
     // The defaults stay on screen; a toggle is refused until a read works.
     .catch(err => { swallowed('landing-page: pins', err); }), []);
   useEffect(() => { loadPins(); }, [loadPins]);
   const togglePin = (id) => {
     if (!pinsLoaded) { showToast?.(t('common.settingsNotLoaded'), true); loadPins(); return; }
-    setPins(prev => {
-      let next;
-      if (prev.includes(id)) next = prev.filter(x => x !== id);
-      else if (prev.length >= 5) { showToast?.(t('profile.landing.pinLimit') || 'Max 5 pinned items'); return prev; }
-      else next = [...prev, id];
-      createMemory('sidebar.pins', next, 'private').catch(err => { swallowed('landing-page', err); return {}; });
-      return next;
-    });
+    let next;
+    if (pins.includes(id)) next = pins.filter(x => x !== id);
+    else if (pins.length >= 5) { showToast?.(t('profile.landing.pinLimit') || 'Max 5 pinned items'); return; }
+    else next = [...pins, id];
+    setOwnPins(next);
+    createMemory('sidebar.pins', next, 'private').catch(err => { swallowed('landing-page', err); return {}; });
   };
+
+  // What waits for the person, by the page it is acted on (views/home/waiting-data.js): the count
+  // on a menu row, and the count on the way home. The read is the home band's and the top bar's.
+  const waiting = useWaiting(true);
+  const waitsOn = (id) => waiting.byTab[id] || 0;
 
   /* ── Group collapse/expand, remembered per browser. ── */
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -495,7 +508,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         ${/* The way back to the front room. The header's brand goes there too, but a person in the
               sidebar is looking at the sidebar, and until 2026-08-27 the only way from here to the
               home was a control that also changed the account's landing page. */''}
-        <${SideMenuHome} href="/v1/home">← ${t('nav.home')}<//>
+        <${SideMenuHome} href="/v1/home" count=${waiting.total}
+          countTitle=${t('nav.waitingTitle', { n: waiting.total })}>← ${t('nav.home')}<//>
         ${/* The Agents v2 section used to hang here as a LINK to /v1/fleet, above the menu rather
               than in it, so a person had to be told the address. It is a section of Settings &
               Controls now — "Your agents", first in Automation — and comes through the same menu as
@@ -520,10 +534,12 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         />
 
         ${(() => {
+          // A pinned page has two rows, the pinned one at the top and its own in its group. The
+          // open page is marked on the pinned row, which is in sight without scrolling.
           const renderItem = (it, pinned) => html`
-            <${SideMenuItem} active=${isOpen(it.id)} key=${(pinned ? 'pin-' : '') + it.id}
+            <${SideMenuItem} active=${isOpen(it.id) && (pinned || !pins.includes(it.id))} key=${(pinned ? 'pin-' : '') + it.id}
               onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}
-              count=${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' ? stats[it.badgeStat] : null}
+              count=${waitsOn(it.id) || (it.badgeStat && typeof stats?.[it.badgeStat] === 'number' ? stats[it.badgeStat] : null)}
               pin=${{ on: pins.includes(it.id),
                 title: pins.includes(it.id) ? (t('profile.landing.pinRemove') || 'Unpin') : (t('profile.landing.pinAdd') || 'Pin'),
                 onToggle: () => togglePin(it.id) }}>
@@ -539,8 +555,9 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
             `}
             ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
               const collapsed = collapsedGroups.has(g.titleKey);
-              // Basic view: only the everyday items. The rest are one toggle away, never gone.
-              const items = showAllTools ? g.items : g.items.filter(it => basicTabs().has(it.id));
+              // Basic view: only the everyday items. The rest are one toggle away, never gone. A
+              // page where something waits for the person is drawn in either view, with its count.
+              const items = showAllTools ? g.items : g.items.filter(it => basicTabs().has(it.id) || waitsOn(it.id) > 0);
               // On a customer's node the node's maintenance left the top bar (Jouni, 2026-10-29) and
               // lives here, with the operator's other tools, behind "Show all tools".
               const adminLink = g.adminOnly && customerNode() && showAllTools;

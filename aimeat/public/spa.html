@@ -803,6 +803,7 @@
       "/views/home/ask-band.js": "/views/home/ask-band.js",
       "/views/home/teams-band.js": "/views/home/teams-band.js",
       "/views/home/waiting-band.js": "/views/home/waiting-band.js",
+      "/views/home/waiting-data.js": "/views/home/waiting-data.js",
       "/views/home/agent-new.js": "/views/home/agent-new.js",
       "/views/home/agent.js": "/views/home/agent.js",
       "/views/home/agent-work.js": "/views/home/agent-work.js",
@@ -1169,7 +1170,7 @@
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { Mark } from '/components/Mark.js';
-    import { useNews } from '/views/home/news-data.js';
+    import { useWaiting } from '/views/home/waiting-data.js';
     import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { Tooltip } from '/components/Tooltip.js';
@@ -1748,9 +1749,12 @@
       // notification bell and the "Me" menu rendered next to a "Sign In" button after a logout.
       const session = useSession();
       const [morsels, setMorsels] = useState(null);
-      // How many changes on this node the person has not confirmed yet: the count on the Home link,
-      // where the home's news band (views/home/news-band.js) lists them.
-      const news = useNews(session);
+      // What waits for the person: the count on the Home link is the decisions and answers the home's
+      // "Waiting for you" band lists, and the count on Messages is the unread messages. One read,
+      // shared with that band and the side menu (views/home/waiting-data.js). Until 2026-11-26 the
+      // Home link carried the count of new system updates, which the home's news band still lists:
+      // a number in the bar says that something needs the person, and an update does not.
+      const waiting = useWaiting(!!session);
       // Whether the operator's new-version tag is on the bar: it arrives after a read and widens the bar.
       const [updateShown, setUpdateShown] = useState(false);
       const [menuOpen, setMenuOpen] = useState(false);
@@ -1801,7 +1805,7 @@
         // link appearing, a different nav config arriving, or the language switching. And when
         // the burger menu closes: a language switched from inside the open menu was measured
         // with the menu's own rows in the bar, which kept the bar compact after a row that fits.
-      }, [session, locale, navConfig, morsels, updateShown, menuOpen, news.count]);
+      }, [session, locale, navConfig, morsels, updateShown, menuOpen, waiting.total, waiting.unread]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -1879,6 +1883,18 @@
         .filter(l => (l.when === 'anon' ? !session : l.when === 'auth' ? !!session : true))
         .map(l => (l.siteKey ? { ...l, path: siteLink(l.siteKey) } : l))
         .filter(l => l.path);
+      // The operator's links as anchors. A visitor gets them first, as the bar's own links; a
+      // signed-in person gets them last, with the places for upkeep (`tone` is that class).
+      const publicLinks = (tone) => visibleLinks.map(link => (link.external
+        ? html`
+          <a href=${link.path} key=${link.id} target="_blank" rel="noopener" class=${tone}
+            onClick=${() => setMenuOpen(false)}>${t(link.key) || link.fallback || link.key}</a>
+        `
+        : html`
+          <a href=${link.path} key=${link.id}
+            onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
+            class="${tone} ${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
+        `));
 
       return html`
         <nav class="topnav" ref=${navRef}>
@@ -1903,26 +1919,20 @@
                   <path d="M5 9.6V20h14V9.6" />
                   <path d="M10 20v-5.5h4V20" />
                 </svg>
+                ${/* What waits for the person, on the one button a folded bar keeps in sight. */''}
+                ${waiting.total > 0 && html`<${Mark} kind="count" tone="waiting" small
+                  title=${t('nav.waitingTitle', { n: waiting.total })}>${waiting.total > 99 ? '99+' : waiting.total}<//>`}
               </a>
             <//>`}
             <${Tooltip} text=${t('nav.menu') || 'Menu'} quiet=${menuOpen}>
               <button class="topnav-burger" aria-label=${t('nav.menu') || 'Menu'} aria-expanded=${menuOpen ? 'true' : 'false'}
                 onClick=${() => setMenuOpen(o => !o)}>☰</button>
             <//>
-            <div class="topnav-menu ${menuOpen ? 'open' : ''}">
+            <div class="topnav-menu ${session ? 'topnav-menu--member' : ''} ${menuOpen ? 'open' : ''}">
               <!-- Public links are operator-configurable (visibility + order) via the admin
                    Portal tab. Classic stays reachable deeper (landing card B "Start
                    building"), and the landing itself is the brand link. -->
-              ${visibleLinks.map(link => (link.external
-                ? html`
-                  <a href=${link.path} key=${link.id} target="_blank" rel="noopener"
-                    onClick=${() => setMenuOpen(false)}>${t(link.key) || link.fallback || link.key}</a>
-                `
-                : html`
-                  <a href=${link.path} key=${link.id}
-                    onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
-                    class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
-                `))}
+              ${!session && publicLinks('')}
               <!-- Where a signed-in person actually goes, inline with the rest. These sat
                    behind a "Me" dropdown until 2026-08-09, which cost a click every time and
                    only existed because the bar was carrying the marketing links at the same
@@ -1936,27 +1946,35 @@
                    places a person opens most, one click from anywhere. Messages opens the
                    Messages tab of /v1/profile the way a notification does (openNotificationLink),
                    so it switches the tab when the profile is already open; Agents opens the
-                   home's agents band on a page of its own (views/home/agents-page.js). -->
+                   home's agents band on a page of its own (views/home/agents-page.js).
+
+                   Two strengths since 2026-11-26. The places a person works in (Home, Messages,
+                   Agents, Chat, Apps) stand first at full strength, and a count on Home or on
+                   Messages says that something waits there. The places for upkeep and help
+                   (Settings & Controls, Admin, Help) follow after a rule, in the quieter tone
+                   (.topnav-aside, top-bar.css); the open one is underlined like any other. -->
               ${session && html`
                 <a href="/v1/home" class="${currentPath === '/v1/home' && !onAgentPage ? 'active' : ''}"
-                  onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}${news.count > 0 && html`${' '}<${Mark} kind="count" tone="waiting"
-                    title=${(t('news.countTitle') || '{n} new changes on your home').replace('{n}', String(news.count))}>${news.count}<//>`}</a>
+                  onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}${waiting.total > 0 && html`${' '}<${Mark} kind="count" tone="waiting"
+                    title=${t('nav.waitingTitle', { n: waiting.total })}>${waiting.total}<//>`}</a>
                 <a href="/v1/profile?tab=messages"
-                  onClick=${(e) => { e.preventDefault(); openNotificationLink('/v1/profile?tab=messages', navigate); setMenuOpen(false); }}>${t('nav.messages') || 'Messages'}</a>
+                  onClick=${(e) => { e.preventDefault(); openNotificationLink('/v1/profile?tab=messages', navigate); setMenuOpen(false); }}>${t('nav.messages') || 'Messages'}${waiting.unread > 0 && html`${' '}<${Mark} kind="count" tone="waiting"
+                    title=${t('nav.unreadTitle', { n: waiting.unread })}>${waiting.unread}<//>`}</a>
                 <a href="/v1/home?agents=1" class="${onAgentPage ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/home?agents=1'); setMenuOpen(false); }}>${t('nav.agents') || 'Agents'}</a>
                 <a href="/v1/chat" class="${currentPath === '/v1/chat' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/chat'); setMenuOpen(false); }}>${t('nav.chat') || 'Chat'}</a>
                 <a href="/v1/appcat" class="${currentPath === '/v1/appcat' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/appcat'); setMenuOpen(false); }}>${t('nav.apps') || 'Apps'}</a>
-                <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}"
+                <a href="/v1/profile" class="profile-link visible topnav-aside topnav-aside--first ${currentPath === '/v1/profile' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>${t('nav.profile')}</a>
                 ${/* On a customer's node the maintenance is in Settings, behind "Show all tools"
                       (Jouni, 2026-10-29): the buyer is its operator, and the top bar is theirs. */''}
                 ${session.roles && session.roles.includes('operator') && !customerNode() && html`
-                  <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}"
+                  <a href="/v1/admin" class="topnav-aside ${currentPath === '/v1/admin' ? 'active' : ''}"
                     onClick=${(e) => { handleNav(e, '/v1/admin'); setMenuOpen(false); }}>${t('nav.admin')}</a>
                 `}
+                ${publicLinks('topnav-aside')}
               `}
               <div class="topnav-center">
                 ${LOCALES.map((l) => html`

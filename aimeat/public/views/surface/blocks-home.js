@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-26: WaitingBlock reads under the key and the address of views/home/waiting-data.js, which
+ *     the top bar and the side menu read too: one request for the three. The strings are unchanged.
  *   2026-11-25: WaitingBlock, "Waiting for you" (views/home/waiting-band.js, GET /v1/home/waiting): one
  *     list of everything that waits for the person, with its count on the contents rail.
  *   2026-11-14: TeamsBlock, "Your teams" (views/home/teams-band.js, GET /v1/teams/status and /v1/teams/waiting).
@@ -81,6 +83,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
+import { WAITING_MAX, WAITING_DOMAINS, waitingKey, waitingPath } from '/views/home/waiting-data.js';
 
 /** How much of each waiting thread's last message the band asks for; a row shows one line of it. */
 const TURN_PREVIEW = 240;
@@ -244,10 +247,11 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
  * first content block of the page keeps its place.
  */
 export function WaitingBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx, props = {} }) {
-  const max = Number.isFinite(props.max) ? props.max : 12;
+  const max = Number.isFinite(props.max) ? props.max : WAITING_MAX;
   const { state } = useHomeState();
-  const { data } = useShared(`home-waiting|${max}`, state?.initialized ? `/v1/home/waiting?limit=${max}` : '',
-    ['agents', 'messages', 'help', 'organisms', 'memory', 'open-items', 'work']);
+  // The key and the address the top bar and the side menu read with (views/home/waiting-data.js):
+  // at the default row count the three share one request.
+  const { data } = useShared(waitingKey(max), state?.initialized ? waitingPath(max) : '', WAITING_DOMAINS);
   if (!state?.initialized || !data) return null;
   // The count the home's contents rail shows beside this band: everything that waits.
   return html`<div class="rail-mark" data-rail-count=${data.total ? String(data.total) : ''}>

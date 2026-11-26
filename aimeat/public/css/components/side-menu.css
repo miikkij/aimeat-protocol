@@ -11,6 +11,9 @@
  *   read, under the component's names (UI consolidation phase 5, a move).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-11-26 — The pin is a drawn mark (SideMenu.js v1.4.0): its stroke and, when pinned,
+ *     its fill, in coral, in place of the emoji's size and grey filter. Beside a count it follows
+ *     the count. The way home may carry a count (the shared .poster-count rule places it).
  *   v1.4.1 — 2026-09-27 — The index strip's line under a word reads var(--shape-frame) instead of a
  *     literal 2px (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:shape-tokens.
  *   v1.4.0 — 2026-09-27 — The index (appcat parity): the way home and the tags toggle in mono coral
@@ -29,10 +32,16 @@
 /* A group folds under its title; the pin shows on hover and stays when on. */
 .pf .side-menu-group-toggle { display: flex; align-items: center; gap: .35rem; width: 100%; background: none; border: none; cursor: pointer; font: inherit; text-align: left; padding: 0; }
 .pf .side-menu-group-toggle .side-menu-chevron { font-size: .55rem; color: var(--muted); }
-.pf .side-menu-pin { display: none; margin-left: auto; font-size: .72rem; opacity: .55; cursor: pointer; filter: grayscale(1); }
+.pf .side-menu-pin { display: none; margin-left: auto; line-height: 0; opacity: .55; cursor: pointer; }
+.pf .side-menu-pin svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
 .pf .side-menu-item:hover .side-menu-pin { display: inline; }
 .pf .side-menu-pin:hover { opacity: 1; }
-.pf .side-menu-pin--on { display: inline; opacity: .9; filter: none; }
+/* A pinned page's mark stays in sight, filled, in coral; on the open row it takes the row's words' colour. */
+.pf .side-menu-pin--on { display: inline; opacity: .9; color: var(--accent); }
+.pf .side-menu-pin--on svg { fill: currentColor; }
+.pf .side-menu-item--active .side-menu-pin--on { color: inherit; }
+/* Beside a count the pin follows it; alone it goes to the row's end. */
+.pf .side-menu-item .poster-count + .side-menu-pin { margin-left: 0; }
 
 .pf .side-menu-chevron { transition: transform .2s; display: inline-block; }
 .pf .side-menu-chevron--open { transform: rotate(180deg); }

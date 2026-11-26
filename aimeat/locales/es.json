@@ -20080,7 +20080,9 @@
     "lookDarkOnly": "Este estilo solo tiene modo oscuro.",
     "lookThemes": "Temas",
     "lookStyles": "Estilos de este tema",
-    "menu": "Menú"
+    "menu": "Menú",
+    "waitingTitle": "Te espera: {n}",
+    "unreadTitle": "Mensajes sin leer: {n}"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glosario",
@@ -27305,7 +27307,6 @@
     "showAll": "Mostrar las {n}",
     "showFewer": "Mostrar menos",
     "for": "Para: {who}",
-    "countTitle": "{n} actualizaciones del sistema nuevas en tu inicio",
     "who": {
       "user": "Tú",
       "agent": "Tu IA y tus agentes",

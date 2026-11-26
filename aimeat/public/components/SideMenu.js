@@ -15,7 +15,7 @@
  *   group words hidden. An item that switches the page's view says so (`tab`: role tab, selected);
  *   a group may have no title, and a `role` and `label` (the view switch is a tab list).
  * @structure SideMenu({ label, index, children }) · SideMenuTitle({ mark, children }) ·
- *   SideMenuHome({ href, children }) · SideMenuItem({ active, onClick, count, tally, small, tab, pin, children }) ·
+ *   SideMenuHome({ href, count, countTitle, children }) · SideMenuItem({ active, onClick, count, tally, small, tab, pin, children }) ·
  *   SideMenuGroup({ title, collapsed, onToggle, role, label, children }) · SideMenuLabel({ children }) ·
  *   SideMenuMore({ onClick, children })
  * @usage html`<${SideMenuGroup} title="Information" collapsed=${false} onToggle=${…}>
@@ -24,6 +24,9 @@
  *          <${SideMenuTitle} mark="📚">My Apps<//>
  *          <${SideMenuGroup} role="tablist"><${SideMenuItem} tab tally active count=${12} onClick=${…}>Your apps<//><//><//>`
  * @version-history
+ *   v1.4.0 — 2026-11-26 — SideMenuHome's `count`: how many things wait for the person on the home, as
+ *     the coral count. The pin is a drawn mark (inline SVG) instead of an emoji, so it takes the
+ *     theme's colours; it has a name for a screen reader.
  *   v1.3.0 — 2026-09-27 — SideMenuLabel: a second word inside a group, whose rows stay in the
  *     group's strip on a phone (the catalogue's "Something missing" in the state group). Additive
  *     (appcat parity).
@@ -57,13 +60,24 @@ export function SideMenuTitle({ mark, children }) {
   return html`<div class="side-menu-title">${mark ? html`<span class="side-menu-title-mark" aria-hidden="true">${mark}</span>` : null}<span class="side-menu-title-words">${children}</span></div>`;
 }
 
-/** The way back to the home, an anchor that lines up with the items under it. */
-export function SideMenuHome({ href, children }) {
+/**
+ * The way back to the home, an anchor that lines up with the items under it. `count` (a number
+ * above 0) is how many things wait for the person there, as the coral count; `countTitle` says so
+ * to a pointer and a screen reader.
+ * @param {{ href: string, count?: number|null, countTitle?: string, children?: any }} props
+ */
+export function SideMenuHome({ href, count, countTitle, children }) {
   return html`
     <a class="side-menu-item side-menu-home" href=${href}>
       <span class="side-menu-label">${children}</span>
+      ${typeof count === 'number' && count > 0 ? html`<span class="poster-count poster-count--waiting" title=${countTitle} aria-label=${countTitle}>${count}</span>` : null}
     </a>`;
 }
+
+/** The pin: a drawn mark, so a theme's colours reach it. */
+const PIN = html`<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+  <path d="M9.6 1.6 14.4 6.4 12.6 7 10.2 9.4 10.4 12.6 3.4 5.6 6.6 5.8 9 3.4Z" />
+  <path d="M6.9 9.1 2.2 13.8" /></svg>`;
 
 /**
  * One item. `count` shows a coral count when it is a number above 0; `pin` ({ on, title, onToggle })
@@ -86,8 +100,8 @@ export function SideMenuItem({ active, onClick, count, tally, small, tab, pin, c
         ? (count !== null && count !== undefined ? html`<span class="side-menu-tally">${count}</span>` : null)
         : (typeof count === 'number' && count > 0 ? html`<span class="poster-count poster-count--waiting">${count}</span>` : null)}
       ${pin ? html`<span class=${`side-menu-pin${pin.on ? ' side-menu-pin--on' : ''}`}
-        role="button" tabindex="-1" title=${pin.title}
-        onClick=${(e) => { e.stopPropagation(); pin.onToggle(); }}>📌</span>` : null}
+        role="button" tabindex="-1" title=${pin.title} aria-label=${pin.title}
+        onClick=${(e) => { e.stopPropagation(); pin.onToggle(); }}>${PIN}</span>` : null}
     </button>`;
 }
 
