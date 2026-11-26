@@ -108,6 +108,9 @@ function reply(r: RecordedRequest) {
       assert(w.status === 200, `pack set: ${w.status} ${JSON.stringify(w.body?.error)}`);
       const d = await json('/v1/evals/pack/aimeat-data/run', { method: 'POST', headers: auth, body: JSON.stringify({ dry_run: true }) });
       assert(d.status === 200 && d.body.data.arms === 2 && d.body.data.model_calls === 6, `pack dry run: ${JSON.stringify(d.body?.data ?? d.body?.error)}`);
+      // A served pack has no version number: its revision names a hash of the text the eval measures,
+      // so a changed text is compared with the one before (it read "unversioned" for every run).
+      assert(/^text:[0-9a-f]{12}$/.test(String(d.body.data.revision)), `the pack's revision names its text: ${d.body.data.revision}`);
       expectRefusal(await put('/v1/evals/pack/no-such-pack', { cases: [{ id: 'x', prompt: 'p', expect: [{ kind: 'contains', value: 'v' }] }] }), 404, 'NOT_FOUND');
     });
 

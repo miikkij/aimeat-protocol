@@ -23,11 +23,13 @@
  *   IN THE BACKGROUND. A run is started and answered at once with its id; the set's `runs` shows it
  *   running, then done or failed. One run per set at a time, read from the set itself, so every node
  *   process sees it; a run left running by a process that stopped stops blocking after 15 minutes.
- * @structure startEvalRun(deps, caller, target, opts) · gradeAnswer(answer, expect, judge)
+ * @structure packRevision(version, aiDoc) · startEvalRun(deps, caller, target, opts) · gradeAnswer(answer, expect, judge)
  * @version-history
+ *   v1.1.0 — 2026-11-26 — A pack's revision names a hash of its AI text: the served packs have no
+ *     version, so every run read as "unversioned" and none was ever compared with the one before.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
@@ -38,6 +40,16 @@ import { getLibraryPacks } from '../../data/library-packs.js';
 import { crewTryStart, crewTryWait, resolveCrewAgent, type CrewCaller } from '../crews/ops.js';
 import { readCrewState } from '../crews/def-store.js';
 import { readEvalSet, recordEvalRun, type ArmResult, type EvalCase, type EvalRun, type EvalSet, type EvalTarget } from './eval-sets.js';
+
+/**
+ * A library pack's revision: what the eval measures is its AI text, and the served SDK packs carry
+ * no version number, so the revision always names a hash of that text (`text:<12 hex>`), after the
+ * version when there is one. A changed text is then a new revision even when nobody bumped a number.
+ */
+export function packRevision(version: string | undefined, aiDoc: string): string {
+  const text = `text:${createHash('sha256').update(aiDoc, 'utf8').digest('hex').slice(0, 12)}`;
+  return version ? `${version} ${text}` : text;
+}
 
 export interface EvalDeps { storage: Storage; config: AimeatConfig }
 export interface EvalCaller { principal: string; owner: string; ownerGhii: string; scopes: string[]; roles: string[] }
@@ -65,7 +77,7 @@ export async function resolveTarget(deps: EvalDeps, caller: EvalCaller, target: 
   if (target.kind === 'pack') {
     const pack = getLibraryPacks().find(p => p.id === target.name);
     if (!pack) return { ok: false, status: 404, code: 'NOT_FOUND', message: `No library pack ${target.name} on this node; aimeat_appdev_overview lists them.` };
-    return { revision: pack.version ?? 'unversioned', system: pack.aiDoc };
+    return { revision: packRevision(pack.version, pack.aiDoc), system: pack.aiDoc };
   }
   const crewCaller: CrewCaller = { principal: caller.principal, owner: caller.owner, scopes: caller.scopes, roles: caller.roles, pipeline: 'evals.run' };
   const agent = await resolveCrewAgent(deps, crewCaller, target.name);
