@@ -35,6 +35,9 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.9.0 — 2026-11-26 — The node-wide report reads every app's data map, compliance documents and
+ *     registration record ahead in batches (report-reads.ts): the single reads followed the number
+ *     of apps, about ten an app.
  *   v1.8.0 — 2026-11-26 — The options and complianceUnlabelledDetail take the request's provenance
  *     population reader, so the report and its detail list read the facets and the share scan once.
  *   v1.7.0 — 2026-11-21 — `regulated_ai`, section 14: the mode per regulated data domain for an outside
@@ -72,6 +75,7 @@ import {
 } from './register.js';
 import { buildProcessingSummary, type ProcessingSummary } from './processing.js';
 import { appAiGaps } from './app-ai-gaps.js';
+import { reportReads } from './report-reads.js';
 import type { ScopeGap } from './scope-gaps.js';
 import { buildDataIntermediationSection, type DataIntermediationSection } from '../data-intermediation/report.js';
 import { buildAmlSection, type AmlSection } from '../aml/report.js';
@@ -485,13 +489,16 @@ export async function buildComplianceReport(
 
   const owner = opts.ownerGhii;
   const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
-  const [transparency, usage, consent, rawUseCases] = await Promise.all([
+  const [transparency, usage, consent, rawUseCases, reads] = await Promise.all([
     buildAiTransparencyReport(storage, {
       sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic, config, populations: opts.populations,
     }),
     aiUsage(storage, window.from, window.to, owner),
     consentTotals(storage, config, window.from, owner),
     readUseCases(storage, config.nodeId),
+    // The node-wide report reads every app's records; they are read ahead in batches
+    // (report-reads.ts). An owner's slice reads its own apps' data maps only, one at a time.
+    owner ? storage : reportReads(storage, config, { docs: true, parties: true }),
   ]);
 
   // The register is one document the operator keeps, so an owner slice SELECTS from it rather than
@@ -511,12 +518,12 @@ export async function buildComplianceReport(
     }));
 
   // The records of processing and everything beside them (plan doc-mvlftkh9zmc9): the operator's only.
-  const processing = owner ? null : await buildProcessingSummary({ storage, config });
+  const processing = owner ? null : await buildProcessingSummary({ storage: reads, config });
 
   // Apps that use AI and that no use case names, by their own statements (compliance-app-ai-gaps.ts).
   // Against the whole stored register, not the owner's slice of it: an entry the operator wrote
   // without an owner still covers the app.
-  const appGaps: ComplianceGap[] = await appAiGaps(storage, config, rawUseCases, owner);
+  const appGaps: ComplianceGap[] = await appAiGaps(reads, config, rawUseCases, owner);
 
   // Section 12, data intermediation (plan doc-mvwxcas3dom3, D7): both rings, the owner's own in a slice.
   const dataIntermediation = await buildDataIntermediationSection({ storage, config }, owner ? { ownerGhii: owner } : {});

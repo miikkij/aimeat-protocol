@@ -18,6 +18,8 @@
  * @structure readAllPlacesOp()
  * @usage const out = await readAllPlacesOp(deps, caller, 'registers');
  * @version-history
+ *   v1.1.2 — 2026-11-26 — The register drafts read every app's data map and registration record in
+ *     batches (report-reads.ts); they were about three reads an app.
  *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-places.ts to src/services/compliance/docs-places.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-10-26 — Registers: a place that keeps none and has a draft (the installation's own,
  *     an app with personal data) answers the draft, `draft: true` and `may_write: false`.
@@ -34,6 +36,7 @@ import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } fro
 import { COMPLIANCE_DOC_KINDS, isComplianceDocKind, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
 import { ComplianceDocError } from './docs-ops.js';
 import { registerDrafts } from './register-drafts.js';
+import { reportReads } from './report-reads.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -60,7 +63,9 @@ export async function readAllPlacesOp(deps: Deps, caller: OperatorCaller, rawKin
   // Registers the node can draft where none is stored: the installation's own in its empty place,
   // and each app with personal data and no register as a place of its own, marked as a draft.
   if (kind === 'registers') {
-    for (const d of await registerDrafts(deps, stored as Array<{ scope: ComplianceScope; doc: { items: unknown[] } }>)) {
+    // The drafts read every app's data map and registration record: read ahead in batches (report-reads.ts).
+    const reads = await reportReads(storage, config, { parties: true });
+    for (const d of await registerDrafts({ storage: reads, config }, stored as Array<{ scope: ComplianceScope; doc: { items: unknown[] } }>)) {
       const empty = places.find(p => p.scope.kind === d.scope.kind && d.scope.kind === 'node' && !(p.doc as { items: unknown[] }).items.length);
       if (empty) { empty.doc = { ...(empty.doc as object), items: d.items } as ComplianceDocs[typeof kind]; empty.draft = true; }
       else places.push({ scope: d.scope, doc: { items: d.items } as ComplianceDocs[typeof kind], draft: true });

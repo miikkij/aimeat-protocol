@@ -15,6 +15,8 @@
  *   failure the whole feature exists to prevent.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-draft.test.ts
  * @version-history
+ *   2026-11-26 — The stub answers the batch read of the data maps (getMemoryByKeysAnyOwner): the
+ *     draft reads them in one batch. The setup no longer matched the draft's reads; the source was right.
  *   v1.1.0 — 2026-10-28 — Every app that uses AI is an entry (TaskGrid on orgnode.example had
  *     none), its Annex III area proposed from its data map, its models from its own calls; "publishes
  *     publicly" needs content a visitor can read, not a record existing.
@@ -74,6 +76,13 @@ function storageWith(opts: {
           manifest: { name: a.name ?? a.filename, description: '', ...(a.aiPosture ? { aiPosture: a.aiPosture } : {}) },
         })),
       ],
+    }),
+    // The draft reads every data map in one batch (services/compliance/report-reads.ts).
+    getMemoryByKeysAnyOwner: async (keys: string[]) => keys.flatMap(key => {
+      const m = /^apps\.(.+)\.datamap$/.exec(key);
+      return Object.entries(opts.maps ?? {})
+        .filter(([ref]) => !!m && ref.split('/')[1] === m[1])
+        .map(([ref, value]) => ({ ownerGaii: `${ref.split('/')[0]}@test-node`, key, value }));
     }),
     getMemory: async (owner: string, key: string) => {
       if (key === 'compliance.usecases' && opts.stored) return { value: { usecases: opts.stored } };

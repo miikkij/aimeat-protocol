@@ -40,6 +40,8 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.3.4 — 2026-11-26 — Every app's data map is read in one batch (report-reads.ts); it was one
+ *     read an app.
  *   v1.3.3 — 2026-11-26 — The provenance pages are read without the count (`noTotal`): each page
  *     ran it again, and on the public read the count evaluates the public test over every record.
  *   v1.3.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
@@ -71,6 +73,7 @@ import type { ComplianceAnswerSource, ComplianceUseCase } from './register.js';
 import { classifyUseCase, effectiveQuestionnaire, readUseCases, type ComplianceRiskVerdict } from './register.js';
 import { appAiSignals } from './app-signals.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
+import { reportReads } from './report-reads.js';
 import type { AiActStatement } from '../data-map/data-map-types.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { appDataMapId } from '../app/app-ref.js';
@@ -243,14 +246,17 @@ export async function draftRegisterFromActivity(
   const days = Math.min(Math.max(opts.sinceDays ?? 30, 1), 3650);
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
 
+  // Every app's data map is read below; the view reads them ahead in one batch (report-reads.ts).
+  const reads = reportReads(storage, config);
   const [usage, agents, activity, questionnaire, apps, stored] = await Promise.all([
     storage.queryUsageDailyAllOwners({ from: since.slice(0, 10), to: new Date().toISOString().slice(0, 10) }),
     storage.listAgents(),
     readActivity(storage, since),
     effectiveQuestionnaire(storage, config.nodeId),
-    storage.listApps({ adminView: true, limit: APP_SCAN }),
+    reads.then(r => r.listApps({ adminView: true, limit: APP_SCAN })),
     readUseCases(storage, config.nodeId),
   ]);
+  const mapStore = await reads;
 
   const questionIds = new Set(questionnaire.questions.map(q => q.id));
   const agentByGaii = new Map(agents.map(a => [a.gaii, a]));
@@ -348,7 +354,7 @@ export async function draftRegisterFromActivity(
     if (!owner) continue;
     const key = appKey(owner, app.filename);
     const storedEntry = storedByApp.get(key);
-    const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, appDataMapId(app.filename));
+    const map = await readAppDataMap(mapStore, `${owner}@${config.nodeId}`, appDataMapId(app.filename));
     const maker = makerAnswers(map?.aiAct);
     if (storedEntry) {
       // Already in the register: only what the maker answered and nobody saved yet, never over a

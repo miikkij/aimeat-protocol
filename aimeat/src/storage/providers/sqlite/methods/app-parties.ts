@@ -12,6 +12,7 @@
  * @structure appPartyMethods · toParty · toData · partyParams · STALE · listLimit
  * @usage Object.assign(SqliteStorage.prototype, appPartyMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-26 — countAppPartiesByApp().
  *   v1.0.0 — 2026-11-15 — Initial
  */
 import type Database from 'better-sqlite3';
@@ -133,6 +134,11 @@ export const appPartyMethods = {
           .get({ appId, now: rule.now, staleBefore: rule.staleBefore }) as { n: number }
       : this.db.prepare('SELECT COUNT(*) AS n FROM app_parties WHERE appId = ?').get(appId) as { n: number };
     return Number(r.n);
+  },
+
+  async countAppPartiesByApp(this: Db): Promise<Record<string, number>> {
+    const rows = this.db.prepare('SELECT appId, COUNT(*) AS n FROM app_parties GROUP BY appId').all() as Array<{ appId: string; n: number }>;
+    return Object.fromEntries(rows.map(r => [r.appId, Number(r.n)]));
   },
 
   async updateAppParty(this: Db, row: AppPartyRow, expectedVersion: number): Promise<boolean> {

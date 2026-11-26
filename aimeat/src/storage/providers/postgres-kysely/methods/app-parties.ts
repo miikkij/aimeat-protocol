@@ -16,6 +16,7 @@
  * @structure appPartyMethods · toParty · toData · partyColumns · staleWhere · listLimit
  * @usage Object.assign(PostgresKyselyStorage.prototype, appPartyMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-26 — countAppPartiesByApp().
  *   v1.0.0 — 2026-11-15 — Initial
  */
 import { sql, type Kysely, type ExpressionBuilder } from 'kysely';
@@ -144,6 +145,11 @@ export const appPartyMethods = {
     let q = this.db.selectFrom('AppParty').select(eb => eb.fn.countAll<string>().as('n')).where('appId', '=', appId);
     if (rule?.staleBefore) q = q.where(eb => eb.not(staleWhere(rule)(eb)));
     return Number((await q.executeTakeFirst())?.n ?? 0);
+  },
+
+  async countAppPartiesByApp(this: Db): Promise<Record<string, number>> {
+    const rows = await this.db.selectFrom('AppParty').select(['appId', eb => eb.fn.countAll<string>().as('n')]).groupBy('appId').execute();
+    return Object.fromEntries(rows.map(r => [r.appId, Number(r.n)]));
   },
 
   async updateAppParty(this: Db, row: AppPartyRow, expectedVersion: number): Promise<boolean> {

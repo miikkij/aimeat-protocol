@@ -24,6 +24,8 @@
  *   AppPartyImportResult · AppPartyRepository
  * @usage import type { AppPartyRow } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-11-26 — countAppPartiesByApp(): every app's count in one statement, for a report
+ *     that reads every app.
  *   v1.0.0 — 2026-11-15 — Initial: app parties leave the memory record for their own tables.
  */
 
@@ -104,6 +106,8 @@ export interface AppPartyRepository {
   listAppParties(appId: string, opts?: { limit?: number; offset?: number }): Promise<AppPartyRow[]>;
   /** How many parties the app holds; with a rule, only the live ones. */
   countAppParties(appId: string, rule?: AppPartyLiveRule): Promise<number>;
+  /** How many parties each app holds, by app id, in one statement; an app with none is absent. */
+  countAppPartiesByApp(): Promise<Record<string, number>>;
   /** Replace the row on the version read. False when another writer changed it first. */
   updateAppParty(row: AppPartyRow, expectedVersion: number): Promise<boolean>;
   /** Remove one party and every collection it keeps: whether there was one, and how many collections went. */

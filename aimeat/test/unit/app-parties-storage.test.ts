@@ -96,6 +96,11 @@ describe.each([0, 1])('AppPartyRepository on provider #%s', (i) => {
     for (const r of [stale, fresh, linkOpen]) expect((await s.insertAppPartyCapped(r, 10, { now: NOW, staleBefore: null })).outcome).toBe('created');
     expect(await s.countAppParties(app)).toBe(3);
     expect(await s.countAppParties(app, RULE)).toBe(2);
+    // Every app's count in one statement: the same number as the count without a rule, and an app
+    // that holds nobody is absent.
+    const byApp = await s.countAppPartiesByApp();
+    expect(byApp[app]).toBe(3);
+    expect(byApp[`alice-${RUN}/nobody-${i}.html`]).toBeUndefined();
     // Cap 2: two live places are taken, so the insert is refused and the stale row stays.
     expect((await s.insertAppPartyCapped(row(ALICE, app), 2, RULE)).outcome).toBe('full');
     expect(await s.getAppParty(app, stale.uid)).not.toBeNull();
