@@ -28032,7 +28032,13 @@ paths:
         operator), action (an English phrase), code (the tool or METHOD and route), target, readOnly,
         outcome, and event (agent.approved, agent.ran, app.published, task.started_by_app) on the entries
         that have one. task.started_by_app is an app's start of a task that waited for the owner in
-        person, and its entry has `detail`: which app, which task, and why it waited.
+        person, and its entry has `detail`: which app, which task, and why it waited. An entry carries
+        `ms` (how long the node took) and, when it failed, `reason` (the refusal or error code).
+        `actor` narrows it to one agent of the account (its name, or name#owner@node) or the account
+        itself (`me`), `app` to one app of the account; with `summary=true` the answer is
+        `{ since, until, summary: { calls, ok, refused, error, ms_p50, ms_p95, top, reasons, first_at,
+        last_at, truncated } }` over the window (default the last 24 hours). This is the node's own
+        record, beside what an agent reports about itself.
         `next` is the `before` of the following page. The owner, or the owner's agent with `memory:read`.
         MCP: aimeat_trail_list.
       security:
@@ -28041,6 +28047,9 @@ paths:
         - { name: since, in: query, required: false, schema: { type: string, format: date-time }, description: Entries at or after this time. }
         - { name: before, in: query, required: false, schema: { type: string, format: date-time }, description: Entries before this time. }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: actor, in: query, required: false, schema: { type: string }, description: 'One agent of the account (name or name#owner@node), or me for the account itself.' }
+        - { name: app, in: query, required: false, schema: { type: string }, description: One app of the account, its filename. }
+        - { name: summary, in: query, required: false, schema: { type: boolean }, description: 'true: the summary of the window instead of the entries.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -73819,6 +73828,11 @@ paths:
     get:
       operationId: getAgentActivity
       summary: Get agent activity stats and history
+      description: >
+        `activity_stats` and `history` count what the agent reported about itself. `recorded_by_node` is
+        the node's own record of the agent's calls over the last 24 hours: `{ since, until, summary:
+        { calls, ok, refused, error, ms_p50, ms_p95, top, reasons, first_at, last_at, truncated }, note }`,
+        from every MCP tool call and REST change the node served it (GET /v1/build-with-you/trail).
       tags: [Agents]
       security:
         - BearerAuth: []

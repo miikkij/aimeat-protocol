@@ -9,6 +9,7 @@
  * @structure buildWithYouTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.3.0 — 2026-11-26 — aimeat_trail_list takes actor, app and summary, and says it is the node's own record.
  *   v1.2.1 — 2026-11-01 — aimeat_build_request_submit takes the four fields flat or under `spec`, the
  *     shape the status's `send` shows; the test lane's chat sent them nested and was refused before the call.
  *   v1.2.0 — 2026-11-01 — With a build code aimeat_build_request_submit sends the request itself, with the
@@ -50,7 +51,7 @@ export const buildWithYouTools = [
   },
   {
     name: 'aimeat_trail_list',
-    description: 'What has been done on this account, newest first: each entry says when (at), who (actorName, and actorKind: person, ai for the person\'s AI over MCP or in the chat, agent, app, operator), what (action, and code: the MCP tool or the REST route), and to what (target). readOnly marks a call that only read. Use it to answer "what did you do", "what has my agent done today" or "who changed this". since (ISO time) and limit (default 100, at most 500) narrow it; next is the before value for the following page.',
+    description: 'What has been done on this account, as the node itself recorded it, newest first: each entry says when (at), who (actorName, and actorKind: person, ai for the person\'s AI over MCP or in the chat, agent, app, operator), what (action, and code: the MCP tool or the REST route), to what (target), how long it took (ms) and, when it failed, why (reason). readOnly marks a call that only read. Use it to answer "what did you do", "what has my agent done today" or "who changed this": it is the record the node keeps, not what an agent reported about itself. actor (an agent\'s name, or "me") and app (an app\'s filename) narrow it to one; summary: true answers the calls, refusals, errors, times, and the tools and reasons seen most over the window (default the last 24 hours) instead of the entries. since (ISO time) and limit (default 100, at most 500) narrow it; next is the before value for the following page.',
     caller: 'agent',
     visibility: agentEverywhere,
     annotations: { title: 'Trail: what was done', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -60,6 +61,9 @@ export const buildWithYouTools = [
       since: { type: 'string', description: 'Only entries at or after this ISO time.' },
       before: { type: 'string', description: 'Only entries before this ISO time: the `next` of the page before.' },
       limit: { type: 'number', description: 'How many entries, 1 to 500 (default 100).' },
+      actor: { type: 'string', description: 'Only what one identity of this account did: an agent\'s name (or its full name#owner@node), or "me" for the account itself.' },
+      app: { type: 'string', description: 'Only what was done through or to one app of this account: its filename.' },
+      summary: { type: 'boolean', description: 'true: answer the summary of the window (default the last 24 hours) instead of the entries.' },
     },
   },
 ] as const satisfies readonly AimeatToolDefinition[];

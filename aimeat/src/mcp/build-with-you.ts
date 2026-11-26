@@ -9,6 +9,7 @@
  * @structure registerBuildWithYouTools(mcp, storage, config, caller)
  * @usage registerBuildWithYouTools(mcp, storage, config, caller);   // mcp/register-all.ts
  * @version-history
+ *   v1.1.0 — 2026-11-26 — aimeat_trail_list takes actor, app and summary (services/place-trail.ts).
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi").
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -59,7 +60,10 @@ export function registerBuildWithYouTools(mcp: McpServer, storage: Storage, conf
     try {
       return ok(await readOwnTrail(storage, caller(), {
         since: iso(a.since), before: iso(a.before), limit: typeof a.limit === 'number' ? a.limit : undefined,
-      }));
+        ...(typeof a.actor === 'string' && a.actor ? { actor: a.actor } : {}),
+        ...(typeof a.app === 'string' && a.app ? { app: a.app } : {}),
+        ...(a.summary === true ? { summary: true } : {}),
+      }, config.nodeId));
     } catch (err) { return fail(err); }
   });
 }

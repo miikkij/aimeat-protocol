@@ -11,6 +11,8 @@
  *   import { registerAgentCapabilityTools } from './agent-capabilities.js';
  *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, caller);
  * @version-history
+ *   2026-11-26 — aimeat_agent_activity answers recorded_by_node: the node's own record of the agent's
+ *     calls over 24 hours, beside what the agent reported.
  *   2026-11-13 — aimeat_agent_activity reads through services/agent/activity-read.ts, the gate and reads
  *     GET /v1/agents/:name/activity calls; the group takes the session's caller for it (structure
  *     programme 2026-11, unit 2b).
@@ -111,7 +113,7 @@ export function registerAgentCapabilityTools(
             if (!read.ok) {
                 return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
             }
-            const { agent, history } = read;
+            const { agent, history, recorded } = read;
 
             return {
                 content: [{
@@ -119,6 +121,7 @@ export function registerAgentCapabilityTools(
                     text: JSON.stringify({
                         stats: agent.activityStats ?? null,
                         history,
+                        recorded_by_node: recorded,
                     }),
                 }],
             };

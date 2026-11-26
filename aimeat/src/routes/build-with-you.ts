@@ -24,6 +24,7 @@
  *   - POST /v1/operator/notify-owner        one notice to the owners, once per code (operator)
  * @usage app.use(buildWithYouRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.0 — 2026-11-26 — GET /v1/build-with-you/trail takes ?actor=, ?app= and ?summary=true.
  *   v1.2.1 — 2026-11-04 — The wrong-password count is kept in the node's storage (checkAdminPasswordOnNode;
  *     codebase analysis 2026-11-03, HA stage 2).
  *   v1.2.0 — 2026-11-04 — The admin password is checked by checkAdminPassword (services/admin-password.ts),
@@ -124,7 +125,13 @@ export function buildWithYouRouter(config: AimeatConfig, storage: Storage): Rout
     }), 201);
   });
   router.get('/v1/build-with-you/trail', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
-    await send(res, () => readOwnTrail(storage, who(req), { since: iso(req.query.since), before: iso(req.query.before), limit: int(req.query.limit) }));
+    const q = req.query as Record<string, unknown>;
+    await send(res, () => readOwnTrail(storage, who(req), {
+      since: iso(q.since), before: iso(q.before), limit: int(q.limit),
+      ...(typeof q.actor === 'string' && q.actor ? { actor: q.actor } : {}),
+      ...(typeof q.app === 'string' && q.app ? { app: q.app } : {}),
+      ...(q.summary === 'true' || q.summary === '1' ? { summary: true } : {}),
+    }, config.nodeId));
   });
 
   router.get('/v1/operator/activity', fleetOrOperator, async (req: Request, res: Response) => {

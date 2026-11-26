@@ -14,6 +14,7 @@
  *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
  *   - POST /v1/agents/:name/refusals/decline -- the owner will not give those permissions
  * @version-history
+ *   2026-11-26 — GET /:name/activity answers recorded_by_node, the node's own record of the agent's calls.
  *   2026-11-13 — GET /:name/activity reads the agent and its history through services/agent/activity-read.ts,
  *     the gate and reads aimeat_agent_activity calls (structure programme 2026-11, unit 2b).
  *   2026-10-25 — POST /refusals/decline tells the agent the "no" (secaudit2026oct22, the approval standard).
@@ -271,7 +272,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       else res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
       return;
     }
-    const { agent, history } = read;
+    const { agent, history, recorded } = read;
 
     // Get scheduled jobs belonging to extensions installed by this agent
     const allExtensions = await storage.listExtensions();
@@ -297,6 +298,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       activity_stats: agent.activityStats ?? null,
       history,
       scheduled_jobs: scheduledJobs,
+      recorded_by_node: recorded,
     }, [
       { description: 'Event log', method: 'GET', url: `/v1/agents/${agentName}/activity/log` },
     ]));

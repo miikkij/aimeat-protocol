@@ -6,6 +6,7 @@
  *   connector MCP: a thin REST proxy over /v1/build-with-you/*, so the node decides everything
  *   (services/builder/with-you.ts, services/place-trail.ts).
  * @version-history
+ *   v1.2.0 — 2026-11-26 — aimeat_trail_list forwards actor, app and summary.
  *   v1.1.0 — 2026-11-01 — aimeat_build_request_submit forwards `spec`, the four fields as one object.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi").
  */
@@ -38,7 +39,10 @@ export const buildWithYouCliTools: ConnectCliToolDefinition[] = [
     name: 'aimeat_trail_list',
     handler: ({ client }, input) => {
       const limit = typeof input.limit === 'number' ? String(input.limit) : undefined;
-      return client.get(`${BASE}/trail${query({ since: optionalString(input, 'since'), before: optionalString(input, 'before'), limit })}`);
+      return client.get(`${BASE}/trail${query({
+        since: optionalString(input, 'since'), before: optionalString(input, 'before'), limit,
+        actor: optionalString(input, 'actor'), app: optionalString(input, 'app'), summary: input.summary === true ? 'true' : undefined,
+      })}`);
     },
   },
 ];
