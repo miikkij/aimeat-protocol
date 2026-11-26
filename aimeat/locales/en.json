@@ -21976,6 +21976,16 @@
     "joinedDate": "joined {date}",
     "reqOne": "1 request",
     "reqMany": "{n} requests",
+    "approvals": {
+      "title": "Waiting for approval",
+      "by": "{who} asked on {when}",
+      "openWs": "Open workspace",
+      "needsOwner": "An owner of this organism decides this.",
+      "needsAdmin": "An owner or an admin of this organism decides this.",
+      "own": "You asked for this, so another owner or admin decides it.",
+      "failed": "That did not work. Try again.",
+      "hint": "Approving runs what was asked. Rejecting leaves everything as it is."
+    },
     "wsNotSetUp": "new. Set up when opened",
     "recOne": "1 record",
     "recMany": "{n} records",

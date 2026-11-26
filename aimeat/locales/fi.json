@@ -22743,6 +22743,16 @@
     "joinedDate": "liittyi {date}",
     "reqOne": "1 pyyntö",
     "reqMany": "{n} pyyntöä",
+    "approvals": {
+      "title": "Odottaa hyväksyntää",
+      "by": "{who} pyysi {when}",
+      "openWs": "Avaa työtila",
+      "needsOwner": "Tämän päättää organismin omistaja.",
+      "needsAdmin": "Tämän päättää organismin omistaja tai ylläpitäjä.",
+      "own": "Pyysit tätä itse, joten toinen omistaja tai ylläpitäjä päättää.",
+      "failed": "Se ei onnistunut. Yritä uudelleen.",
+      "hint": "Kun hyväksyt, pyydetty asia tehdään. Kun hylkäät, mikään ei muutu."
+    },
     "wsNotSetUp": "uusi, otetaan käyttöön avattaessa",
     "recOne": "1 tietue",
     "recMany": "{n} tietuetta",

@@ -13,6 +13,9 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.16.0 -- 2026-11-26 -- The page of an organism that is not a team starts with the approvals that
+ *     wait in it (approvals-section.js), decided on the row; the sections after it are numbered one
+ *     higher while there is one. The waiting list opens this page for an approval with no workspace.
  *   v3.15.0 -- 2026-11-20 -- The Members section tells every member when the creators see the value report per member, with their own numbers (PerMemberNotice).
  *   v3.14.0 -- 2026-11-20 -- A folded section "Measures" for the creators and admins (measures-panel.js): the organism's own measures with their numbers, read when the section opens.
  *   v3.13.0 -- 2026-11-20 -- A folded section "Directive for members' AI" (directive-panel.js): the organism's directive, and for its creators the answers as counts and the sentence to make or change it. The folded sections with a detail line (06, 08, 09) take FoldSection's `wrap`: at 390 px the detail ran past the edge and was cut off.
@@ -69,6 +72,7 @@ import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { useTeam, TeamSections } from '/views/profile/organisms/team-sections.js';
+import { OrgApprovals } from './approvals-section.js';
 import { swallowed } from '/js/swallowed.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -86,6 +90,9 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [view, setView] = useState(initialSettings ? 'settings' : 'home');
   const [wsCount, setWsCount] = useState(null);
   const [pendingJoin, setPendingJoin] = useState(0);
+  // How many approvals wait in this organism (approvals-section.js tells it): with one or more the
+  // page starts with their section, and every section after it is numbered one higher.
+  const [approvalCount, setApprovalCount] = useState(0);
   const [openReadme, setOpenReadme] = useState(false);
   const [openMap, setOpenMap] = useState(false);
   const [openAi, setOpenAi] = useState(false);
@@ -186,7 +193,10 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   // The directive section: for a member when there is one, and always for its creators, who make it.
   const showDirective = canEdit || !!directive.directives;
   // A team's page opens with its three sections (team-sections.js), and the organism's own follow.
-  const shift = team ? 3 : 0;
+  // Without a team, the approvals that wait come first when there are any (a team's own waiting
+  // section names the team's approvals).
+  const approvalsFirst = !team && approvalCount > 0;
+  const shift = team ? 3 : approvalsFirst ? 1 : 0;
   const num = (i) => String(i + shift).padStart(2, '0');
   const teamRail = team ? [
     { id: 'og-team-waiting', num: num(-2), label: t('organisms.team.waitingTitle'), count: team.items.length + team.approvals.length },
@@ -196,6 +206,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   // The rail: every section scrolls into view (the three folds open first), then Settings, a page of its own.
   const sections = [
     ...teamRail,
+    ...(approvalsFirst ? [{ id: 'og-approvals', num: num(0), label: t('organisms.approvals.title'), count: approvalCount }] : []),
     { id: 'og-workspaces', num: num(1), label: tr('organisms.tabWorkspaces', 'Workspaces'), count: wsCount ?? '' },
     { id: 'og-members', num: num(2), label: tr('organisms.tabMembers', 'Members'), count: memberCount },
     { id: 'og-agents', num: num(3), label: tr('organisms.tabAgents', 'Agents'), count: agentCount },
@@ -245,8 +256,10 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       ]} />`}
       rail=${rail}
       after=${html`<${ConfirmUI} />`}>
-      ${team ? html`<${TeamSections} team=${team} me=${ghii} num=${(i) => num(i - 3)} />` : null}
-      <${Section} id="og-workspaces" num=${num(1)} first=${!team} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
+      ${team ? html`<${TeamSections} team=${team} me=${ghii} num=${(i) => num(i - 3)} />` : html`
+        <${OrgApprovals} org=${org} ghii=${ghii} isCreator=${isCreator} isAdmin=${isAdmin} showToast=${showToast}
+          onOpenWs=${onOpenWs} id="og-approvals" num=${num(0)} first onCount=${setApprovalCount} />`}
+      <${Section} id="og-workspaces" num=${num(1)} first=${!team && !approvalsFirst} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
         <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
         <${Row} align="end">
           <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>

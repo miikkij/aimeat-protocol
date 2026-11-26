@@ -20856,6 +20856,16 @@
     "joinedDate": "se unió el {date}",
     "reqOne": "1 solicitud",
     "reqMany": "{n} solicitudes",
+    "approvals": {
+      "title": "Esperan aprobación",
+      "by": "{who} lo pidió el {when}",
+      "openWs": "Abrir espacio de trabajo",
+      "needsOwner": "Esto lo decide un propietario de este organismo.",
+      "needsAdmin": "Esto lo decide un propietario o un administrador de este organismo.",
+      "own": "Lo pediste tú, así que lo decide otro propietario o administrador.",
+      "failed": "No ha funcionado. Inténtalo de nuevo.",
+      "hint": "Al aprobar, se hace lo pedido. Al rechazar, nada cambia."
+    },
     "wsNotSetUp": "nuevo. Se prepara al abrirlo",
     "recOne": "1 registro",
     "recMany": "{n} registros",
