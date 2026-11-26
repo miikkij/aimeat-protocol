@@ -13,6 +13,8 @@
  * @structure CALL_FILE_LIMITS · readCallFiles(deps, reader, callerGaii, files) · readCallerAudio(deps, reader, callerGaii, key)
  *   · IMAGE_INPUT_LIMITS · readImageInputs(deps, reader, callerGaii, { references, mask }, payerGaii?)
  * @version-history
+ *   v1.3.1 — 2026-11-26 — A data URL's bytes are checked one character at a time (parseDataUrl); the
+ *     regular expression over the whole URL threw past 4 MiB characters.
  *   v1.3.0 — 2026-11-08 — Each reader takes { storage, config } (or a bare storage, as before) for
  *     readAiFile, which asks the labels a data package version keeps of a package file
  *     (secaudit2026nov08b round 15b).
@@ -27,6 +29,7 @@ import type { TextFile } from './gateway.js';
 import { readAiFile, aiFileDeps, type AiFileSource } from './inputs.js';
 import type { ContentReader } from '../classification/reader.js';
 import { sniffImage } from '../openrouter.js';
+import { isBase64Text, withoutWhitespace } from '../../utils/base64.js';
 
 /** At most this many files, and this many bytes in all: a few documents, inside one request. */
 export const CALL_FILE_LIMITS = { maxFiles: 5, maxTotalBytes: 20 * 1024 * 1024 } as const;
@@ -40,7 +43,20 @@ export interface CallFileInput {
   mime?: string;
 }
 
-const DATA_URL = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
+/** The head of a data URL, read from its first 300 characters: a media type is short. */
+const DATA_URL_HEAD = /^data:([\w.+-]+\/[\w.+-]+);base64,/;
+
+/**
+ * A `data:<mime>;base64,<bytes>` URL read into its media type and its base64 text, or null. The bytes
+ * are checked one character at a time: the one regular expression over the whole URL that this was
+ * threw past 4 MiB characters, and a reference picture is often larger (utils/base64.ts).
+ */
+function parseDataUrl(url: string): [string, string, string] | null {
+  const head = DATA_URL_HEAD.exec(url.slice(0, 300));
+  if (!head) return null;
+  const bytes = url.slice(head[0].length);
+  return isBase64Text(withoutWhitespace(bytes), { urlSafe: false, padding: 'anywhere' }) ? [url, head[1], bytes] : null;
+}
 
 /**
  * An audio file in the caller's own storage, for a transcription: POST /v1/ai/transcribe and
@@ -81,7 +97,7 @@ export async function readCallFiles(deps: AiFileSource, reader: ContentReader, c
       mediaType = (typeof raw.mime === 'string' && raw.mime) || file.mimeType || 'application/octet-stream';
       filename ??= raw.storage_key.split('/').pop();
     } else if (typeof raw.data_url === 'string' && raw.data_url) {
-      const m = DATA_URL.exec(raw.data_url);
+      const m = parseDataUrl(raw.data_url);
       if (!m) throw new AiCompletionError('INVALID_BODY', 400, 'files: data_url must be data:<mime>;base64,<bytes>. An https URL is not accepted; store the file and pass storage_key.');
       data = Buffer.from(m[2], 'base64');
       mediaType = m[1];
@@ -131,7 +147,7 @@ async function readImageInput(
     if (!file) throw new AiCompletionError('NOT_FOUND', 404, `${field}: no such file in your storage: ${input.storage_key}.`);
     data = file.data;
   } else if (typeof input.data_url === 'string' && input.data_url) {
-    const m = DATA_URL.exec(input.data_url);
+    const m = parseDataUrl(input.data_url);
     if (!m) throw new AiCompletionError('INVALID_BODY', 400, `${field}: data_url must be data:<mime>;base64,<bytes>. An https URL is not accepted; store the picture and pass storage_key.`);
     data = Buffer.from(m[2], 'base64');
   } else {

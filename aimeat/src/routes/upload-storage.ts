@@ -10,6 +10,8 @@
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.6.0 — 2026-11-26 — The storage answer carries `federate` and `created_at`, as POST /v1/storage does:
+ *     AIMEAT.storage.upload() now sends a File through this route and returns the inline answer's shape.
  *   v1.5.0 — 2026-11-01 — The write takes the welcome page's writer from the signed token (`page_writer`)
  *     when no live caller is asked (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   v1.4.0 — 2026-10-31 — completeDirectStorageUpload (POST /v1/upload/{token}/complete): the file a client
@@ -197,6 +199,10 @@ export async function handleStorageUpload(
         size: file.size,
         mime_type: file.mimeType,
         visibility: file.visibility,
+        // As POST /v1/storage answers them, so AIMEAT.storage.upload() returns one shape whichever way
+        // the bytes went.
+        federate: file.federate ?? false,
+        created_at: file.createdAt,
         // What the account-wide quota cost this upload. The charge already happened on this path;
         // reporting it is what tells the caller their balance moved.
         ...(overageMorsels > 0 ? { overage_charged: overageMorsels } : {}),

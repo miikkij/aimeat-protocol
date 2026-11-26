@@ -1,16 +1,23 @@
 /**
  * @file storage/index.js
  * @description The aimeat-storage library (SDK-libs migration Phase 2). Exposes AIMEAT.storage — the
- *   file upload/download SDK: upload (File/Blob/base64, chunked for large files), download/metadata,
+ *   file upload/download SDK: upload (a File or Blob as raw bytes in one PUT, base64 inline; chunked
+ *   on request), download/metadata,
  *   list/delete, publicUrl, and an enableDropZone() drag-&-drop helper. Over the AIMEAT.auth session,
  *   with direct NODE_URL fetches for binary GET/HEAD/chunk PUT. Componentized ESM source esbuild
  *   bundles to the IIFE served, unchanged, at /v1/libs/aimeat-storage.js. Ported verbatim from
  *   lib-storage.ts; NODE_URL now comes from _core/config.
- * @structure imports NODE_URL (config) + getSession/authFetch (session) + attach (namespace); the
- *   `storage` object incl. uploadChunked + enableDropZone; attach('storage', …).
+ * @structure imports NODE_URL (config) + getSession/authFetch (session) + attach (namespace);
+ *   levelOf · binding · uploadError · putFile; the `storage` object incl. uploadChunked +
+ *   enableDropZone; attach('storage', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-storage.js"></script>
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
+ *   v1.6.0 — 2026-11-26 — upload(File|Blob) sends the raw bytes in one PUT to a presigned upload
+ *     address instead of base64 in JSON: the JSON was a third larger, and past about 3.1 MB of file
+ *     the node answered 500 (a 3.5 MB zip was lost). It answers the same fields as before. A failed
+ *     upload throws the node's sentence with `code` and `status` on the error. opts.store names the
+ *     store for the bytes. A base64 string still goes inline; uploadChunked is unchanged.
  *   v1.5.0 — 2026-10-18 — upload() and uploadChunked() take opts.nodeDefault: with no visibility named,
  *     they send visibility 'default' and the node applies its starting level for an app's upload (plan
  *     doc-mvcn6c7e4e5q, V5.2). Without it, an upload with no visibility is still sent as private.
@@ -64,41 +71,95 @@ function binding(opts) {
   };
 }
 
+/**
+ * An Error with the node's sentence as its message, and its code and HTTP status beside it.
+ * @param {string} message
+ * @param {string} [code]
+ * @param {number} [status]
+ * @returns {Error & { code?: string, status?: number }}
+ */
+function uploadError(message, code, status) {
+  const err = /** @type {Error & { code?: string, status?: number }} */ (new Error(message));
+  if (code) err.code = code;
+  if (status) err.status = status;
+  return err;
+}
+
+/**
+ * Store a File or a Blob with ONE request that carries its bytes: the node mints an upload address
+ * (POST /v1/storage with mode 'presigned', the same key, type, visibility, sharing and store the inline
+ * upload sends), and the bytes go to it as they are in one PUT, up to the node's file limit.
+ * Base64 in JSON made the body a third larger and, past about 3.1 MB of file, answered 500 on
+ * aimeat.io. The answer is the one the inline upload gave: key, store, owner_gaii, size, mime_type,
+ * visibility, federate, created_at, embed_url, embed_markdown, versioned_url, and ai_provenance,
+ * warnings or publish_request when the node adds them.
+ * @param {Blob} file
+ * @param {any} opts
+ */
+async function putFile(file, opts) {
+  // A bare Blob has no .name (only File does) — reading it yields undefined → the fallback.
+  const named = /** @type {File} */ (file);
+  const key = opts?.key || named.name || ('file-' + Date.now());
+  const mime_type = opts?.mime_type || file.type || 'application/octet-stream';
+  const minted = await authFetch('/v1/storage', {
+    method: 'POST',
+    body: JSON.stringify({
+      key, mime_type, visibility: levelOf(opts), mode: 'presigned', ...binding(opts),
+      ...(opts && typeof opts.store === 'string' && opts.store ? { store: opts.store } : {}),
+    }),
+  });
+  if (!minted.ok) throw uploadError(minted.error?.message || 'Upload failed', minted.error?.code, minted.status);
+  const target = minted.data || {};
+  if (typeof target.max_size_bytes === 'number' && file.size > target.max_size_bytes) {
+    throw uploadError('Upload exceeds limit of ' + target.max_size_bytes + ' bytes', 'FILE_TOO_LARGE', 413);
+  }
+  // The address carries its own permission (a one-use token), so no Authorization header goes with it.
+  const r = await fetch(target.upload_url, {
+    method: target.upload_method || 'PUT',
+    headers: { 'Content-Type': target.content_type || mime_type },
+    body: file,
+  });
+  const text = await r.text();
+  /** @type {any} */
+  let answer;
+  try {
+    answer = JSON.parse(text);
+  } catch (parseErr) {
+    throw uploadError('Upload failed: the node answered ' + r.status + ' with no JSON (' + String(parseErr) + ')', undefined, r.status);
+  }
+  if (!r.ok || !answer || answer.success === false) {
+    throw uploadError((answer && answer.message) || ('Upload failed: ' + r.status), answer && answer.error, r.status);
+  }
+  // The PUT answers in its own shape ({ success, type, ...file }); hand back the inline one.
+  const stored = { ...answer };
+  delete stored.success;
+  delete stored.type;
+  if (stored.federate === undefined) stored.federate = false;
+  if (!stored.warnings && Array.isArray(target.warnings) && target.warnings.length) stored.warnings = target.warnings;
+  return stored;
+}
+
 const storage = {
   // Upload a file (File object, Blob, or base64 string). opts: key, mime_type, visibility
-  // ('private' | 'owner' | 'group' | 'public' | 'workspace'), and for a shared file group_id or
-  // workspace_ref / workspaceRefs.
+  // ('private' | 'owner' | 'group' | 'public' | 'workspace'), for a shared file group_id or
+  // workspace_ref / workspaceRefs, and store ('own:<name>' or 'node:<name>'). A File or a Blob goes as
+  // its raw bytes in one PUT (putFile above); a base64 string still goes inline as JSON.
   async upload(fileOrData, opts) {
-    let key, data, mime_type, visibility;
-
-    if (fileOrData instanceof File || fileOrData instanceof Blob) {
-      // A bare Blob has no .name (only File does) — reading it yields undefined → the fallback.
-      const file = /** @type {File} */ (fileOrData);
-      key = opts?.key || file.name || ('file-' + Date.now());
-      mime_type = opts?.mime_type || file.type || 'application/octet-stream';
-      visibility = levelOf(opts);
-      const buf = await file.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 8192) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
-      }
-      data = btoa(binary);
-    } else if (typeof fileOrData === 'string') {
-      // Assume base64
-      key = opts?.key || ('file-' + Date.now());
-      data = fileOrData;
-      mime_type = opts?.mime_type || 'application/octet-stream';
-      visibility = levelOf(opts);
-    } else {
-      throw new Error('upload() expects a File, Blob, or base64 string');
-    }
+    if (fileOrData instanceof Blob) return putFile(fileOrData, opts);
+    if (typeof fileOrData !== 'string') throw new Error('upload() expects a File, Blob, or base64 string');
 
     const res = await authFetch('/v1/storage', {
       method: 'POST',
-      body: JSON.stringify({ key, data, mime_type, visibility, ...binding(opts) }),
+      body: JSON.stringify({
+        key: opts?.key || ('file-' + Date.now()),
+        data: fileOrData,
+        mime_type: opts?.mime_type || 'application/octet-stream',
+        visibility: levelOf(opts),
+        ...binding(opts),
+        ...(opts && typeof opts.store === 'string' && opts.store ? { store: opts.store } : {}),
+      }),
     });
-    if (!res.ok) throw new Error(res.error?.message || 'Upload failed');
+    if (!res.ok) throw uploadError(res.error?.message || 'Upload failed', res.error?.code, res.status);
     return res.data;
   },
 

@@ -31622,8 +31622,9 @@ paths:
       responses:
         '200':
           description: >-
-            Upload processed successfully. A storage upload answers with key, owner_gaii, size,
-            mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage),
+            Upload processed successfully. A storage upload answers with key, store, owner_gaii, size,
+            mime_type, visibility, federate, created_at, embed_url, embed_markdown and versioned_url,
+            the fields POST /v1/storage answers (AIMEAT.storage.upload sends a File this way),
             and `ai_provenance` (AiProvenanceItemBlock) when the file contains a record: the
             `ai_provenance` / `ai_provenance_id` asked for at the mint ride in the token and are
             decided against these bytes (400 PROVENANCE_HASH_MISMATCH when an attached record names

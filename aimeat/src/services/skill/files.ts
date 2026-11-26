@@ -19,9 +19,12 @@
  *   const { value, size, encoding } = storedSkillFile(content);
  *   writeFileSync(target, skillFileBytes(skill.fileContents[path], encodingOf(path)));
  * @version-history
+ *   v1.0.1 — 2026-11-26 — A base64 file is checked with isBase64Text (utils/base64.ts), not one regular
+ *     expression over the whole text, which threw past 4 MiB characters.
  *   v1.0.0 — 2026-10-26 — Initial: binary files in a skill folder (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  */
 import { isUtf8Text, SkillValidationError } from './md.js';
+import { isBase64Text } from '../../utils/base64.js';
 
 /** How a stored file's string reads back into bytes; absent is UTF-8 text. */
 export type SkillFileEncoding = 'base64';
@@ -47,8 +50,12 @@ export function skillFileBytes(value: string, encoding?: string): Buffer {
   return encoding === 'base64' ? Buffer.from(value, 'base64') : Buffer.from(value, 'utf8');
 }
 
-/** Standard base64 with its padding, and nothing else: a typo is refused rather than half-decoded. */
-const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+/**
+ * Standard base64 with its padding, and nothing else: a typo is refused rather than half-decoded.
+ * Whole groups of four, `=` only at the end; the empty text is an empty file. Read one character at a
+ * time: the regular expression this was threw past 4 MiB characters (utils/base64.ts).
+ */
+const isPaddedBase64 = (s: string): boolean => s === '' || (s.length % 4 === 0 && isBase64Text(s, { urlSafe: false }));
 
 /**
  * One file as a JSON caller sends it: a string is the file's text, `{ content, encoding: "base64" }`
@@ -58,7 +65,7 @@ export function readSkillFileInput(path: string, raw: unknown): string | Buffer 
   if (typeof raw === 'string') return raw;
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const { content, encoding } = raw as { content?: unknown; encoding?: unknown };
-    if (encoding === 'base64' && typeof content === 'string' && BASE64_RE.test(content)) return Buffer.from(content, 'base64');
+    if (encoding === 'base64' && typeof content === 'string' && isPaddedBase64(content)) return Buffer.from(content, 'base64');
     if (encoding === undefined && typeof content === 'string') return content;
   }
   throw new SkillValidationError('BAD_ENCODING',

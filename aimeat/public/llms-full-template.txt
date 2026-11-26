@@ -520,8 +520,8 @@ await AIMEAT.data.getPublic(gaii, key)   // read another user's public data (no 
 
 **AIMEAT.storage** (`/v1/libs/aimeat-storage.js`):
 ```javascript
-await AIMEAT.storage.upload(file)        // upload File or Blob
-await AIMEAT.storage.upload(base64str, { key, mime_type }) // upload base64
+await AIMEAT.storage.upload(file)        // File or Blob: its bytes in one PUT, up to the node's file limit
+await AIMEAT.storage.upload(base64str, { key, mime_type }) // upload base64 (inline JSON, for small files)
 await AIMEAT.storage.download(key)       // download as Blob
 await AIMEAT.storage.list()              // list all files
 await AIMEAT.storage.delete(key)         // delete file

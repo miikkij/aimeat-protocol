@@ -12,6 +12,9 @@
  *     token, metadata carried forward, strict base64, the empty body and the bad token), so it stays.
  *   v1.3.0 -- 2026-11-15 -- Audit M045 (an unheld address answers 410 TOKEN_EXPIRED), M046 (the
  *     storage PUT asks the shared writer again, bytes read back) and L122 (the delete cascade is read).
+ *   v1.4.0 -- 2026-11-26 -- A file over 4 MiB: an inline POST /v1/storage whose base64 passes 4 MiB
+ *     characters stores it (it answered 500 on aimeat.io), and the served AIMEAT.storage.upload sends
+ *     a File in one PUT and answers the fields the inline upload answers.
  */
 
 import * as ed from '@noble/ed25519';
@@ -412,6 +415,74 @@ await test('POST /v1/apps with malformed base64 (random non-alphabet chars) -> 4
     }));
     assert(status === 400, `Expected 400, got ${status}`);
     assert(body.error?.code === 'INVALID_INPUT', `Expected INVALID_INPUT, got ${body.error?.code}`);
+});
+
+// ── Phase 3.6: a file over 4 MiB, inline and through the served SDK ──
+// On aimeat.io an inline POST /v1/storage whose base64 passed 4,194,304 characters answered 500: the
+// check was one regular expression over the whole text (utils/base64.ts). AIMEAT.storage.upload(File)
+// sent that JSON; it now sends the raw bytes in one PUT to a presigned address.
+console.log('\nPhase 3.6: A file over 4 MiB');
+
+/** 4.5 MiB of bytes that are not all alike, so a byte lost or moved is seen when they are read back. */
+const BIG = Buffer.alloc(Math.round(4.5 * 1024 * 1024));
+for (let i = 0; i < BIG.length; i++) BIG[i] = (i * 7 + (i >> 11)) & 0xff;
+const sameBytes = async (key: string): Promise<boolean> => {
+    const back = await fetch(`${BASE}/v1/storage/${key}`, authed());
+    return back.status === 200 && Buffer.from(await back.arrayBuffer()).equals(BIG);
+};
+let inlineBig: Record<string, unknown> = {};
+
+await test('An inline POST /v1/storage with over 4 MiB characters of base64 stores the file', async () => {
+    const data = BIG.toString('base64');
+    assert(data.length > 4 * 1024 * 1024, `the base64 is over 4 MiB characters, got ${data.length}`);
+    const { status, body } = await json('/v1/storage', authed({
+        method: 'POST',
+        body: JSON.stringify({ key: 'big/inline.bin', data, mime_type: 'application/zip', visibility: 'private' }),
+    }));
+    assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body).slice(0, 300)}`);
+    assert(body.data?.size === BIG.length, `size ${body.data?.size}`);
+    inlineBig = body.data;
+    assert(await sameBytes('big/inline.bin'), 'the stored bytes read back the same');
+});
+
+await test('The served AIMEAT.storage.upload sends a File over 4 MiB in one PUT and answers the inline fields', async () => {
+    const vm = await import('node:vm');
+    const code = await (await fetch(`${BASE}/v1/libs/aimeat-storage.js`)).text();
+    const sent: Array<{ url: string; method: string; bytes: number }> = [];
+    // The node itself, through a recorder: the SDK's authed calls and its PUT both go to it.
+    const nodeFetch = async (url: string, init: RequestInit = {}) => {
+        const body = init.body as unknown;
+        sent.push({ url, method: init.method ?? 'GET', bytes: body instanceof Blob ? body.size : typeof body === 'string' ? body.length : 0 });
+        return fetch(url, init);
+    };
+    const session = {
+        jwt: ownerToken,
+        fetch: async (path: string, opts: RequestInit = {}) => {
+            const r = await nodeFetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` } });
+            return { ...(await r.json() as object), status: r.status };
+        },
+    };
+    const page: Record<string, unknown> = {
+        document: { querySelector: () => null },
+        location: { protocol: 'http:', origin: BASE, href: `${BASE}/` },
+        fetch: nodeFetch, Blob, File, Response, console, setTimeout, clearTimeout,
+    };
+    page.window = page;
+    page.self = page;
+    page.AIMEAT = { auth: { getSession: () => session } };
+    vm.runInContext(code, vm.createContext(page));
+    const storage = (page.AIMEAT as { storage: { upload: (f: unknown, o?: unknown) => Promise<Record<string, unknown>> } }).storage;
+
+    const out = await storage.upload(new File([BIG], 'sdk.bin', { type: 'application/zip' }), { key: 'big/sdk.bin', visibility: 'private' });
+    const puts = sent.filter((s) => s.method === 'PUT');
+    assert(puts.length === 1 && puts[0].url.includes('/v1/upload/') && puts[0].bytes === BIG.length,
+        `one PUT of the raw bytes to an upload address, got ${JSON.stringify(sent)}`);
+    assert(!sent.some((s) => s.method === 'POST' && s.bytes > 4096), `no JSON body carried the file, got ${JSON.stringify(sent)}`);
+    assert(out.key === 'big/sdk.bin' && out.size === BIG.length && out.federate === false && typeof out.created_at === 'string',
+        `the inline answer's fields, got ${JSON.stringify(out)}`);
+    const inlineKeys = Object.keys(inlineBig).sort().join(',');
+    assert(Object.keys(out).sort().join(',') === inlineKeys, `the same fields as the inline answer: ${Object.keys(out).sort()} vs ${inlineKeys}`);
+    assert(await sameBytes('big/sdk.bin'), 'the stored bytes read back the same');
 });
 
 // ── Phase 4: Cleanup ──

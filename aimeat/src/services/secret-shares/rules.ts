@@ -16,12 +16,15 @@
  *   newPickupCode · newDepositToken · secretHmac · hmacEquals · hmacMatches · normalizeTerms · normalizeContent ·
  *   ShareRefusal · refuse
  * @version-history
+ *   v1.0.1 — 2026-11-26 — A file's base64 is checked with isBase64Text (utils/base64.ts), not one regular
+ *     expression over the whole text, which threw past 4 MiB characters.
  *   v1.0.0 — 2026-11-14 — Initial (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  */
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { otherRingKeys } from '../owner/secrets.js';
+import { isBase64Text, withoutWhitespace } from '../../utils/base64.js';
 import type {
   SecretShareFormat, SecretShareProtection, SecretShareRecipients, SecretShareRetention,
 } from '../../storage/types/secret-shares.js';
@@ -192,8 +195,9 @@ export function normalizeContent(body: Record<string, unknown>, maxBytes: number
   const format = (body.format ?? 'text') as SecretShareFormat;
   if (!FORMATS.includes(format)) return refuse(400, 'INVALID_FORMAT', 'format is text (a key, a password, a token), pairs (NAME=value lines, such as an .env file) or file (content_base64 with file_name).');
   if (format === 'file') {
-    const b64 = typeof body.content_base64 === 'string' ? body.content_base64.replace(/\s+/g, '') : '';
-    if (!b64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return refuse(400, 'INVALID_CONTENT', 'A file is sent as content_base64 (standard base64).');
+    // Read one character at a time: a whole-text regular expression threw past 4 MiB characters (utils/base64.ts).
+    const b64 = typeof body.content_base64 === 'string' ? withoutWhitespace(body.content_base64) : '';
+    if (!b64 || !isBase64Text(b64, { urlSafe: false })) return refuse(400, 'INVALID_CONTENT', 'A file is sent as content_base64 (standard base64).');
     const size = Buffer.from(b64, 'base64').length;
     if (size > maxBytes) return refuse(413, 'SECRET_TOO_LARGE', `That file is ${size} bytes and this node takes at most ${maxBytes}. The operator sets the limit (secrets.share_max_bytes).`);
     const fileName = typeof body.file_name === 'string' && body.file_name.trim() ? body.file_name.trim().slice(0, 200) : 'secret.bin';

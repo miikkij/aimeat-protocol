@@ -38,7 +38,8 @@ import { tu } from './copy-upload-i18n.js';
  */
 
 /**
- * What AIMEAT.storage.upload and uploadChunked answer (POST /v1/storage, the chunked complete).
+ * What AIMEAT.storage.upload and uploadChunked answer (the PUT a File goes in, POST /v1/storage for
+ * base64, the chunked complete): the same fields each way.
  * @typedef {{ key: string, owner_gaii?: string, size?: number, mime_type?: string, visibility?: string,
  *   embed_url?: string, versioned_url?: string }} UploadAnswer
  */
