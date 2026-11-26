@@ -322,7 +322,7 @@
       "digest": "sha256:8c2e58268a2878527f57a454"
     },
     "17. AI transparency and compliance": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/data/compliance-domains.ts",
         "aimeat/src/services/compliance/domain-floor.ts",
@@ -336,7 +336,7 @@
         "aimeat/src/services/data-intermediation",
         "aimeat/src/services/provenance-embed"
       ],
-      "digest": "sha256:14beb0a3faba881caa04f7dc"
+      "digest": "sha256:f8b9b5c75d5000719cccd853"
     },
     "18. Federation and your own node": {
       "reviewedOn": "2026-11-22",
@@ -928,7 +928,7 @@
       "aimeat/src/routes/owners/export-sections.ts": "e13ba3d2a3b0f831",
       "aimeat/src/services/mydata-receipt.ts": "5b49c16627f28f36",
       "aimeat/src/routes/ai-provenance.ts": "0f53e7e4d0e5b99a",
-      "aimeat/src/routes/ai-transparency.ts": "9629d31bf24a4602",
+      "aimeat/src/routes/ai-transparency.ts": "505b353fa8c93cf4",
       "aimeat/src/routes/compliance.ts": "98cb0bc3f89245de",
       "aimeat/src/routes/compliance-agreements.ts": "1264d3c3a976883e",
       "aimeat/src/services/data-intermediation/art12.ts": "2b2b07aa7dde87b1",
