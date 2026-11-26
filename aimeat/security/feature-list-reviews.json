@@ -232,7 +232,7 @@
       "digest": "sha256:f472722f418daa5eeeef829d"
     },
     "12. Messages, contacts and email": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/routes/outbound.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts",
@@ -248,7 +248,7 @@
         "aimeat/src/services/message/broadcast.ts",
         "aimeat/src/tool-catalog/definitions/broadcast-summary.ts"
       ],
-      "digest": "sha256:1a9a65dd1a3ec34d43b2c9ef"
+      "digest": "sha256:b9bc29f72e6373e87e514575"
     },
     "13. Notifications, boards and live updates": {
       "reviewedOn": "2026-11-22",
@@ -809,7 +809,7 @@
     },
     "12. Messages, contacts and email": {
       "aimeat/src/routes/outbound.ts": "bdb77e334bc4bd61",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "3a65e66af820fe5d",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "3a6188b28bd8acbb",
       "aimeat/src/tool-catalog/definitions/dm-groups.ts": "abb2efa534fe1126",
       "aimeat/src/tool-catalog/definitions/dm-reactions.ts": "7aed76c7b8c2db88",
       "aimeat/src/tool-catalog/definitions/connections.ts": "5780713bac3393b5",

@@ -8,6 +8,7 @@
  * @structure organismMethods
  * @usage Object.assign(SqliteStorage.prototype, organismMethods) in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-11-26 — listJoinRequestsForOrgs: join requests for many organisms in one query.
  *   v1.3.0 — 2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129): read and
  *     written; `via` is a JSON object in a TEXT column, read by storage/join-request-via.ts.
  *   v1.2.0 — 2026-11-11 — deleteOrganism also removes the organism's workspace rows and their
@@ -334,6 +335,21 @@ export const organismMethods = {
     if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeJoinRequest(r));
+  },
+
+  // Join requests for MANY organisms in ONE `organismId IN (…)` query, grouped by organism.
+  async listJoinRequestsForOrgs(this: SqliteStorage, organismIds: string[], opts: { status?: string; limit: number }): Promise<Record<string, JoinRequestRecord[]>> {
+    if (organismIds.length === 0) return {};
+    const ph = organismIds.map(() => '?').join(',');
+    let sql = `SELECT * FROM join_requests WHERE organismId IN (${ph})`;
+    const params: unknown[] = [...organismIds];
+    if (opts.status) { sql += ' AND status = ?'; params.push(opts.status); }
+    sql += ' ORDER BY createdAt ASC LIMIT ?';
+    params.push(Math.max(1, Math.trunc(opts.limit)));
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const out: Record<string, JoinRequestRecord[]> = {};
+    for (const r of rows) { const rec = this.deserializeJoinRequest(r); (out[rec.organismId] ??= []).push(rec); }
+    return out;
   },
 
   async updateJoinRequest(this: SqliteStorage, id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null> {

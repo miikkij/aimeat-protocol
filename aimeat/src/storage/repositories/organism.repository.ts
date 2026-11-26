@@ -11,6 +11,8 @@
  *   - PendingApproval methods: create/get/list/update plus listOverduePendingApprovals
  *
  * @version-history
+ *   2026-11-26 — listJoinRequestsForOrgs: the join requests of many organisms in one query (the list
+ *     of what waits for a person asks for every organism the person runs).
  *   2026-11-09 — organismNames: many organisms' names in one query (the Data Wallet read 51 whole
  *     records one at a time for their names).
  *   2026-11-04 — listPendingApprovalsForOrgs is required: both providers implement it (codebase
@@ -39,6 +41,12 @@ export interface OrganismRepository {
   createJoinRequest(record: JoinRequestRecord): Promise<JoinRequestRecord>;
   getJoinRequest(id: string): Promise<JoinRequestRecord | null>;
   listJoinRequests(organismId: string, opts?: { status?: string }): Promise<JoinRequestRecord[]>;
+  /**
+   * Join requests for MANY organisms in ONE query, oldest first, at most `limit` rows in all, keyed
+   * by organismId (an organism with none is absent). The list of what waits for a person reads it
+   * on every page, for every organism the person runs, so it must not be one query per organism.
+   */
+  listJoinRequestsForOrgs(organismIds: string[], opts: { status?: string; limit: number }): Promise<Record<string, JoinRequestRecord[]>>;
   updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null>;
   /**
    * An erased account's join requests: every request the account made is deleted, and its name is

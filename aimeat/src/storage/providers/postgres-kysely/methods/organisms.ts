@@ -11,6 +11,7 @@
  *     written; `via` is a JSON object in a TEXT column, read by storage/join-request-via.ts.
  *   v1.9.0 — 2026-11-11 — deleteOrganism also removes the organism's workspace rows and their
  *     revisions, its invitations and its pending approvals, which nothing could reach afterwards.
+ *   v1.9.0 — 2026-11-26 — listJoinRequestsForOrgs: join requests for many organisms in one query.
  *   v1.8.0 — 2026-11-09 — organismNames: many organisms' names in one query.
  *   v1.7.0 — 2026-10-16 — deleteOrganism runs in one transaction, lets every statement's error fail
  *     the call, and answers whether the organism row went, as the SQLite twin does (QA audit D4-10, E6-05).
@@ -221,6 +222,14 @@ export const organismMethods = {
     let q = this.db.selectFrom('JoinRequest').selectAll().where('organismId', '=', organismId);
     if (opts?.status) q = q.where('status', '=', opts.status);
     return (await q.execute()).map(toJoin);
+  },
+  async listJoinRequestsForOrgs(this: PostgresKyselyStorage, organismIds: string[], opts: { status?: string; limit: number }): Promise<Record<string, JoinRequestRecord[]>> {
+    if (organismIds.length === 0) return {};
+    let q = this.db.selectFrom('JoinRequest').selectAll().where('organismId', 'in', organismIds);
+    if (opts.status) q = q.where('status', '=', opts.status);
+    const out: Record<string, JoinRequestRecord[]> = {};
+    for (const r of await q.orderBy('createdAt', 'asc').limit(Math.max(1, Math.trunc(opts.limit))).execute()) (out[r.organismId] ??= []).push(toJoin(r));
+    return out;
   },
   async updateJoinRequest(this: PostgresKyselyStorage, id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null> {
     const data: Record<string, unknown> = {};

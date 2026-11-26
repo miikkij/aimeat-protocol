@@ -22,8 +22,10 @@
  *
  *   STATEMENTS. The organisms once, the pending approvals of all of them in one read, the workspace
  *   names in one read; a team record per organism that has something to decide, and the workspace's
- *   registration per workspace that holds a suggestion a plain member might decide. Join requests are
- *   read per managed organism, as before.
+ *   registration per workspace that holds a suggestion a plain member might decide. The route reads
+ *   join requests per managed organism, as before; joinRequestsToReviewFor reads them in one
+ *   statement, because the list of what waits is read on every page and a person can run dozens of
+ *   organisms.
  * @structure ReviewRow · JoinRow · InviteRow · organismWaitingFor · approvalsToDecideFor ·
  *   joinRequestsToReviewFor
  * @usage const items = await organismWaitingFor({ storage, config }, { owner, principal });
@@ -151,9 +153,21 @@ export async function approvalsToDecideFor(deps: Deps, who: WaitingWho): Promise
     }));
 }
 
-/** The open join requests of every organism this person owns or administers. */
+/** How many pending join requests one read lists, across every organism the person runs. */
+export const JOIN_REQUESTS_READ_MAX = 200;
+
+/**
+ * The open join requests of every organism this person owns or administers, oldest first, in one
+ * statement whatever the number of organisms: this is read on every page of a signed-in person. A
+ * request whose asker has become a member meanwhile is left out and not closed here; closing it is
+ * the work of the organism's own join request list (openJoinRequests).
+ */
 export async function joinRequestsToReviewFor(deps: Deps, who: WaitingWho): Promise<Array<{ organism: OrganismRecord; requests: JoinRequestRecord[] }>> {
     const managed = managedBy(await admittedOrganisms(deps, who), who.owner);
-    const read = await Promise.all(managed.map(async organism => ({ organism, requests: await openJoinRequests(deps, organism) })));
-    return read.filter(r => r.requests.length);
+    if (!managed.length) return [];
+    const pending = await deps.storage.listJoinRequestsForOrgs(managed.map(o => o.id), { status: 'pending', limit: JOIN_REQUESTS_READ_MAX });
+    return managed.map((organism) => {
+        const members = new Set(organism.members ?? []);
+        return { organism, requests: (pending[organism.id] ?? []).filter(r => !members.has(r.ghii)) };
+    }).filter(r => r.requests.length);
 }

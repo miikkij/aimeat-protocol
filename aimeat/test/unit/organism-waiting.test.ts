@@ -138,6 +138,32 @@ describe('joinRequestsToReviewFor', () => {
         expect(await joinRequestsToReviewFor(deps, who('bob'))).toEqual([]);
         expect(await joinRequestsToReviewFor(deps, who('erin'))).toEqual([]);
     });
+
+    it('leaves out a request whose asker is a member already', async () => {
+        await request('bob');
+        await request('erin');
+        const got = await joinRequestsToReviewFor(deps, who('alice'));
+        expect(got.flatMap(g => g.requests.map(r => r.ghii))).toEqual(['erin']);
+    });
+
+    it('reads the requests of every organism the person runs in one statement', async () => {
+        for (let i = 0; i < 30; i++) {
+            await organism(`org-${i}`, `Org ${i}`, [['alice', 'creator']]);
+            await sqlite.createJoinRequest({ id: `jr-${i}`, organismId: `org-${i}`, ghii: `guest${i}`, status: 'pending', createdAt: stamp } as JoinRequestRecord);
+        }
+        const calls: string[] = [];
+        const counted = new Proxy(sqlite, {
+            get(target, prop, receiver) {
+                const v = Reflect.get(target, prop, receiver);
+                if (typeof v !== 'function') return v;
+                return (...args: unknown[]) => { calls.push(String(prop)); return (v as (...a: unknown[]) => unknown).apply(target, args); };
+            },
+        });
+        const got = await joinRequestsToReviewFor({ storage: counted as unknown as Storage, config }, who('alice'));
+        expect(got).toHaveLength(30);
+        expect(calls.filter(c => c === 'listJoinRequestsForOrgs')).toHaveLength(1);
+        expect(calls.filter(c => c === 'listJoinRequests')).toHaveLength(0);
+    });
 });
 
 describe('organismWaitingFor, the answer of GET /v1/organisms/waiting', () => {
