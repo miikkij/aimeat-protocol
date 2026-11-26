@@ -39,8 +39,15 @@
  *   node scripts/eval-skill.mjs --node-skill <name> [claude plugin eval options]
  *   pnpm eval:skill aimeat-writing --model sonnet --max-cost-usd 10
  *   pnpm eval:skill --node-skill aimeat-ai-capabilities --model opus --max-cost-usd 10
- *   Results land in .claude/evals/<skill>/results/<timestamp>/ (gitignored).
+ *   pnpm eval:skill aimeat-writing --codex [--model <m>] [--runs 3] [--case <glob>] [-j 2] [--dry-run]
+ *   Results land in .claude/evals/<skill>/results/<timestamp>/ (gitignored); the Codex arm's in
+ *   <timestamp>-codex/.
+ *
+ *   CODEX. `--codex` runs the same suite through `codex exec` instead of `claude plugin eval`,
+ *   with and without the skill, scored by the same graders; scripts/eval-skill-codex.mjs says how
+ *   the baseline is kept free of the person's own Codex setup.
  * @version-history
+ *   v1.2.0 — 2026-11-26 — `--codex`: the Codex arm (scripts/eval-skill-codex.mjs).
  *   v1.1.0 — 2026-09-28 — `--node-skill <name>`: evaluates a built-in node skill from its
  *     BUILTIN_SKILLS entry without copying it into the repo; plugin assembly exported as
  *     buildPlugin() (V5 of the System 2 plan).
@@ -142,6 +149,35 @@ export function buildPlugin(source) {
   return plugin;
 }
 
+/**
+ * The Codex arm (scripts/eval-skill-codex.mjs): the same suite through `codex exec`, with and
+ * without the skill. Runs instead of `claude plugin eval` when `--codex` is given.
+ */
+async function mainCodex(source, passthrough) {
+  const { runCodexEval, parseCodexArgs, CodexEvalError } = await import('./eval-skill-codex.mjs');
+  const name = source.nodeSkill ?? source.skill;
+  try {
+    if (!name || name.startsWith('-')) throw new EvalSkillError(USAGE);
+    const options = parseCodexArgs(passthrough);
+    const suiteDir = suiteDirFor(name);
+    if (!existsSync(suiteDir)) throw new EvalSkillError(`no eval suite at ${suiteDir}; write cases there first`);
+    let skill;
+    if (source.nodeSkill) {
+      skill = { name, skillMd: readNodeSkill(name) };
+    } else {
+      const dir = join(REPO, '.claude', 'skills', name);
+      if (!existsSync(join(dir, 'SKILL.md'))) throw new EvalSkillError(`no skill at ${dir}`);
+      skill = { name, dir };
+    }
+    await runCodexEval({ skill, suiteDir, options });
+    return 0;
+  } catch (err) {
+    if (!(err instanceof EvalSkillError) && !(err instanceof CodexEvalError)) throw err;
+    console.error(err.message);
+    return 1;
+  }
+}
+
 function main(argv) {
   let source;
   let passthrough;
@@ -152,6 +188,7 @@ function main(argv) {
     source = { skill: argv[0] };
     passthrough = argv.slice(1);
   }
+  if (passthrough.includes('--codex')) return mainCodex(source, passthrough.filter(a => a !== '--codex'));
   const name = source.nodeSkill ?? source.skill;
 
   let plugin;
@@ -193,4 +230,4 @@ function main(argv) {
 // import.meta.main arrived in Node 24.2; the realpath comparison covers 24.0 and 24.1.
 const isEntry = import.meta.main
   ?? (Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)));
-if (isEntry) process.exit(main(process.argv.slice(2)));
+if (isEntry) Promise.resolve(main(process.argv.slice(2))).then(code => process.exit(code));

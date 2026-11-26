@@ -54,6 +54,11 @@ own, as `CONTRIBUTING.md` says. Push `main` only.
    - `aimeat-library-authoring`: shared code (served libs, cortex libs, extensions, packs).
    - `aimeat-imagery`: any picture (`scripts/gen_image.py`, run with `uv run python`).
    - `aimeat-organism-records`, `aimeat-pages-links`, `aimeat-video`: as their names say.
+
+   A skill with a suite under `.claude/evals/<name>/` is measured for you, too:
+   `pnpm eval:skill <name> --codex` runs its cases through `codex exec` with the skill and without
+   it and prints the difference (`.claude/rules/skills.md`). It spends the developer's plan, so ask
+   first.
 4. **The node, over MCP.** `aimeat_handbook_get` with no arguments is the node's operating guide
    and lists its skills by situation; `aimeat_skill_get` loads one. What the node says wins over
    what you remember.
