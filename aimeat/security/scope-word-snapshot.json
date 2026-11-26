@@ -1083,6 +1083,7 @@
     "src/routes/apps/design-spec.ts:GET:/v1/apps/:owner/:filename/design-spec": ["app:write"],
     "src/routes/apps/design-spec.ts:PUT:/v1/apps/:owner/:filename/design-spec": ["app:write"],
     "src/routes/apps/design-spec.ts:PUT:/v1/apps/:owner/:filename/design-spec/criteria": ["app:write"],
+    "src/routes/apps/design-spec.ts:PUT:/v1/apps/:owner/:filename/design-spec/scenarios": ["app:write"],
     "src/routes/apps/drafts.ts:DELETE:/v1/apps/:owner/:filename/draft": ["app:write"],
     "src/routes/apps/drafts.ts:GET:/v1/apps/:owner/:filename/draft": ["app:write"],
     "src/routes/apps/drafts.ts:GET:/v1/apps/:owner/:filename/draft/lines": ["app:write"],

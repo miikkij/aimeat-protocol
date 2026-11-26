@@ -91,6 +91,10 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
+      "src/services/app/playtest-scenarios.ts": {
+        "count": 1,
+        "why": "ConsoleMessage.text() in the headless page's console listener: the text of one console line the browser already holds, cut to 240 characters, not a response body."
+      },
       "src/services/builder/app-prompt-session.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -678,6 +682,10 @@
         "count": 1,
         "why": "The headless browser loads the app page from this origin, and the page's relative URLs resolve against it; a browser needs a real socket."
       },
+      "src/services/app/playtest-scenarios.ts": {
+        "count": 2,
+        "why": "The same headless page as playtest.ts: the page is opened on this origin, and the member route forwards that page's own /v1/ requests, with the throwaway member's token, to the same socket the browser would have reached."
+      },
       "src/services/connect-tunnel.ts": {
         "count": 1,
         "why": "loopbackBase: the origin a tunnel frame's path is resolved against and pinned to (the SSRF guard in connect-tunnel-forward.ts). No request goes to it over a socket: the forward is dispatched in process."
@@ -736,6 +744,10 @@
       }
     },
     "token-mint": {
+      "src/services/app/playtest-member.ts": {
+        "count": 1,
+        "why": "A playtest scenario's throwaway member: the claims routes/app-grants.ts issueAccessToken mints for an app grant (role app only, the scopes upsertAppGrant wrote from the app's declared aimeat-scopes, the grant id, the app), for an account that holds the owner role alone and is erased when the run ends; 600 seconds."
+      },
       "src/mcp/commerce.ts": {
         "count": 1,
         "why": "The fulfilment call's token for the calling agent itself: its own sub and role, the scopes on its record."
