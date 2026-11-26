@@ -5,6 +5,17 @@
       "date": "2026-11-26",
       "version": "4.3.1",
       "kind": "feature",
+      "id": "2026-11-26-download-all-your-data-files-included",
+      "highlight": false,
+      "audience": ["user", "agent", "operator"],
+      "title": { "en": "Download all your data, files included", "fi": "Lataa kaikki tietosi tiedostoineen" },
+      "body": { "en": "On the Data Wallet page you choose the parts of your export and see their sizes first: memory, how AI content was made, app code, the files on the server and the files in your own storage. The server writes your export in the background as ZIP files and tells you when it is ready; the files wait a week. Only you get the download links. Your AI can start an export for you, but it cannot download it.", "fi": "Tietolompakko-sivulla valitset viennin osat ja näet ensin niiden koot: muisti, miten tekoälyn sisältö on tehty, sovellusten koodi, palvelimen tiedostot ja oman tallennustilasi tiedostot. Palvelin kirjoittaa viennin taustalla zip-tiedostoiksi ja kertoo, kun se on valmis. Tiedostot odottavat viikon. Latauslinkit saat vain sinä. Tekoälysi voi aloittaa viennin puolestasi, mutta ei voi ladata sitä." },
+      "summary": { "en": "Choose the parts and see their sizes first; the server writes your export as ZIP files and tells you when it is ready.", "fi": "Valitse osat ja näe ensin niiden koot. Palvelin kirjoittaa viennin zip-tiedostoiksi ja kertoo, kun se on valmis." }
+    },
+    {
+      "date": "2026-11-26",
+      "version": "4.3.1",
+      "kind": "feature",
       "id": "2026-11-26-see-at-once-where-something-waits-for-you",
       "highlight": false,
       "audience": ["user"],
