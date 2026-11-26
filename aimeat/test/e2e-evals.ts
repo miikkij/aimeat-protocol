@@ -152,7 +152,7 @@ function reply(r: RecordedRequest) {
 
     await test('an agent with read access only may not remove a set', async () => {
       const reader = await connectAgentByDevice(BASE, { owner: alice.name, ownerToken: alice.token, name: 'evalreader', scopes: ['memory:read'] });
-      const r = await json(at, { method: 'DELETE', headers: { Authorization: `Bearer ${reader.token}` } });
+      const r = await json(`/v1/evals/skill/${ref}`, { method: 'DELETE', headers: { Authorization: `Bearer ${reader.token}` } });
       assert(r.status === 403, `refused without memory:write: ${r.status} ${JSON.stringify(r.body?.error)}`);
       assert((await json(at, { headers: auth })).status === 200, 'the set is still there');
     });
