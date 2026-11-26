@@ -29,6 +29,8 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.6.0 — 2026-11-26 — The list filters `facts` and `noTotal`: the unlabelled list reads its rows
+ *     in one statement, and a paged read that ignores the count does not run it.
  *   v1.5.0 — 2026-10-28 — The list filter `publicOnly`: public content, reviewed or not (the
  *     register draft's "does this publish").
  *   v1.4.0 — 2026-10-08 — `storage_files` joins the list: a public stored file is served to anyone
@@ -159,9 +161,24 @@ export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
    * something was generated, and on a node whose apps are all parked that answer was "yes".
    */
   publicOnly?: boolean;
+  /**
+   * Only records whose facts equal one of these, as a facet names them (`unstated` is an absent
+   * `humanInvolvement` or `level`, null an absent `mediaKind` or reason). The unlabelled list passes
+   * the combinations the facets counted as unlabelled, so the rows come back in one statement
+   * however many labelled rows are newer. An empty list matches nothing.
+   */
+  facts?: AiProvenanceFacts[];
+  /**
+   * The caller does not read `total`: the count statement is not run and `total` is -1. A paged
+   * read that asked for it ran the same count once per page.
+   */
+  noTotal?: boolean;
   limit?: number;
   offset?: number;
 }
+
+/** The four facts of a record that decide whether its public content owes a label (a facet's, without the day). */
+export type AiProvenanceFacts = Pick<AiProvenanceFacet, 'humanInvolvement' | 'level' | 'mediaKind' | 'reason'>;
 
 /** Filter for the hash lookup. `ownerGhii` widens a public-only read to include the caller's own. */
 export interface AiProvenanceHashQuery {

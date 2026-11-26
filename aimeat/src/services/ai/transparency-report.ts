@@ -22,14 +22,27 @@
  *   not appear in these counts — it cannot, there is nothing to count. `scope` carries that
  *   sentence, because a total that reads as "everything on this node" would be the one misleading
  *   number in a compliance artefact.
+ *
+ *   ONE POPULATION, READ ONCE. The facet query and the share scan evaluate the public test over
+ *   every record of the window, and a node mints a record per AI write (81 000 in thirty days on
+ *   the node this was measured on, 2026-11-26). A caller that builds a report and its detail list
+ *   passes one `provenancePopulations()` reader to both, so each is one statement per request.
  * @structure
  *   - AiTransparencyReport — the shape both surfaces serve
+ *   - provenancePopulations(storage, config) — a request's reader: each population is read once
  *   - buildAiTransparencyReport(storage, opts) — the roll-up
  *   - listUnlabelledPublic(storage, opts) — the sweep's population, as rows
  * @usage
- *   const report = await buildAiTransparencyReport(storage, { sinceDays: 30 });
+ *   const populations = provenancePopulations(storage, config);
+ *   const report = await buildAiTransparencyReport(storage, { sinceDays: 30, config, populations });
+ *   const detail = await listUnlabelledPublic(storage, { sinceDays: 30, config, populations });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.3.0 — 2026-11-26 — provenancePopulations(): a report and its detail list read the facets and
+ *     the share scan once. listUnlabelledPublic reads its rows in one statement, by the fact
+ *     combinations the facets counted as unlabelled, and without the count: it read every public
+ *     unreviewed row 500 at a time with a count per page, and stopped after 5 000 rows, so
+ *     unlabelled rows older than 5 000 labelled ones were never listed.
  *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/ai-transparency-report.ts to src/services/ai/transparency-report.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.2.0 — 2026-10-16 — With `config`, content an open workspace share serves to anyone counts as
  *     public in the roll-up and in the unlabelled list (services/share-provenance.ts
@@ -42,7 +55,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow, AiProvenanceFacet, AiProvenanceFacts } from '../../storage/interface.js';
 import { sharePublicInScope, SHARE_SCAN_LIMIT } from '../share/provenance.js';
 import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../../models/ai-provenance-schemas.js';
 import { disclosureFor, type DisclosureLabelPolicy } from './disclosure.js';
@@ -93,6 +106,46 @@ export interface ReportOptions {
    * decides its label; without it only the SQL rule counts, which sees no share.
    */
   config?: AimeatConfig;
+  /**
+   * The request's population reader (provenancePopulations). A caller that builds a report and its
+   * detail list passes the same one to both, so the facet query and the share scan run once. The
+   * reader carries its own configuration; without one, each call reads its population itself.
+   */
+  populations?: ProvenancePopulations;
+}
+
+/** What a report counts: the facets of one account or the node since a day, and what open shares add. */
+export interface ProvenancePopulation {
+  /** The start of the window, or undefined for every record. */
+  since: string | undefined;
+  facets: AiProvenanceFacet[];
+  /** The records an open workspace share serves to anyone; null when the reader has no configuration. */
+  shared: { rows: AiProvenanceRecordRow[]; facts: CountedFacts[]; capped: boolean } | null;
+}
+
+/** Reads a population the first time it is asked for, and answers the same one after that. */
+export type ProvenancePopulations = (scope: { ownerGhii?: string; days?: number }) => Promise<ProvenancePopulation>;
+
+/**
+ * A reader for one request. `days` absent is every record. Two reads of the same account and
+ * window share one facet query and one share scan; the window starts when it is first read.
+ */
+export function provenancePopulations(storage: Storage, config?: AimeatConfig): ProvenancePopulations {
+  const read = new Map<string, Promise<ProvenancePopulation>>();
+  return (scope) => {
+    const key = `${scope.ownerGhii ?? ''}|${scope.days ?? 'all'}`;
+    let population = read.get(key);
+    if (!population) {
+      population = (async () => {
+        const since = scope.days ? sinceIso(scope.days) : undefined;
+        const facets = await storage.aiProvenanceFacets({ ownerGhii: scope.ownerGhii, since });
+        const shared = config ? await shareOpenedFacts(storage, config, { ownerGhii: scope.ownerGhii, since }) : null;
+        return { since, facets, shared };
+      })();
+      read.set(key, population);
+    }
+    return population;
+  };
 }
 
 /** One record's facts, as the facet query groups them: what a share-public record adds to the counts. */
@@ -149,14 +202,14 @@ export async function buildAiTransparencyReport(
   storage: Storage, opts: ReportOptions = {},
 ): Promise<AiTransparencyReport> {
   const days = Math.min(Math.max(opts.sinceDays ?? DEFAULT_TREND_DAYS, 1), 3650);
-  const since = sinceIso(days);
-  const facets = await storage.aiProvenanceFacets({ ownerGhii: opts.ownerGhii, since });
+  const population = await (opts.populations ?? provenancePopulations(storage, opts.config))({ ownerGhii: opts.ownerGhii, days });
+  const { facets } = population;
   const policy = opts.labelPolicy ?? 'light';
 
   const report: AiTransparencyReport = {
     scope: {
       owner_ghii: opts.ownerGhii ?? null,
-      since,
+      since: population.since ?? null,
       note: 'Counts describe content this node holds a provenance record for. Content with NO record '
         + 'is UNSTATED and does not appear here — absence of a record is not evidence that a person '
         + 'wrote something.',
@@ -197,8 +250,8 @@ export async function buildAiTransparencyReport(
     if (f.publiclyLinked) countPublic(f);
   }
   // What an open workspace share serves to anyone: counted in `total` above as not public.
-  if (opts.config) {
-    const shared = await shareOpenedFacts(storage, opts.config, { ownerGhii: opts.ownerGhii, since });
+  const shared = population.shared;
+  if (shared) {
     for (const f of shared.facts) countPublic(f);
     if (shared.capped) {
       report.scope.note += ` More workspace share candidates were found than one report reads (${SHARE_SCAN_LIMIT}); `
@@ -249,38 +302,38 @@ export async function listUnlabelledPublic(
   storage: Storage, opts: ReportOptions & { limit?: number } = {},
 ): Promise<{ items: AiProvenanceRecordRow[]; total: number }> {
   const policy = opts.labelPolicy ?? 'light';
-  const since = opts.sinceDays ? sinceIso(opts.sinceDays) : undefined;
+  // No window when the caller names none: every record, as before.
+  const population = await (opts.populations ?? provenancePopulations(storage, opts.config))(
+    { ownerGhii: opts.ownerGhii, ...(opts.sinceDays ? { days: opts.sinceDays } : {}) });
+  const since = population.since;
   // The honest total comes from the facets, which cover the whole population in SQL. When it is
-  // zero (the usual case, since every public surface decides its label when it serves) nothing is
-  // scanned at all.
-  const facets = await storage.aiProvenanceFacets({ ownerGhii: opts.ownerGhii, since });
-  let total = facets
+  // zero (the usual case, since every public surface decides its label when it serves) no row is
+  // read at all.
+  const unlabelled = population.facets
     .filter((f) => f.publiclyLinked && (f.humanInvolvement === 'none' || f.humanInvolvement === 'light-review')
-      && !owedWhenPublic(f, policy))
-    .reduce((n, f) => n + f.count, 0);
+      && !owedWhenPublic(f, policy));
+  let total = unlabelled.reduce((n, f) => n + f.count, 0);
   const limit = opts.limit ?? 25;
   const items: AiProvenanceRecordRow[] = [];
-  // The rows, newest first: the unreviewed public population, decided one by one with the same
-  // rule. Paged, and capped at UNLABELLED_SCAN_PAGES so a large node cannot turn the sweep into a
-  // full read; `total` above stays the whole count either way.
-  for (let page = 0; total > 0 && items.length < limit && page < UNLABELLED_SCAN_PAGES; page++) {
+  // The rows, newest first, in one statement: the label is decided by four facts, and the facets
+  // above already say which combinations of them are unlabelled, so the list asks for exactly those
+  // rows. Deciding row by row in the process read every public unreviewed row to find a few, and
+  // had to stop somewhere; it stopped after 5 000, and whatever was older was never listed.
+  if (total > 0) {
+    const facts = new Map<string, AiProvenanceFacts>();
+    for (const f of unlabelled) {
+      facts.set(JSON.stringify([f.humanInvolvement, f.level, f.mediaKind, f.reason]),
+        { humanInvolvement: f.humanInvolvement, level: f.level, mediaKind: f.mediaKind, reason: f.reason });
+    }
     const { items: rows } = await storage.listAiProvenance({
       ownerGhii: opts.ownerGhii, ...(since ? { since } : {}),
-      unreviewedPublicOnly: true, limit: UNLABELLED_SCAN_PAGE, offset: page * UNLABELLED_SCAN_PAGE,
+      unreviewedPublicOnly: true, facts: [...facts.values()], noTotal: true, limit,
     });
-    for (const row of rows) {
-      const r = row.record;
-      const owed = owedWhenPublic({
-        level: r.level, humanInvolvement: r.humanInvolvement,
-        mediaKind: r.mediaKind ?? null, reason: r.disclosure?.reason ?? null,
-      }, policy);
-      if (!owed && items.length < limit) items.push(row);
-    }
-    if (rows.length < UNLABELLED_SCAN_PAGE) break;
+    items.push(...rows);
   }
   // What an open workspace share serves to anyone, which the SQL population above cannot see.
-  if (opts.config) {
-    const shared = await shareOpenedFacts(storage, opts.config, { ownerGhii: opts.ownerGhii, since });
+  const shared = population.shared;
+  if (shared) {
     shared.facts.forEach((f, i) => {
       if (f.humanInvolvement !== 'none' && f.humanInvolvement !== 'light-review') return;
       if (owedWhenPublic(f, policy)) return;
@@ -290,7 +343,3 @@ export async function listUnlabelledPublic(
   }
   return { items, total };
 }
-
-/** Rows read per page while collecting the unlabelled list, and the most pages read. */
-const UNLABELLED_SCAN_PAGE = 500;
-const UNLABELLED_SCAN_PAGES = 10;

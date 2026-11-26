@@ -31,6 +31,9 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.9.1 — 2026-11-26 — The report and the draft are read one at a time and with a two-minute
+ *     limit of their own (compliance-tab.load.js): on a node where the report took 34 s the page
+ *     never opened, and each event started another report beside the one still running.
  *   v3.9.0 — 2026-11-19 — Section 13, anti-money-laundering (compliance-tab.aml.js; services/aml/), and a
  *     row in section 01 for its findings that wait for a person, counted in the verdict.
  *   v3.8.0 — 2026-11-09 — Section 01's verdict counts what the records of processing leave open and
@@ -79,13 +82,14 @@
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
 import { downloadBlob, toCsvBlob } from '/js/utils.js';
 import { num, Spinner, useToast, Toast } from './shared.js';
-import { apiGet, apiPut, apiPost } from '/js/api.js';
+import { api, apiGet, apiPut, apiPost } from '/js/api.js';
+import { oneAtATime, SLOW_READ } from './compliance-tab.load.js';
 import { swallowed } from '/js/swallowed.js';
 import { groupGaps, answerStats, classCounts } from './compliance-tab.gaps.js';
 import { RegisterSection, QuestionnaireSection, classWord } from './compliance-tab.register.js';
@@ -330,15 +334,16 @@ export default function ComplianceTab(props) {
   const [toastMsg, showError, showSuccess, clearToast] = useToast();
   const days = PERIODS.find(p => p.key === period)?.days ?? 30;
 
-  const load = useCallback(async (d) => {
+  // One read at a time, and the two whole-node reads with their own time limit (compliance-tab.load.js).
+  const load = useMemo(() => oneAtATime(async (d) => {
     try {
       // The draft rides along for the printout: on paper the AI uses the node finds print whether or
       // not anybody saved them, each marked as the system's finding (compliance-tab.print.js).
       const [rep, qs, regs, dr] = await Promise.all([
-        apiGet(`/v1/admin/compliance/report?since_days=${d}`),
+        api(`/v1/admin/compliance/report?since_days=${d}`, SLOW_READ),
         apiGet('/v1/admin/compliance/questionnaire'),
         apiGet('/v1/compliance/docs/registers').catch((e) => { swallowed('compliance-tab: registers', e); return null; }),
-        apiGet(`/v1/admin/compliance/draft?since_days=${d}`).catch((e) => { swallowed('compliance-tab: draft for print', e); return null; }),
+        api(`/v1/admin/compliance/draft?since_days=${d}`, SLOW_READ).catch((e) => { swallowed('compliance-tab: draft for print', e); return null; }),
       ]);
       if (rep?.data) setReport(rep.data);
       // A question still as shipped carries `builtIn`, and only those are shown translated
@@ -355,7 +360,7 @@ export default function ComplianceTab(props) {
       setFailed(true);
       swallowed('compliance-tab: load', e);
     }
-  }, []);
+  }), []);
 
   useEffect(() => { load(days); }, [days, load]);
   useEffect(() => onLiveUpdate(['compliance'], () => load(days)), [days, load]);
@@ -394,7 +399,7 @@ export default function ComplianceTab(props) {
   const loadDraft = async () => {
     setDrafting(true);
     try {
-      const r = await apiGet(`/v1/admin/compliance/draft?since_days=${days}`);
+      const r = await api(`/v1/admin/compliance/draft?since_days=${days}`, SLOW_READ);
       const d = r?.data;
       if (!d?.usecases) { showError(C('draftFailed')); return; }
       setDraft((prev) => {

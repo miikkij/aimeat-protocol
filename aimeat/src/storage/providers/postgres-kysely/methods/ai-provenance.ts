@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
+ *     and a read without the count statement. The statements that evaluate the public test over a
+ *     whole population (facets, the public lists, the share scan) run with JIT off (withoutJit).
  *   v1.7.0 — 2026-10-28 — listAiProvenance({ publicOnly }): public records, reviewed or not.
  *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
  *     owner or the node since a day that publiclyLinked does not count, up to 5000, for the
@@ -49,7 +52,7 @@
 import { sql, type Selectable } from 'kysely';
 import type {
   AiProvenanceRecordRow, AiProvenanceHashQuery,
-  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery, AiProvenanceFacts,
 } from '../../../interface.js';
 import type { AiProvenance as AiProvenanceDoc } from '../../../../models/ai-provenance-schemas.js';
 import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
@@ -197,7 +200,7 @@ export const aiProvenanceMethods = {
       .groupBy(['hi', 'lvl', 'day', 'pub', 'req', 'rsn', 'mk']);
     if (query?.ownerGhii) q = q.where('p.ownerGhii', '=', query.ownerGhii);
     if (query?.since) q = q.where('p.generatedAt', '>=', query.since);
-    const rows = await q.execute();
+    const rows = await withoutJit(this, () => q.execute());
     return rows.map((r) => ({
       // `unstated` rather than null: a record whose document somehow lacks the field says nothing
       // about human involvement, and "nothing" must never be counted as "a human was involved".
@@ -227,20 +230,25 @@ export const aiProvenanceMethods = {
         publiclyLinked('p."id"'),
         sql`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`,
       ] : query?.publicOnly ? [publiclyLinked('p."id"')] : []),
+      ...(query?.facts ? [factsMatch(query.facts)] : []),
     ], sql` AND `)}`;
 
-    const counted = await this.db.selectFrom('AiProvenance as p')
-      .select(sql<string>`COUNT(*)`.as('n'))
-      .where(conditions)
-      .executeTakeFirst();
     const limit = Math.min(Math.max(query?.limit ?? 50, 1), 500);
-    const rows = await this.db.selectFrom('AiProvenance as p').selectAll()
-      .where(conditions)
-      .orderBy('p.generatedAt', 'desc')
-      .limit(limit)
-      .offset(Math.max(query?.offset ?? 0, 0))
-      .execute();
-    return { items: rows.map(toRecord), total: Number(counted?.n ?? 0) };
+    const read = async (): Promise<{ items: AiProvenanceRecordRow[]; total: number }> => {
+      const counted = query?.noTotal ? undefined : await this.db.selectFrom('AiProvenance as p')
+        .select(sql<string>`COUNT(*)`.as('n'))
+        .where(conditions)
+        .executeTakeFirst();
+      const rows = await this.db.selectFrom('AiProvenance as p').selectAll()
+        .where(conditions)
+        .orderBy('p.generatedAt', 'desc')
+        .limit(limit)
+        .offset(Math.max(query?.offset ?? 0, 0))
+        .execute();
+      return { items: rows.map(toRecord), total: query?.noTotal ? -1 : Number(counted?.n ?? 0) };
+    };
+    // Only the public test makes these statements whole-population ones (withoutJit).
+    return query?.unreviewedPublicOnly || query?.publicOnly ? withoutJit(this, read) : read();
   },
 
   // ── Workspace share candidates (aiprov E1) — kept apart from publiclyLinked above on purpose:
@@ -264,12 +272,45 @@ export const aiProvenanceMethods = {
         ...(ids.length ? [sql`p."id" IN (${sql.join(ids)})`] : []),
         ...(query.contentHash ? [sql`p."contentHash" = ${query.contentHash}`] : []),
       ], sql` OR `)})`;
-    const rows = await sql<WorkspaceProvenanceLink>`
+    const read = () => sql<WorkspaceProvenanceLink>`
       SELECT p."id" AS "provenanceId", m."ownerGaii" AS "ownerGaii", m."key" AS "key"
         FROM "AiProvenance" p JOIN "Memory" m ON m."aiProvenanceId" = p."id"
        WHERE ${match} AND m."deletedAt" IS NULL AND m."archived" = false
          AND m."key" LIKE 'organism.%.w.%.latest'
        LIMIT ${limit}`.execute(this.db);
+    // A scan evaluates the public test over a report's whole population; ids and a hash read a few rows.
+    const rows = await (scan ? withoutJit(this, read) : read());
     return rows.rows;
   },
 };
+
+/**
+ * Run a statement that reads a report's whole population with JIT compilation off.
+ *
+ * The public test puts these plans far past `jit_above_cost` (6.4 million against 100 000 for the
+ * facet query on a node with 231 000 records), and the planner then compiles the expressions of a
+ * statement that runs once. Measured on such a node on 2026-11-26: JIT took 2.2 s of a 2.4 s facet
+ * query and about half of each list and scan statement; with `jit = off` the facet query took 1.0 s.
+ * `SET LOCAL` lasts to the end of the transaction, so the setting never reaches another statement
+ * of the pool; inside a caller's transaction it stays off for the rest of that transaction.
+ */
+function withoutJit<T>(storage: PostgresKyselyStorage, run: () => Promise<T>): Promise<T> {
+  return storage.transaction(async () => {
+    await sql`SET LOCAL jit = off`.execute(storage.db);
+    return run();
+  });
+}
+
+/**
+ * The rows whose four facts equal one of the named combinations (AiProvenanceListQuery.facts). A
+ * facet names an absent involvement or level `unstated`, so that word matches the absent field.
+ */
+function factsMatch(facts: AiProvenanceFacts[]) {
+  if (facts.length === 0) return sql<boolean>`FALSE`;
+  const absent = (v: string | null): string | null => (v === 'unstated' ? null : v);
+  return sql<boolean>`(${sql.join(facts.map(f => sql`(
+    ${HUMAN_INVOLVEMENT} IS NOT DISTINCT FROM ${absent(f.humanInvolvement)}::text
+    AND ${LEVEL} IS NOT DISTINCT FROM ${absent(f.level)}::text
+    AND ${MEDIA_KIND} IS NOT DISTINCT FROM ${f.mediaKind}::text
+    AND ${REASON} IS NOT DISTINCT FROM ${f.reason}::text)`), sql` OR `)})`;
+}

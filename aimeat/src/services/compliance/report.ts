@@ -35,6 +35,8 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.8.0 — 2026-11-26 — The options and complianceUnlabelledDetail take the request's provenance
+ *     population reader, so the report and its detail list read the facets and the share scan once.
  *   v1.7.0 — 2026-11-21 — `regulated_ai`, section 14: the mode per regulated data domain for an outside
  *     AI model, what the law row suggests, and the period's marks (feature audit item 1.3).
  *   v1.6.0 — 2026-11-19 — `aml`, section 13 (Regulation (EU) 2024/1624): the setting, the declarations,
@@ -62,7 +64,7 @@ import type { Storage } from '../../storage/interface.js';
 import { FontService } from '../themes/fonts.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
-  type AiTransparencyReport,
+  type AiTransparencyReport, type ProvenancePopulations,
 } from '../ai/transparency-report.js';
 import {
   classifyUseCase, effectiveQuestionnaire, readUseCases, UNCLASSIFIED,
@@ -197,6 +199,12 @@ export interface ComplianceReportOptions {
    * from resolveIdentity() for exactly the reason every other identity-keyed read on this node does.
    */
   ownerGhii?: string;
+  /**
+   * The request's provenance population reader (services/ai/transparency-report.ts). The route
+   * passes the one it also gives complianceUnlabelledDetail, so the report and the detail list read
+   * the facets and the share scan once when their windows are the same.
+   */
+  populations?: ProvenancePopulations;
 }
 
 /** Inclusive `from` / exclusive-feeling `to` for a calendar month, both ISO. */
@@ -478,7 +486,9 @@ export async function buildComplianceReport(
   const owner = opts.ownerGhii;
   const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
   const [transparency, usage, consent, rawUseCases] = await Promise.all([
-    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic, config }),
+    buildAiTransparencyReport(storage, {
+      sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic, config, populations: opts.populations,
+    }),
     aiUsage(storage, window.from, window.to, owner),
     consentTotals(storage, config, window.from, owner),
     readUseCases(storage, config.nodeId),
@@ -540,8 +550,9 @@ export async function buildComplianceReport(
 /** The unlabelled rows behind the count, for the surface that shows a list rather than a number. */
 export async function complianceUnlabelledDetail(
   storage: Storage, sinceDays: number, limit = 50, labelPolicy?: AimeatConfig['aiLabelPublic'], config?: AimeatConfig,
+  populations?: ProvenancePopulations,
 ): Promise<{ total: number; shown: number; items: unknown[] }> {
-  const found = await listUnlabelledPublic(storage, { sinceDays, limit, labelPolicy, config });
+  const found = await listUnlabelledPublic(storage, { sinceDays, limit, labelPolicy, config, populations });
   // `total` beside a capped list, always: a truncated list without one reads as the whole story,
   // which is exactly how a compliance report comes to overstate its own coverage.
   return { total: found.total, shown: found.items.length, items: found.items };

@@ -40,6 +40,8 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.3.3 — 2026-11-26 — The provenance pages are read without the count (`noTotal`): each page
+ *     ran it again, and on the public read the count evaluates the public test over every record.
  *   v1.3.2 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead of a regex of this file's own; no change in behaviour.
  *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-draft.ts to src/services/compliance/draft.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app that uses AI with no employment or biometric data in its map gets
@@ -134,7 +136,8 @@ export interface RegisterDraft {
 async function provenanceRows(storage: Storage, query: AiProvenanceListQuery): Promise<AiProvenanceRecordRow[]> {
   const out: AiProvenanceRecordRow[] = [];
   for (let offset = 0; offset < PROVENANCE_SAMPLE; offset += PROVENANCE_PAGE) {
-    const { items } = await storage.listAiProvenance({ ...query, limit: PROVENANCE_PAGE, offset });
+    // noTotal: the count is not read here, and with it every page ran the count statement again.
+    const { items } = await storage.listAiProvenance({ ...query, limit: PROVENANCE_PAGE, offset, noTotal: true });
     out.push(...items);
     if (items.length < PROVENANCE_PAGE) break;
   }

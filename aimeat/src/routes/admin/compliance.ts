@@ -37,6 +37,8 @@
  *   import { adminComplianceRouter } from './routes/admin/compliance.js';
  *   app.use(adminComplianceRouter(config, storage));
  * @version-history
+ *   v1.2.1 — 2026-11-26 — GET report passes one provenance population reader to the report and its
+ *     detail list.
  *   v1.2.0 — 2026-10-28 — GET questionnaire also answers `built_in`, the questions still as shipped,
  *     which a page shows in the reader's language.
  *   v1.1.2 — 2026-10-16 — The unlabelled detail counts what an open workspace share serves to anyone as public.
@@ -60,6 +62,7 @@ import {
   buildComplianceReport, complianceUnlabelledDetail, MONTH_RE,
 } from '../../services/compliance/report.js';
 import { draftRegisterFromActivity } from '../../services/compliance/draft.js';
+import { provenancePopulations } from '../../services/ai/transparency-report.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
   writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
@@ -83,9 +86,13 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
       return;
     }
     const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
+    // One reader for the report and the detail list below: with the same window (thirty days, the
+    // page's own) the facet query and the share scan run once.
+    const populations = provenancePopulations(storage, config);
     const report = await buildComplianceReport(storage, config, {
       month,
       sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
+      populations,
     });
 
     // The audit row, written before the response. See the file header.
@@ -102,7 +109,7 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
       operator, gaps: report.gaps.length, usecases: report.register.usecases.length,
     });
 
-    const detail = await complianceUnlabelledDetail(storage, 30, 50, config.aiLabelPublic, config);
+    const detail = await complianceUnlabelledDetail(storage, 30, 50, config.aiLabelPublic, config, populations);
     res.json(success(config.nodeId, { ...report, unlabelled_detail: detail }, [
       { description: 'The register this report compares against', method: 'GET', url: '/v1/admin/compliance/usecases' },
       { description: 'The node\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },

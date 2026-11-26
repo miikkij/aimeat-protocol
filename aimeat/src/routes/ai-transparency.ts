@@ -28,6 +28,8 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.6.2 — 2026-11-26 — The operator's report and the owner's view pass one provenance population
+ *     reader to the roll-up and the unlabelled list, so the facet query and the share scan run once.
  *   v1.6.1 — 2026-11-15 — The flag link says what POST /v1/flags needs (a sign-in and social:write),
  *     not "anyone can".
  *   v1.6.0 — 2026-11-01 — `ai_processing_region`: where the node's AI key has prompts processed, the
@@ -65,7 +67,7 @@ import { LOCALES } from '../i18n.js';
 import { regionDeclaration } from '../services/ai/openrouter-region.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
 import {
-  buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
+  buildAiTransparencyReport, listUnlabelledPublic, provenancePopulations, DEFAULT_TREND_DAYS,
 } from '../services/ai/transparency-report.js';
 
 /** Official section titles, quoted verbatim from the Code of Practice signature form. A section
@@ -373,12 +375,14 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
     requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
+      // One reader for both: the report and its detail list describe the same population.
+      const populations = provenancePopulations(storage, config);
       const report = await buildAiTransparencyReport(storage, {
-        sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic, config,
+        sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic, config, populations,
       });
       const detail = await listUnlabelledPublic(storage, {
         sinceDays: Number.isFinite(sinceDays) ? sinceDays : DEFAULT_TREND_DAYS,
-        limit: 50, labelPolicy: config.aiLabelPublic, config,
+        limit: 50, labelPolicy: config.aiLabelPublic, config, populations,
       });
       res.json(success(config.nodeId, {
         ...report,
@@ -401,7 +405,10 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/v1/ai-transparency/mine', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
-    const opts = { ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic, config };
+    const opts = {
+      ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic, config,
+      populations: provenancePopulations(storage, config),
+    };
     const [report, recent, unlabelled] = await Promise.all([
       buildAiTransparencyReport(storage, opts),
       storage.listAiProvenance({ ownerGhii, limit: 25 }),

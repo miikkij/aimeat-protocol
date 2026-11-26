@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
+ *     and a read without the count statement.
  *   v1.7.0 — 2026-10-28 — listAiProvenance({ publicOnly }): public records, reviewed or not.
  *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
  *     owner or the node since a day that PUBLICLY_LINKED does not count, up to 5000. Mirrors the
@@ -221,8 +223,15 @@ export const aiProvenanceMethods = {
     } else if (query?.publicOnly) {
       where.push(PUBLICLY_LINKED);
     }
+    if (query?.facts) {
+      // `IS` is SQLite's null-safe equality. A facet names an absent involvement or level `unstated`.
+      const absent = (v: string | null): string | null => (v === 'unstated' ? null : v);
+      where.push(query.facts.length === 0 ? '0' : `(${query.facts.map(() =>
+        `(${HUMAN_INVOLVEMENT} IS ? AND ${LEVEL} IS ? AND ${MEDIA_KIND} IS ? AND ${REASON} IS ?)`).join(' OR ')})`);
+      for (const f of query.facts) params.push(absent(f.humanInvolvement), absent(f.level), f.mediaKind, f.reason);
+    }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)
+    const total = query?.noTotal ? -1 : (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)
       .get(...params) as { n: number }).n;
     const limit = Math.min(Math.max(query?.limit ?? 50, 1), 500);
     const rows = this.db.prepare(

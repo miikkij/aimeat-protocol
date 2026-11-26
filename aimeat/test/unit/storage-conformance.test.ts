@@ -94,6 +94,7 @@
  *   v1.5.0 -- 2026-09-26 -- deleteOwner leaves nothing a new account under the same name inherits:
  *     an action published under the bare name goes, and a kept AI provenance record names the
  *     erasure's pseudonym instead of the person (secaudit 2026-09: A8-4, N6).
+ *   2026-11-26 -- listAiProvenance's `facts` and `noTotal` filters, on both providers.
  *   v1.4.0 -- 2026-09-07 -- Fail on a configured Postgres connection error; CI requires both providers.
  *   v1.3.0 — 2026-09-04 — Six tables join the seed and the cascade check: memory version history,
  *     the owner's agent defaults, the two usage tables, group shares and the ecosystem-app handshake.
@@ -860,6 +861,52 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(kept[0]?.ownerGhii, `${name}: one pseudonym for the whole erasure`).toBe(kept[1]?.ownerGhii);
             expect.soft((await storage.listAiProvenance({ ownerGhii: p.ghii })).total, `${name}: the freed name still lists the records`).toBe(0);
             expect.soft((await storage.getAiProvenance(p.ids.stranger))?.ownerGhii, `${name}: somebody else's record changed`).toBe(p.stranger);
+        }
+    }, 60_000);
+
+    // The unlabelled list reads its rows by the fact combinations the facets counted
+    // (services/ai/transparency-report.ts): `facts` names them as a facet does, with `unstated` for
+    // an absent involvement and null for an absent medium or reason, and `noTotal` skips the count.
+    it('listAiProvenance returns the rows of the named fact combinations, and no count with noTotal', async () => {
+        for (const { name, storage } of provs) {
+            const owner = `conffacts${Date.now()}${Math.floor(Math.random() * 1000)}@aimeat-conformance-001`;
+            const now = new Date().toISOString();
+            const rows: Array<[string, Record<string, unknown>]> = [
+                ['plain', { level: 'ai-generated', humanInvolvement: 'none' }],
+                ['policy', { level: 'ai-generated', humanInvolvement: 'none', disclosure: { required: false, reason: 'policy', short: { en: '-' } } }],
+                ['policy-image', { level: 'ai-generated', humanInvolvement: 'none', mediaKind: 'image', disclosure: { required: false, reason: 'policy', short: { en: '-' } } }],
+                ['assisted-policy', { level: 'assisted', humanInvolvement: 'light-review', disclosure: { required: false, reason: 'policy', short: { en: '-' } } }],
+                ['no-involvement', { level: 'ai-generated' }],
+            ];
+            const ids: Record<string, string> = {};
+            for (const [label, facts] of rows) {
+                ids[label] = randomUUID();
+                await storage.createAiProvenance({
+                    id: ids[label], ownerGhii: owner, principal: owner, contentHash: null, generatedAt: now, createdAt: now,
+                    record: { spec: 'aimeat.provenance/v1', generatedAt: now, ...facts } as never,
+                });
+            }
+            const labelsOf = (found: { items: Array<{ id: string }> }) =>
+                found.items.map(r => Object.keys(ids).find(l => ids[l] === r.id)).sort();
+            const policyText = { humanInvolvement: 'none', level: 'ai-generated', mediaKind: null, reason: 'policy' };
+
+            const one = await storage.listAiProvenance({ ownerGhii: owner, facts: [policyText] });
+            expect.soft(labelsOf(one), `${name}: a null medium matches the absent one only`).toEqual(['policy']);
+            expect.soft(one.total, `${name}: the count is of the same rows`).toBe(1);
+
+            const two = await storage.listAiProvenance({
+                ownerGhii: owner, noTotal: true,
+                facts: [policyText, { humanInvolvement: 'light-review', level: 'assisted', mediaKind: null, reason: 'policy' }],
+            });
+            expect.soft(labelsOf(two), `${name}: any of the named combinations`).toEqual(['assisted-policy', 'policy']);
+            expect.soft(two.total, `${name}: noTotal answers -1 and runs no count`).toBe(-1);
+
+            const absent = await storage.listAiProvenance({ ownerGhii: owner, facts: [{ humanInvolvement: 'unstated', level: 'ai-generated', mediaKind: null, reason: null }] });
+            expect.soft(labelsOf(absent), `${name}: unstated is the absent involvement`).toEqual(['no-involvement']);
+
+            const none = await storage.listAiProvenance({ ownerGhii: owner, facts: [] });
+            expect.soft(none.items.length, `${name}: an empty list of combinations matches nothing`).toBe(0);
+            expect.soft((await storage.listAiProvenance({ ownerGhii: owner })).total, `${name}: without the filter, every row`).toBe(rows.length);
         }
     }, 60_000);
 
