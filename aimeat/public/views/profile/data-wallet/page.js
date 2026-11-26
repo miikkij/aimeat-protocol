@@ -93,7 +93,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, dateTime } from '/js/format.js';
+import { num, date } from '/js/format.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -328,7 +328,8 @@ function exportState(ctx) {
   const job = ctx.exportJob;
   if (!job) return null;
   const busy = ctx.busy === 'export';
-  const when = (iso) => (iso ? dateTime(iso) : '');
+  // The day is enough: the files go some time on that day, at the hourly sweep.
+  const when = (iso) => (iso ? date(iso) : '');
   if (job.state === 'queued' || job.state === 'running') {
     const line = job.state === 'queued'
       ? x('exportJob.queued', { place: job.place_in_queue || 1 })
