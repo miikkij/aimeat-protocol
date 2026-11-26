@@ -28091,6 +28091,26 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: evalSetRemove
+      summary: Remove the eval set with its runs
+      tags: [Agents]
+      description: >
+        Removes the account's eval set for this target with every run, also when the crew or skill it
+        names no longer exists. `{ target, removed: true }`; 404 NO_EVAL_SET when the account has none.
+        The set is the account's own record: the account's data export carries it and the account's
+        erasure removes it. Needs memory:write. MCP: aimeat_eval_set with remove true.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [crew, skill, pack] } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/evals/{kind}/{name}/run:
     post:
       operationId: evalSetRun

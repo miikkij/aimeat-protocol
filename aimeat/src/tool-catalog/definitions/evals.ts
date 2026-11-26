@@ -6,6 +6,7 @@
  *   aimeat_eval_get, aimeat_eval_run. REST: routes/evals/evals.ts.
  * @structure evalTools — the three definitions
  * @version-history
+ *   v1.1.0 — 2026-11-26 — aimeat_eval_set takes remove; cases is required only without it.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import { z } from 'zod';
@@ -17,7 +18,7 @@ const name = { type: 'string' as const, required: true, description: 'The crew\'
 export const evalTools = [
   {
     name: 'aimeat_eval_set',
-    description: 'Write the eval set for one crew, skill or library pack: up to 10 cases, each a prompt and 1 to 5 expectations a good answer meets (kind contains or not_contains with the words, or judge with a rubric a model reads and answers PASS or FAIL), and how many times each case runs (repeats, 1 to 5, default 3, because one run of a model proves little). It replaces the cases; the runs made of earlier cases stay. Write the cases from what the person said the crew or skill is for. Run it with aimeat_eval_run.',
+    description: 'Write the eval set for one crew, skill or library pack: up to 10 cases, each a prompt and 1 to 5 expectations a good answer meets (kind contains or not_contains with the words, or judge with a rubric a model reads and answers PASS or FAIL), and how many times each case runs (repeats, 1 to 5, default 3, because one run of a model proves little). It replaces the cases; the runs made of earlier cases stay. Write the cases from what the person said the crew or skill is for. Run it with aimeat_eval_run. remove: true removes the set with its runs instead (send no cases), also when the crew or skill it names is gone.',
     caller: 'agent',
     visibility: agentEverywhere,
     annotations: { title: 'Eval set: write', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -27,8 +28,7 @@ export const evalTools = [
       kind, name,
       cases: {
         type: 'array',
-        required: true,
-        description: 'The cases: [{ id (short, lowercase), prompt, expect: [{ kind: "contains" | "not_contains" | "judge", value }] }], at most 10.',
+        description: 'The cases: [{ id (short, lowercase), prompt, expect: [{ kind: "contains" | "not_contains" | "judge", value }] }], at most 10. Required unless remove is true.',
         zod: z.array(z.object({
           id: z.string().max(40),
           prompt: z.string().max(2000),
@@ -36,6 +36,7 @@ export const evalTools = [
         })).max(10),
       },
       repeats: { type: 'number', description: 'How many times each case runs, 1 to 5 (default 3).', zod: z.number().int().min(1).max(5) },
+      remove: { type: 'boolean', description: 'true: remove the set with its runs, and write nothing.' },
     },
   },
   {

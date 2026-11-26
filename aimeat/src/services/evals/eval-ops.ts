@@ -4,21 +4,23 @@
  * SPDX-License-Identifier: MIT
  * @description The eval set operations every surface calls: write a set, read it with its runs, and
  *   start a run. REST: PUT /v1/evals/:kind/:name, GET /v1/evals/:kind/:name, POST
- *   /v1/evals/:kind/:name/run (routes/evals/evals.ts); MCP: aimeat_eval_set, aimeat_eval_get,
- *   aimeat_eval_run (mcp/evals.ts). The scope words are on the routes and the tools: memory:write to
- *   write, memory:read to read, ai:use to run.
+ *   /v1/evals/:kind/:name/run, DELETE /v1/evals/:kind/:name (routes/evals/evals.ts); MCP:
+ *   aimeat_eval_set (remove: true removes), aimeat_eval_get, aimeat_eval_run (mcp/evals.ts). The scope
+ *   words are on the routes and the tools: memory:write to write or remove, memory:read to read,
+ *   ai:use to run.
  *
  *   WHO. The account the target belongs to: the owner and the owner's agents. An app grant, an
  *   ecosystem app, a visitor from another node and an anonymous caller are refused: a run spends the
  *   account's AI allowance and a set is the account's own test of its own work. A crew must be an
  *   agent of the account; a skill one the account can read; a pack one this node serves.
- * @structure evalCallerOf · setEvalFor · getEvalFor · runEvalFor
+ * @structure evalCallerOf · setEvalFor · getEvalFor · removeEvalFor · runEvalFor
  * @version-history
+ *   v1.1.0 — 2026-11-26 — removeEvalFor.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import type { CallerContext } from '../caller-context.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { checkCases, EVAL_TARGET_KINDS, readEvalSet, REPEATS_MAX, writeEvalSet, type EvalTarget, type EvalTargetKind } from './eval-sets.js';
+import { checkCases, EVAL_TARGET_KINDS, readEvalSet, removeEvalSet, REPEATS_MAX, writeEvalSet, type EvalTarget, type EvalTargetKind } from './eval-sets.js';
 import { resolveTarget, startEvalRun, type EvalCaller, type EvalDeps, type EvalRefusal } from './eval-run.js';
 
 type Outcome = { ok: true; status?: number; data: Record<string, unknown> } | EvalRefusal;
@@ -66,6 +68,20 @@ export async function getEvalFor(deps: EvalDeps, c: CallerContext, kind: string,
   const set = await readEvalSet(deps.storage, caller.ownerGhii, target);
   if (!set) return refuse(404, 'NO_EVAL_SET', `There is no eval set for ${target.kind} ${target.name}.`);
   return { ok: true, data: { target, cases: set.cases, repeats: set.repeats, updated_at: set.updatedAt, runs: set.runs } };
+}
+
+/**
+ * DELETE .../evals/:kind/:name: remove the set with its runs. The target need not exist any more,
+ * because a set for a deleted skill or crew is exactly what the account wants to clean away.
+ */
+export async function removeEvalFor(deps: EvalDeps, c: CallerContext, kind: string, name: string): Promise<Outcome> {
+  const caller = evalCallerOf(c);
+  if ('ok' in caller) return caller;
+  const target = targetOf(kind, name);
+  if ('ok' in target) return target;
+  const removed = await removeEvalSet(deps.storage, caller.ownerGhii, target, caller.principal);
+  if (!removed) return refuse(404, 'NO_EVAL_SET', `There is no eval set for ${target.kind} ${target.name}.`);
+  return { ok: true, data: { target, removed: true } };
 }
 
 /** POST .../evals/:kind/:name/run { dry_run? }: start a run, or say what it would cost. */

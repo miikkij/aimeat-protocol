@@ -8,9 +8,12 @@
  *   - dry_run names the model calls a run makes, and makes none;
  *   - a run scores the skill with its text and without it, and the judge's verdict counts;
  *   - a new version of the skill is scored against the version before, with the change;
- *   - an agent without ai:use may not start a run.
+ *   - an agent without ai:use may not start a run;
+ *   - the set is in the owner's data export, and is removed by its owner (REST and MCP), never by an
+ *     agent without memory:write or by another owner.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=evals
  * @version-history
+ *   v1.1.0 — 2026-11-26 — Export and removal.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
@@ -134,6 +137,37 @@ function reply(r: RecordedRequest) {
       assert(!set.isError && JSON.parse(set.text).repeats === 1, `set: ${set.text.slice(0, 300)}`);
       const run = await callTool(session, 'aimeat_eval_run', { kind: 'pack', name: 'aimeat-data', dry_run: true });
       assert(run.isError, `a run without ai:use is refused over MCP too: ${run.text.slice(0, 300)}`);
+      const removed = await callTool(session, 'aimeat_eval_set', { kind: 'pack', name: 'aimeat-data', remove: true });
+      assert(!removed.isError && JSON.parse(removed.text).removed === true, `remove over MCP: ${removed.text.slice(0, 300)}`);
+      const gone = await callTool(session, 'aimeat_eval_get', { kind: 'pack', name: 'aimeat-data' });
+      assert(gone.isError && gone.text.startsWith('NO_EVAL_SET'), `the removed set is gone: ${gone.text.slice(0, 200)}`);
+    });
+
+    await test('the set is the account\'s own record: the owner\'s data export carries it', async () => {
+      const e = await json(`/v1/owners/${alice.name}/export`, { headers: auth });
+      assert(e.status === 200, `export: ${e.status} ${JSON.stringify(e.body?.error)}`);
+      const keys = JSON.stringify(e.body).match(/"key":"evalset\.[0-9a-f]+"/g) ?? [];
+      assert(keys.length === 1, `the skill's set is in the export: ${keys.length}`);
+    });
+
+    await test('an agent with read access only may not remove a set', async () => {
+      const reader = await connectAgentByDevice(BASE, { owner: alice.name, ownerToken: alice.token, name: 'evalreader', scopes: ['memory:read'] });
+      const r = await json(at, { method: 'DELETE', headers: { Authorization: `Bearer ${reader.token}` } });
+      assert(r.status === 403, `refused without memory:write: ${r.status} ${JSON.stringify(r.body?.error)}`);
+      assert((await json(at, { headers: auth })).status === 200, 'the set is still there');
+    });
+
+    await test('another owner removes nothing of this owner\'s: the same name is no set of theirs', async () => {
+      const bob = await registerOwner(BASE, `evalb${Date.now()}`);
+      expectRefusal(await json(at, { method: 'DELETE', headers: { Authorization: `Bearer ${bob.token}` } }), 404, 'NO_EVAL_SET');
+      assert((await json(at, { headers: auth })).status === 200, 'alice\'s set is still there');
+    });
+
+    await test('the owner removes the set with its runs; a second remove says there is none', async () => {
+      const r = await json(at, { method: 'DELETE', headers: auth });
+      assert(r.status === 200 && r.body.data.removed === true, `remove: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+      expectRefusal(await json(at, { headers: auth }), 404, 'NO_EVAL_SET');
+      expectRefusal(await json(at, { method: 'DELETE', headers: auth }), 404, 'NO_EVAL_SET');
     });
   } finally {
     await stub.close();

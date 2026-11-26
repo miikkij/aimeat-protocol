@@ -16,16 +16,23 @@
  *   and answers PASS or FAIL). No pattern of the builder's own runs on the node: a regular expression
  *   from outside against model output is a way to stall the process.
  *
- *   WHERE. One record per set in the node namespace NS, which no principal can address, so a score is
- *   only ever what the node measured. Readable and writable by the account the target belongs to (the
- *   owner and the owner's agents). The newest RUNS_KEPT runs are kept.
- * @structure EvalTarget · EvalCase · EvalRun · EvalSet · checkCases · readEvalSet · writeEvalSet · recordEvalRun
+ *   WHERE. One record per set in the account's service namespace (`svc:<owner>@<node>`,
+ *   services/service-records.ts), which no principal can write through a memory route, so a score is
+ *   only ever what the node measured. The set is still the account's: its data export carries it and
+ *   the account's erasure removes it with the rest of that namespace (services/owner/erasure.ts).
+ *   Readable, writable and removable by the account the target belongs to (the owner and the owner's
+ *   agents). The newest RUNS_KEPT runs are kept. A set outlives the skill or crew it names, as a test
+ *   file outlives a deleted function: the account removes it with removeEvalSet.
+ * @structure EvalTarget · EvalCase · EvalRun · EvalSet · checkCases · readEvalSet · writeEvalSet ·
+ *   recordEvalRun · removeEvalSet
  * @version-history
+ *   v1.1.0 — 2026-11-26 — The sets moved from a node namespace no one could address into the account's
+ *     service namespace, so the account's export and erasure reach them; removeEvalSet.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import type { Storage } from '../../storage/interface.js';
+import { serviceNamespaceOf } from '../../utils/service-namespace.js';
 
-const NS = 'eval-sets';
 export const CASES_MAX = 10;
 export const REPEATS_MAX = 5;
 export const RUNS_KEPT = 10;
@@ -78,7 +85,9 @@ export interface EvalSet {
   runs: EvalRun[];
 }
 
-const keyOf = (owner: string, t: EvalTarget) => `evalset.${Buffer.from(`${owner}|${t.kind}|${t.name}`, 'utf8').toString('hex')}`;
+/** `owner` is the account's GHII; the record lives in that account's service namespace. */
+const nsOf = (owner: string) => serviceNamespaceOf(owner);
+const keyOf = (t: EvalTarget) => `evalset.${Buffer.from(`${t.kind}|${t.name}`, 'utf8').toString('hex')}`;
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 /** Read a written list of cases: shapes, bounds and unique ids. */
@@ -112,7 +121,7 @@ export function checkCases(input: unknown): { ok: true; cases: EvalCase[] } | { 
 }
 
 export async function readEvalSet(storage: Storage, owner: string, target: EvalTarget): Promise<EvalSet | null> {
-  const rec = await storage.getMemory(NS, keyOf(owner, target));
+  const rec = await storage.getMemory(nsOf(owner), keyOf(target));
   const v = rec?.value as EvalSet | undefined;
   return v && v.spec === 'aimeat.evalset/1' && v.owner === owner ? v : null;
 }
@@ -122,12 +131,12 @@ export async function updateEvalSet(
   storage: Storage, owner: string, target: EvalTarget, change: (live: EvalSet | null) => EvalSet,
 ): Promise<EvalSet> {
   for (let attempt = 0; attempt < 30; attempt++) {
-    const rec = await storage.getMemory(NS, keyOf(owner, target));
+    const rec = await storage.getMemory(nsOf(owner), keyOf(target));
     const live = rec?.value && (rec.value as EvalSet).spec === 'aimeat.evalset/1' ? rec.value as EvalSet : null;
     const next = change(live);
     const now = new Date().toISOString();
     const record = {
-      key: keyOf(owner, target), ownerGaii: NS, value: next, visibility: 'private' as const, tags: ['eval-set'], ttlHours: null,
+      key: keyOf(target), ownerGaii: nsOf(owner), value: next, visibility: 'private' as const, tags: ['eval-set'], ttlHours: null,
       version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
     };
     const saved = rec ? await storage.setMemoryIfVersion(record, rec.version) : await storage.createMemoryIfAbsent(record);
@@ -153,4 +162,10 @@ export async function recordEvalRun(storage: Storage, owner: string, target: Eva
     const others = live.runs.filter(r => r.id !== run.id);
     return { ...live, runs: [run, ...others].slice(0, RUNS_KEPT) };
   });
+}
+
+/** Remove the set with its runs. False when the account has no set for this target. */
+export async function removeEvalSet(storage: Storage, owner: string, target: EvalTarget, by: string): Promise<boolean> {
+  if (!(await readEvalSet(storage, owner, target))) return false;
+  return storage.deleteMemory(nsOf(owner), keyOf(target), by);
 }

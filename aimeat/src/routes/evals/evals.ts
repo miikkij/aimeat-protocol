@@ -5,10 +5,12 @@
  * @description Stored eval sets for a crew, a skill or a library pack (services/evals/):
  *   - PUT  /v1/evals/:kind/:name        write the cases (memory:write)
  *   - GET  /v1/evals/:kind/:name        the set and its runs (memory:read)
+ *   - DELETE /v1/evals/:kind/:name      remove the set with its runs (memory:write)
  *   - POST /v1/evals/:kind/:name/run    start a run, or { dry_run: true } for its cost (ai:use)
  *   The work and the who-may test are in services/evals/eval-ops.ts, which the MCP tools call too.
  * @structure evalsRouter(config, storage)
  * @version-history
+ *   v1.1.0 — 2026-11-26 — DELETE removes a set.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import { Router, type Request, type Response } from 'express';
@@ -20,7 +22,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
 import { validateBody } from '../../models/schemas.js';
 import { safeText } from '../../models/input-limits.js';
-import { getEvalFor, runEvalFor, setEvalFor } from '../../services/evals/eval-ops.js';
+import { getEvalFor, removeEvalFor, runEvalFor, setEvalFor } from '../../services/evals/eval-ops.js';
 
 const EvalSetBody = z.object({
   cases: z.array(z.object({
@@ -48,6 +50,10 @@ export function evalsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/evals/:kind/:name', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const { kind, name } = p(req);
     send(res, await getEvalFor(deps, callerOf(req, config.nodeId, storage), kind, name));
+  });
+  router.delete('/v1/evals/:kind/:name', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const { kind, name } = p(req);
+    send(res, await removeEvalFor(deps, callerOf(req, config.nodeId, storage), kind, name));
   });
   router.post('/v1/evals/:kind/:name/run', requireAuth(), requireScope('ai:use'), validateBody(EvalRunBody, config.nodeId), async (req, res) => {
     const { kind, name } = p(req);

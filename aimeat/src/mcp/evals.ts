@@ -7,6 +7,7 @@
  *   as the caller; the scope word each needs is on its catalog entry (tool-catalog/definitions/evals.ts).
  * @structure registerEvalTools(mcp, storage, config, caller)
  * @version-history
+ *   v1.1.0 — 2026-11-26 — aimeat_eval_set { remove: true } removes the set (DELETE /v1/evals/:kind/:name).
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -17,7 +18,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { getEvalFor, runEvalFor, setEvalFor } from '../services/evals/eval-ops.js';
+import { getEvalFor, removeEvalFor, runEvalFor, setEvalFor } from '../services/evals/eval-ops.js';
 
 type Out = { ok: true; data: Record<string, unknown> } | { ok: false; code: string; message: string };
 
@@ -30,7 +31,9 @@ export function registerEvalTools(mcp: McpServer, storage: Storage, config: Aime
     description: descriptionFor('aimeat_eval_set'), inputSchema: zodShapeFor('aimeat_eval_set'), annotations: annotationsFor('aimeat_eval_set'),
   }, async (args) => {
     const a = args as Record<string, unknown>;
-    const out: Out = await setEvalFor(deps, caller(), s(a.kind), s(a.name), { cases: a.cases, ...(a.repeats !== undefined ? { repeats: a.repeats } : {}) });
+    const out: Out = a.remove === true
+      ? await removeEvalFor(deps, caller(), s(a.kind), s(a.name))
+      : await setEvalFor(deps, caller(), s(a.kind), s(a.name), { cases: a.cases, ...(a.repeats !== undefined ? { repeats: a.repeats } : {}) });
     if (!out.ok) return toolError(out.code, out.message);
     return ok(out.data);
   });
