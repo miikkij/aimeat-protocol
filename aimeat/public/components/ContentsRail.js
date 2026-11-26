@@ -32,6 +32,9 @@
  *   html`${rail && railFold([rail])}
  *     <div class="og-grid"><div class="og-main og-main--flow" ref=${setRoot}>…</div>${rail && html`<${Rail} ...${rail} />`}</div>`
  * @version-history
+ *   v1.3.0 — 2026-11-26 — A marker's headline may be a title that is no heading element (a panel's
+ *     .poster-section-title, or a list group's title when there is neither): the Settings overview's
+ *     panels carry their own numbers, and a panel's number no longer lands on an h3 inside it.
  *   v1.2.0 — 2026-11-25 — A listed section's headline carries the rail's number (`data-rail-n`, drawn
  *     by tab-page.css), so "open 05" names a headline on the page as it does on a Settings page.
  *   v1.1.0 — 2026-11-19 — `kit`: the page kit's own sections (.og-sec) with their own numbers and
@@ -102,7 +105,14 @@ export function readSections(root, opts = {}) {
     const target = targetOf(el);
     // Nothing drawn, or drawn with no box (a block that answered null, a panel still empty).
     if (!target || !el.firstElementChild || target.getClientRects().length === 0) continue;
-    const heading = opts.kit ? el.querySelector(':scope > .og-sec-h h2, :scope > h3') : el.querySelector('h2, h3');
+    // A marker's headline is its first h2 or h3, or the first headline a part draws as one without
+    // being a heading element (a panel's title, .poster-section-title), or, with neither, a list
+    // group's title. With only "h2, h3" a panel's own title was passed over and the number went to
+    // an h3 further down inside it (the Settings overview: the number of "Suggested next steps" stood
+    // on "Open items", and three panels had none).
+    const heading = opts.kit
+      ? el.querySelector(':scope > .og-sec-h h2, :scope > h3')
+      : (el.querySelector('h2, h3, .poster-section-title') || el.querySelector('.list-group-title'));
     const label = el.getAttribute('data-rail-label') || (heading ? headingWords(heading, opts.kit ? 'small, .og-sec-doors' : '') : '');
     if (!label) continue;
     const marks = opts.kit ? kitMarks(heading) : { num: '', count: '' };

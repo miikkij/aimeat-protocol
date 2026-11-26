@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-26 — "Waiting for you" has no emoji before its title: the contents rail's number stands
+ *     there now (components/ContentsRail.js), and an emoji is no part of the interface.
  *   2026-11-20 — The business group lists Reports (report subscriptions) after Usage.
  *   2026-11-19 — The account group lists Knowing the customer (kyc) after the data wallet.
  *   v1.34.0 -- 2026-11-14 -- "Vault" under Account, after Access: the secrets a person shares and receives (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
@@ -144,7 +146,7 @@ export function WaitingForYou() {
   };
   return html`
     <${Note} kind="aside" size="small">
-      <${Group} title=${`📨 ${t('profile.landing.waitingTitle') || 'Waiting for you'}`}>
+      <${Group} title=${t('profile.landing.waitingTitle') || 'Waiting for you'}>
         <${List} cols="name-state" keepCols>
           ${items.map((it, i) => html`
             <${Row} key=${i}>
