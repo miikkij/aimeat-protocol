@@ -12,6 +12,10 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-26 — The 4.0.3 entries re-read against 4.3.1 (RECHECKED): fourteen held, and five were
+ *     corrected: namespace-rule, handle-both-auth-paths, no-max-tokens, keyboard-viewport and
+ *     auth-pill-overflow. grid-track-blowout gives the per-element measure instead of pointing at the
+ *     retired Classic mobile section. Three about browser or tool behaviour stay on CHECKED.
  *   2026-11-26 — edit-published-app names aimeat_app_manage rollback for undoing a broken release.
  *   2026-11-26 — +key-in-page-source (the publish refuses a key in the page) and
  *     +html-built-from-values (warns on values written into HTML with nothing escaped), both read by
@@ -132,6 +136,13 @@ const E = (e: AppdevPitfallEntry): AppdevPitfallEntry => e;
 
 /** The review that last read every entry against the code. */
 const CHECKED = { verifiedAt: '2026-10-17', verifiedVersion: '4.0.3' } as const;
+/**
+ * The re-check of 2026-11-26: each entry stamped with it was read against the code of 4.3.1, and the
+ * five whose words had gone out of date (the retired Classic build spec, the pill's stored session,
+ * a cut AI answer, the genres' viewport, the shell's bar) were corrected. The entries still on CHECKED
+ * describe browser or tool behaviour the node has no code for, so the re-check could not decide them.
+ */
+const RECHECKED = { verifiedAt: '2026-11-26', verifiedVersion: '4.3.1' } as const;
 
 export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- app basics -------------------------------------------------------
@@ -297,12 +308,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'namespace-rule',
     title: 'Data your agents wrote is not in the owner\'s namespace',
     symptom: 'The app shows the signed-in owner an empty screen while the data is plainly there: an agent wrote it minutes ago, the owner can see it in their own memory list, and the app\'s list() returns nothing at all. Or a delete answers ok and the record is still there, or an agent\'s update never shows because the owner holds an older copy of the same key.',
-    fix: 'An agent writes under ITS own identity (`name#owner@node`), and an app token is role `app`, which gets no automatic owner-scope broadening, so an unscoped read legitimately finds nothing. Name the namespace on every operation: `AIMEAT.data.list({ prefix, ownerScope: true })` covers the owner GHII and every agent of theirs (each item has owner_gaii), `{ agent: "name#owner@node" }` picks one, `AIMEAT.data.getPublic(gaii, key)` reads a specific public record, and `AIMEAT.data.delete(key, { ownerScope: true })` removes a key an agent wrote (check what it answers rather than catching and ignoring it, or a refused delete looks done). When the owner and an agent both hold one key, owner-scope reads return the owner\'s copy. The build spec states this under "Namespace rule".',
+    fix: 'An agent writes under ITS own identity (`name#owner@node`), and an app token is role `app`, which gets no automatic owner-scope broadening, so an unscoped read legitimately finds nothing. Name the namespace on every operation: `AIMEAT.data.list({ prefix, ownerScope: true })` covers the owner GHII and every agent of theirs (each item has owner_gaii), `{ agent: "name#owner@node" }` picks one, `AIMEAT.data.getPublic(gaii, key)` reads a specific public record, and `AIMEAT.data.delete(key, { ownerScope: true })` removes a key an agent wrote (check what it answers rather than catching and ignoring it, or a refused delete looks done). When the owner and an agent both hold one key, owner-scope reads return the owner\'s copy. The build specification states this in its platform section `agent-data` (`aimeat_handbook_get { tier: "build-app-atelier/agent-data" }`).',
     appliesTo: ['app', 'auth'],
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'cdn-libs-blocked',
@@ -364,7 +375,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-11-21',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- auth from an app origin -----------------------------------------
@@ -377,18 +388,18 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'handle-both-auth-paths',
     title: 'Show the app from onSession: onLogin alone misses a returning user',
     symptom: 'The app works on first sign-in but shows logged-out UI after a reload: onLogin fires on a fresh interactive sign-in, not on a session restored in the background.',
-    fix: 'Active again since 2026-11-21: it was marked outdated on 2026-10-17 because the build specification\'s session section and the aimeat-auth library guide state onSession, and builders still met it. Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
+    fix: 'Active again since 2026-11-21: it was marked outdated on 2026-10-17 because the build specification\'s session section and the aimeat-auth library guide state onSession, and builders still met it. Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill checks a stored session with the node on load and removes it when the node answers with no session, so a stale one does not stay drawn over an app that cannot call anything. When the node cannot be reached, the stored session stays and the app hears \'offline\' with the last identity. On an Atelier page the shell mounts the pill: put the ready code in `AIMEAT.atelier.app({ onReady, onSession })`.',
     appliesTo: ['auth', 'app'],
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-11-21',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'apps-localhost-cross-site',
@@ -399,7 +410,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'info',
     source: 'curated',
     updatedAt: '2026-07-19',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- extensions & cortex ---------------------------------------------
@@ -412,7 +423,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-11-21',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'callext-path',
@@ -423,7 +434,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-10-18',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'session-fetch-parsed',
@@ -434,7 +445,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-10-17',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'ext-manifest-strict',
@@ -445,7 +456,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'cortex-register-reactivate',
@@ -456,20 +467,20 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'info',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- AI calls from apps ----------------------------------------------
   E({
     id: 'no-max-tokens',
     title: 'Do not cap an AI call\'s output, and read `truncated` on every answer',
-    symptom: 'An answer that stops mid-sentence and reads like a model failure. A cap cuts it in silence, and so can a limit the owner saved in their AI settings.',
+    symptom: 'An answer that stops mid-sentence and reads like a model failure. A cap cuts it, and so can a limit the owner saved in their AI settings. The answer then has `truncated: true` (for the call\'s own max_tokens also `capped_at` and a `warning`, which the console shows), and a page that does not read it shows half an answer as the whole one.',
     fix: 'Do not pass max_tokens to AIMEAT.ai.complete(). Every answer has `finish_reason` and `truncated` (true when the provider cut it at a length limit): when truncated is true, show the answer as unfinished or ask again, never as the whole answer. A generation that needs minutes belongs in AIMEAT.ai.job: a text job runs with no cap, a limit the owner saved included, and the record from AIMEAT.ai.job.get() or waitFor() has the same `finish_reason` and `truncated`.',
     appliesTo: ['ai'],
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-10-19',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'long-ai-calls-timeout',
@@ -480,7 +491,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- publishing over MCP ---------------------------------------------
@@ -531,25 +542,25 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-10-17',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'keyboard-viewport',
     title: 'Bottom-pinned inputs hide behind the on-screen keyboard',
     symptom: 'position:fixed;bottom:0 anchors to the LAYOUT viewport; the keyboard shrinks only the visual viewport, so the composer ends up under the keyboard, or a dead gap appears when the height is double-counted.',
-    fix: 'The shells already have interactive-widget=resizes-content in the viewport meta; where a browser does not honour it, size the pane from visualViewport (body top to visualViewport bottom). With resizes-content, dvh ALREADY excludes the keyboard, so never also subtract the keyboard height. Keep a message list pinned to the bottom instead of scrollIntoView({block:"center"}) on the composer. Verify by focusing the input and shrinking the viewport height (780 to 440): the composer bottom should meet the viewport bottom.',
+    fix: 'The Atelier shell (`shell-atelier`) has interactive-widget=resizes-content in its viewport meta; the Design Book genres do not, so a page forked from a genre adds it. Where a browser does not honour it, size the pane from visualViewport (body top to visualViewport bottom). With resizes-content, dvh ALREADY excludes the keyboard, so never also subtract the keyboard height. Keep a message list pinned to the bottom instead of scrollIntoView({block:"center"}) on the composer. Verify by focusing the input and shrinking the viewport height (780 to 440): the composer bottom should meet the viewport bottom.',
     appliesTo: ['mobile'],
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'grid-track-blowout',
     enforcedBy: 'app-mobile-lint:gridTrackFindings',
     title: 'One wide child inflates a 1fr grid track and the whole page overflows',
     symptom: 'ONE view overflows horizontally on mobile while sibling views are fine — a non-wrapping table/<pre>/long code inside an overflow-x:auto wrapper still pushes the page wide, because the grid track grew to its min-content.',
-    fix: 'Use grid-template-columns: ... minmax(0,1fr) and/or min-width:0 on the grid/flex children so the track can shrink and the inner overflow-x:auto actually scrolls. Verify per element at 390px with the measure the build specification gives in its mobile section: under the shells\' body{overflow-x:clip} a scrollWidth check passes while the track is still too wide.',
+    fix: 'Use grid-template-columns: ... minmax(0,1fr) and/or min-width:0 on the grid/flex children so the track can shrink and the inner overflow-x:auto actually scrolls. Verify per element at 390px: `[...document.querySelectorAll("body *")].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5)` must be empty; under the shells\' body{overflow-x:clip} a scrollWidth check passes while the track is still too wide.',
     appliesTo: ['mobile'],
     severity: 'warn',
     source: 'curated',
@@ -560,12 +571,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'auth-pill-overflow',
     title: 'The login pill next to other header widgets overflows a portrait phone',
     symptom: 'On a ~390px phone the page zooms out and every font renders tiny: an un-shrinkable header row (the pill beside a brand and extra toggles) forces shrink-to-fit.',
-    fix: 'mountLoginButton renders compact on every origin by default: signed in, an account button with a popover; signed out, Sign In and one settings trigger. So: use the shell (or copy its head), put no other fixed-width widgets in the header row (the pill already has language and theme), let flex children shrink (min-width:0), and keep body{overflow-x:clip} (clip, NOT hidden, which breaks position:sticky). Verify per element at 390px and phone landscape, with the measure the build specification gives in its mobile section.',
+    fix: 'mountLoginButton renders compact on every origin by default: signed in, an account button with a popover; signed out, Sign In and one settings trigger. Use the Atelier shell, which mounts the pill in its bar and clips horizontal overflow on its frame. Put no other fixed-width widgets in the bar (the pill already has language and theme) and let flex children shrink (min-width:0). On a page outside the shell, keep body{overflow-x:clip} (clip, NOT hidden, which breaks position:sticky). Verify at 390px and phone landscape per element: `[...document.querySelectorAll("body *")].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5)` must be empty.',
     appliesTo: ['mobile', 'auth'],
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'fixed-fab-drift',
@@ -587,7 +598,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'info',
     source: 'curated',
     updatedAt: '2026-07-19',
-    ...CHECKED,
+    ...RECHECKED,
   }),
   E({
     id: 'heavy-widgets-on-a-phone',
@@ -598,7 +609,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'info',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- realtime -----------------------------------------------------------
@@ -611,7 +622,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- sending and scheduling -------------------------------------------
@@ -624,7 +635,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-10-19',
-    ...CHECKED,
+    ...RECHECKED,
   }),
 
   // ---- the words 4.0 checks ------------------------------------------------
