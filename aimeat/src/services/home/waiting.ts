@@ -31,6 +31,9 @@
  *   WAITING_SOURCES · homeWaitingFor(deps, caller, opts) · WAITING_LIMIT_DEFAULT · WAITING_LIMIT_MAX
  * @usage const answer = await homeWaitingFor({ storage, config }, callerOf(req, config.nodeId, storage), { limit: 20 });
  * @version-history
+ *   v1.1.1 — 2026-11-26 — An approval row names no `act_with`: the tool it named reads the approval
+ *     inbox and cannot resolve anything, and the answer's note tells an AI to act with the tool a row
+ *     names.
  *   v1.1.0 — 2026-11-26 — Two kinds more, so the Settings overview draws this list and keeps none of
  *     its own: `approval` (the pending approvals of an organism the person can decide, per workspace,
  *     outside their teams) and `join_request` (a request to join an organism the person owns or
@@ -300,7 +303,9 @@ const organismHref = (org: string, ws?: string) =>
 /**
  * The read of GET /v1/organisms/waiting (organism:read), kept to what this person can decide: the
  * pending approvals of an organism, one row per workspace with how many. A team's approvals are in
- * its `team` row. No `decide`: the deciding route takes the decision in its body.
+ * its `team` row. No `decide`: the deciding route takes the decision in its body. No `act_with`
+ * either: a person resolves an approval, never an agent (aimeat_organism_approvals only reads the
+ * inbox), so the row is the person's own decision on the page at its `href`.
  */
 const approvals: WaitingSource = {
     kind: 'approval',
@@ -314,7 +319,6 @@ const approvals: WaitingSource = {
             count: r.n,
             ...(r.at ? { at: r.at } : {}),
             href: organismHref(r.orgId, r.wsId),
-            act_with: 'aimeat_organism_approvals',
         }));
     },
 };

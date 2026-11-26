@@ -212,7 +212,7 @@ const waiting = (tok: string, q = '') => json(`/v1/home/waiting${q}`, { headers:
     let joinRequestId = '';
     let approvalId = '';
 
-    await test('an approval alice can decide and a request to join her organism are in her list, each with its page and its tool', async () => {
+    await test('an approval alice can decide and a request to join her organism are in her list, each with its page, and the request with its tool', async () => {
         const before = (await waiting(alice.token)).body.data;
         const o = await json('/v1/organisms', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ name: 'Front desk', description: 'Where visitors ask', type: 'project', join_policy: 'approval_required', visibility: 'public' }) });
         assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body?.error)}`);
@@ -230,7 +230,8 @@ const waiting = (tok: string, q = '') => json(`/v1/home/waiting${q}`, { headers:
         joinRequestId = jr.id;
         const ap = d.items.find((i: any) => i.kind === 'approval');
         assert(ap && ap.group === 'decide' && ap.count === 1 && ap.from === 'Front desk' && ap.subject === 'Front desk', `approval ${JSON.stringify(ap)}`);
-        assert(ap.href === `/v1/profile?tab=organisms&org=${encodeURIComponent(deskId)}` && ap.act_with === 'aimeat_organism_approvals' && !ap.decide, `approval page ${JSON.stringify(ap)}`);
+        // A person resolves an approval, never an agent: the row names no tool, only its page.
+        assert(ap.href === `/v1/profile?tab=organisms&org=${encodeURIComponent(deskId)}` && ap.act_with === undefined && !ap.decide, `approval page ${JSON.stringify(ap)}`);
         assert(d.by_kind.join_request === 1 && d.by_kind.approval === 1, `by_kind ${JSON.stringify(d.by_kind)}`);
         assert(d.total === before.total + 2, `total ${before.total} -> ${d.total}`);
     });
