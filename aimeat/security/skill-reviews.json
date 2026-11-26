@@ -193,12 +193,12 @@
       "digest": "sha256:b9f96b5526e764d31255d42e"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:ab255c8655bcf7bb5771fd43"
+      "digest": "sha256:904257d01d0ae54774c07f11"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-22",
@@ -542,7 +542,7 @@
       "digest": "sha256:b5d81d0a5efaeb4ea4bbf922"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:7df8f2b33b0711af00f56372",
+      "digest": "sha256:c4cdc65aff27894dc9fad1bb",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -638,12 +638,12 @@
       "note": "The locale loop it teaches, and the commit-msg hook whose limits it states (the limits themselves are in check-commit-msg.ts, which its eval grader within-hook-limits also mirrors)."
     },
     "project:security-audit": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:8fd6b7c097dfb43b3952bdb3",
+      "digest": "sha256:2935a684b7bbb70d3f78d36c",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -655,12 +655,12 @@
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:8fd6b7c097dfb43b3952bdb3",
+      "digest": "sha256:2935a684b7bbb70d3f78d36c",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -721,7 +721,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "905fba7ed8d0e386",
-      "aimeat/src/services/app/publish-next-steps.ts": "80c6611c43f06ced"
+      "aimeat/src/services/app/publish-next-steps.ts": "2447698dfb706873"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
@@ -844,7 +844,7 @@
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
       "aimeat/src/services/builder/atelier-prompt.ts": "29fc491ce623c41d",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
-      "aimeat/src/services/app/publish.ts": "749d1f2ee934b41e",
+      "aimeat/src/services/app/publish.ts": "d60e8864bf0adbe6",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
       "aimeat/src/services/app/agent-deploy.ts": "cf9f7771be84c7c5",
@@ -1059,14 +1059,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "1c47a386d7766c90"
+      "aimeat/test/run-e2e-ci.ts": "2de529ddc725cc53"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "ff5667f45f677f32"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "1c47a386d7766c90"
+      "aimeat/test/run-e2e-ci.ts": "2de529ddc725cc53"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
