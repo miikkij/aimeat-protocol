@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-26 — criteria_set and the `criteria` field: the acceptance criteria inside the design spec
+ *     (services/app/acceptance-criteria.ts).
  *   2026-11-26 — rollback: an earlier version back as the newest, with the reason in the audit log
  *     (services/app/rollback-ops.ts); `version` and `note` describe it.
  *   2026-11-20 — `filename` is the app's name without `.html`; the file name works too (services/app/app-ref.ts).
@@ -193,7 +195,19 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision. For face_set: the whole agent face as one markdown document, at most 256 KB; it replaces the face there.' },
     words: { type: 'array', description: 'For scope_allowance_remove: the scopes to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
-    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
+    criteria: {
+        type: 'array',
+        description: 'For criteria_set: the WHOLE list of acceptance criteria, at most 50; it replaces what is there. Each line: { id (short, lowercase, e.g. "empty-state"), text (one behaviour, one sentence), check ("lint", "scenario", "screenshot", "eval" or "person"), status ("open", "evidenced" or "waived"), evidence (with evidenced: what proved it), waived_reason (with waived: why the app ships without it) }.',
+        zod: z.array(z.object({
+            id: z.string().max(40),
+            text: z.string().max(400),
+            check: z.enum(['lint', 'scenario', 'screenshot', 'eval', 'person']),
+            status: z.enum(['open', 'evidenced', 'waived']).optional(),
+            evidence: z.string().max(400).optional(),
+            waived_reason: z.string().max(400).optional(),
+        })).max(50),
+    },
+    expected_revision: { type: 'number', description: 'For spec_set and criteria_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
     // the app's structure and plan (routes/apps/structure.ts)
     purpose: { type: 'string', description: 'For structure_set: who the app is for and the one job it does for them, in the person\'s words, at most 800 characters. An empty string clears it.', zod: z.string().max(800) },
     data: { type: 'object', description: 'For structure_set: the data in short, before the data map can be written: { "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }. Write it once the person has confirmed the data map questions.', zod: z.object({ summary: z.string().max(800), personalData: z.enum(['yes', 'no', 'unstated']).optional() }) },
@@ -286,6 +300,8 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data is stored, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
     spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
+    criteria_set: { fields: F(['filename', 'criteria'], ['owner', 'expected_revision']), scope: 'app:write',
+        summary: 'write the app\'s acceptance criteria, the whole list (read it first with spec, where it is design_spec.criteria): what "correct" means for the app, one line each, with how it is proven (check: lint, scenario, screenshot, eval or person) and where it stands (status: open, evidenced with evidence that says what proved it, or waived with waived_reason). Write the lines with the person before you build; the empty, error and loading states, the phone width and both themes are where builds fall short. At the finest level an update is refused while a line is open. Everybody who may build the app writes it; only the owner waives a line. The spec must exist first' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
     // The permissions the app kept when the node moved to 4.0 (services/app/scope-allowance.ts).

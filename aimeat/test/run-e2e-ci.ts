@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-26 -- Add e2e-app-criteria.ts: the acceptance criteria inside the design spec, held at publish.
  *   2026-11-26 -- Add e2e-app-rollback.ts: POST .../rollback and the change-failure count.
  *   2026-11-26 -- Add e2e-app-publish-generated-code.ts: a key in the page refuses the publish, and
  *     values written into HTML unescaped warn.
@@ -692,6 +693,8 @@ const ALL_SUITES = [
     'test/e2e-app-publish-generated-code.ts',
     // An earlier version back in one call, and the change-failure count (2026-11-26).
     'test/e2e-app-rollback.ts',
+    // The acceptance criteria inside the design spec, held at publish on the finest level (2026-11-26).
+    'test/e2e-app-criteria.ts',
     // An aimeat-scopes word no app grant can hold refuses the publish (2026-11-21).
     'test/e2e-app-publish-scope-words.ts',
     'test/e2e-app-ai-path.ts',

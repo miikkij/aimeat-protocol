@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.9.0 — 2026-11-26 — `criteria` and `criteria_counts`: how the acceptance criteria stand, every
+ *     time, and how to write the first ones (acceptance-criteria.ts).
  *   v1.8.0 — 2026-11-25 — `screens` and `acceptance` read the one size matrix from publish-finish.ts
  *     (`screens` named three of its four sizes), and `agent_face` and `bound_skill` say "Not owed" on a
  *     quick prototype and a presentation, which the publish refusal (owed-gate.ts) asks for neither.
@@ -91,6 +93,7 @@ function toolsCountOf(value: unknown): number {
 import { legalReadiness } from '../app-build/legal-readiness.js';
 import { balancingTestStep } from '../compliance/lia-write.js';
 import { registerStep } from '../compliance/register-step.js';
+import { criteriaCounts, type AppCriterion } from './acceptance-criteria.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -108,6 +111,8 @@ export interface DocumentsBesideApp {
   dataMapRowsWithoutWhy: number;
   designSpecVersion: number | undefined;
   newVersion: number;
+  /** The acceptance criteria inside the spec, when there are any (acceptance-criteria.ts). */
+  criteria?: readonly AppCriterion[];
 }
 
 /** What the answer says about the data map and the design spec, present or not, every time. */
@@ -121,11 +126,20 @@ export function documentSteps(ownerName: string, filename: string, d: DocumentsB
   const designSpec = d.designSpecVersion === undefined
     ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data is stored, what was decided and why, what is open, and what went wrong; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
     : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
+  const counts = criteriaCounts(d.criteria);
+  const open = (d.criteria ?? []).filter(c => c.status === 'open').map(c => c.id);
+  const criteria = counts.total === 0
+    ? `No acceptance criteria yet. Say what "correct" means for this app, one line each, with aimeat_app_manage { action: "criteria_set", owner: "${ownerName}", filename: "${filename}", criteria: [{ id, text, check, status }] }: the empty, error and loading states, the phone width and both themes are where a build most often falls short. At the finest level an update is refused while a line is open.`
+    : open.length
+      ? `${open.length} of ${counts.total} acceptance criteria are open (${open.join(', ')}). Evidence each with what proved it, or ask the owner to waive it, with { action: "criteria_set" }; at the finest level the next update is refused while one is open.`
+      : `All ${counts.total} acceptance criteria are evidenced or waived. When this change altered a behaviour a line describes, set that line open again and evidence it anew.`;
   return {
     data_map_present: !d.dataMapMissing,
     design_spec_present: d.designSpecVersion !== undefined,
     data_map: dataMap,
     design_spec: designSpec,
+    criteria_counts: counts,
+    criteria,
   };
 }
 

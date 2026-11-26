@@ -45118,6 +45118,59 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { description: 'APP_ARTIFACT_BROKEN: the version''s bytes would not publish today; details.findings names why.' }
+  /v1/apps/{owner}/{filename}/design-spec/criteria:
+    put:
+      operationId: appDesignSpecCriteriaWrite
+      summary: Write the app's acceptance criteria, the whole list
+      description: >
+        Body `{ criteria, expected_revision? }`. Each line is `{ id, text, check, status?, evidence?,
+        waived_reason? }`: `check` is how it is proven (lint, scenario, screenshot, eval, person),
+        `status` open (the default), evidenced (with `evidence`, what proved it) or waived (with
+        `waived_reason`). At most 50 lines; the list replaces what is there and lives inside the design
+        spec, which must exist first (409 `NO_DESIGN_SPEC`). The node stamps who evidenced or waived a
+        line, when, and at which app version. A builder of another account may not newly waive a line
+        (403). At the finest level an update of the app is refused while a line is open (422
+        `APP_OWES_ITEMS`, item `criteria`); every publish answer counts them in `next_steps`. Returns
+        `{ app, app_version, criteria, counts, revision, meaning }`. Needs `app:write` and the owner,
+        one of the owner's agents, or a development right.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [criteria]
+              properties:
+                criteria:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [id, text, check]
+                    properties:
+                      id: { type: string, maxLength: 40 }
+                      text: { type: string, maxLength: 400 }
+                      check: { type: string, enum: [lint, scenario, screenshot, eval, person] }
+                      status: { type: string, enum: [open, evidenced, waived] }
+                      evidence: { type: string, maxLength: 400 }
+                      waived_reason: { type: string, maxLength: 400 }
+                expected_revision: { type: integer, minimum: 0, nullable: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/apps/{owner}/{filename}/design-spec:
     get:
       operationId: appDesignSpecGet

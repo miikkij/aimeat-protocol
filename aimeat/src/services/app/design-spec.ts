@@ -38,6 +38,8 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
+ *   2026-11-26 — The record carries `criteria` (services/app/acceptance-criteria.ts), written alone by
+ *     writeAppCriteria; a write of the prose keeps them.
  *   2026-11-19 — eraseAppDesignSpecsOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
@@ -47,6 +49,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId } from './record-keys.js';
+import type { AppCriterion } from './acceptance-criteria.js';
 
 export const APP_DESIGN_SPEC_SPEC = 'aimeat.appdesignspec/1' as const;
 
@@ -71,6 +74,8 @@ export interface AppDesignSpec {
   /** This document's own counter, from 1. A write may name the revision it expects to replace. */
   revision: number;
   createdAt: string;
+  /** What "correct" means for the app, one line each (services/app/acceptance-criteria.ts). */
+  criteria?: AppCriterion[];
 }
 
 /** What the manifest carries, so a listing never has to load the prose. */
@@ -167,6 +172,8 @@ export async function writeAppDesignSpec(
       version: input.appVersion,
       revision: unchanged ? live.revision : (live?.revision ?? 0) + 1,
       createdAt: live?.createdAt ?? now,
+      // The criteria are written on their own (writeAppCriteria); a write of the prose keeps them.
+      ...(live?.criteria ? { criteria: live.criteria } : {}),
     };
     const record = {
       key: appDesignSpecKey(input.appId), ownerGaii: NS_SPEC, value: spec,
@@ -177,6 +184,31 @@ export async function writeAppDesignSpec(
       ? await storage.setMemoryIfVersion(record, existing.version)
       : await storage.createMemoryIfAbsent(record);
     if (saved) return { spec, replacedRevision: live?.revision ?? null, unchanged };
+  }
+  throw new Error('The design spec changed repeatedly. Retry this write.');
+}
+
+/**
+ * Write the acceptance criteria and nothing else: the prose and its version stay, the revision moves
+ * on. Null when there is no spec yet (the criteria live inside it), or the record that is there when
+ * the caller named a revision it expected to replace and that is not the one stored.
+ */
+export async function writeAppCriteria(
+  storage: Storage,
+  input: { appId: string; criteria: AppCriterion[]; by: string; principal: string; expectedRevision?: number },
+): Promise<{ spec: AppDesignSpec } | { conflict: AppDesignSpec } | null> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(input.appId), input.appId);
+    const current = existing?.value as AppDesignSpec | undefined;
+    if (!existing || !current || current.spec !== APP_DESIGN_SPEC_SPEC) return null;
+    if (typeof input.expectedRevision === 'number' && current.revision !== input.expectedRevision) return { conflict: current };
+    const now = new Date().toISOString();
+    const spec: AppDesignSpec = {
+      ...current, criteria: input.criteria, updatedBy: input.by, updatedByPrincipal: input.principal,
+      updatedAt: now, revision: current.revision + 1,
+    };
+    const saved = await storage.setMemoryIfVersion({ ...existing, value: spec, version: existing.version + 1, updatedAt: now }, existing.version);
+    if (saved) return { spec };
   }
   throw new Error('The design spec changed repeatedly. Retry this write.');
 }

@@ -116,6 +116,8 @@ export type AppAuditAction =
   | 'dev.granted' | 'dev.revoked'
   // The design spec beside the app (services/app/design-spec.ts): each write, and the owner's removal.
   | 'design_spec.set' | 'design_spec.cleared'
+  // The acceptance criteria inside the spec (services/app/acceptance-criteria.ts): each write of the list.
+  | 'design_spec.criteria'
   // The member roster (routes/app-members.ts): each decision about a person, the plan and the sweep.
   | 'member.approved' | 'member.role_changed' | 'member.removed'
   | 'request.declined' | 'visitor.dismissed'

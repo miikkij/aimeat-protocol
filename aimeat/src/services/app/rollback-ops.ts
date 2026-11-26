@@ -28,6 +28,7 @@
  * @structure rollbackAppFor(storage, config, caller, ref, body)
  * @usage const out = await rollbackAppFor(storage, config, req.auth!, { owner, filename }, req.body);
  * @version-history
+ *   v1.0.1 — 2026-11-26 — `owes` names the open acceptance criteria too (acceptance-criteria.ts).
  *   v1.0.0 — 2026-11-26 — Initial (wish-app-rollback-in-one-call-and-a-count-of-failed-changes-per-a).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -38,6 +39,7 @@ import { recordAppAudit } from './audit.js';
 import { resolveAppTarget } from './dev-grant.js';
 import { owedMissing } from './owed-gate.js';
 import { readAppDesignSpec } from './design-spec.js';
+import { openCriteriaIds } from './acceptance-criteria.js';
 import { publishApp } from './publish.js';
 import { done, refuse, type AppOpCaller, type AppOpOutcome } from './op-outcome.js';
 
@@ -105,10 +107,11 @@ export async function rollbackAppFor(
 
   // What the app owes beside its bytes: named, never refused (see the file header).
   const html = /html/i.test(old.mimeType) ? old.data.toString('utf8') : '';
+  const spec = html ? await readAppDesignSpec(storage, `${t.ownerName}/${ref.filename}`) : null;
   const owes = html
     ? await owedMissing(storage, config, {
       ownerName: t.ownerName, ownerGhii: t.ownerGhii, filename: ref.filename, html,
-      hasDesignSpec: !!await readAppDesignSpec(storage, `${t.ownerName}/${ref.filename}`), roadmapLine: 'rollback',
+      hasDesignSpec: !!spec, roadmapLine: 'rollback', openCriteria: openCriteriaIds(spec),
     })
     : [];
 

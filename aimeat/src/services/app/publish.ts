@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-26 — The owed gate reads the design spec's open acceptance criteria, and next_steps counts
+ *     them (acceptance-criteria.ts).
  *   2026-11-26 — Source `rollback` (services/app/rollback-ops.ts) is not held to the owed-documents gate;
  *     every byte check still holds.
  *   2026-11-24 — An update of an app that lacks its design spec, its data map (when it keeps data), its
@@ -148,6 +150,7 @@ import { accountOf } from './members.js';
 import { effectiveDevLevel, mayAct, isSharedApp } from './dev-grant.js';
 import { roadmapGate, addRoadmapEntry, roadmapStamp } from './roadmap.js';
 import { readAppDesignSpec, designSpecStamp, designSpecHint } from './design-spec.js';
+import { openCriteriaIds } from './acceptance-criteria.js';
 import { owedMissing, owedRefusal } from './owed-gate.js';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -282,7 +285,8 @@ export async function publishApp(
   if (!road.ok) return { refusal: { status: 400, code: 'ROADMAP_REQUIRED', message: road.message } };
   // The design spec's stamp as it stands before this version: copied onto the new manifest below,
   // and compared with the new version number for the hint the response carries.
-  const designSpec = designSpecStamp(await readAppDesignSpec(storage, `${ownerName}/${filename}`));
+  const specRecord = await readAppDesignSpec(storage, `${ownerName}/${filename}`);
+  const designSpec = designSpecStamp(specRecord);
 
   const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
   const isUpdate = existingVersion > 0;
@@ -429,6 +433,7 @@ export async function publishApp(
   if (isUpdate && isHtml && input.source !== 'package-install' && input.source !== 'rollback' && config.appOwedOnPublish === 'refuse') {
     const missing = await owedMissing(storage, config, {
       ownerName, ownerGhii, filename, html, hasDesignSpec: !!designSpec, roadmapLine: 'line' in road ? road.line : null,
+      openCriteria: openCriteriaIds(specRecord),
     });
     if (missing.length) return { refusal: owedRefusal(missing, `${ownerName}/${filename}`) };
   }
@@ -769,7 +774,7 @@ export async function publishApp(
     // The data map and the design spec, as this publish found them (HTML apps only: both describe an app).
     isHtml && dataMap ? {
       dataMapMissing: dataMap.missing, dataMapRowsWithoutWhy: dataMap.rowsWithoutWhy,
-      designSpecVersion: designSpec?.version, newVersion,
+      designSpecVersion: designSpec?.version, newVersion, criteria: specRecord?.criteria,
     } : undefined);
 
   const specHint = designSpecHint({ stamp: designSpec, newVersion, shared });

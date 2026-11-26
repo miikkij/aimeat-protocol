@@ -26,6 +26,8 @@
  *   GET /design-spec · PUT /design-spec · DELETE /design-spec
  * @usage registerDesignSpecRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-11-26 — PUT .../design-spec/criteria: the acceptance criteria inside the spec
+ *     (services/app/acceptance-criteria.ts), checked by schema here and per status in the service.
  *   v1.1.0 — 2026-10-05 — The handlers' logic (the build test, the refusals, the manifest stamp, the
  *     audit row) moved to services/app-design-spec-ops.ts, and the appTarget parameter went with it;
  *     aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
@@ -34,9 +36,26 @@
 import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import { z } from 'zod';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
-import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../../services/app/design-spec-ops.js';
+import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, clearDesignSpecFor } from '../../services/app/design-spec-ops.js';
+import { CRITERIA_MAX, CRITERION_CHECKS, CRITERION_STATUSES } from '../../services/app/acceptance-criteria.js';
+import { validateBody } from '../../models/schemas.js';
+import { safeText } from '../../models/input-limits.js';
 import { sendAppOp } from '../app-op-answer.js';
+
+/** The shape and bounds of a criteria write; evidence and reasons per status are the service's. */
+const CriteriaWriteSchema = z.object({
+    criteria: z.array(z.object({
+        id: safeText(40),
+        text: safeText(400),
+        check: z.enum(CRITERION_CHECKS),
+        status: z.enum(CRITERION_STATUSES).optional(),
+        evidence: safeText(400).optional(),
+        waived_reason: safeText(400).optional(),
+    })).max(CRITERIA_MAX),
+    expected_revision: z.number().int().min(0).nullable().optional(),
+});
 
 /** The app this request names: `:owner` (`me` for the caller's own) and `:filename`. */
 const refOf = (req: Request) => ({ owner: String(req.params.owner ?? ''), filename: String(req.params.filename ?? '') });
@@ -52,6 +71,10 @@ export function registerDesignSpecRoutes(router: Router, config: AimeatConfig, s
     // ── PUT .../design-spec — write the whole document ──
     router.put('/v1/apps/:owner/:filename/design-spec', requireAuth(), requireScope('app:write'), async (req, res) =>
         sendAppOp(res, config.nodeId, await writeDesignSpecFor(storage, config, req.auth!, refOf(req), req.body)));
+
+    // ── PUT .../design-spec/criteria — the whole list of acceptance criteria inside the spec ──
+    router.put('/v1/apps/:owner/:filename/design-spec/criteria', requireAuth(), requireScope('app:write'), validateBody(CriteriaWriteSchema, config.nodeId), async (req, res) =>
+        sendAppOp(res, config.nodeId, await writeCriteriaFor(storage, config, req.auth!, refOf(req), req.body)));
 
     // ── DELETE .../design-spec — the owner takes the document away ──
     router.delete('/v1/apps/:owner/:filename/design-spec', requireAuth(), requireScope('app:write'), async (req, res) =>

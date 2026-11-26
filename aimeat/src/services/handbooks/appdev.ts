@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-26 — The app's acceptance criteria: criteria_set, the check kinds and statuses, and the
+ *     refusal at the finest level (services/app/acceptance-criteria.ts).
  *   2026-11-25 — FINISH says which owed items an app owes at its level, the refusal from the second
  *     version, and the size matrix, from app/publish-finish.ts (the texts the specification, the skill
  *     and the publish answer read), and names face_set for the agent face.
@@ -426,6 +428,15 @@ version. The publish answer contains \`design_spec_hint\` when the spec is missi
 has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the app's
 own page in the App Catalog, in its Design spec section, beside the Roadmap and Who else may build
 this sections.
+
+**The app's acceptance criteria.** The spec holds what "correct" means for the app, one line each:
+an \`id\`, one sentence, how it is proven (\`check\`: lint, scenario, screenshot, eval or person) and
+where it stands (\`status\`: open, evidenced with \`evidence\` that says what proved it, or waived with
+\`waived_reason\`). Agree the lines with the person when you propose the app, before any code: the
+empty, error and loading states, the phone width and both themes are where builds fall short. Write
+the whole list with \`aimeat_app_manage\` \`criteria_set\`; the spec must exist first. At the finest
+level an update is refused while a line is open (\`APP_OWES_ITEMS\`, item \`criteria\`); every
+publish answer counts them in \`next_steps\`. Only the owner waives a line.
 
 **The app's structure page.** Every app has a page that shows the person its eight steps (purpose,
 data, layout, look, build, builders, visibility, requirements), what is done and what is open, and

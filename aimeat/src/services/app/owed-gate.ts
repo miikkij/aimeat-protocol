@@ -20,6 +20,8 @@
  * @structure OwedFacts · owedMissing(storage, config, facts) · owedRefusal(missing)
  * @usage const missing = await owedMissing(storage, config, facts); if (missing.length && config.appOwedOnPublish === 'refuse') return { refusal: owedRefusal(missing, ...) };
  * @version-history
+ *   v1.1.0 — 2026-11-26 — `criteria`: at the finest level an open acceptance criterion is owed
+ *     (acceptance-criteria.ts; wish-acceptance-criteria-in-the-design-spec-checked-at-publish).
  *   v1.0.1 — 2026-11-25 — The agent face's `how` names aimeat_app_manage face_set, the MCP call for it.
  *   v1.0.0 — 2026-11-24 — Initial (wish-corp-paketin-apit-saavat-datakartan-design-specin-ja-skillin).
  */
@@ -46,9 +48,11 @@ export interface OwedFacts {
   hasDesignSpec: boolean;
   /** The roadmap line this publish carries (the draft's notice counts), or null. */
   roadmapLine: string | null;
+  /** The ids of the acceptance criteria still open in the design spec (acceptance-criteria.ts). */
+  openCriteria?: readonly string[];
 }
 
-export interface OwedItem { item: 'design_spec' | 'data_map' | 'bound_skill' | 'agent_face' | 'roadmap'; how: string }
+export interface OwedItem { item: 'design_spec' | 'data_map' | 'bound_skill' | 'agent_face' | 'roadmap' | 'criteria'; how: string }
 
 /** What the app still owes. Empty when nothing is missing. */
 export async function owedMissing(storage: Storage, config: AimeatConfig, f: OwedFacts): Promise<OwedItem[]> {
@@ -75,6 +79,12 @@ export async function owedMissing(storage: Storage, config: AimeatConfig, f: Owe
   }
   if (!f.roadmapLine) {
     out.push({ item: 'roadmap', how: 'send `roadmap` on this publish: one sentence on what this version changes (a draft\'s notice counts)' });
+  }
+  // The finest level owes every acceptance criterion its evidence or the owner's waiver; a quick
+  // prototype and an ordinary page only count them in the publish answer. No level reads as fine.
+  const level = declaredLevel(f.html);
+  if ((level === undefined || level === 'fine') && f.openCriteria?.length) {
+    out.push({ item: 'criteria', how: `${f.openCriteria.length} acceptance criteria are open (${f.openCriteria.join(', ')}): read them with aimeat_app_manage { action: "spec", filename: "${f.filename}" }, then write the list back with { action: "criteria_set" } (PUT /v1/apps/${app}/design-spec/criteria), each line evidenced with what proved it, or waived by the owner with the reason` });
   }
   return out;
 }
