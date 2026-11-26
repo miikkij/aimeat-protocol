@@ -45,8 +45,37 @@
     }
   }
 
+  // src/static/sdk-libs/_core/app-ref.js
+  function appRef() {
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const raw = node.textContent || "";
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+      }
+      if (!parsed || !parsed.owner || !parsed.app_id) return null;
+      const ref = { owner: String(parsed.owner), filename: String(parsed.app_id) };
+      if (parsed.tour_invite === false) ref.tourInvite = false;
+      return ref;
+    } catch {
+      return null;
+    }
+  }
+
   // src/static/sdk-libs/agentface/index.js
   var MAX_BYTES = 256 * 1024;
+  function ownerMayWrite(session) {
+    const ref = appRef();
+    if (!ref) return true;
+    const name = session && typeof session.owner === "string" ? session.owner : "";
+    const full = session && typeof session.ghii === "string" ? session.ghii : "";
+    if (!name && !full) return false;
+    return ref.owner.indexOf("@") >= 0 ? full === ref.owner || name === ref.owner : name === ref.owner;
+  }
   function getSession() {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
@@ -54,7 +83,7 @@
     }
     const s = auth.getSession();
     if (!s) {
-      throw new Error("Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER; another user's publish is written to their own namespace and is never served.");
+      throw new Error("Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER, and publish() writes nothing for any other account.");
     }
     return s;
   }
@@ -107,7 +136,8 @@
   function quietRun(filename, input) {
     const st = quietState(filename);
     const run = st.chain.then(async function() {
-      if (!sessionOrNull()) return false;
+      const session = sessionOrNull();
+      if (!session || !ownerMayWrite(session)) return false;
       let markdown;
       try {
         const value = typeof input === "function" ? input() : input;
@@ -153,7 +183,12 @@
      * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
      * opts.app names the app filename explicitly (e.g. 'my-app.html') and overrides inference —
      * pass it on per-app subdomain origins, where the filename is not derivable from the URL.
-     * Writes the public record apps.{filename}.agentface via the authenticated memory API.
+     * Writes the public record apps.{filename}.agentface via the authenticated memory API, and
+     * only for the app's owner (ownerMayWrite above). For any other signed-in account it makes no
+     * request and resolves { key, app, written: false, reason: 'not-owner' }: it resolves and does
+     * not reject, because apps call it at sign-in without awaiting it, and a rejection would put an
+     * unhandled error into every visitor's console.
+     * @returns {Promise<{ key: string, app: string, written: boolean, version?: number, visibility?: 'public', reason?: 'not-owner' }>}
      */
     async publish(input, opts) {
       opts = opts || {};
@@ -168,6 +203,7 @@
       }
       const session = getSession();
       const key = agentface.key(filename);
+      if (!ownerMayWrite(session)) return { key, app: filename, written: false, reason: "not-owner" };
       const res = await session.fetch("/v1/memory", {
         method: "POST",
         body: JSON.stringify({ key, value: markdown, visibility: "public" })
@@ -175,22 +211,24 @@
       if (!res.ok) {
         throw new Error(res.error && res.error.message || "Failed to publish the agent face");
       }
-      return { key, app: filename, version: res.data && res.data.version, visibility: "public" };
+      return { key, app: filename, version: res.data && res.data.version, visibility: "public", written: true };
     },
     /**
      * publish() for an app that updates its face as it runs and must never break because of it.
      * `input` is what publish() takes (markdown or { title, sections }) or a function that returns
      * it, called when the write happens, so a debounced burst composes the latest state once.
      * Resolves true when the face was written; false when nothing was written: signed out or no
-     * aimeat-auth on the page, the same markdown as the last write for this app, a burst member
-     * that a later call replaced, or a failure (then one console.warn line). Never rejects.
+     * aimeat-auth on the page, a signed-in account that is not the app's owner, the same markdown
+     * as the last write for this app, a burst member that a later call replaced, or a failure
+     * (then one console.warn line). Never rejects.
      * @param {string|object|(() => string|object)} input
      * @param {{ app?: string, debounceMs?: number }} [opts]
      * @returns {Promise<boolean>}
      */
     publishQuietly(input, opts) {
       const o = opts || {};
-      if (!sessionOrNull()) return Promise.resolve(false);
+      const session = sessionOrNull();
+      if (!session || !ownerMayWrite(session)) return Promise.resolve(false);
       const filename = typeof o.app === "string" && o.app.trim() ? o.app.trim() : inferFilename();
       if (!filename) {
         quietWarn(null, new Error('no app filename on this origin; pass { app: "your-file.html" }'));

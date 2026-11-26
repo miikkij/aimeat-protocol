@@ -17,6 +17,14 @@
  *   AIMEATAgentFace.publishQuietly(() => ({ title, sections }), { app: 'my-app.html', debounceMs: 800 });
  *   await AIMEAT.agentface.copyText(promptText);  // the shared "Copy prompt" implementation
  * @version-history
+ *   v1.3.0 — 2026-11-26 — publish() and publishQuietly() write only for the app's owner, the
+ *     account the node names in the served page (the aimeat-app-ref block, _core/app-ref.js).
+ *     Until now they wrote for whoever was signed in, so an app that publishes at sign-in left a
+ *     public record in every visitor's own namespace: nothing reads it, and it showed that the
+ *     account had opened the app, with whatever the app had put into its face. For any other
+ *     account publish() resolves { written: false, reason: 'not-owner' } with no request and
+ *     publishQuietly() resolves false. The owner's write answers written: true. A page with no
+ *     aimeat-app-ref block writes as before.
  *   v1.2.1 — 2026-11-21 — A section's `title` is read as its heading (appdev pitfall
  *     app/agentface-sections-need-heading); `heading` wins when both are given.
  *   v1.2.0 — 2026-10-01 — publishQuietly(input, { app, debounceMs }): the guard ten apps wrote by
@@ -32,8 +40,30 @@
  */
 import { attach } from '../_core/namespace.js';
 import { copyText } from '../_core/clipboard.js';
+import { appRef } from '../_core/app-ref.js';
 
 const MAX_BYTES = 256 * 1024; // the convention cap — the node treats an oversize face as absent
+
+/**
+ * Whether this session may write the app's face. The node serves the face from the app OWNER's
+ * record alone, so a write as anybody else landed in that person's own namespace as a public
+ * record that nothing reads: it showed that the account had opened the app, and whatever the app
+ * had put into its face. The owner is the account the node names in the served page (the
+ * aimeat-app-ref block). The name is compared whole: a visitor from another node carries
+ * name@node as its account name and is not the local account of that name.
+ * A page with no such block (a file opened from disk, the library test page) names no owner to
+ * compare with, and the write goes ahead as it did before v1.3.0.
+ * @param {{ owner?: any, ghii?: any }|null} session
+ * @returns {boolean}
+ */
+function ownerMayWrite(session) {
+  const ref = appRef();
+  if (!ref) return true;
+  const name = session && typeof session.owner === 'string' ? session.owner : '';
+  const full = session && typeof session.ghii === 'string' ? session.ghii : '';
+  if (!name && !full) return false;
+  return ref.owner.indexOf('@') >= 0 ? (full === ref.owner || name === ref.owner) : name === ref.owner;
+}
 
 function getSession() {
   const auth = window.AIMEAT && window.AIMEAT.auth;
@@ -42,7 +72,7 @@ function getSession() {
   }
   const s = auth.getSession();
   if (!s) {
-    throw new Error('Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER; another user\'s publish is written to their own namespace and is never served.');
+    throw new Error('Not signed in. AIMEATAgentFace.publish writes the face as the signed-in user — call AIMEAT.auth.login() first. Note: the node serves only the record written by the APP OWNER, and publish() writes nothing for any other account.');
   }
   return s;
 }
@@ -119,7 +149,10 @@ function quietWarn(filename, err) {
 function quietRun(filename, input) {
   const st = quietState(filename);
   const run = st.chain.then(async function () {
-    if (!sessionOrNull()) return false;
+    const session = sessionOrNull();
+    // Before the input is read: a visitor's refusal leaves no "last written" behind, so the owner
+    // who signs in on the same page still gets the face written.
+    if (!session || !ownerMayWrite(session)) return false;
     let markdown;
     try {
       const value = typeof input === 'function' ? input() : input;
@@ -162,7 +195,12 @@ const agentface = {
    * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
    * opts.app names the app filename explicitly (e.g. 'my-app.html') and overrides inference —
    * pass it on per-app subdomain origins, where the filename is not derivable from the URL.
-   * Writes the public record apps.{filename}.agentface via the authenticated memory API.
+   * Writes the public record apps.{filename}.agentface via the authenticated memory API, and
+   * only for the app's owner (ownerMayWrite above). For any other signed-in account it makes no
+   * request and resolves { key, app, written: false, reason: 'not-owner' }: it resolves and does
+   * not reject, because apps call it at sign-in without awaiting it, and a rejection would put an
+   * unhandled error into every visitor's console.
+   * @returns {Promise<{ key: string, app: string, written: boolean, version?: number, visibility?: 'public', reason?: 'not-owner' }>}
    */
   async publish(input, opts) {
     opts = opts || {};
@@ -177,6 +215,7 @@ const agentface = {
     }
     const session = getSession();
     const key = agentface.key(filename);
+    if (!ownerMayWrite(session)) return { key: key, app: filename, written: false, reason: 'not-owner' };
     const res = await session.fetch('/v1/memory', {
       method: 'POST',
       body: JSON.stringify({ key: key, value: markdown, visibility: 'public' }),
@@ -184,7 +223,7 @@ const agentface = {
     if (!res.ok) {
       throw new Error((res.error && res.error.message) || 'Failed to publish the agent face');
     }
-    return { key: key, app: filename, version: res.data && res.data.version, visibility: 'public' };
+    return { key: key, app: filename, version: res.data && res.data.version, visibility: 'public', written: true };
   },
 
   /**
@@ -192,15 +231,17 @@ const agentface = {
    * `input` is what publish() takes (markdown or { title, sections }) or a function that returns
    * it, called when the write happens, so a debounced burst composes the latest state once.
    * Resolves true when the face was written; false when nothing was written: signed out or no
-   * aimeat-auth on the page, the same markdown as the last write for this app, a burst member
-   * that a later call replaced, or a failure (then one console.warn line). Never rejects.
+   * aimeat-auth on the page, a signed-in account that is not the app's owner, the same markdown
+   * as the last write for this app, a burst member that a later call replaced, or a failure
+   * (then one console.warn line). Never rejects.
    * @param {string|object|(() => string|object)} input
    * @param {{ app?: string, debounceMs?: number }} [opts]
    * @returns {Promise<boolean>}
    */
   publishQuietly(input, opts) {
     const o = opts || {};
-    if (!sessionOrNull()) return Promise.resolve(false);
+    const session = sessionOrNull();
+    if (!session || !ownerMayWrite(session)) return Promise.resolve(false);
     const filename = typeof o.app === 'string' && o.app.trim() ? o.app.trim() : inferFilename();
     if (!filename) {
       quietWarn(null, new Error('no app filename on this origin; pass { app: "your-file.html" }'));
