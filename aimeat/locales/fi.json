@@ -2977,6 +2977,7 @@
           "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa",
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
+          "stray_agent_faces": "Kopiot sovellusten kuvauksista kävijöiden muistissa",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
           "erased_lock_holders": "Lukitukset, jotka voivat olla poistetun tilin",
           "workspace_write_role": "Rajatut tilat, joihin jäsenet ovat kirjoittaneet",
@@ -3019,6 +3020,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
+            "stray_agent_faces": "Sovellus voi julkaista itsestään julkisen kuvauksen tekoälyagenteille. Palvelin näyttää kuvauksen vain sovelluksen omistajan muistista. Ennen 26.11.2026 sovellus, joka julkaisi kuvauksen ihmisen kirjautuessa, tallensi siitä myös julkisen kopion jokaisen kirjautuneen kävijän muistiin. Mikään ei käytä näitä kopioita, mutta kuka tahansa voi lukea ne. Kopio kertoo, että tili avasi sovelluksen, ja siinä on se, mitä sovellus kirjoitti kuvaukseensa. Kun valitset Poista, kopiot siirtyvät kunkin tilin roskakoriin. Omistajan oma kuvaus säilyy. Mikään ei muutu, ennen kuin valitset.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
             "workspace_write_role": "Työtilan tila kertoo, kuka saa kirjoittaa siihen: jokainen jäsen, vain työtilan luoja ja organismin ylläpitäjät tai vain organismin ylläpitäjät. Ennen 21.11.2026 palvelin noudatti tätä sääntöä vain rivitiloissa. Nyt se noudattaa sitä kaikissa tiloissa. Jäsenet ovat jo kirjoittaneet alla oleviin tiloihin, joten tilat toimivat kuten ennen, kunnes valitset. Ota sääntö käyttöön: nämä jäsenet eivät enää voi kirjoittaa tilaan. Anna jäsenten kirjoittaa: tila muuttuu niin, että jokainen jäsen saa kirjoittaa siihen.",
             "erased_lock_holders": "Nämä lukitukset tehtiin ennen kuin käyttäjänimen nykyinen tili rekisteröitiin. Lukitus määrää, mitä jokainen tili saa kirjoittaa sen avaimen alle, ja lukituksen haltija voi muuttaa tai poistaa sen. Ennen 8.11.2026 tilin poistaminen ei irrottanut sen lukituksia käyttäjänimestä. Siksi alla oleva lukitus voi olla poistetun tilin, vaikka sen haltija on nyt tili, joka rekisteröi saman nimen myöhemmin. Valitse jokaisesta lukituksesta, kenen se on. Mikään ei muutu, ennen kuin valitset. Palvelin irrotti jo käynnistyessään kaikista tileistä ne lukitukset, joiden käyttäjänimellä ei nyt ole tiliä.",
@@ -3048,7 +3050,8 @@
             "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin.",
             "platform_fee": "Jätetäänkö tämä tietue pois rahamaksuistasi? {line} Tietue säilyy, mutta Talous-sivu ei enää laske sitä.",
             "schema_lock": "Irrotetaanko lukitus tilistä? {line} Lukitus pysyy voimassa, mutta millään tilillä ei ole sitä. Voit yhä muuttaa tai poistaa sen.",
-            "space_write_role": "Otetaanko sääntö käyttöön tässä tilassa? {line} Sen jälkeen jäsen, jota sääntö ei nimeä, ei enää voi kirjoittaa tilaan."
+            "space_write_role": "Otetaanko sääntö käyttöön tässä tilassa? {line} Sen jälkeen jäsen, jota sääntö ei nimeä, ei enää voi kirjoittaa tilaan.",
+            "agent_face_copies": "Siirretäänkö nämä kopiot roskakoriin? {line} Jokainen kopio siirtyy oman tilinsä roskakoriin. Omistajan oma kuvaus säilyy."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -3069,7 +3072,8 @@
             "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}",
             "platform_fee": "{amount} tilin {owner} muistissa ({key}), myyjä {seller}, ostaja {buyer}",
             "schema_lock": "Avaimen {pattern} lukitus. Haltija {holder}, voimassa {setAt} alkaen. Tili {account} rekisteröitiin {registered}.",
-            "space_write_role": "Tila {space} työtilassa {workspace}, organismi {organism}. Siihen saavat kirjoittaa vain luoja tai ylläpitäjät. Nämä jäsenet ovat kirjoittaneet siihen: {writers}."
+            "space_write_role": "Tila {space} työtilassa {workspace}, organismi {organism}. Siihen saavat kirjoittaa vain luoja tai ylläpitäjät. Nämä jäsenet ovat kirjoittaneet siihen: {writers}.",
+            "agent_face_copies": "Kopiot sovelluksen {app} kuvauksesta niiden tilien muistissa, jotka eivät omista sovellusta: {copies}"
           }
         },
         "source": {

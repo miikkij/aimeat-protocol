@@ -2933,6 +2933,7 @@
           "config_setting": "A setting the server did not accept, so it runs the default",
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
+          "stray_agent_faces": "Copies of apps' descriptions in visitors' memory",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
           "erased_lock_holders": "Locks that may be a deleted account's",
           "workspace_write_role": "Restricted spaces that members have written in",
@@ -2975,6 +2976,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
+            "stray_agent_faces": "An app can publish a public description of itself for AI agents. The server shows that description only from the memory of the app's owner. Before 26 November 2026, an app that published it when a person signed in also saved a public copy in the memory of each signed-in visitor. Nothing uses these copies, but anyone can read them: a copy shows that the account opened the app, and it holds what the app wrote into its description. When you choose Delete, the copies go to the bin of each account. The owner's own description stays. Nothing changes until you choose.",
             "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
             "workspace_write_role": "A space in a workspace says who may write in it: every member, only the workspace's creator and the organism's admins, or only the organism's admins. Until 21 November 2026 the server kept that rule only in row spaces. Now it keeps it in every space. Members have already written in the spaces below, so these work as before until you choose. Apply the rule: those members can no longer write in the space. Let members write: the space changes so that every member may write in it.",
             "erased_lock_holders": "These locks were set before the account that holds the username now was registered. A lock decides what every account may write under its key, and the account that holds it can change or remove it. Before 8 November 2026, deleting an account did not take its locks from the username. So a lock below may be a deleted account's, and the account that registered the same name later holds it now. For each lock, choose whose it is. Nothing changes until you choose. At start, the server already took from every account the locks whose username no account uses now.",
@@ -3004,7 +3006,8 @@
             "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before.",
             "platform_fee": "Leave this record out of your money fees? {line} The record stays, and the Economy page no longer counts it.",
             "schema_lock": "Take this lock from the account? {line} The lock stays in force, but no account holds it. You can still change or remove it.",
-            "space_write_role": "Apply the rule to this space? {line} After this, a member the rule does not name can no longer write in it."
+            "space_write_role": "Apply the rule to this space? {line} After this, a member the rule does not name can no longer write in it.",
+            "agent_face_copies": "Move these copies to the bin? {line} Each copy goes to the bin of its own account. The owner's own description stays."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -3025,7 +3028,8 @@
             "subdomain": "{label}: the app {app}, published by {owner}",
             "platform_fee": "{amount} in the memory of {owner} ({key}), seller {seller}, buyer {buyer}",
             "schema_lock": "The lock on {pattern}, held by {holder} since {setAt}. The account {account} was registered on {registered}.",
-            "space_write_role": "The space {space} in the workspace {workspace} of {organism}. Only its creator or admins may write in it. These members have written there: {writers}."
+            "space_write_role": "The space {space} in the workspace {workspace} of {organism}. Only its creator or admins may write in it. These members have written there: {writers}.",
+            "agent_face_copies": "Copies of the description of {app} in the memory of accounts that do not own the app: {copies}"
           }
         },
         "source": {

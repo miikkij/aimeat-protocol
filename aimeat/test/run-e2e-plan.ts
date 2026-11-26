@@ -124,6 +124,7 @@ export const RUNNER_NODE_FREE: readonly string[] = [
     'e2e-sign-in-policy',
     'e2e-single-process-lease',
     'e2e-sse',
+    'e2e-stray-agent-faces',
     'e2e-test-money-guard',
     'e2e-two-process-bus',
     'e2e-two-process-leases',

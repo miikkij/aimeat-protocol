@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-26 -- e2e-stray-agent-faces.ts joins the list (not the guard tier): the copies of an app's agent
+ *     face in visitors' memory are one Security page incident, once, on its own node on 28591.
  *   2026-11-26 -- Add e2e-owner-export-job.ts: the data export as a background job of chosen parts.
  *   2026-11-26 -- Add e2e-evals.ts: stored eval sets scored per revision.
  *   2026-11-26 -- Add e2e-trail-recorded.ts: the node's own record of an agent's calls.
@@ -1400,6 +1402,9 @@ const ALL_SUITES = [
     // Owns its server on 28458 and boots it three times on one database: what the shared anonymous
     // agent wrote outside its namespace becomes one Security page incident, once (secaudit2026oct22).
     'test/e2e-anonymous-records-incident.ts',
+    // Owns its server on 28591 and boots it three times on one database: the copies of an app's agent
+    // face in the memory of accounts that do not own the app become one Security page incident, once.
+    'test/e2e-stray-agent-faces.ts',
     // Owns its server on 28477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
     // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
     'test/e2e-rest-scope-keep-working.ts',

@@ -7,11 +7,15 @@
  *   offered default audience cap (classification/default-caps.ts decideDefaultCap, "apply" or
  *   "keep"), or a record an incident names to act on (incident-entries.ts: "clear", "delete" or "app_only" as
  *   the entry offers, or "keep"; the shared anonymous agent's records, the schedules older account
- *   erasures left, and the subdomain addresses the start step could not classify). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
+ *   erasures left, the subdomain addresses the start step could not classify, and the copies of an
+ *   app's agent face in the memory of accounts that do not own the app). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
  *   aimeat_admin_incident_resolve and its CLI twin all call decideIncidentCase(), so they decide alike.
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.9.0 -- 2026-11-26 -- And of the incident of agent face copies in the memory of accounts that do
+ *     not own the app: 'delete' moves the copies still stray to their accounts' bins
+ *     (services/app/stray-agent-faces.ts; owner ruling 2026-11-26).
  *   v1.8.0 -- 2026-11-21 -- And of the incident of workspace spaces members wrote before their writeRole
  *     held: 'enforce' applies it, 'keep' sets the writeRole to "member" (services/workspace/write-role-hold.ts).
  *   v1.7.0 -- 2026-11-08 -- And of the incident of schema locks older than the account that holds their
@@ -44,6 +48,7 @@ import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './su
 import { PLATFORM_FEE_INCIDENT_TYPE, uncountPlatformFeeRecord } from '../commerce/platform-fee-writers.js';
 import { ERASED_LOCK_INCIDENT_TYPE, pseudonymiseLockEntry } from './csm/erased-lock-holders.js';
 import { WRITE_ROLE_INCIDENT_TYPE, enforceHeldSpace, letMembersWriteHeldSpace } from './workspace/write-role-hold.js';
+import { STRAY_AGENT_FACES_INCIDENT_TYPE, deleteStrayAgentFaceCopies } from './app/stray-agent-faces.js';
 
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
@@ -61,7 +66,8 @@ export async function decideIncidentCase(
     : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule
     : type === SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE ? serveAtAppAddressOnly
     : type === PLATFORM_FEE_INCIDENT_TYPE ? uncountPlatformFeeRecord
-    : type === ERASED_LOCK_INCIDENT_TYPE ? pseudonymiseLockEntry : null;
+    : type === ERASED_LOCK_INCIDENT_TYPE ? pseudonymiseLockEntry
+    : type === STRAY_AGENT_FACES_INCIDENT_TYPE ? deleteStrayAgentFaceCopies : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
   // A workspace space members wrote before its writeRole held: 'enforce' applies it, 'keep' sets the
   // writeRole to "member" so the members keep writing (services/workspace/write-role-hold.ts).

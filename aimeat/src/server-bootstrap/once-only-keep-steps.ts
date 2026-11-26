@@ -21,6 +21,9 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-26 -- reportStrayAgentFacesOnce, after the anonymous-records step: the copies of an app's agent
+ *     face in the memory of accounts that do not own the app are named on the Security page, nothing
+ *     changed (owner ruling 2026-11-26; services/app/stray-agent-faces.ts).
  *   2026-11-21 -- holdMemberWrittenSpacesOnce, after the accountant grant step: the workspace spaces whose
  *     writeRole members already wrote past keep working until the operator decides (ruling 2026-11-21).
  *   2026-11-15 -- moveAppPartiesToTablesOnce, after moveCsmLockHoldersOnce: the people registered to apps
@@ -114,6 +117,7 @@ import { disableMalformedExtensionRefsOnce } from '../services/capabilities/exte
 import { reindexShareSearchTextOnce } from '../services/share/search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
+import { reportStrayAgentFacesOnce } from '../services/app/stray-agent-faces.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
 import { moveErasedLockHoldersOnce } from '../services/csm/erased-lock-holders.js';
 import { moveCsmLockHoldersOnce } from '../services/csm/csm-lock-holders.js';
@@ -236,7 +240,13 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // What the shared anonymous agent wrote outside its namespace before its token was refused there is
   // named on the Security page, one entry per record, nothing changed (services/anonymous-principal-records.ts).
   await reportAnonymousPrincipalRecordsOnce(storage, config)
-    .catch(err => logger.error('Failed to look for the records the shared anonymous agent wrote; the next boot tries again', { error: String(err) }));  // The schedules account erasures before 2026-10-25 left are named on the Security page, one entry
+    .catch(err => logger.error('Failed to look for the records the shared anonymous agent wrote; the next boot tries again', { error: String(err) }));
+  // The copies of an app's agent face that the aimeat-agentface library wrote into the memory of
+  // accounts that do not own the app are named on the Security page, one entry per app, nothing
+  // changed (services/app/stray-agent-faces.ts).
+  await reportStrayAgentFacesOnce(storage, config)
+    .catch(err => logger.error('Failed to look for the agent face copies in the memory of accounts that do not own the app; the next boot tries again', { error: String(err) }));
+  // The schedules account erasures before 2026-10-25 left are named on the Security page, one entry
   // per schedule, nothing changed (services/erasure-leftover-schedules.ts).
   await reportErasureLeftoverSchedulesOnce(storage, config)
     .catch(err => logger.error('Failed to look for the schedules older account erasures left; the next boot tries again', { error: String(err) }));

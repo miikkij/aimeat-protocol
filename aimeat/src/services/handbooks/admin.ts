@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.44.0 -- 2026-11-26 -- The incident stray_agent_faces and its two decisions, delete and keep.
  *   v1.43.0 -- 2026-11-21 -- The incident workspace_write_role and its two decisions, enforce and keep.
  *   v1.42.0 -- 2026-11-21 -- compliance.regulated_ai_modes: what an outside AI model gets of regulated
  *     data (five modes, drop included), and the report's regulated_ai section (feature audit item 1.3).
@@ -463,7 +464,11 @@ the locks of accounts that no longer exist were moved to a pseudonym at start wi
 workspace record spaces that declare writeRole owner or admin and that members who do not meet it wrote into
 before the rule held (type \`workspace_write_role\`, the entry id is \`<organism>/<workspace>/<namespace>\`:
 "enforce" applies the writeRole, so those members are refused; "keep" sets the space's writeRole to member, so
-they keep writing; until then the space works as before). Read them with
+they keep writing; until then the space works as before), and the public copies of an app's agent face
+that the aimeat-agentface library wrote into the memory of signed-in visitors who do not own the app (type
+\`stray_agent_faces\`, one entry per app, the entry id is \`face:<filename>\`: "delete" moves every copy still
+stray at that moment to its account's bin and never touches the owner's or the owner's agents' face, "keep"
+leaves them). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.

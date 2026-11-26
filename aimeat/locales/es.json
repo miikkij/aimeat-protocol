@@ -2072,6 +2072,7 @@
           "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado",
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
+          "stray_agent_faces": "Copias de descripciones de aplicaciones en la memoria de visitantes",
           "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
           "erased_lock_holders": "Bloqueos que pueden ser de una cuenta eliminada",
           "workspace_write_role": "Espacios restringidos en los que han escrito miembros",
@@ -2114,6 +2115,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
+            "stray_agent_faces": "Una aplicación puede publicar una descripción pública de sí misma para agentes de IA. El servidor muestra esa descripción solo desde la memoria del propietario de la aplicación. Antes del 26 de noviembre de 2026, una aplicación que la publicaba cuando alguien iniciaba sesión también guardaba una copia pública en la memoria de cada visitante con sesión iniciada. Nada usa estas copias, pero cualquiera puede leerlas: una copia muestra que la cuenta abrió la aplicación y contiene lo que la aplicación escribió en su descripción. Si eliges Eliminar, las copias van a la papelera de cada cuenta. La descripción del propietario se conserva. Nada cambia hasta que elijas.",
             "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas.",
             "workspace_write_role": "Cada espacio de un espacio de trabajo dice quién puede escribir en él: cada miembro, solo el creador del espacio de trabajo y los administradores del organismo, o solo los administradores del organismo. Hasta el 21 de noviembre de 2026 el servidor aplicaba esta regla solo en los espacios de filas. Ahora la aplica en todos los espacios. Los miembros ya escribieron en los espacios de abajo, así que funcionan como antes hasta que elijas. Aplicar la regla: esos miembros ya no pueden escribir en el espacio. Dejar escribir a los miembros: el espacio cambia para que cada miembro pueda escribir en él.",
             "erased_lock_holders": "Estos bloqueos se crearon antes de que se registrara la cuenta que hoy tiene ese nombre de usuario. Un bloqueo decide qué puede escribir cada cuenta bajo su clave, y la cuenta que lo tiene puede cambiarlo o quitarlo. Antes del 8 de noviembre de 2026, eliminar una cuenta no separaba sus bloqueos del nombre de usuario. Por eso un bloqueo de esta lista puede ser de una cuenta eliminada, aunque ahora lo tenga la cuenta que registró el mismo nombre después. Elige de quién es cada bloqueo. Nada cambia hasta que elijas. Al iniciar, el servidor ya separó de todas las cuentas los bloqueos cuyo nombre de usuario hoy no usa ninguna cuenta.",
@@ -2143,7 +2145,8 @@
             "subdomain": "¿Quieres que esta sea solo una dirección de la aplicación? {line} Quien la abra en tu dominio irá a la dirección propia de la aplicación, donde la aplicación funciona como antes.",
             "platform_fee": "¿Dejar este registro fuera de tus comisiones en dinero? {line} El registro se conserva, pero la página Economía ya no lo cuenta.",
             "schema_lock": "¿Separar este bloqueo de la cuenta? {line} El bloqueo sigue vigente, pero ninguna cuenta lo tiene. Aún puedes cambiarlo o quitarlo.",
-            "space_write_role": "¿Aplicar la regla a este espacio? {line} Después, un miembro que la regla no nombra ya no puede escribir en él."
+            "space_write_role": "¿Aplicar la regla a este espacio? {line} Después, un miembro que la regla no nombra ya no puede escribir en él.",
+            "agent_face_copies": "¿Mover estas copias a la papelera? {line} Cada copia va a la papelera de su propia cuenta. La descripción del propietario se conserva."
           },
           "rowResolved": "Todos los registros están decididos.",
           "clear": "Vaciar",
@@ -2164,7 +2167,8 @@
             "subdomain": "{label}: la aplicación {app}, publicada por {owner}",
             "platform_fee": "{amount} en la memoria de {owner} ({key}), vendedor {seller}, comprador {buyer}",
             "schema_lock": "El bloqueo de {pattern}, que tiene {holder} desde {setAt}. La cuenta {account} se registró el {registered}.",
-            "space_write_role": "El espacio {space} del espacio de trabajo {workspace}, en {organism}. Solo su creador o los administradores pueden escribir en él. Estos miembros han escrito en él: {writers}."
+            "space_write_role": "El espacio {space} del espacio de trabajo {workspace}, en {organism}. Solo su creador o los administradores pueden escribir en él. Estos miembros han escrito en él: {writers}.",
+            "agent_face_copies": "Copias de la descripción de {app} en la memoria de cuentas que no son dueñas de la aplicación: {copies}"
           }
         },
         "source": {
