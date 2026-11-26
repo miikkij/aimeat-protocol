@@ -67,7 +67,7 @@
       "digest": "sha256:bdddd8c7a12eea724f90f0c7"
     },
     "4. Access, consent and sharing": {
-      "reviewedOn": "2026-11-23",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/services/access-guard.ts",
         "aimeat/src/services/consent.ts",
@@ -86,7 +86,7 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:3881a3a9d7ca543d17d470eb"
+      "digest": "sha256:1506c1a2e60746f369c41320"
     },
     "5. Memory, files and search": {
       "reviewedOn": "2026-11-23",
@@ -613,7 +613,7 @@
       "aimeat/src/services/secret-shares/events.ts": "cd19c9e8482a6f85",
       "aimeat/src/services/secret-shares/notices.ts": "452ca55780f53095",
       "aimeat/src/services/secret-shares/pickup.ts": "b51aa2afbcb4759a",
-      "aimeat/src/services/secret-shares/rules.ts": "1fa92ea25540f577",
+      "aimeat/src/services/secret-shares/rules.ts": "d2875b4b8efc2ad1",
       "aimeat/src/services/secret-shares/service.ts": "8f4540b640b3096f",
       "aimeat/src/services/secret-shares/view.ts": "3ea341cd6da1c1c5",
       "aimeat/src/routes/secrets.ts": "d97badf3c10162f4",
