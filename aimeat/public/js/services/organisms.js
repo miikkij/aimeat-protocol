@@ -13,6 +13,8 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.14.0 — 2026-11-26 — getWaiting() is removed: its one caller, the Settings overview, draws the
+ *     home's waiting list (GET /v1/home/waiting). The route GET /v1/organisms/waiting stays.
  *   v1.13.3 — 2026-10-27 — Re-exports fetchStorageTabUrl, the inert fetch a document's file link opens (secaudit2026oct26).
  *   v1.13.2 — 2026-10-25 — decideWorkspaceAccess sends a role choice as `approve` with `role`; the
  *     participants panel's Add as contributor and as viewer answered 400 and kept their buttons.
@@ -169,16 +171,6 @@ export async function listJoinRequests(id) {
 /** Review join request (approve/reject). */
 export async function reviewJoinRequest(organismId, requestId, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(organismId)}/join-requests/${encodeURIComponent(requestId)}/review`, { decision });
-}
-
-/** "Waiting for you" — pending reviews + join-requests + invitations aggregated across the caller's
- *  member organisms in ONE request (replaces the home widget's per-org listApprovals/listJoinRequests/
- *  listWorkspaces fan-out). Returns the flat `items` array ({kind:'review'|'join'|'invite', …}). */
-export async function getWaiting() {
-  try {
-    const resp = await apiGet('/v1/organisms/waiting');
-    return Array.isArray(resp?.data?.items) ? resp.data.items : [];
-  } catch (err) { swallowed('organisms: getWaiting', err); return []; }
 }
 
 /** Agent activity aggregated across every readable workspace in ONE request (organism Agents tab).

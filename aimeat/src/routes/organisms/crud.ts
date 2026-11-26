@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-26 — GET /v1/organisms/waiting calls services/organism-read/waiting.ts organismWaitingFor,
+ *     where its read moved unchanged; the list of everything that waits for a person reads the same
+ *     service. The answer is unchanged.
  *   2026-11-21 — GET /v1/organisms/:id carries the organism's own `objectives` for a member, with
  *     level, serves, until and their KPIs (services/structure/organism-objectives.ts).
  *   2026-11-20 — GET /v1/organisms/:id carries `value_per_member` for a member while the creators see
@@ -108,7 +111,6 @@ import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
-import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism/privacy.js';
 import { showOrganismReadme } from '../../services/organism/readme.js';
 import { teamNamesFor } from '../../services/team/record.js';
@@ -121,9 +123,8 @@ import { organismForManager } from '../../services/organism-read/manager.js';
 import { listedOrganisms } from '../../services/organism-read/list.js';
 import { leaveOrganismAs } from '../../services/organism-read/leave.js';
 import { organismShownTo, organismToJoin } from '../../services/organism-read/member.js';
-import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
+import { organismWaitingFor } from '../../services/organism-read/waiting.js';
 import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
-import { agentBarred, organismsAdmitting } from '../../services/organism/agent-access.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { teamDeleteGate } from '../../services/team/action-gate.js';
@@ -133,7 +134,7 @@ import { objectiveFields } from '../../services/structure/organism-objectives.js
 
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
+  const { workspaceCountsByOrg } = H;
 
   /* ── POST /v1/organisms — Create a new organism.
    *
@@ -264,43 +265,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
    * 2–3N fan-out (listApprovals + listJoinRequests + listWorkspaces × O orgs). MUST be registered
    * before GET /:id so ':id' doesn't capture 'waiting'. ── */
   router.get('/v1/organisms/waiting', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
-    const owner = req.auth!.owner as string;
-    await expireOverdueApprovals(storage, new Date().toISOString());
-    // An organism that admits only listed agents is left out for an agent it does not admit, as the
-    // MCP organism list leaves it out (secaudit2026oct22): its name and its waiting items are its own.
-    const principal = resolveIdentity(req.auth!, config.nodeId);
-    const orgs = organismsAdmitting(await storage.listOrganisms({ member: owner }), principal);
-    const reviews: Array<{ kind: 'review'; n: number; orgId: string; orgName: string; wsId: string; wsName: string }> = [];
-    const joinRequests: Array<{ kind: 'join'; n: number; orgId: string; orgName: string }> = [];
-
-    // Pending approvals for EVERY member org in one batched read (was listPendingApprovals per org), then
-    // the ws-name registry lookup for just the orgs that have approvals in one batched cross-owner read.
-    const orgIds = orgs.map(o => o.id);
-    const apsByOrg = await storage.listPendingApprovalsForOrgs(orgIds, { status: 'pending' });
-    const namesByOrg = await workspaceNamesByOrg(orgs.filter(o => (apsByOrg[o.id]?.length)).map(o => o.id));
-    for (const org of orgs) {
-      const aps = apsByOrg[org.id] ?? [];
-      if (aps.length) {
-        const byWs: Record<string, number> = {};
-        for (const a of aps) { const w = (a.arguments as { ws?: string } | undefined)?.ws ?? ''; byWs[w] = (byWs[w] ?? 0) + 1; }
-        const names = namesByOrg.get(org.id);
-        for (const [wsId, n] of Object.entries(byWs)) reviews.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names?.get(wsId) || wsId });
-      }
-    }
-    // Join requests only for orgs the caller manages (creator/admin) — kept per-org (typically few managed).
-    const managed = orgs.filter(org => isOrganismOwner(org, owner) || (org.admins ?? []).includes(owner));
-    await Promise.all(managed.map(async (org) => {
-      const jr = await openJoinRequests({ storage, config }, org);
-      if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
-    }));
-    const invited = (await storage.listMembershipsByGhii(owner)).filter(m => m.status === 'invited');
-    const invitations: Array<{ kind: 'invite'; orgName: string; organismId: string }> = [];
-    for (const m of invited) {
-      const org = await storage.getOrganism(m.organismId);
-      if (org && !agentBarred(org, principal)) invitations.push({ kind: 'invite', orgName: org.name, organismId: org.id });
-    }
-    // Flat `items` array in the exact shape the home widget renders (review | join | invite).
-    res.json(success(config.nodeId, { items: [...reviews, ...joinRequests, ...invitations] }));
+    // The read is services/organism-read/waiting.ts, which the list of everything that waits for a
+    // person (services/home/waiting.ts) asks too. Flat `items`: review | join | invite.
+    const items = await organismWaitingFor({ storage, config }, { owner: req.auth!.owner as string, principal: resolveIdentity(req.auth!, config.nodeId) });
+    res.json(success(config.nodeId, { items }));
   });
 
   /* ── GET /v1/organisms/:id — Get organism detail ── */

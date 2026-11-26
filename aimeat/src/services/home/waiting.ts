@@ -31,6 +31,10 @@
  *   WAITING_SOURCES · homeWaitingFor(deps, caller, opts) · WAITING_LIMIT_DEFAULT · WAITING_LIMIT_MAX
  * @usage const answer = await homeWaitingFor({ storage, config }, callerOf(req, config.nodeId, storage), { limit: 20 });
  * @version-history
+ *   v1.1.0 — 2026-11-26 — Two kinds more, so the Settings overview draws this list and keeps none of
+ *     its own: `approval` (the pending approvals of an organism the person can decide, per workspace,
+ *     outside their teams) and `join_request` (a request to join an organism the person owns or
+ *     administers). Both read services/organism-read/waiting.ts, which GET /v1/organisms/waiting calls.
  *   v1.0.0 — 2026-11-25 — Initial: ten kinds, one answer for the Home page and aimeat_home_waiting.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -44,6 +48,7 @@ import { mailboxReaderOf, readOwnerConversations, readOwnerInbox } from '../owne
 import { listInbox } from '../help/questions.js';
 import { teamWaitingFor } from '../team/waiting.js';
 import { nameInvitationsOf } from '../organism-read/name-invitations.js';
+import { approvalsToDecideFor, joinRequestsToReviewFor } from '../organism-read/waiting.js';
 import { listPublishRequestsFor } from '../publish-requests/decide.js';
 import { requesterName } from '../publish-requests/store.js';
 import { pendingHumanInputs } from '../workflow/lifecycle.js';
@@ -54,7 +59,8 @@ import { loadOwnerAgents } from '../db/owner-identity.js';
 
 export type WaitingKind =
     | 'agent_proposal' | 'agent_sign_in' | 'reply' | 'help_question' | 'team'
-    | 'invitation' | 'publish_request' | 'workflow_input' | 'open_item' | 'unread';
+    | 'invitation' | 'publish_request' | 'workflow_input' | 'open_item' | 'unread'
+    | 'approval' | 'join_request';
 
 /** decide: a yes or no · answer: someone waits for words · look: a count to open. */
 export type WaitingGroup = 'decide' | 'answer' | 'look';
@@ -73,7 +79,7 @@ export interface HomeWaitingItem {
     detail?: string;
     /** ISO time it began to wait. */
     at?: string;
-    /** How many, on `look` rows and team rows. */
+    /** How many, on `look` rows, team rows and approval rows. */
     count?: number;
     /** The path on this node where a person opens it. */
     href: string;
@@ -84,7 +90,7 @@ export interface HomeWaitingItem {
 }
 
 export interface HomeWaitingAnswer {
-    /** What waits for a decision or an answer, before the cap: the rows of groups `decide` and `answer`, a team row by its count. */
+    /** What waits for a decision or an answer, before the cap: the rows of groups `decide` and `answer`, a team row and an approval row by its count. */
     total: number;
     /** The sum of the `look` rows' counts. Kept apart from `total`, because a count repeats things the other rows name. */
     to_open: number;
@@ -288,6 +294,52 @@ const invitations: WaitingSource = {
     },
 };
 
+const organismHref = (org: string, ws?: string) =>
+    `/v1/profile?tab=organisms&org=${encodeURIComponent(org)}${ws ? `&ws=${encodeURIComponent(ws)}` : ''}`;
+
+/**
+ * The read of GET /v1/organisms/waiting (organism:read), kept to what this person can decide: the
+ * pending approvals of an organism, one row per workspace with how many. A team's approvals are in
+ * its `team` row. No `decide`: the deciding route takes the decision in its body.
+ */
+const approvals: WaitingSource = {
+    kind: 'approval',
+    readable: c => isPersonOrAgent(c) && c.has('organism:read'),
+    async read(deps, caller) {
+        const rows = await approvalsToDecideFor(deps, { owner: caller.owner, principal: caller.principal });
+        return rows.map(r => ({
+            kind: 'approval' as const, id: `${r.orgId}/${r.wsId}`, group: 'decide' as const,
+            from: r.orgName,
+            subject: r.wsName || r.orgName,
+            count: r.n,
+            ...(r.at ? { at: r.at } : {}),
+            href: organismHref(r.orgId, r.wsId),
+            act_with: 'aimeat_organism_approvals',
+        }));
+    },
+};
+
+/**
+ * The same read's join requests (organism:read): one row per person who asks to join an organism
+ * this person owns or administers. No `decide`: the review route takes the decision in its body.
+ */
+const joinRequests: WaitingSource = {
+    kind: 'join_request',
+    readable: c => isPersonOrAgent(c) && c.has('organism:read'),
+    async read(deps, caller) {
+        const managed = await joinRequestsToReviewFor(deps, { owner: caller.owner, principal: caller.principal });
+        return managed.flatMap(({ organism, requests }) => requests.map(r => ({
+            kind: 'join_request' as const, id: r.id, group: 'decide' as const,
+            fromAccount: r.ghii,
+            subject: organism.name,
+            ...detailOf(r.message),
+            at: r.createdAt,
+            href: organismHref(organism.id),
+            act_with: 'aimeat_organism_join_request_review',
+        })));
+    },
+};
+
 /**
  * GET /v1/publish-requests (memory:write): the requests waiting for the owner's answer. No `decide`:
  * the decision route takes the decision in its body, so a bare POST is not a press.
@@ -356,7 +408,7 @@ const unread: WaitingSource = {
 
 /** Every source, in the order the kinds are listed in `by_kind`. */
 export const WAITING_SOURCES: readonly WaitingSource[] = [
-    agentProposals, agentSignIns, invitations, publishRequests,
+    agentProposals, agentSignIns, invitations, publishRequests, approvals, joinRequests,
     replies, helpQuestions, workflowInputs, teams,
     openItems, unread,
 ];

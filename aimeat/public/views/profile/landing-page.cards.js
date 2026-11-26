@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-26 — WaitingForYou draws the home's waiting list (views/home/waiting-band.js WaitingRows)
+ *     from the read the top bar and the side menu count from, and keeps no list of its own: the bar
+ *     said three while this listed one, because it read the organisms' items alone.
  *   2026-11-26 — "Waiting for you" has no emoji before its title: the contents rail's number stands
  *     there now (components/ContentsRail.js), and an emoji is no part of the interface.
  *   2026-11-20 — The business group lists Reports (report subscriptions) after Usage.
@@ -82,7 +85,6 @@ import { creditEur } from "/js/ai-credit.js";
 import { money } from "/js/format.js";
 import { listAgents } from "/js/services/agents.js";
 import { listAllSchedules } from "/js/services/schedules.js";
-import * as orgService from "/js/services/organisms.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { listRecents } from "/js/recents.js";
 import { listInbox } from "/js/services/messages.js";
@@ -99,7 +101,7 @@ import { Box } from '/components/Box.js';
 import { NumberBand } from '/components/NumberBand.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Meter, Tinted } from '/components/Figure.js';
-import { List, Row, Name, Desc, Num, Cell, Doors, Group } from '/components/List.js';
+import { List, Row, Name, Desc, Num, Cell, Group } from '/components/List.js';
 import { Folds, FoldRow } from '/components/Folds.js';
 import { Mark, Marks, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -108,52 +110,30 @@ import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { Row as Line, Split, Space } from '/components/Layout.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { STEP, openSteps, stepTitle, stepLine, stepHref } from '../home/journey-steps.js';
+import { WaitingRows, moreThanShown, moreWords } from '/views/home/waiting-band.js';
 import {
-  relTime, fmtClock, openProfileTab, gotoWorkspace, gotoOrganism, gotoOrganismsList,
+  relTime, fmtClock, openProfileTab, gotoWorkspace, gotoOrganism,
   fmtBytes, fmtUsd, fmtCompact,
 } from "./landing-page.helpers.js";
 
 /* ───── Home dashboard cards ───── */
 
-/* "Waiting for you" — everything that needs the user's decision, aggregated across organisms:
- * pending publish approvals (per workspace), pending join requests (orgs they manage), and
- * incoming organism invitations. Renders nothing when there is nothing to do. */
-export function WaitingForYou() {
-  const [items, setItems] = useState(null);
-  // ONE aggregated request replaces the old per-org fan-out (listOrganisms → per-org listApprovals +
-  // listJoinRequests + listWorkspaces + a final listMyInvitations). The server returns the same flat
-  // {kind:'review'|'join'|'invite', …} items this widget renders.
-  const load = useCallback(async () => { setItems(await orgService.getWaiting()); }, []);
-  useEffect(() => { load(); }, [load]);
-  const liveRef = useRef(load); liveRef.current = load;
-  // Only re-run the per-organism approvals/join-requests fan-out when ORGANISMS actually
-  // change — not on every unrelated event (agent churn, memory, etc.), which on an account in
-  // many organisms turned into a hundreds-of-requests storm.
-  useEffect(() => onLiveUpdate(['organisms'], () => liveRef.current()), []);
+/** The groups of the waiting list the overview draws: what needs a yes, a no or words. */
+const WAITING_GROUPS = ['decide', 'answer'];
 
-  if (!items || items.length === 0) return null;
-  const words = (it) => {
-    if (it.kind === 'review') return html`<b>${(t('profile.landing.draftsToReview') || '{n} drafts to review').replace('{n}', String(it.n))}</b> · ${it.orgName} / ${it.wsName}`;
-    if (it.kind === 'join') return html`<b>${it.n === 1 ? (t('profile.landing.joinReqOne') || '1 join request') : (t('profile.landing.joinReqMany') || '{n} join requests').replace('{n}', String(it.n))}</b> · ${it.orgName}`;
-    if (it.kind === 'invite') return html`<b>${t('profile.landing.inviteWaiting') || 'You’re invited'}</b> · ${it.orgName}`;
-    return null;
-  };
-  const door = (it) => {
-    if (it.kind === 'review') return html`<${Action} small row onClick=${() => (it.wsId ? gotoWorkspace(it.orgId, it.wsId, 'review') : gotoOrganism(it.orgId))}>${t('profile.landing.reviewBtn') || 'Review'}<//>`;
-    if (it.kind === 'join') return html`<${Action} small row onClick=${() => gotoOrganism(it.orgId, 'members')}>${t('profile.landing.viewBtn') || 'View'}<//>`;
-    if (it.kind === 'invite') return html`<${Action} small row onClick=${() => gotoOrganismsList()}>${t('profile.landing.viewBtn') || 'View'}<//>`;
-    return null;
-  };
+/* "Waiting for you": the list the home starts with (views/home/waiting-band.js, GET /v1/home/waiting),
+ * from the read the top bar and the side menu count from, so the number there and the rows here are
+ * the same things. The counts to open are left out: they are the top bar's own numbers. Draws nothing
+ * when nothing waits. Until 2026-11-26 this was a list of its own (GET /v1/organisms/waiting) that
+ * held only the organisms' items, so the bar said three while this listed one. */
+export function WaitingForYou({ data }) {
+  if (!data || !data.total) return null;
+  const more = moreThanShown(data);
   return html`
     <${Note} kind="aside" size="small">
       <${Group} title=${t('profile.landing.waitingTitle') || 'Waiting for you'}>
-        <${List} cols="name-state" keepCols>
-          ${items.map((it, i) => html`
-            <${Row} key=${i}>
-              <${Desc}>${words(it)}<//>
-              <${Doors}>${door(it)}<//>
-            <//>`)}
-        <//>
+        <${WaitingRows} data=${data} groups=${WAITING_GROUPS} />
+        ${more > 0 ? html`<${Note} kind="quiet">${moreWords(more)}<//>` : null}
       <//>
     <//>
   `;

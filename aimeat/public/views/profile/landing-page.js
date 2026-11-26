@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.28.0 — 2026-11-26 — The overview's "Waiting for you" gets the answer the menu counts from
+ *     (useWaiting's `data`), so the overview lists what the top bar's number counts.
  *   v3.27.0 — 2026-11-26 — The menu says where something waits: the way home carries the count of
  *     what waits for the person, and a page where it is acted on (an agent's proposal or sign-in, an
  *     invitation, a request to publish, a workflow's question) carries its count and is drawn in the basic menu
@@ -633,7 +635,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
             switchTab=${(id) => open(id, 'main')} />
           ${/* Each panel is a section of the contents rail: a marker with no box of its own, listed
                 once the panel has drawn something (components/ContentsRail.js). */''}
-          ${railMark('waiting', t('profile.landing.waitingTitle'), html`<${WaitingForYou} owner=${owner} />`)}
+          ${railMark('waiting', t('profile.landing.waitingTitle'), html`<${WaitingForYou} data=${waiting.data} />`)}
           ${railMark('next', t('profile.landing.nextTitle'), html`<${NextSteps} switchTab=${(id) => open(id, 'main')} />`)}
           <${CardGrid} cols="panels">
             ${railMark('continue', t('profile.landing.continueTitle'), html`<${ContinueCard} />`)}

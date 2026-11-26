@@ -19,9 +19,13 @@
  *   not know yet is shown by its subject and opens its page.
  *
  *   Composed from library components only; it has no sheet of its own.
- * @structure WaitingBand({ data, navigate }) · wordsOf(item) · GROUPS
+ * @structure WaitingBand({ data, navigate }) · WaitingRows({ data, navigate, groups }) · wordsOf(item) ·
+ *   moreThanShown(data) · moreWords(n) · GROUPS
  * @usage html`<${WaitingBand} data=${data} navigate=${ctx?.navigate} />` (views/surface/blocks-home.js)
  * @version-history
+ *   v1.1.0 — 2026-11-26 — Two kinds more: an organism's approvals the person can decide and a request to
+ *     join an organism they run. The rows moved to WaitingRows, which the Settings overview draws too,
+ *     so the home and the overview show one list; the band looks as before.
  *   v1.0.0 — 2026-11-25 — Initial.
  */
 import { h } from 'preact';
@@ -78,6 +82,18 @@ export function wordsOf(item) {
           : fill(tr('home.waiting.kind.invitation', 'Invitation: {subject}'), v),
         desc: detail,
       };
+    case 'approval':
+      return {
+        name: v.from && v.from !== v.subject ? `${v.from} / ${v.subject}` : v.subject,
+        desc: fill(tr('home.waiting.kind.approval', 'Waiting for your approval: {n}'), v),
+      };
+    case 'join_request':
+      return {
+        name: v.from
+          ? fill(tr('home.waiting.kind.joinRequestBy', '{from} asks to join {subject}'), v)
+          : fill(tr('home.waiting.kind.joinRequest', 'Request to join {subject}'), v),
+        desc: detail,
+      };
     case 'publish_request':
       return {
         name: v.from
@@ -122,16 +138,17 @@ function leadOf(total, toOpen) {
 }
 
 /**
- * @param {{ data: { total: number, to_open?: number, items: Array<any>, partial?: string[] }, navigate?: (path: string) => void }} props
+ * The rows of the list under their group names, with the yes and the no of a row that has them. The
+ * band draws every group; the Settings overview passes `groups` to leave out the counts to open.
+ * @param {{ data: { total?: number, items?: Array<any> }, navigate?: (path: string) => void, groups?: string[] }} props
  */
-export function WaitingBand({ data, navigate }) {
+export function WaitingRows({ data, navigate, groups }) {
   const [busy, setBusy] = useState(false);
   // What a decided row says until the list is read again: the row keeps its place, so the next row
   // does not move under the pointer of a person who decides several in a row.
   const [settled, setSettled] = useState(/** @type {Record<string, string>} */ ({}));
 
   const items = data.items ?? [];
-  const total = data.total ?? items.length;
   const keyOf = (it) => `${it.kind}|${it.id}`;
 
   async function decide(item, answer) {
@@ -174,23 +191,42 @@ export function WaitingBand({ data, navigate }) {
       <//>`;
   };
 
-  // What the cap left out: the decisions and answers the server counted and did not send.
+  return GROUPS.filter(({ group }) => !groups || groups.includes(group)).map(({ group, label }) => {
+    const rows = items.filter((it) => it.group === group);
+    if (!rows.length) return null;
+    return html`
+      <${NamedRow} key=${group} stack label=${label()}>
+        <${List} cols="name-desc-doors">${rows.map(rowOf)}<//>
+      <//>`;
+  });
+}
+
+/**
+ * How many decisions and answers the server counted and did not send: what the cap left out.
+ * @param {{ total?: number, items?: Array<any> }} data
+ */
+export function moreThanShown(data) {
+  const items = data.items ?? [];
   const shown = items.filter((it) => it.group !== 'look').reduce((sum, it) => sum + (it.count || 1), 0);
-  const more = total - shown;
+  return (data.total ?? items.length) - shown;
+}
+
+/** The sentence under a capped list. */
+export const moreWords = (n) => fill(tr('home.waiting.more', '{n} more wait for you.'), { n });
+
+/**
+ * @param {{ data: { total: number, to_open?: number, items: Array<any>, partial?: string[] }, navigate?: (path: string) => void }} props
+ */
+export function WaitingBand({ data, navigate }) {
+  const total = data.total ?? (data.items ?? []).length;
+  const more = moreThanShown(data);
   const title = tr('home.waiting.title', 'Waiting for you');
 
   return html`
     <${Band} title=${html`${title} <${HelpTip} term="home.waiting" label=${title} />`}>
       <${Note} kind="state" tone=${total ? 'attention' : 'fine'}>${leadOf(total, data.to_open ?? 0)}<//>
-      ${GROUPS.map(({ group, label }) => {
-        const rows = items.filter((it) => it.group === group);
-        if (!rows.length) return null;
-        return html`
-          <${NamedRow} key=${group} stack label=${label()}>
-            <${List} cols="name-desc-doors">${rows.map(rowOf)}<//>
-          <//>`;
-      })}
-      ${more > 0 && html`<${BandNote}>${fill(tr('home.waiting.more', '{n} more wait for you.'), { n: more })}<//>`}
+      <${WaitingRows} data=${data} navigate=${navigate} />
+      ${more > 0 && html`<${BandNote}>${moreWords(more)}<//>`}
       ${(data.partial ?? []).length > 0 && html`<${Note} kind="quiet">${tr('home.waiting.partial', 'A part of the list could not be read just now.')}<//>`}
     <//>`;
 }

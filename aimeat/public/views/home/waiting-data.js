@@ -13,12 +13,14 @@
  *   `unread` is the unread messages, which the node counts apart because a thread that waits for an
  *   answer is already in `total`. `byTab` says on which Settings & Controls page each kind is acted
  *   on, for the kinds whose address is one page: an agent's proposal and an agent's sign-in
- *   (agents, the two the Agents page itself counts as waiting), an invitation and a team's waiting
- *   records (organisms), a request to publish (notifications) and a workflow's question (workflows).
+ *   (agents, the two the Agents page itself counts as waiting), an invitation, a team's waiting
+ *   records, an organism's approvals and a request to join one (organisms), a request to publish (notifications) and a workflow's question (workflows).
  *   A message is answered in Messages, whose row has its own unread count.
  * @structure WAITING_MAX · WAITING_DOMAINS · waitingKey(max) · waitingPath(max) · useWaiting(on) · waitingByTab(data)
  * @usage const waiting = useWaiting(!!session); // waiting.total, waiting.unread, waiting.byTab.agents
  * @version-history
+ *   v1.1.0 — 2026-11-26 — useWaiting also gives the whole answer (`data`), which the Settings overview
+ *     lists; an organism's approvals and a request to join one count on the Organisms row.
  *   v1.0.0 — 2026-11-26 — Initial: the home band's read under a shared name, so the top bar and the
  *     side menu show the same numbers from the same request.
  */
@@ -39,6 +41,8 @@ const TAB_OF_KIND = {
   agent_sign_in: 'agents',
   invitation: 'organisms',
   team: 'organisms',
+  approval: 'organisms',
+  join_request: 'organisms',
   publish_request: 'notifications',
   workflow_input: 'workflows',
 };
@@ -61,12 +65,14 @@ export function waitingByTab(data) {
 /**
  * What waits for the signed-in person. `on` false asks nothing (nobody is signed in).
  * @param {boolean} on
- * @returns {{ ready: boolean, total: number, unread: number, byTab: Record<string, number> }}
+ * @returns {{ ready: boolean, total: number, unread: number, byTab: Record<string, number>, data: any }}
  */
 export function useWaiting(on) {
   const { data, ready } = useShared(waitingKey(), on ? waitingPath() : '', WAITING_DOMAINS);
   return {
     ready,
+    // The whole answer, for a part that lists the rows (the Settings overview).
+    data: data ?? null,
     total: Number(data?.total) || 0,
     unread: Number(data?.by_kind?.unread) || 0,
     byTab: waitingByTab(data),

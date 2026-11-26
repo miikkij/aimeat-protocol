@@ -20,6 +20,10 @@ describe('waitingByTab', () => {
         expect(waitingByTab({ by_kind: { agent_proposal: 1, agent_sign_in: 2 } })).toEqual({ agents: 3 });
     });
 
+    it("counts an organism's approvals and a request to join one on the Organisms row", () => {
+        expect(waitingByTab({ by_kind: { approval: 2, join_request: 1, invitation: 1 } })).toEqual({ organisms: 4 });
+    });
+
     it('leaves out the kinds that are acted on elsewhere: a message in Messages, an open item on the overview', () => {
         expect(waitingByTab({ by_kind: { reply: 1, help_question: 1, unread: 5, open_item: 3 } })).toEqual({});
     });

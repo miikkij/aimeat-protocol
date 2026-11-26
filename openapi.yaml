@@ -19128,7 +19128,9 @@ paths:
       summary: What waits for the person, every kind in one answer
       description: |
         Everything that waits for the person, from every place that holds something for them: agent
-        proposals, agents asking to sign in, organism invitations, requests to make something public,
+        proposals, agents asking to sign in, organism invitations, the pending approvals of an organism
+        the person can decide (one row per workspace, outside their teams), requests to join an
+        organism they own or administer, requests to make something public,
         message threads whose last message came in, questions asked of them, workflow questions, the
         waiting work of their teams (one row per team), and one row each for the open items and the
         unread messages when there are any. The Home page's first block reads it, and the MCP tool
@@ -19136,8 +19138,8 @@ paths:
 
         `group` is `decide` (a yes or no), `answer` (someone waits for words) or `look` (a count to
         open). Items come decide first, then answer, then look, newest first inside a group, and stop
-        at `limit`. `total` counts the decide and answer items before the cap (a team row by its
-        count), `to_open` is the sum of the `look` rows' counts, and `by_kind` has every kind before
+        at `limit`. `total` counts the decide and answer items before the cap (a team row and an
+        approval row by its count), `to_open` is the sum of the `look` rows' counts, and `by_kind` has every kind before
         the cap. The two totals are apart because a count repeats things the other rows name: a
         proposal also makes an open item, and a thread that waits for an answer holds unread messages.
         `from`, `subject` and `detail` are data (names, previews), never sentences: a client words a
@@ -19147,7 +19149,7 @@ paths:
 
         Requires `memory:read`, which the person in person always holds. Each kind is then read only
         when the caller also holds the word its own route asks (agent proposals `memory:read`,
-        invitations and teams `organism:read`, publish requests `memory:write`, workflow questions
+        invitations, teams, an organism's approvals and join requests `organism:read`, publish requests `memory:write`, workflow questions
         `workflow:read`, help questions `help:ask` or `help:answer`, message rows the owner's mailbox
         read, open items the person in person); a kind it does not hold is named in `withheld` and
         left out of `by_kind`. A kind whose source failed is named in `partial`, and the rest answers.
@@ -19189,14 +19191,14 @@ paths:
                               properties:
                                 kind:
                                   type: string
-                                  enum: [agent_proposal, agent_sign_in, reply, help_question, team, invitation, publish_request, workflow_input, open_item, unread]
+                                  enum: [agent_proposal, agent_sign_in, reply, help_question, team, invitation, publish_request, workflow_input, open_item, unread, approval, join_request]
                                 id: { type: string }
                                 group: { type: string, enum: [decide, answer, look] }
                                 from: { type: string, description: The shown name of who or what asks. }
                                 subject: { type: string, description: "The thing itself (a proposal's name, a thread's subject or first words, an organism's name)." }
                                 detail: { type: string, maxLength: 200 }
                                 at: { type: string, format: date-time, description: When it began to wait. }
-                                count: { type: integer, description: "How many, on look rows and team rows." }
+                                count: { type: integer, description: "How many, on look rows, team rows and approval rows." }
                                 href: { type: string, description: The path on this node where a person opens it. }
                                 decide:
                                   type: object

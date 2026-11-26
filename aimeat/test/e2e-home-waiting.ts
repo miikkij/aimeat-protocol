@@ -14,6 +14,9 @@
  *   reads only the kinds its words cover, and is told which ones it could not read.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=home-waiting
  * @version-history
+ *   v1.1.0 — 2026-11-26 — The kinds approval and join_request: in the list of the person who can
+ *     decide them, absent for a person who only asked and for a member whose role does not decide,
+ *     withheld from an agent without organism:read, gone once decided.
  *   v1.0.0 — 2026-11-25 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -21,7 +24,7 @@ import { createHash } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { BASE, test, assert, json, finish } from './helpers/harness.js';
 
-const KINDS = ['agent_proposal', 'agent_sign_in', 'invitation', 'publish_request', 'reply', 'help_question', 'workflow_input', 'team', 'open_item', 'unread'];
+const KINDS = ['agent_proposal', 'agent_sign_in', 'invitation', 'publish_request', 'reply', 'help_question', 'workflow_input', 'team', 'open_item', 'unread', 'approval', 'join_request'];
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
@@ -201,6 +204,65 @@ const waiting = (tok: string, q = '') => json(`/v1/home/waiting${q}`, { headers:
         assert(!m.isError, `MCP: ${m.text.slice(0, 200)}`);
         const v = JSON.parse(m.text);
         assert(v.total === d.total && JSON.stringify(v.by_kind) === JSON.stringify(d.by_kind) && JSON.stringify(v.withheld) === JSON.stringify(d.withheld), `MCP ${m.text.slice(0, 300)} vs REST ${JSON.stringify(d).slice(0, 300)}`);
+    });
+
+    // ── An organism's approvals and join requests: the two kinds the Settings overview listed alone
+    //    until 2026-11-26 (GET /v1/organisms/waiting), now in the one list. ──
+    let deskId = '';
+    let joinRequestId = '';
+    let approvalId = '';
+
+    await test('an approval alice can decide and a request to join her organism are in her list, each with its page and its tool', async () => {
+        const before = (await waiting(alice.token)).body.data;
+        const o = await json('/v1/organisms', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ name: 'Front desk', description: 'Where visitors ask', type: 'project', join_policy: 'approval_required', visibility: 'public' }) });
+        assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body?.error)}`);
+        deskId = o.body.data.organism.id;
+        const j = await json(`/v1/organisms/${deskId}/join`, { method: 'POST', headers: auth(bob.token), body: JSON.stringify({ message: 'I answer the phones on Fridays.' }) });
+        assert(j.status === 202, `join ${j.status}: ${JSON.stringify(j.body)}`);
+        const a = await json(`/v1/organisms/${deskId}/approvals`, { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ action: 'external-release', risk: 'low' }) });
+        assert(a.status === 201 && a.body.data.gated === true, `approval ${a.status}: ${JSON.stringify(a.body?.data ?? a.body?.error)}`);
+        approvalId = a.body.data.approval.id;
+
+        const d = (await waiting(alice.token)).body.data;
+        const jr = d.items.find((i: any) => i.kind === 'join_request');
+        assert(jr && jr.group === 'decide' && jr.from === 'Bob Writer' && jr.subject === 'Front desk' && jr.detail === 'I answer the phones on Fridays.', `join request ${JSON.stringify(jr)}`);
+        assert(jr.href === `/v1/profile?tab=organisms&org=${encodeURIComponent(deskId)}` && jr.act_with === 'aimeat_organism_join_request_review' && !jr.decide, `join request page ${JSON.stringify(jr)}`);
+        joinRequestId = jr.id;
+        const ap = d.items.find((i: any) => i.kind === 'approval');
+        assert(ap && ap.group === 'decide' && ap.count === 1 && ap.from === 'Front desk' && ap.subject === 'Front desk', `approval ${JSON.stringify(ap)}`);
+        assert(ap.href === `/v1/profile?tab=organisms&org=${encodeURIComponent(deskId)}` && ap.act_with === 'aimeat_organism_approvals' && !ap.decide, `approval page ${JSON.stringify(ap)}`);
+        assert(d.by_kind.join_request === 1 && d.by_kind.approval === 1, `by_kind ${JSON.stringify(d.by_kind)}`);
+        assert(d.total === before.total + 2, `total ${before.total} -> ${d.total}`);
+    });
+
+    await test('ISOLATION: bob, who only asked to join, sees neither; an agent without organism:read is told both are withheld', async () => {
+        const b = (await waiting(bob.token)).body.data;
+        assert(b.by_kind.join_request === 0 && b.by_kind.approval === 0, `bob's counts ${JSON.stringify(b.by_kind)}`);
+        assert(!JSON.stringify(b).includes(deskId), `bob sees the organism: ${JSON.stringify(b.items).slice(0, 300)}`);
+        const s = (await waiting(scout.token)).body.data;
+        for (const k of ['approval', 'join_request']) {
+            assert(s.withheld?.includes(k) && !(k in s.by_kind), `${k} for the agent: withheld ${JSON.stringify(s.withheld)} by_kind ${JSON.stringify(s.by_kind)}`);
+        }
+        assert(!s.items.some((i: any) => i.kind === 'approval' || i.kind === 'join_request'), `the agent sees ${JSON.stringify(s.items)}`);
+    });
+
+    await test('EDGE: once bob is a member, the approval that needs the owner is not his to decide, and the request leaves alice\'s list', async () => {
+        const rev = await json(`/v1/organisms/${deskId}/join-requests/${joinRequestId}/review`, { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ decision: 'approved' }) });
+        assert(rev.status === 200, `review ${rev.status}: ${JSON.stringify(rev.body?.error)}`);
+        const b = (await waiting(bob.token)).body.data;
+        assert(b.by_kind.approval === 0 && !b.items.some((i: any) => i.kind === 'approval'), `bob's list ${JSON.stringify(b.by_kind)}`);
+        // The organisms' own route keeps its answer: it counts the approval for every member.
+        const old = await json('/v1/organisms/waiting', { headers: auth(bob.token) });
+        assert(old.status === 200 && old.body.data.items.some((i: any) => i.kind === 'review' && i.orgId === deskId && i.n === 1), `GET /v1/organisms/waiting for bob: ${JSON.stringify(old.body?.data)}`);
+        const a = (await waiting(alice.token)).body.data;
+        assert(a.by_kind.join_request === 0 && a.by_kind.approval === 1, `alice's counts ${JSON.stringify(a.by_kind)}`);
+    });
+
+    await test('a decided approval leaves the list', async () => {
+        const r = await json(`/v1/organisms/${deskId}/approvals/${approvalId}`, { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ decision: 'approve' }) });
+        assert(r.status === 200, `decide ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const a = (await waiting(alice.token)).body.data;
+        assert(a.by_kind.approval === 0 && !a.items.some((i: any) => i.kind === 'approval'), `alice's list ${JSON.stringify(a.by_kind)}`);
     });
 
     finish();
