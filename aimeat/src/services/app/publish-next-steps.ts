@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.10.0 — 2026-11-26 — `bound_skill_issues`: each bound skill whose calls the app's tools now
+ *     refuse (services/app/freshness.ts).
  *   v1.9.0 — 2026-11-26 — `criteria` and `criteria_counts`: how the acceptance criteria stand, every
  *     time, and how to write the first ones (acceptance-criteria.ts).
  *   v1.8.0 — 2026-11-25 — `screens` and `acceptance` read the one size matrix from publish-finish.ts
@@ -94,6 +96,7 @@ import { legalReadiness } from '../app-build/legal-readiness.js';
 import { balancingTestStep } from '../compliance/lia-write.js';
 import { registerStep } from '../compliance/register-step.js';
 import { criteriaCounts, type AppCriterion } from './acceptance-criteria.js';
+import { boundSkillIssues } from './freshness.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -195,6 +198,11 @@ export async function buildPublishNextSteps(
     // which level they were published at, in words the builder can repeat to the owner.
     const level = html ? levelStep(html) : undefined;
     const notOwed = faceAndSkillNotOwed(html ? declaredLevel(html) : undefined, declaresNoAiPath(html));
+    // A bound skill whose calls the app's tools now refuse (services/app/freshness.ts): a publish that
+    // changed the tools is the moment a skill breaks, so the answer names it here.
+    const skillIssues = boundSkills.length > 0
+      ? (await boundSkillIssues(storage, config, ownerName, filename)).filter(s => s.tool_field_issues.length > 0)
+      : [];
 
     return {
       ...(size ? { size } : {}),
@@ -234,8 +242,11 @@ export async function buildPublishNextSteps(
         : notOwed
           ? `Not owed: ${notOwed}. Raising the level makes both owed.`
           : `No agent face yet. Write one with aimeat_app_manage { action: "face_set", filename: "${filename}", markdown }, or from the app with /v1/libs/aimeat-agentface.js — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One PUBLIC memory record: ${agentFaceKey(filename)}, so an app whose data is private describes what it does and never its records.`,
+      ...(skillIssues.length ? { bound_skill_issues: skillIssues } : {}),
       bound_skill: boundSkills.length > 0
-        ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
+        ? skillIssues.length
+          ? `${skillIssues.length} of the ${boundSkills.length} skill(s) bound to this app call its tools with fields the tools refuse now (bound_skill_issues): correct each skill and publish it again, or a person's AI that follows it is refused.`
+          : `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
         : notOwed
           ? `Not owed: ${notOwed}.`
           : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,

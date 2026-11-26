@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.8.0 — 2026-11-26 — freshness calls appFreshnessFor (services/app/freshness.ts).
  *   v1.7.0 — 2026-11-26 — criteria_set calls writeCriteriaFor (services/app/design-spec-ops.ts).
  *   v1.6.0 — 2026-11-26 — rollback calls rollbackAppFor (services/app/rollback-ops.ts).
  *   v1.5.0 — 2026-11-01 — party_stop and party_resume call setAppPartyStatus (WP9d).
@@ -38,6 +39,7 @@ import { setCarryPlan, setMember, removeRosterMember } from '../services/app/ros
 import { listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app/dev-grant-ops.js';
 import { readDesignSpecFor, writeDesignSpecFor, writeCriteriaFor, clearDesignSpecFor } from '../services/app/design-spec-ops.js';
 import { rollbackAppFor } from '../services/app/rollback-ops.js';
+import { appFreshnessFor } from '../services/app/freshness.js';
 import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app/scope-allowance.js';
 import { readStructureFor, writePlanFor, listPlansFor } from '../services/app/structure.js';
 import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app/audit-keep.js';
@@ -135,6 +137,8 @@ export async function appManageMemberAction(
       return opAnswer(await clearDesignSpecFor(storage, config, caller, ref));
     case 'criteria_set':
       return opAnswer(await writeCriteriaFor(storage, config, caller, ref, pick(args, ['criteria', 'expected_revision'])));
+    case 'freshness':
+      return opAnswer(await appFreshnessFor(storage, config, caller, ref));
     case 'rollback':
       return opAnswer(await rollbackAppFor(storage, config, caller, ref, pick(args, ['version', 'note'])));
     case 'structure':

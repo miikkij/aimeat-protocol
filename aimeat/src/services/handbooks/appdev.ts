@@ -436,7 +436,9 @@ where it stands (\`status\`: open, evidenced with \`evidence\` that says what pr
 empty, error and loading states, the phone width and both themes are where builds fall short. Write
 the whole list with \`aimeat_app_manage\` \`criteria_set\`; the spec must exist first. At the finest
 level an update is refused while a line is open (\`APP_OWES_ITEMS\`, item \`criteria\`); every
-publish answer counts them in \`next_steps\`. Only the owner waives a line.
+publish answer counts them in \`next_steps\`. Only the owner waives a line. \`freshness\` says in one
+answer what beside the app has fallen behind it: the spec, criteria evidenced at an older version, the
+data map, and a bound skill whose calls the app's tools now refuse.
 
 **The app's structure page.** Every app has a page that shows the person its eight steps (purpose,
 data, layout, look, build, builders, visibility, requirements), what is done and what is open, and

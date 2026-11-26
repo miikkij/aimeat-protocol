@@ -109,6 +109,7 @@
  *   2026-09-24 -- canonicalOwner and appTarget shorten the caller's `owner` claim with
  *     localAccountName: `name@node` of THIS node is still the bare name, and a visitor's home GHII
  *     stays whole, so it no longer lands in the local namesake's app bucket (secaudit 2026-09, F-1).
+ *   2026-11-26 -- registerFreshnessRoutes: what beside the app is behind it (apps/freshness.ts).
  *   2026-11-26 -- registerRollbackRoutes: an earlier version back in one call (apps/rollback.ts).
  *   2026-10-02 -- registerDesignSpecRoutes: the design spec beside the app (apps/design-spec.ts).
  *   2026-10-05 -- registerDesignSpecRoutes takes no appTarget: the build test moved with the handlers'
@@ -137,6 +138,7 @@ import { registerRoadmapRoutes } from './apps/roadmap.js';
 import { registerAppNewsRoutes } from './apps/news.js';
 import { registerDesignSpecRoutes } from './apps/design-spec.js';
 import { registerRollbackRoutes } from './apps/rollback.js';
+import { registerFreshnessRoutes } from './apps/freshness.js';
 import { registerStructureRoutes } from './apps/structure.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerScopeAllowanceRoutes } from './apps/scope-allowance.js';
@@ -207,6 +209,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerAppNewsRoutes(router, config, storage);
     registerDesignSpecRoutes(router, config, storage);
     registerRollbackRoutes(router, config, storage);
+    registerFreshnessRoutes(router, config, storage);
     registerStructureRoutes(router, config, storage);
     registerScopeAllowanceRoutes(router, config, storage);
     registerAppAgentRoutes(router, config, storage);

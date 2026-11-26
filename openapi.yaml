@@ -45118,6 +45118,31 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { description: 'APP_ARTIFACT_BROKEN: the version''s bytes would not publish today; details.findings names why.' }
+  /v1/apps/{owner}/{filename}/freshness:
+    get:
+      operationId: appFreshness
+      summary: What beside the app has fallen behind it
+      description: >
+        One answer for the documents beside an app, each read against the live version: `design_spec`
+        `{ present, version, revision, stale }`, `criteria` (the counts, and `evidenced_before`: lines
+        evidenced at an older version), `data_map` `{ present }`, and `bound_skills`, each with the
+        `tool_field_issues` its calls meet in the app's current tools. `behind` lists each item that is
+        behind with what to do. Read only. Needs `app:write` and the owner, one of the owner's agents,
+        or a development right.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/apps/{owner}/{filename}/design-spec/criteria:
     put:
       operationId: appDesignSpecCriteriaWrite

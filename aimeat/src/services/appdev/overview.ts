@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from './overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-26 — A curated entry verified more than two minor versions before the node carries
+ *     needs_recheck: true, and pitfalls_curated counts them (the learned entries' rule, kb-quality.ts).
  *   2026-11-21 — pitfalls_curated.enforced names each enforced entry (id, title, enforced_by), narrowed
  *     by the areas like the items, and enforced_at_publish counts that list.
  *   2026-11-21 — opts.areas (the areas a draft uses) narrows both pitfall sections; a curated entry a
@@ -277,15 +279,25 @@ export async function buildAppdevOverview(
         const inAreas = (appliesTo: readonly string[]) => areas.size === 0 || appliesTo.some(a => areas.has(a));
         const enforcedEntries = getAppdevPitfalls().filter(p => p.enforcedBy);
         const enforced = new Set(enforcedEntries.map(p => p.id));
+        // A curated entry is held to the rule a learned one is (kb-quality.ts needsRecheck): verified more
+        // than STALE_MINOR_WINDOW minor versions before this node's own version, it is marked, so a
+        // builder reads it as a lead to check rather than as how the node behaves today.
+        const curatedVersion = getSoftwareVersion();
         const idx = getAppdevPitfallIndex()
             .filter(p => !enforced.has(p.id))
-            .filter(p => inAreas(p.appliesTo));
+            .filter(p => inAreas(p.appliesTo))
+            .map(p => (needsRecheck({ verified_version: p.verifiedVersion }, curatedVersion) ? { ...p, needs_recheck: true } : p));
+        const curatedStale = idx.filter(p => 'needs_recheck' in p).length;
         // Still named, apart: what the publish answer will name when its check fires.
         const enforcedList = enforcedEntries.filter(p => inAreas(p.appliesTo))
             .map(p => ({ id: p.id, title: p.title, enforced_by: p.enforcedBy as string }));
         out.pitfalls_curated = {
             ...capped(idx),
             facets: getAppdevPitfallFacets(),
+            ...(curatedStale > 0 ? {
+                needs_recheck: curatedStale,
+                needs_recheck_note: `${curatedStale} entries were last verified more than ${STALE_MINOR_WINDOW} minor versions before this node (${curatedVersion}); each carries needs_recheck: true. Read them as leads and check them against what the node does now.`,
+            } : {}),
             ...(enforcedList.length > 0 ? {
                 enforced_at_publish: enforcedList.length,
                 enforced: enforcedList,

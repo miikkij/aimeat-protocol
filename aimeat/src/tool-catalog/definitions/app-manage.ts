@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-26 — freshness: what beside the app is behind it (services/app/freshness.ts).
  *   2026-11-26 — criteria_set and the `criteria` field: the acceptance criteria inside the design spec
  *     (services/app/acceptance-criteria.ts).
  *   2026-11-26 — rollback: an earlier version back as the newest, with the reason in the audit log
@@ -300,6 +301,8 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data is stored, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
     spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
+    freshness: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'what beside the app has fallen behind it, in one answer: the design spec (written against an older version), the acceptance criteria (open, or evidenced at an older version), the data map (missing), and each bound skill whose calls the app\'s tools now refuse. Each item behind says what to do. Read it before you change an app and after you publish one. The owner and everybody who may build the app' },
     criteria_set: { fields: F(['filename', 'criteria'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the app\'s acceptance criteria, the whole list (read it first with spec, where it is design_spec.criteria): what "correct" means for the app, one line each, with how it is proven (check: lint, scenario, screenshot, eval or person) and where it stands (status: open, evidenced with evidence that says what proved it, or waived with waived_reason). Write the lines with the person before you build; the empty, error and loading states, the phone width and both themes are where builds fall short. At the finest level an update is refused while a line is open. Everybody who may build the app writes it; only the owner waives a line. The spec must exist first' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',

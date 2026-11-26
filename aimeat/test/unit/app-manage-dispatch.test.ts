@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-26 — freshness reaches GET /v1/apps/:owner/:filename/freshness.
  *   2026-11-26 — criteria_set reaches PUT /v1/apps/:owner/:filename/design-spec/criteria.
  *   2026-11-26 — rollback reaches POST /v1/apps/:owner/:filename/rollback with version and note.
  *   2026-11-25 — face_set reaches POST /v1/memory with the agent face as a public record.
@@ -141,6 +142,7 @@ const EXPECT: Record<string, [string, string]> = {
     spec_clear: ['DELETE', '/v1/apps/alice/shop.html/design-spec'],
     rollback: ['POST', '/v1/apps/alice/shop.html/rollback'],
     criteria_set: ['PUT', '/v1/apps/alice/shop.html/design-spec/criteria'],
+    freshness: ['GET', '/v1/apps/alice/shop.html/freshness'],
     // The permissions the app kept at the move to 4.0; the words to remove travel in the query.
     scope_allowance: ['GET', '/v1/apps/alice/shop.html/scope-allowance'],
     scope_allowance_remove: ['DELETE', '/v1/apps/alice/shop.html/scope-allowance?words=zqxword'],

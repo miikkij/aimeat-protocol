@@ -198,6 +198,18 @@ describe('the research overview lists an enforced entry apart', () => {
     expect(cur.total).toBeGreaterThanOrEqual(20);
   });
 
+  it('marks a curated entry verified more than two minor versions back, and counts them', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const out = await buildAppdevOverview(storage as never, config, reader, { sections: ['pitfalls_curated'] });
+    const cur = out.pitfalls_curated as { items: Array<{ id: string; verifiedVersion: string | null; needs_recheck?: true }>; needs_recheck?: number };
+    const old = cur.items.filter(i => i.verifiedVersion === '4.0.3');
+    const fresh = cur.items.filter(i => i.verifiedVersion === '4.3.1');
+    expect(old.length).toBeGreaterThan(0);
+    for (const i of old) expect(i.needs_recheck, i.id).toBe(true);
+    for (const i of fresh) expect(i.needs_recheck, i.id).toBeUndefined();
+    expect(cur.needs_recheck).toBe(cur.items.filter(i => i.needs_recheck).length);
+  });
+
   it('narrowed to an area, lists only that area\'s enforced entries', async () => {
     const storage = new SqliteStorage(':memory:');
     const out = await buildAppdevOverview(storage as never, config, reader, { sections: ['pitfalls_curated'], areas: ['ai'] });
