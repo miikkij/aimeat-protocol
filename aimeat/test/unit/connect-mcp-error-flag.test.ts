@@ -23,6 +23,7 @@
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
  *   2026-11-25 — aimeat_knowledge_contribute calls the node and is probed like every other tool.
+ *   2026-11-26 — PROBE_SETUP for aimeat_eval_set (a list of cases).
  *   2026-11-19 — PROBE_SETUP for aimeat_kyc_suspicion_mark (an organism and an observation).
  *   2026-11-12 — PROBE_SETUP for aimeat_access_request (an app ref, <owner>/<filename>).
  *   2026-11-09 — PROBE_SETUP for aimeat_memory_write (a value), whose value is optional now that the
@@ -81,6 +82,8 @@ const NEVER_CALLS_THE_NODE = new Map<string, string>([
  * REFUSES_A_GENERIC_PROBE untested; with them the node-refusal path is actually measured.
  */
 const PROBE_SETUP: Record<string, Record<string, unknown>> = {
+  // The cases are a list of { id, prompt, expect }; the generic probe's string is not one.
+  aimeat_eval_set: { kind: 'skill', name: 'probe', cases: [{ id: 'probe', prompt: 'probe', expect: [{ kind: 'contains', value: 'probe' }] }] },
   // `value` is optional now that `patch` is the other way to write; exactly one of them is needed.
   aimeat_memory_write: { value: { probe: true } },
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },

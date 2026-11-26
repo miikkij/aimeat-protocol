@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
 const kind = { type: 'string' as const, enum: ['crew', 'skill', 'pack'], required: true, description: 'What is evaluated: a crew (one of your agents), a skill, or a library pack.' };
-const name = { type: 'string' as const, required: true, description: 'The crew\'s agent name, the skill\'s ref or name (user:alice/my-skill, node:aimeat-writing), or the pack\'s id.' };
+const name = { type: 'string' as const, required: true, description: 'The crew\'s agent name, the skill\'s ref or name (user:alice/my-skill, node:aimeat-app-builder-atelier), or the pack\'s id.' };
 
 export const evalTools = [
   {
