@@ -1305,6 +1305,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
+    "src/services/compliance/report-reads.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getMemoryByKeys": 1,
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Written 2026-11-26, the node's own read: the batch form of reads listed elsewhere, for one compliance report. By key it reads every app's public data-map declaration (data-map/data-map-store.ts), the app's registration setting (app-parties/store.ts) and the compliance documents of system@<node> (compliance/docs.ts); the single read passes on a key one of those listed readers asks for. No content of a person's is shown; who reads the report is decided at its route."
+    },
     "src/services/component/content.ts": {
       "reads": {
         "getMemory": 3
@@ -3136,6 +3144,12 @@
       },
       "why": "Reviewed 2026-10-31, the node's own read: the operator's settlement ceiling for a federation peer and the day's record of that peer's refused settlements, in the federation-settlement system namespace. No content of a person's."
     },
+    "src/services/share/provenance.ts": {
+      "reads": {
+        "listAllMemoryByKeyShape": 1
+      },
+      "why": "Written 2026-11-26, the node's own read: the stored share records of every workspace (organism.{org}.w.{ws}.meta.share), read to find the workspaces whose share is open before a report's scan. A share record holds flags, end dates and hashes, no content; the content a share serves is loaded by workspace/public-collectors.ts, which takes the classification reader."
+    },
     "src/services/share/search-reindex.ts": {
       "reads": {
         "listAllMemory": 1
@@ -3507,9 +3521,9 @@
     },
     "src/services/workspace/public-collectors.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemoryByKeyShape": 1
       },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16."
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16. Since 2026-11-26 it reads a space's published rows by key shape, one call for both collectors."
     },
     "src/services/workspace/records-delete-op.ts": {
       "reads": {
