@@ -90,6 +90,16 @@ function themeCss(): string {
 .og-sec .og-sec .poster-section-title { font-size: 1.15rem; }
 .og-sec .og-sec .poster-section-title small.og-sec-num { min-width: 34px; height: 30px; font-size: .8rem; }
 .og-sec .og-fold-sec { border-top: 1px solid var(--border); margin-top: 0; padding: 6px 0; }
+/* A section with a sub-number (02.1) is one card with the section before it: no gap, no frame
+   between them, a rule over its smaller headline. */
+.og-sec:has(+ .og-sec--sub) { border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; padding-bottom: 8px; }
+.og-sec + .og-sec--sub { margin-top: 0; border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; padding-top: 0; }
+.og-main > .og-sec + .og-sec--sub { margin-top: -1.4rem; }
+.og-sec--sub > .og-sec-h { border-top: 1px solid var(--border); padding-top: 18px; }
+.og-sec + .og-fold-sec.og-sec--sub { padding-bottom: 10px; }
+.og-fold-sec.og-sec--sub > .og-fold { border-top: 1px solid var(--border); padding-top: 12px; }
+.og-sec--sub > .og-sec-h .poster-section-title { font-size: 1.15rem; }
+.og-sec--sub > .og-sec-h .poster-section-title small.og-sec-num { min-width: 34px; height: 30px; font-size: .8rem; }
 
 /* A section's headline is a plain heading with its number in a sun tile, not a dark block. */
 .poster-section-title { background: transparent; color: var(--text); border-bottom: 0; padding: 0; display: flex; align-items: center; gap: 12px; font-size: 1.375rem; }
