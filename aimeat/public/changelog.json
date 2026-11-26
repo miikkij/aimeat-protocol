@@ -5,6 +5,17 @@
       "date": "2026-11-26",
       "version": "4.3.1",
       "kind": "feature",
+      "id": "2026-11-26-see-at-once-where-something-waits-for-you",
+      "highlight": false,
+      "audience": ["user"],
+      "title": { "en": "See at once where something waits for you", "fi": "Näet heti, missä jokin odottaa sinua" },
+      "body": { "en": "The Home link in the top bar and the Settings & Controls menu show a count where something waits for your decision. The count changes while the page is open. The Settings & Controls pages start with figures that say where things stand: how many goals run, which agents need attention, which invitations wait for you. The top bar now shows your own places first and the rest after them.", "fi": "Yläpalkin Koti-linkki ja Asetukset ja hallinta -valikko näyttävät luvun siellä, missä jokin odottaa päätöstäsi. Luku muuttuu, kun sivu on auki. Asetukset ja hallinta -sivut alkavat luvuilla, jotka kertovat tilanteen: montako tavoitetta on käynnissä, mitkä agentit kaipaavat huomiota ja mitkä kutsut odottavat sinua. Yläpalkki näyttää nyt omat paikkasi ensin ja muut niiden jälkeen." },
+      "summary": { "en": "The top bar and the Settings menu show a count where something waits for your decision.", "fi": "Yläpalkki ja Asetukset-valikko näyttävät luvun siellä, missä jokin odottaa päätöstäsi." }
+    },
+    {
+      "date": "2026-11-26",
+      "version": "4.3.1",
+      "kind": "feature",
       "id": "2026-11-26-prove-an-app-works-before-people-use-it",
       "highlight": false,
       "audience": ["user", "agent", "developer"],
