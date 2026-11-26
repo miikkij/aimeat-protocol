@@ -24,6 +24,9 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.2.0 — 2026-11-26 — The Settings overview: its totals are the dark state band of a Settings
+ *     page (the poster's tilted coral band was the largest thing on the page), and a list group's
+ *     title the contents rail lists carries the number tile.
  *   v1.1.0 — 2026-11-26 — The Settings menu: a group that folds has the bold name the others have,
  *     rows have no rule between them, the row under the pointer gets a ground and the open row is
  *     the one filled box. "Show all tools" is an outlined button, as every action of the theme is.
@@ -278,7 +281,7 @@ function themeCss(): string {
 .poster-band, .poster-chooser, .open-items { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--shape-corner); padding: 24px; margin-top: 20px; }
 .poster-band .poster-band, .poster-chooser .poster-band, .poster-band .open-items { border: 0; border-radius: 0; padding: 0; background: transparent; }
 :root .poster-section-title[data-rail-n]::before { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; min-width: 40px; height: 40px; padding: 0 10px; margin: 0; border-radius: var(--shape-corner-control); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .95rem; font-weight: 500; }
-:root .open-items-title[data-rail-n]::before { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 40px; height: 40px; padding: 0 10px; margin: 0 12px 0 0; border-radius: var(--shape-corner-control); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .95rem; font-weight: 500; vertical-align: middle; }
+:root .open-items-title[data-rail-n]::before, :root .list-group-title[data-rail-n]::before { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 40px; height: 40px; padding: 0 10px; margin: 0 12px 0 0; border-radius: var(--shape-corner-control); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .95rem; font-weight: 500; vertical-align: middle; }
 /* The sentence that says where a band stands (how many things wait) is the dark state band of a
    Settings page: ink ground, light words, never a pale tint. */
 .poster-band > .state-line { margin: 0; padding: 12px 16px; border-radius: var(--shape-corner); background: var(--ink-ground); color: var(--on-ink-ground); font-size: 1.05rem; font-weight: 700; }
@@ -286,6 +289,15 @@ function themeCss(): string {
 /* The block that starts the chat is the home's one loud box: the ink frame and the sun's offset shadow that a
    Settings page gives its page start. */
 .poster-chooser { border: 2px solid var(--text); box-shadow: 6px 6px 0 var(--sun); }
+/* The Settings overview's totals are the dark state band of a Settings page, level and as high as
+   its figures: not the poster's tilted coral band, which was the largest thing on the page and said
+   only how many of each thing there are. The app catalogue's fitted band keeps its own cut. */
+.number-band:not(.number-band--fitted) .number-band-row { margin: 20px 0 16px; padding: 14px 20px; gap: 10px 44px; align-items: flex-start; border-radius: var(--shape-corner); background: var(--ink-ground); color: var(--on-ink-ground); }
+.number-band:not(.number-band--fitted) .number-band-row::before, .number-band:not(.number-band--fitted) .number-band-row::after { content: none; }
+.number-band:not(.number-band--fitted) .number-band-item { gap: 2px; color: var(--on-ink-ground); }
+.number-band:not(.number-band--fitted) .number-band-value { font-size: 2rem; color: var(--sun); }
+.number-band:not(.number-band--fitted) .number-band-item:hover .number-band-value { color: var(--on-ink-ground); }
+.number-band:not(.number-band--fitted) .number-band-label { color: var(--on-ink-ground); }
 /* The person's name on the home is a heading beside a small picture, not a poster's headline. */
 .poster-masthead-name { font-size: 2.25rem; }
 .poster-masthead-avatar { width: 64px; height: 64px; }
