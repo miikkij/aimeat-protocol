@@ -191,6 +191,13 @@ export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
    * read that asked for it ran the same count once per page.
    */
   noTotal?: boolean;
+  /**
+   * Keyset cursor: only records older than this one, in the list's own order (generatedAt, then id,
+   * both descending). A reader that walks the whole list passes the last row of the page before, so
+   * each page costs the same; with an offset the database skipped every earlier row again, and 413
+   * pages of one account took 108 seconds (the owner export, 2026-11-26). `offset` is ignored with it.
+   */
+  before?: { generatedAt: string; id: string };
   limit?: number;
   offset?: number;
 }

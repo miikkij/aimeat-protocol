@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.11.0 — 2026-11-26 — listAiProvenance({ before }): a keyset page, ordered by generatedAt and then
+ *     id, for a reader that walks every record (the owner export). Mirrors the Postgres provider.
  *   v1.10.0 — 2026-11-26 — aiProvenanceActivity(): counts by principal, pipeline, model, public and
  *     reviewed. Mirrors the Postgres provider.
  *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
@@ -266,9 +268,13 @@ export const aiProvenanceMethods = {
     const total = query?.noTotal ? -1 : (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)
       .get(...params) as { n: number }).n;
     const limit = Math.min(Math.max(query?.limit ?? 50, 1), 500);
+    // The keyset (query.before): the rows after the cursor in this order, so no earlier row is read again.
+    const before = query?.before;
+    const pageWhere = before ? `${clause ? `${clause} AND` : 'WHERE'} (p.generatedAt, p.id) < (?, ?)` : clause;
+    const pageParams = before ? [...params, before.generatedAt, before.id] : params;
     const rows = this.db.prepare(
-      `SELECT p.* FROM ai_provenance p ${clause} ORDER BY p.generatedAt DESC LIMIT ? OFFSET ?`
-    ).all(...params, limit, Math.max(query?.offset ?? 0, 0)) as Record<string, unknown>[];
+      `SELECT p.* FROM ai_provenance p ${pageWhere} ORDER BY p.generatedAt DESC, p.id DESC LIMIT ? OFFSET ?`
+    ).all(...pageParams, limit, before ? 0 : Math.max(query?.offset ?? 0, 0)) as Record<string, unknown>[];
     return { items: rows.map(deserialize), total };
   },
 

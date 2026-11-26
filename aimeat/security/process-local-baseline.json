@@ -1089,6 +1089,14 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/owner-export/runner.ts :: map :: running": {
+      "count": 1,
+      "reason": "The data export this process writes now; the queue runs in the one process holding the lease owner-export, and a cancel from another process reaches it through the stored job record."
+    },
+    "src/services/owner-export/runner.ts :: interval :: scheduleOwnerExports": {
+      "count": 1,
+      "reason": "Each process ticks; claimedSweep lets one of them run the hourly removal of expired exports."
+    },
     "src/services/goose/chat-config.ts :: let :: warnedOperatorFile": {
       "count": 1,
       "reason": "DEBT"

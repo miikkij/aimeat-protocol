@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The GDPR export (GET /v1/owners/:name/export) carries what the account holds beyond
  *   memory, files and agents: its message threads, companies, invoices, vouchers, fiscal years,
- *   outbound contacts and its agents' tasks (routes/owners/export-records.ts). Each section is read
+ *   outbound contacts and its agents' tasks (services/owner-export/export-records.ts). Each section is read
  *   against a fixture with several records of its kind, and another owner's export carries none of
  *   them. The sections the export had before stay as e2e-owner-export.ts holds them.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-export-records

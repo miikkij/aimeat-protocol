@@ -544,13 +544,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's outbound theme configuration."
     },
-    "src/routes/owners/export.ts": {
-      "reads": {
-        "listMemory": 3,
-        "listStorageFiles": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis 2026-11-03, B6): the third listMemory reads the account's service namespace and passes the same exportable() presentation as the account's own records."
-    },
     "src/routes/page-host.ts": {
       "reads": {
         "getStorageFile": 1,
@@ -1308,8 +1301,8 @@
     "src/services/compliance/report-reads.ts": {
       "reads": {
         "getMemory": 1,
-        "getMemoryByKeys": 1,
-        "getMemoryByKeysAnyOwner": 1
+        "getMemoryByKeysAnyOwner": 1,
+        "getMemoryByKeys": 1
       },
       "why": "Written 2026-11-26, the node's own read: the batch form of reads listed elsewhere, for one compliance report. By key it reads every app's public data-map declaration (data-map/data-map-store.ts), the app's registration setting (app-parties/store.ts) and the compliance documents of system@<node> (compliance/docs.ts); the single read passes on a key one of those listed readers asks for. No content of a person's is shown; who reads the report is decided at its route."
     },
@@ -2712,6 +2705,38 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-02, the node's own read: the owner's encrypted AI key records (openrouter.apikey, ai.apikey.provider.*), read only to answer whether a ciphertext is there. No content and no key leaves the function."
+    },
+    "src/services/owner-export/account-sections.ts": {
+      "reads": {
+        "listMemory": 1,
+        "listStorageFiles": 2
+      },
+      "why": "Moved from routes/owners/export.ts on 2026-11-26 with the same reasons (TARGET-082 V1, reviewed 2026-09-29): the memory pages pass presentMemories with the classification reader and the credential mask, the account's service namespace included (B6), and organism content is named in classified_organism_content (decided 2026-09-30). The file reads are metadata only."
+    },
+    "src/services/owner-export/build.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 1,
+        "readStorageFileRange": 1
+      },
+      "why": "Reviewed 2026-11-26: the person's own data export. The files read are those of the account and its agents, the parts the person chose, copied into their own ZIP; their memory pages pass the classification reader through account-sections.ts. No other account's file is read."
+    },
+    "src/services/owner-export/job-store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-26, the node's own read: the export job record (export.job in the account's service namespace) and the node's export queue (export.queue under system@node). No content."
+    },
+    "src/services/owner-export/ops.ts": {
+      "reads": {
+        "generateDownloadToken": 1
+      },
+      "why": "Reviewed 2026-11-26: the download link of one ZIP file of the account's own ready export, minted only for the account holder or the operator in person (an agent gets none). It names the export's file, not a stored file."
+    },
+    "src/services/owner-export/parts.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Reviewed 2026-11-26, the node's own read: the sizes of the account's files for the export plan, metadata only."
     },
     "src/services/owner/memory.ts": {
       "reads": {

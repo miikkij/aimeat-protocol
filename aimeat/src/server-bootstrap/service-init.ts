@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-26 — scheduleOwnerExports: the data export queue and its hourly sweep (services/owner-export/runner.ts).
  *   2026-11-24 — After the stored peers load, the Core FED-16 step names the peers whose sign-in checks
  *     stopped, from the same rows (services/federation/signin-permission-step.ts).
  *   2026-11-14 — The hourly team-end sweep (services/team/expiry.ts): temporary members and team end days.
@@ -189,6 +190,7 @@ import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai/disclosure-sweep.js';
 import { scheduleAgreementSweep } from '../services/compliance/agreements-gaps.js';
 import { scheduleGoalSweep } from '../services/goals/goals-sweep.js';
+import { scheduleOwnerExports } from '../services/owner-export/runner.js';
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notifications/sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
@@ -632,6 +634,8 @@ export async function initializeServices(
   // Hourly: the shortest clock is a day.
   scheduleAgreementSweep({ storage, config });
   scheduleGoalSweep({ storage, config });
+  // The data export queue, one export at a time on the node, and the hourly removal of expired ones.
+  scheduleOwnerExports({ storage, config });
 
   // Notifications the owner asked to be held or folded (services/notifications/sweeps.ts): every
   // five minutes, the pushes held during quiet hours go out as one when the window has just ended;

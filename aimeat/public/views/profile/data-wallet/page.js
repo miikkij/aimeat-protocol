@@ -11,7 +11,7 @@
  *   02 the outside parties (parties.js); 03 what happened (today, yesterday and earlier, each opening
  *   the trail grouped: who tried what, how many times, with the grants and revocations read off the
  *   permissions' own timestamps); 04 the grant
- *   form as a fold; 05 everything you own as one file, with what is inside; 06 classification
+ *   form as a fold; 05 the data export, the parts chosen with their sizes, as ZIP files; 06 classification
  *   (classification.js); 07 what is known about your content (content-classes.js); 08 marked content,
  *   where the person accepts, takes back or releases what may try to steer an AI (content-risk.js). A wallet that
  *   lives on another server shows one box. Pure render over the ctx bag; the rows are rows.js. How
@@ -19,6 +19,10 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.32.0 — 2026-11-26 — 04 is the data export as a background job: the parts as check lines with
+ *     their size on this account (the account itself always in), the start, and the export's state
+ *     with its ZIP files to download and a way to cancel or remove it. The card grid of what one JSON
+ *     file held, and its download, left (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   v1.31.0 — 2026-11-26 — The eight sections are four with their parts: 01 who reaches what (01.1 the
  *     outside parties, 01.2 the grant form), 02 what happened, 03 classification (03.1 what is known
  *     about the content, 03.2 marked content), 04 everything as one file. The section ids are the old
@@ -89,6 +93,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { num, dateTime } from '/js/format.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -99,9 +104,9 @@ import { FigureStrip } from '/components/FigureStrip.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Box, SettingBox } from '/components/Box.js';
-import { Card, CardGrid } from '/components/Card.js';
 import { Row as Line } from '/components/Layout.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
+import { Check } from '/components/Check.js';
 import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
@@ -129,7 +134,7 @@ export function renderPage(ctx) {
     { id: 'dw-class', num: '03', label: x('cls.title'), count: classificationCount(ctx.cls) },
     { id: 'dw-content', num: '03.1', label: x('cc.title'), count: contentCount(ctx.content) },
     { id: 'dw-risk', num: '03.2', label: x('cr.title'), count: riskCount(ctx.risk) },
-    { id: 'dw-export', num: '04', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
+    { id: 'dw-export', num: '04', label: x('secExport'), count: ctx.exportJob ? x('exportJob.state.' + ctx.exportJob.state) : '' },
   ];
   // The start: the page's own list answers the same question, so there is no button and no done.
   const start = html`<${PageStart} id="dataWallet" />`;
@@ -170,7 +175,7 @@ function head(ctx) {
     <${Loud} onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}<//>
     <${Note} kind="hint" slab inline>${x('grantSlabHint')}<//>
     <${Actions}>
-      <${Action} small disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}<//>
+      <${Action} small onClick=${() => ctx.goToExport()}>${x('exportDoor')}<//>
     <//>`;
   return { title: t('profile.tabs.dataWallet'), help: 'concept.data_wallet', sub: x('titleSub'), marks, desc: x('desc'), actions };
 }
@@ -308,30 +313,83 @@ function secGrant(ctx) {
 
 /* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secExport(ctx) {
-  const ps = ctx.ov.permSummary;
-  const mb = Math.max(1, Math.round((ps.total_memory_keys * 2) / 1000));
-  const items = [
-    ['account', x('export.accountSub')],
-    ['memory', x('export.memorySub', { n: n(ps.total_memory_keys) })],
-    ['files', x('export.filesSub', { n: n(ps.total_storage_files) })],
-    ['agents', x('export.agentsSub')],
-    ['consents', x('export.consentsSub', { n: ctx.ov.consents.total, active: ctx.active.length, revoked: ctx.revokedList.length })],
-    ['trade', x('export.tradeSub')],
-    ['organisms', x('export.organismsSub')],
-    ['push', x('export.pushSub')],
-    ['flags', x('export.flagsSub')],
-  ];
-  return html`
-    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
-      <${Note} kind="lead">${x('exportIntro', { mb })}<//>
-      <${CardGrid}>${items.map(([k, sub]) => html`<${Card} key=${k} name=${x('export.' + k)} meta=${sub} />`)}<//>
+/** Bytes in the reader's numbers: kB under a megabyte (one decimal, 0 for nothing), MB under a gigabyte, GB from there. */
+function size(bytes) {
+  const b = Number(bytes) || 0;
+  if (b >= 1e9) return x('bytes.gb', { n: fmtDec(b / 1e9) });
+  if (b >= 1e6) return x('bytes.mb', { n: fmtDec(b / 1e6) });
+  return x('bytes.kb', { n: fmtDec(b / 1e3) });
+}
+/** One decimal, in the reader's own number format. */
+const fmtDec = (v) => num(Math.round(v * 10) / 10);
+
+/** The export now: waiting, being written, ready with its files, or how it ended. */
+function exportState(ctx) {
+  const job = ctx.exportJob;
+  if (!job) return null;
+  const busy = ctx.busy === 'export';
+  const when = (iso) => (iso ? dateTime(iso) : '');
+  if (job.state === 'queued' || job.state === 'running') {
+    const line = job.state === 'queued'
+      ? x('exportJob.queued', { place: job.place_in_queue || 1 })
+      : x('exportJob.running', { part: x('exportPart.' + (job.progress?.part || 'account') + '.name'), size: size(job.progress?.bytes || 0) });
+    return html`
       <${Box}>
         <${Line} gap="large" wrap>
-          <${Loud} control disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}<//>
-          <span>${x('exportBody', { file: ctx.exportName })} ${msg(ctx.exportMsg)}</span>
+          <span>${line}</span>
+          <${Action} small soft disabled=${busy} onClick=${() => ctx.cancelExport()}>${x('exportJob.cancel')}<//>
         <//>
-      <//>
+      <//>`;
+  }
+  if (job.state === 'ready') {
+    const total = (job.files || []).reduce((s, f) => s + f.bytes, 0);
+    return html`
+      <${Box}>
+        <${Note} kind="lead">${x((job.files || []).length === 1 ? 'exportJob.readyOne' : 'exportJob.readyMany', { files: (job.files || []).length, size: size(total), until: when(job.expires_at) })}<//>
+        <${Actions}>
+          ${(job.files || []).map((f, i, all) => {
+            // The file's own name is long; the browser saves it under that name (Content-Disposition),
+            // so the action says which part it is and how large, and fits a phone's width.
+            const label = all.length === 1 ? x('exportJob.downloadOne', { size: size(f.bytes) }) : x('exportJob.downloadPart', { n: f.n, of: all.length, size: size(f.bytes) });
+            return f.url
+              ? html`<${Action} key=${f.n} href=${f.url} download=${f.file} title=${f.file}>${label}<//>`
+              : html`<span key=${f.n}>${label}</span>`;
+          })}
+        <//>
+        <${Note} kind="hint">${x('exportJob.readyHint')}<//>
+        <${Actions}>
+          <${Action} small soft disabled=${busy} onClick=${() => ctx.cancelExport()}>${x('exportJob.remove')}<//>
+        <//>
+      <//>`;
+  }
+  const ended = job.state === 'failed' ? x('exportJob.failed', { reason: job.error || '' })
+    : job.state === 'expired' ? x('exportJob.expired') : x('exportJob.cancelledNote');
+  return html`<${Note} kind=${job.state === 'failed' ? 'message' : 'quiet'} error=${job.state === 'failed'}>${ended}<//>`;
+}
+
+function secExport(ctx) {
+  const plan = ctx.exportPlan;
+  const job = ctx.exportJob;
+  const chosen = new Set(ctx.exportParts || []);
+  const live = job && (job.state === 'queued' || job.state === 'running');
+  const parts = plan?.parts || [];
+  const total = parts.filter((p) => chosen.has(p.id)).reduce((s, p) => s + p.bytes, 0);
+  const count = (p) => (p.id === 'memories' || p.id === 'ai_provenance' ? x('exportPart.records', { n: n(p.count) }) : p.id === 'app_code' ? x('exportPart.versions', { n: n(p.count) }) : x('exportPart.files', { n: n(p.count) }));
+  return html`
+    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${plan ? x('exportJob.sub', { size: size(total) }) : ''}>
+      <${Note} kind="lead">${x('exportJob.intro', { size: size((plan?.file_mb || 1024) * 1e6), days: plan?.keep_days || 7 })}<//>
+      ${exportState(ctx)}
+      ${!plan ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        <${Note} kind="lead"><strong>${x('exportJob.alwaysTitle')}</strong> ${x('exportPart.account.what')}<//>
+        <${Field} label=${x('exportJob.what')} group>
+          ${parts.map((p) => html`
+            <${Check} key=${p.id} checked=${chosen.has(p.id)} disabled=${live} onChange=${(on) => ctx.toggleExportPart(p.id, on)}
+              hint=${x('exportPart.' + p.id + '.what')}><strong>${x('exportPart.' + p.id + '.name')}</strong> · ${count(p)} · ${size(p.bytes)}<//>`)}
+        <//>
+        <${FormActions}>
+          <${Loud} control disabled=${live || ctx.busy === 'export'} onClick=${() => ctx.startExport()}>${ctx.busy === 'export' ? x('exportJob.starting') : x('exportJob.start')}<//>
+          ${msg(ctx.exportMsg)}
+        <//>`}
     <//>`;
 }
 

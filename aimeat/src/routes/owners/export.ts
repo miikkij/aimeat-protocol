@@ -2,17 +2,21 @@
  * @file src/routes/owners/export.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description GDPR data export for one owner: GET /v1/owners/:name/export. Extracted VERBATIM
- *   from src/routes/owners.ts to satisfy max-file-lines; the route body is unchanged, so what the
- *   export contains and who may call it are exactly what they were.
- *
- *   Owner-invariant reads (boards, posts, flags) stay hoisted out of the per-agent loop — that was
- *   an O(agents x boards) fix and moving the file must not undo it.
+ * @description GDPR data export for one owner as one JSON answer: GET /v1/owners/:name/export. The
+ *   sections and what each holds are read by services/owner-export/account-sections.ts; this route
+ *   decides who may call it and writes the answer a piece at a time. For a large account the person
+ *   chooses parts and gets ZIP files from the background export (routes/owners/exports.ts).
  * @structure registerOwnerExportRoute(router, config, storage)
  * @usage
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   2026-11-26 — The answer is written section by section and a list a page at a time
+ *     (services/owner-export/json-stream.ts), with the sections read by account-sections.ts. One
+ *     res.json() of the whole export passed V8's string limit on the largest account of a production
+ *     node and answered 500 after 108 s; the AI provenance records are read by keyset pages now, which
+ *     was most of those seconds. The answer's keys and order are unchanged
+ *     (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   2026-11-19 — Seventeen sections the export lacked (export-records.ts): `message_threads`,
  *     `contacts`, `companies`, `invoices`, `vouchers`, `fiscal_years`, `outbound_contacts`,
  *     `outbound_messages`, `agent_tasks`, `scheduled_jobs`, `capabilities`, `package_instances`,
@@ -38,93 +42,75 @@
  *     mask, TARGET-082).
  *   v1.7.0 — 2026-09-26 — `work_provided` and `work_requested` beside `memories`: the person's own
  *     work under their GHII, what they published and asked for in person, with the disputes on it.
- *     One view per side (workProvidedView, workRequestedView) for these and the per-agent sections.
  *   v1.6.0 — 2026-09-20 — A credential record is redacted here too (shownMemoryValue), for the owner's
- *     memories and their agents' alike. Every other door has answered `{ configured: true }` since
- *     2026-09-16; this one handed out the ciphertext of the OpenRouter and TypeSafe keys and the PSP
- *     secret, in a file that leaves the node by design. The person loses nothing: they cannot decrypt
- *     it, and the key itself lives at the provider.
+ *     memories and their agents' alike. The person loses nothing: they cannot decrypt it, and the key
+ *     itself lives at the provider.
  *   v1.5.0 — 2026-09-14 — requireLocalSession. requireOwnerPrincipal admits a federated login,
  *     which carries roles ['owner'] and the local part of the visitor's HOME name, so the name
  *     comparison matched the LOCAL account and a visitor exported everything it had ever stored.
  *   v1.4.0 — 2026-09-09 — The `listings`, `purchases` and per-agent `escrow_holds` sections are gone
- *     with the storage methods behind them: nothing on any node ever wrote a marketplace listing, a
- *     purchase or a generic escrow hold, so the sections could only ever be empty (e2e-owner-export
- *     test 14 had pinned that). The tables stay; the export no longer names them.
- *   v1.3.0 — 2026-09-08 — Three sections that existed for values nothing produced: organism
- *     memberships and flags filed are keyed by the bare owner name where they are written and were
- *     read by GHII only, and the consent audit trail skipped the pending buffer, so the last
- *     minute was missing. All three found by e2e-owner-export.
- *   v1.2.0 — 2026-08-29 — The owner's OWN memory entries and storage files are in the export. They
- *     never were: memory and files were read inside the per-agent loop only, so the GHII namespace
- *     where an owner session actually writes was skipped entirely, and this route's own comment
- *     claimed it exported ALL data types. Erasure had always known better (owner-erasure.ts calls
- *     deleteAllMemory(ghii)), so export and delete disagreed about where a person's data lives.
- *     Found while auditing the privacy policy, which names this button as the Article 15 and 20
- *     mechanism. New response keys `memories` and `storage_files` sit beside `ghii`.
- *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: behind requireOwnerPrincipal(). One export is
- *     everything the account holds in one response, and the check below only refuses a DIFFERENT
- *     owner — every machine principal of the SAME owner passed it, because req.auth.owner is the
- *     human's account name on an agent, ecosystem and app-grant token alike.
+ *     with the storage methods behind them.
+ *   v1.3.0 — 2026-09-08 — Three sections that existed for values nothing produced (organism
+ *     memberships, flags filed, the consent audit's pending buffer). All three found by e2e-owner-export.
+ *   v1.2.0 — 2026-08-29 — The owner's OWN memory entries and storage files are in the export.
+ *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: behind requireOwnerPrincipal().
  *   v1.0.0 — 2026-08-07 — Extracted from routes/owners.ts (max-file-lines).
  */
-import type { Router } from 'express';
+import type { Router, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, WorkRecord, MemoryRecord } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
-import { calculateTrustScore } from '../../services/trust.js';
-import { getPendingConsentAudit } from '../../services/consent/audit-buffer.js';
-import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { memoryTarget } from '../../services/classification/labels.js';
-import { scopeOrganism } from '../../services/classification/policy.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator/override.js';
-import { exportExtraSections, exportAgentMessages } from './export-sections.js';
-import { exportAccountRecords } from './export-records.js';
+import { ownerExportSections } from '../../services/owner-export/account-sections.js';
+import { sectionsAsJsonObject } from '../../services/owner-export/json-stream.js';
 import { appendRequest } from '../../services/compliance/docs.js';
 import { logger } from '../../utils/logger.js';
-import { isValidGHII } from '../../utils/gaii.js';
-import { serviceNamespaceOf } from '../../utils/service-namespace.js';
 
-/** One work item this identity was to do, as the export shows it: the other side is the requester. */
-function workProvidedView(w: WorkRecord) {
-  return {
-    tracking_code: w.trackingCode, action_id: w.actionId, status: w.status, requester_gaii: w.requesterGaii,
-    cost: w.cost, rating: w.rating, created_at: w.createdAt, updated_at: w.updatedAt,
-  };
-}
+/** Pieces are gathered to about this many characters before one write, so a page of small rows is one write. */
+const WRITE_CHUNK = 64 * 1024;
 
-/** One work item this identity asked for, as the export shows it: the other side is the provider. */
-function workRequestedView(w: WorkRecord) {
-  return {
-    tracking_code: w.trackingCode, action_id: w.actionId, status: w.status, provider_gaii: w.providerGaii,
-    cost: w.cost, rating: w.rating, created_at: w.createdAt, updated_at: w.updatedAt,
+/** Write the pieces to the response, waiting whenever the socket asks it to. */
+async function writeAll(res: Response, pieces: AsyncIterable<string>): Promise<void> {
+  let buf = '';
+  const flush = async (): Promise<void> => {
+    if (!buf) return;
+    const ok = res.write(buf);
+    buf = '';
+    if (!ok) await new Promise<void>((resolve, reject) => {
+      const done = (): void => { res.off('drain', done); res.off('close', closed); resolve(); };
+      const closed = (): void => { res.off('drain', done); reject(new Error('the client closed the connection')); };
+      res.once('drain', done);
+      res.once('close', closed);
+    });
   };
+  for await (const piece of pieces) {
+    buf += piece;
+    if (buf.length >= WRITE_CHUNK) await flush();
+  }
+  await flush();
 }
 
 /** Mount GET /v1/owners/:name/export on an existing router. */
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
-  // GET /v1/owners/:name/export — GDPR data export (account holder or operator)
-  // Exports ALL data types associated with the owner for full GDPR compliance.
+  // GET /v1/owners/:name/export — GDPR data export (account holder or operator), every section the
+  // account holds in one JSON answer.
   //
-  // requireLocalSession for the same reason the deletion door has it: a federated login mints
+  // requireLocalSession for the same reason the deletion route has it: a federated login mints
   // `owner` as the local part of the visitor's HOME name with roles ['owner'], so
   // requireOwnerPrincipal admitted a visitor called `alice` and the name comparison below matched
-  // the LOCAL alice — one call and a visitor from any peer held everything she had ever stored.
-  // Found by the AI triage of 2026-09-13.
+  // the LOCAL alice. Found by the AI triage of 2026-09-13.
   router.get('/v1/owners/:name/export', requireAuth(), requireLocalSession(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
-    // The operator half asks isOperatorCaller, as the MCP tools do. The operator trail
-    // (operatorOverride: the operator's usage row and a line in the person's feed) is written once
-    // the account is known to exist, so a mistyped name leaves no row in a feed that a later
-    // account of that name would inherit.
+    // The operator half asks isOperatorCaller, as the MCP tools do. The operator trail is written once
+    // the account is known to exist, so a mistyped name leaves no row in a feed that a later account of
+    // that name would inherit.
     const own = req.auth!.owner === name;
     if (!own && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own data'));
       return;
     }
-
     const owner = await storage.getOwner(name);
     if (!owner) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${name}`));
@@ -135,453 +121,37 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // ── GHII (identity) data ────────────────────────────────────────
-    const ghiiRecord = await storage.getGHIIByOwner(name);
-    const ghiiData = ghiiRecord ? {
-      username: ghiiRecord.username,
-      ghii: ghiiRecord.ghii,
-      display_name: ghiiRecord.displayName,
-      bio: ghiiRecord.bio,
-      avatar: ghiiRecord.avatar,
-      locale: ghiiRecord.locale,
-      verification_level: ghiiRecord.verificationLevel,
-      totp_enabled: ghiiRecord.totpEnabled,
-      // NOTE: TOTP secret is intentionally excluded for security
-      email_verified_at: ghiiRecord.emailVerifiedAt,
-      verification_method: ghiiRecord.verificationMethod,
-      magic_link_enabled: ghiiRecord.magicLinkEnabled,
-      notification_email: ghiiRecord.notificationEmail,
-      last_login_at: ghiiRecord.lastLoginAt,
-      login_count: ghiiRecord.loginCount,
-      trust_score: ghiiRecord.trustScore,
-      morsel_balance: ghiiRecord.morselBalance,
-      verified_attributes: ghiiRecord.verifiedAttributes,
-      ftn_verified: ghiiRecord.ftnVerified,
-      created_at: ghiiRecord.createdAt,
-      updated_at: ghiiRecord.updatedAt,
-    } : null;
-    const ghii = ghiiRecord?.ghii;
-
-    // ── Agent data (comprehensive) ──────────────────────────────────
-    const agents = await storage.getAgentsByOwner(name);
-    const agentGaiis = agents.map(a => a.gaii);
-    const allWorkTrackingCodes = new Set<string>();
-    const agentData: Record<string, unknown>[] = [];
-
-    // Owner-invariant reads hoisted OUT of the per-agent loop (were re-fetched per agent →
-    // O(agents×boards) for posts). Boards + their posts load once; flags load once.
-    const allBoards = await storage.listBoards();
-    const postsByBoard = new Map<string, Awaited<ReturnType<typeof storage.listPosts>>>();
-    for (const board of allBoards) {
-      postsByBoard.set(board.id, await storage.listPosts(board.id, { limit: 10000 }));
-    }
-    const allFlags = await storage.listFlags();
-
-    // The one presentation of memory values (classification reader + credential mask, TARGET-082).
-    // NO leave() here (decided by Jouni 2026-09-30): this is the person's legal right to their own
-    // data (GDPR Articles 15 and 20), so an organism's record held under their name or an agent's
-    // comes out whatever its classification, and the answer says so in
-    // `classified_organism_content`. The ordinary export (GET /v1/memory/export, the bundle) still
-    // keeps what may not leave its organism behind.
-    const reader = readerFor({ storage, config }, req.auth);
-    const organismKeys: string[] = [];
-    const exportable = async (records: MemoryRecord[]): Promise<MemoryRecord[]> => {
-      const shown = await presentMemories(reader, records);
-      for (const r of shown) if (scopeOrganism(memoryTarget(r.ownerGaii, r.key).scope)) organismKeys.push(r.key);
-      return shown;
-    };
-    for (const agent of agents) {
-      const memories = await exportable(await storage.listMemory(agent.gaii));
-      const providerWork = await storage.listWorkByProvider(agent.gaii);
-      const requesterWork = await storage.listWorkByRequester(agent.gaii);
-      for (const w of providerWork) allWorkTrackingCodes.add(w.trackingCode);
-      for (const w of requesterWork) allWorkTrackingCodes.add(w.trackingCode);
-      const transactions = await storage.getTransactions(agent.gaii, 10000);
-      const trust = await calculateTrustScore(agent.gaii, storage);
-
-      // Board posts by this agent (from the pre-loaded per-board posts).
-      const agentBoardPosts = [];
-      for (const board of allBoards) {
-        const posts = postsByBoard.get(board.id) ?? [];
-        for (const post of posts) {
-          if (post.authorGaii === agent.gaii) {
-            agentBoardPosts.push({
-              board_id: post.boardId,
-              post_id: post.id,
-              title: post.title,
-              body: post.body,
-              category: post.category,
-              tags: post.tags,
-              reactions: post.reactions,
-              reply_to: post.replyTo,
-              created_at: post.createdAt,
-            });
-          }
-        }
-      }
-
-      // Consent records granted by this agent
-      const consentsGranted = await storage.listConsents(agent.gaii);
-      // Consent audit trail for this agent. Entries are buffered for up to a minute before they
-      // are stored (consent-audit-buffer.ts), so the pending queue is merged in the way
-      // GET /v1/consent/audit does; without it the trail handed to the person was missing
-      // everything from the last minute (2026-09-08, e2e-owner-export).
-      const consentAudit = [
-        ...getPendingConsentAudit(agent.gaii)
-          .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0)),
-        ...await storage.listConsentAudit(agent.gaii),
-      ];
-
-      // Flags filed by this agent (from the pre-loaded flag list)
-      const flagsFiled = allFlags.filter(f => f.flaggedBy === agent.gaii).map(f => ({
-        id: f.id,
-        target_type: f.targetType,
-        target_id: f.targetId,
-        reason: f.reason,
-        description: f.description,
-        status: f.status,
-        created_at: f.createdAt,
-      }));
-      // Flags against this agent
-      const flagsAgainst = allFlags.filter(f => f.targetType === 'agent' && f.targetId === agent.gaii).map(f => ({
-        id: f.id,
-        flagged_by: f.flaggedBy,
-        reason: f.reason,
-        description: f.description,
-        status: f.status,
-        created_at: f.createdAt,
-      }));
-
-      // Storage files (metadata only — no binary data)
-      const storageFiles = await storage.listStorageFiles(agent.gaii);
-      const filesMetadata = storageFiles.map(f => ({
-        key: f.key,
-        mime_type: f.mimeType,
-        size: f.size,
-        visibility: f.visibility,
-        created_at: f.createdAt,
-      }));
-
-      // Board subscriptions
-      const boardSubscriptions = await storage.listSubscriptionsByAgent(agent.gaii);
-      // The messages between the person and this agent (feature-list audit #160).
-      const agentMessages = await exportAgentMessages(storage, agent.gaii);
-
-      // agent.owner === name for every agent here (all from getAgentsByOwner(name)), so the owner
-      // GHII is the already-loaded ghiiRecord — no per-agent getGHIIByOwner re-fetch. The morsel
-      // balance lives on the owner GHII (agent balances are always 0 in the morsel economy).
-      agentData.push({
-        gaii: agent.gaii,
-        display_name: agent.displayName,
-        description: agent.description,
-        capabilities: agent.capabilities,
-        default_scopes: agent.defaultScopes,
-        trust,
-        morsel_balance: ghiiRecord?.morselBalance ?? 0,
-        created_at: agent.createdAt,
-        last_seen: agent.lastSeen,
-        memories: memories.map(m => ({
-          key: m.key,
-          // Same as the owner's own, below: an agent's namespace holds its own keys now.
-          value: m.value,
-          visibility: m.visibility,
-          tags: m.tags,
-          version: m.version,
-          created_at: m.createdAt,
-          updated_at: m.updatedAt,
-        })),
-        work_provided: providerWork.map(workProvidedView),
-        work_requested: requesterWork.map(workRequestedView),
-        transactions: transactions.map(t => ({
-          id: t.id,
-          type: t.type,
-          amount: t.amount,
-          counterparty_gaii: t.counterpartyGaii,
-          tracking_code: t.trackingCode,
-          timestamp: t.timestamp,
-        })),
-        board_posts: agentBoardPosts,
-        consents_granted: consentsGranted.map(c => ({
-          id: c.id,
-          data_pattern: c.dataPattern,
-          recipient: c.recipient,
-          purpose: c.purpose,
-          scope: c.scope,
-          expires: c.expires,
-          status: c.status,
-          granted_at: c.grantedAt,
-          revoked_at: c.revokedAt,
-        })),
-        consent_audit: consentAudit.map(a => ({
-          consent_id: a.consentId,
-          accessor_gaii: a.accessorGaii,
-          memory_key: a.memoryKey,
-          action: a.action,
-          allowed: a.allowed,
-          timestamp: a.timestamp,
-        })),
-        flags_filed: flagsFiled,
-        flags_against: flagsAgainst,
-        storage_files: filesMetadata,
-        board_subscriptions: boardSubscriptions.map(s => ({
-          board_id: s.boardId,
-          callback_url: s.callbackUrl,
-          filters: s.filters,
-          created_at: s.createdAt,
-        })),
-        messages: agentMessages,
-      });
-    }
-
-    // ── The person's own work, under their GHII ─────────────────────
-    // An action published in person and a request made in person are filed under the GHII, not
-    // under an agent, so the per-agent sections above do not hold them.
-    const ownWorkProvided = ghii ? await storage.listWorkByProvider(ghii) : [];
-    const ownWorkRequested = ghii ? await storage.listWorkByRequester(ghii) : [];
-    for (const w of [...ownWorkProvided, ...ownWorkRequested]) allWorkTrackingCodes.add(w.trackingCode);
-
-    // ── Disputes (via work tracking codes) ──────────────────────────
-    const allDisputes = await storage.listAllDisputes();
-    const ownerDisputes = allDisputes.filter(d =>
-      agentGaiis.includes(d.openedBy) ||
-      // Also include disputes on work records involving the owner or the owner's agents
-      allWorkTrackingCodes.has(d.trackingCode)
-    );
-    const disputeExport = [];
-    for (const dispute of ownerDisputes) {
-      const auditLog = await storage.getDisputeAuditLog(dispute.id);
-      disputeExport.push({
-        id: dispute.id,
-        tracking_code: dispute.trackingCode,
-        status: dispute.status,
-        opened_by: dispute.openedBy,
-        reason: dispute.reason,
-        ruling: dispute.ruling,
-        created_at: dispute.createdAt,
-        updated_at: dispute.updatedAt,
-        audit_log: auditLog.map(e => ({
-          sequence: e.sequence,
-          event: e.event,
-          actor: e.actor,
-          timestamp: e.timestamp,
-          data: e.data,
-        })),
-      });
-    }
-
-    // ── Personal node data ──────────────────────────────────────────
-    const personalNode = await storage.getPersonalNodeByOwner(name);
-    const personalNodeData = personalNode ? {
-      node_id: personalNode.nodeId,
-      anchor_node_id: personalNode.anchorNodeId,
-      status: personalNode.status,
-      agent_gaiis: personalNode.agentGaiis,
-      last_seen: personalNode.lastSeen,
-      mailbox_quota_bytes: personalNode.mailboxQuotaBytes,
-      mailbox_used_bytes: personalNode.mailboxUsedBytes,
-      visibility: personalNode.visibility,
-      created_at: personalNode.createdAt,
-      updated_at: personalNode.updatedAt,
-    } : null;
-
-    // ── Personal push subscriptions (on personal node) ──────────────
-    let personalPushSubscriptions: unknown[] = [];
-    if (personalNode) {
-      const subs = await storage.listPersonalPushSubscriptions(personalNode.nodeId);
-      personalPushSubscriptions = subs.map(s => ({
-        id: s.id,
-        endpoint: s.endpoint,
-        failure_count: s.failureCount,
-        created_at: s.createdAt,
-        last_used_at: s.lastUsedAt,
-      }));
-
-      // Notification preferences
-      const prefs = await storage.getNotificationPreferences(personalNode.nodeId);
-      if (prefs) {
-        (personalNodeData as Record<string, unknown>).notification_preferences = {
-          enabled: prefs.enabled,
-          channels: prefs.channels,
-          notify_types: prefs.notifyTypes,
-          cooldown_minutes: prefs.cooldownMinutes,
-          quiet_hours_utc: prefs.quietHoursUtc,
-          email: prefs.email,
-        };
-      }
-    }
-
-    // ── Push subscription (PWA — Phase 3.1) ─────────────────────────
-    const pushSub = await storage.getPushSubscription(name);
-    const pushSubscription = pushSub ? {
-      endpoint: pushSub.endpoint,
-      created_at: pushSub.createdAt,
-      last_used_at: pushSub.lastUsedAt,
-    } : null;
-
-    // ── The owner's OWN memory and files (via GHII) ─────────────────
-    // An owner session resolves to the GHII, so everything a person writes themselves — and
-    // everything an app grant or an ecosystem token writes in their name — lands under this
-    // identity and not under any agent's. The loop above walks agents only, so until this existed
-    // the export returned the smaller half of the account while the route promised all of it, and
-    // the privacy policy pointed at it as the Article 15 and 20 mechanism. Erasure never had the
-    // bug: owner-erasure.ts clears deleteAllMemory(ghii) explicitly.
-    let ownerMemories: unknown[] = [];
-    let ownerFiles: unknown[] = [];
-    if (ghii) {
-      // The records this node's services keep for the account in its service namespace are the
-      // account's too (services/service-records.ts), and no memory route reads them, so this export
-      // carries them beside the account's own; a key the account's own namespace also holds is
-      // shown once, from there.
-      const own = await storage.listMemory(ghii);
-      const ownKeys = new Set(own.map(m => m.key));
-      const kept = isValidGHII(ghii) ? (await storage.listMemory(serviceNamespaceOf(ghii))).filter(m => !ownKeys.has(m.key)) : [];
-      const memories = await exportable([...own, ...kept]);
-      ownerMemories = memories.map(m => ({
-        key: m.key,
-        // A credential comes out as `{ configured: true }`, the same as at every other door. The
-        // value here is the CIPHERTEXT of an OpenRouter or TypeSafe key, or the PSP secret: useless
-        // to the person (the node holds the decryption key, not them) and a real key to anybody who
-        // has that. An export travels: a download, a cloud backup, a mail attachment, a chat. This
-        // door was the one the redaction never reached. presentMemories applies it.
-        value: m.value,
-        visibility: m.visibility,
-        tags: m.tags,
-        version: m.version,
-        created_at: m.createdAt,
-        updated_at: m.updatedAt,
-      }));
-      // Metadata only, like the per-agent list — the bytes are downloaded from their own endpoint.
-      const files = await storage.listStorageFiles(ghii);
-      ownerFiles = files.map(f => ({
-        key: f.key,
-        mime_type: f.mimeType,
-        size: f.size,
-        visibility: f.visibility,
-        created_at: f.createdAt,
-      }));
-    }
-
-    // ── Organism memberships (via GHII) ─────────────────────────────
-    let organismMemberships: unknown[] = [];
-    if (ghii) {
-      // Membership rows are written under the bare owner name (organism-lifecycle on create and
-      // join, workspace-access on an invitation) and were read here by GHII only, so this section
-      // was empty on every account (2026-09-08, e2e-owner-export). Both alphabets are read.
-      const byGhii = await storage.listMembershipsByGhii(ghii);
-      const byName = await storage.listMembershipsByGhii(name);
-      const seen = new Set(byGhii.map(m => m.organismId));
-      const memberships = [...byGhii, ...byName.filter(m => !seen.has(m.organismId))];
-      const membershipExport = [];
-      for (const mem of memberships) {
-        const organism = await storage.getOrganism(mem.organismId);
-        membershipExport.push({
-          organism_id: mem.organismId,
-          organism_name: organism?.name ?? null,
-          role: mem.role,
-          status: mem.status,
-          joined_at: mem.joinedAt,
-          invited_by: mem.invitedBy,
-        });
-      }
-      organismMemberships = membershipExport;
-    }
-
-    // ── Chat instances ──────────────────────────────────────────────
-    const chatInstances = await storage.listChatInstances({ ownerName: name });
-    const chatInstancesExport = chatInstances.map(c => ({
-      id: c.id,
-      platform: c.platform,
-      app_name: c.appName,
-      ghii: c.ghii,
-      is_anonymous: c.isAnonymous,
-      created_at: c.createdAt,
-      last_seen: c.lastSeen,
-    }));
-
-    // ── Flags filed by GHII (owner-level moderation) ────────────────
-    // Flags may also be filed by GHII directly (not just agent GAIIs)
-    let ghiiFlags: unknown[] = [];
-    if (ghii) {
-      const allFlags = await storage.listFlags();
-      // POST /v1/flags stamps flaggedBy with the bare account name on an owner session, so a
-      // filter on the GHII alone matched nothing (2026-09-08, e2e-owner-export).
-      ghiiFlags = allFlags.filter(f => f.flaggedBy === ghii || f.flaggedBy === name).map(f => ({
-        id: f.id,
-        target_type: f.targetType,
-        target_id: f.targetId,
-        reason: f.reason,
-        description: f.description,
-        status: f.status,
-        created_at: f.createdAt,
-      }));
-    }
-
-    // ── Published apps, AI provenance, outside-account connections (never the credential) and the
-    //    apps taken (feature-list audit #160) ──
-    const extra = await exportExtraSections(storage, ghii, agentGaiis);
-    // ── Message threads, contacts, companies and bookkeeping, outbound mail, agent tasks and the
-    //    account's other records (feature audit 2026-11-19, item 4.2). Each is read by the GHII. ──
-    const records = ghii ? await exportAccountRecords(storage, ghii, [ghii, ...agentGaiis]) : null;
+    // The envelope as success() writes it, opened before `data` and closed after it, so the answer is
+    // the same JSON a res.json() wrote, written a section at a time.
+    const marker = '\u0000aimeat-export-data\u0000';
+    const envelope = JSON.stringify(success(config.nodeId, marker));
+    const at = envelope.indexOf(JSON.stringify(marker));
+    const prefix = `${envelope.slice(0, at)}{`;
+    const suffix = `}${envelope.slice(at + JSON.stringify(marker).length)}`;
 
     // The export is an access and portability request the node answered (GDPR art. 15 and 20): it
-    // logs itself in the node's request list (plan doc-mvlftkh9zmc9, C4.3).
+    // logs itself in the node's request list (plan doc-mvlftkh9zmc9, C4.3), before the answer as always.
     const answeredAt = new Date().toISOString();
     await appendRequest(storage, config.nodeId, { kind: 'node' }, {
       kind: 'portability', subject: name, receivedAt: answeredAt, status: 'done', closedAt: answeredAt,
       channel: 'node', auto: true, ...(own ? {} : { notes: 'Exported by the operator.' }),
     }).catch(err => logger.warn('export: the export was not logged as a data subject request', { name, error: String(err) }));
 
-    res.json(success(config.nodeId, {
-      owner: {
-        name: owner.name,
-        display_name: owner.displayName,
-        roles: owner.roles,
-        created_at: owner.createdAt,
-      },
-      ghii: ghiiData,
-      memories: ownerMemories,
-      storage_files: ownerFiles,
-      work_provided: ownWorkProvided.map(workProvidedView),
-      work_requested: ownWorkRequested.map(workRequestedView),
-      agents: agentData,
-      disputes: disputeExport,
-      personal_node: personalNodeData,
-      personal_push_subscriptions: personalPushSubscriptions,
-      push_subscription: pushSubscription,
-      organism_memberships: organismMemberships,
-      chat_instances: chatInstancesExport,
-      ghii_flags_filed: ghiiFlags,
-      published_apps: extra.published_apps,
-      ai_provenance: extra.ai_provenance,
-      connections: extra.connections,
-      app_purchases: extra.app_purchases,
-      message_threads: records?.message_threads ?? [],
-      contacts: records?.contacts ?? [],
-      companies: records?.companies ?? [],
-      invoices: records?.invoices ?? [],
-      vouchers: records?.vouchers ?? [],
-      fiscal_years: records?.fiscal_years ?? [],
-      outbound_contacts: records?.outbound_contacts ?? [],
-      outbound_messages: records?.outbound_messages ?? [],
-      agent_tasks: records?.agent_tasks ?? [],
-      scheduled_jobs: records?.scheduled_jobs ?? [],
-      capabilities: records?.capabilities ?? [],
-      package_instances: records?.package_instances ?? [],
-      help_questions: records?.help_questions ?? [],
-      sharing_groups: records?.sharing_groups ?? [],
-      group_shares: records?.group_shares ?? [],
-      ai_decisions: records?.ai_decisions ?? [],
-      account_events: records?.account_events ?? [],
-      // Organism content is in this export because it is the person's own data; the file carries
-      // content an organism classified, so it says which keys (decided 2026-09-30).
-      ...(organismKeys.length ? {
-        classified_organism_content: {
-          count: organismKeys.length,
-          keys: organismKeys,
-          note: 'This export includes records of organisms you belong to that you or your agents hold, whatever their classification, because they are your own data. Organism content may be classified: keep the file as carefully as the organism asks.',
-        },
-      } : {}),
-      exported_at: new Date().toISOString(),
-    }));
+    const sections = ownerExportSections({ storage, config }, {
+      name, owner, reader: readerFor({ storage, config }, req.auth), memories: true, provenance: true,
+    });
+    res.status(200);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    // A large answer is not held by a buffering reverse proxy (nginx reads this header).
+    res.setHeader('X-Accel-Buffering', 'no');
+    try {
+      await writeAll(res, sectionsAsJsonObject(sections, prefix, suffix));
+      res.end();
+    } catch (err) {
+      // The status line is sent, so a failure can only end the connection: the client sees a cut
+      // answer, never a whole one that lacks a section.
+      logger.error('export: the export stopped before its end', { name, error: String(err) });
+      res.destroy(err instanceof Error ? err : new Error(String(err)));
+    }
   });
 }

@@ -1,5 +1,5 @@
 /**
- * @file src/routes/owners/export-sections.ts
+ * @file src/services/owner-export/export-sections.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Five sections of the GDPR export (GET /v1/owners/:name/export, export.ts) that it
@@ -11,12 +11,16 @@
  *   decrypt it, and anyone holding the node's key could. An app's bytes and a taken app's stored
  *   copy are not personal data and can be large; each app is named with its versions, and the bytes
  *   are downloaded from GET /v1/apps/:owner/:filename.
- * @structure exportExtraSections(storage, ghii, agentGaiis) → { published_apps, ai_provenance,
- *   connections, app_purchases } · exportAgentMessages(storage, agentGaii)
+ * @structure exportExtraSections(storage, ghii, agentGaiis) → { published_apps, connections,
+ *   app_purchases } · exportAgentMessages(storage, agentGaii)
  * @usage
  *   const extra = await exportExtraSections(storage, ghii, agentGaiis);
  *   const messages = await exportAgentMessages(storage, agent.gaii);
  * @version-history
+ *   2026-11-26 — Moved from routes/owners/ to services/owner-export/ (no Express in it), and the AI
+ *     provenance records left this file: account-sections.ts reads them by keyset pages
+ *     (provenancePages), because the offset pages here with a count each took 108 s on the largest
+ *     account (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   2026-10-15 — Initial (feature-list audit #160).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -46,19 +50,6 @@ async function publishedApps(storage: Storage, owners: string[]) {
         created_at: app.createdAt,
       });
     }
-  }
-  return out;
-}
-
-/** Every AI provenance record of the account, the canonical document as stored. */
-async function aiProvenance(storage: Storage, ghii: string) {
-  const out = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const { items, total } = await storage.listAiProvenance({ ownerGhii: ghii, limit: PAGE, offset });
-    for (const r of items) {
-      out.push({ id: r.id, principal: r.principal, content_hash: r.contentHash, generated_at: r.generatedAt, created_at: r.createdAt, record: r.record });
-    }
-    if (items.length < PAGE || offset + items.length >= total) break;
   }
   return out;
 }
@@ -97,12 +88,11 @@ async function appPurchases(storage: Storage, buyers: string[]) {
   return out;
 }
 
-/** The four account-level sections export.ts adds beside `memories`. */
+/** Three of the account-level sections account-sections.ts yields beside `memories`. */
 export async function exportExtraSections(storage: Storage, ghii: string | undefined, agentGaiis: string[]) {
   const all = ghii ? [ghii, ...agentGaiis] : agentGaiis;
   return {
     published_apps: await publishedApps(storage, all),
-    ai_provenance: ghii ? await aiProvenance(storage, ghii) : [],
     connections: await connections(storage, all),
     app_purchases: await appPurchases(storage, all),
   };

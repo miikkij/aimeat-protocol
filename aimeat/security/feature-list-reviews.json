@@ -327,7 +327,7 @@
         "aimeat/src/data/compliance-domains.ts",
         "aimeat/src/services/compliance/domain-floor.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts",
-        "aimeat/src/routes/owners/export-sections.ts",
+        "aimeat/src/services/owner-export/export-sections.ts",
         "aimeat/src/services/mydata-receipt.ts",
         "aimeat/src/routes/ai-provenance.ts",
         "aimeat/src/routes/ai-transparency.ts",
@@ -336,7 +336,7 @@
         "aimeat/src/services/data-intermediation",
         "aimeat/src/services/provenance-embed"
       ],
-      "digest": "sha256:f8b9b5c75d5000719cccd853"
+      "digest": "sha256:55e17db40fcc4e7fc5c8a3f1"
     },
     "18. Federation and your own node": {
       "reviewedOn": "2026-11-22",
@@ -925,7 +925,7 @@
       "aimeat/src/data/compliance-domains.ts": "830e481580beab96",
       "aimeat/src/services/compliance/domain-floor.ts": "f8ed5d1f6183ffa0",
       "aimeat/src/tool-catalog/definitions/compliance.ts": "b58ab66f4ea898ae",
-      "aimeat/src/routes/owners/export-sections.ts": "e13ba3d2a3b0f831",
+      "aimeat/src/services/owner-export/export-sections.ts": "3e39777ebb37c30f",
       "aimeat/src/services/mydata-receipt.ts": "5b49c16627f28f36",
       "aimeat/src/routes/ai-provenance.ts": "0f53e7e4d0e5b99a",
       "aimeat/src/routes/ai-transparency.ts": "505b353fa8c93cf4",

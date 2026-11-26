@@ -9,6 +9,8 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './schema-node-limits.js';
  * @version-history
+ *   2026-11-26 — storage.export_dir, storage.export_keep_days, storage.export_volume_mb and
+ *     storage.export_max_disk_gb (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   2026-11-25 — mcp.tool_answer_chars.
  *   2026-11-08 — mcp.legacy_sessions_per_owner (secaudit2026nov08 round 14).
  *   2026-11-04 — storage.request_statement_ms (codebase analysis 2026-11-03, item C8),
@@ -93,4 +95,15 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'mcpToolAnswerChars', dotPath: 'mcp.tool_answer_chars', envVar: 'AIMEAT_MCP_TOOL_ANSWER_CHARS', type: 'number', validate: v => wholeOrOff(v) && (v as number) <= 10_000_000, immutable: false,
     description: 'Characters of text one tool answer to an AI may hold. Opening many workspace records in one call stops at it and names the ones still to open, the usage report counts the answers over it, and every tool declares it to the AI program, so Claude Code passes an answer of this size to the model as text, up to 500000 characters. A session that is open keeps the value it started with. Lower it when people here use an AI program that cuts a long answer. 0 = no limit',
     range: '0-10000000' },
+  { key: 'exportDir', dotPath: 'storage.export_dir', envVar: 'AIMEAT_EXPORT_DIR', type: 'string', validate: v => typeof v === 'string' && v.trim() !== '' && v.length <= 500, immutable: false,
+    description: 'The folder where a person\'s data export waits for its download, one folder per account. Put it on the data disk, never in the system temp folder: an export with files can be gigabytes. An export already made stays in the folder it was made in' },
+  { key: 'exportKeepDays', dotPath: 'storage.export_keep_days', envVar: 'AIMEAT_EXPORT_KEEP_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 90, immutable: false,
+    description: 'Days a finished data export waits for its download. Then the hourly sweep removes it, and the person can make a new one',
+    range: '1-90' },
+  { key: 'exportVolumeMb', dotPath: 'storage.export_volume_mb', envVar: 'AIMEAT_EXPORT_VOLUME_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 16 && v <= 4096, immutable: false,
+    description: 'Megabytes one ZIP file of a data export holds at most; a larger export is several files, so a broken download costs one file. Keep it under the reverse proxy\'s buffer if the proxy buffers downloads',
+    range: '16-4096' },
+  { key: 'exportMaxDiskGb', dotPath: 'storage.export_max_disk_gb', envVar: 'AIMEAT_EXPORT_MAX_DISK_GB', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'Gigabytes all data exports waiting for their download may take together. An export whose estimate does not fit is refused before it starts, with its size. The free disk is checked too. 0 = no limit',
+    range: '0-100000' },
 ];

@@ -16,6 +16,10 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.7.0 — 2026-11-26 — The export is a background job of the parts the person chooses (routes/owners/
+ *     exports.ts): the parts and their sizes are read once at mount, the export's state again on each
+ *     `owner-export` change, and the page starts, cancels and downloads it. The one-file JSON download
+ *     left the page: on a large account it could not be built (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   v2.6.0 — 2026-11-22 — Section 08, marked content: its state is useContentRisk (data-wallet/content-risk.js),
  *     ctx.risk (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   v2.5.0 — 2026-11-09 — Grouped by who (look round of the performance work, Jouni's choice "Group by
@@ -98,7 +102,9 @@ export default function DataWalletTab({ session, showToast }) {
   const [orgs, setOrgs] = useState([]);
   const [formMsg, setFormMsg] = useState(null);
   const [exportMsg, setExportMsg] = useState(null);
-  const [exporting, setExporting] = useState(false);
+  const [exportPlan, setExportPlan] = useState(null);
+  const [exportJob, setExportJob] = useState(null);
+  const [exportParts, setExportParts] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
@@ -132,6 +138,27 @@ export default function DataWalletTab({ session, showToast }) {
   const loadRef = useRef(null);
   loadRef.current = () => load();
   useEffect(() => onLiveUpdate(['consent', 'memory', 'files'], () => loadRef.current()), []);
+
+  /* The export: the parts and their sizes are measured once at mount; the export's state is read
+     again each time the node says it changed (the `owner-export` domain), never on a timer. */
+  const loadExportJob = useCallback(async () => {
+    if (federated || !session?.owner) return;
+    try {
+      const job = await consentService.getExportCurrent(session.owner);
+      setExportJob(job);
+      // "It is in the queue" says nothing once the export moved on; the state box says the rest.
+      if (job?.state !== 'queued' && job?.state !== 'running') setExportMsg(null);
+    } catch (e) { swallowed('data-wallet: export state', e); }
+  }, [federated, session?.owner]);
+  useEffect(() => {
+    if (federated || !session?.owner) return;
+    consentService.getExportPlan(session.owner).then((p) => {
+      setExportPlan(p);
+      setExportJob(p?.current || null);
+      setExportParts((cur) => cur || (p?.parts || []).filter((q) => q.default).map((q) => q.id));
+    }).catch((e) => swallowed('data-wallet: export plan', e));
+  }, [federated, session?.owner]);
+  useEffect(() => onLiveUpdate(['owner-export'], () => loadExportJob()), [loadExportJob]);
 
   /** The owner's organisms with their workspaces, for the form; read once when the form first opens. */
   const loadOrgs = useCallback(async () => {
@@ -215,7 +242,6 @@ export default function DataWalletTab({ session, showToast }) {
   }, [revokedList, consents]);
   const expiring = useMemo(() => active.filter((c) => c.expires).length, [active]);
   const quota = ov?.permSummary?.consent_quota || 100;
-  const exportName = `aimeat-${session?.owner || 'me'}-${new Date().toISOString().slice(0, 10)}.json`;
 
   /* ── Handlers ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -316,30 +342,44 @@ export default function DataWalletTab({ session, showToast }) {
     }, { danger: true });
   };
 
-  const exportAll = async () => {
-    setExporting(true);
+  const toggleExportPart = (id, on) => setExportParts((cur) => {
+    const set = new Set(cur || []);
+    if (on) set.add(id); else set.delete(id);
+    return [...set];
+  });
+  /** Queue the export of the chosen parts; the node answers at once and works in the background. */
+  const runStart = async () => {
     const flash = flashFor(setExportMsg);
+    setBusy('export');
     try {
-      const data = await consentService.exportGdpr(session.owner);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = exportName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      flash(x('exported', { mb: Math.max(1, Math.round(blob.size / 100000) / 10) }));
-    } catch (e) { swallowed('data-wallet: export', e); flash(x('exportFailed'), true); toast(x('exportFailed'), true); }
-    setExporting(false);
+      const r = await consentService.startExport(session.owner, exportParts || []);
+      setExportJob(r?.export || null);
+      flash(x('exportJob.started'));
+    } catch (e) { flash(errText(e, x('exportFailed')), true); }
+    setBusy(false);
   };
+  // A new export replaces a ready one and removes its files, so the person is asked first.
+  const startExport = () => (exportJob?.state === 'ready' ? confirm(x('exportJob.confirmReplace'), runStart, { danger: true }) : runStart());
+  const cancelExport = () => {
+    const ready = exportJob?.state === 'ready';
+    confirm(ready ? x('exportJob.confirmRemove') : x('exportJob.confirmCancel'), async () => {
+      setBusy('export');
+      try {
+        await consentService.cancelExport(session.owner);
+        await loadExportJob();
+        toast(ready ? x('exportJob.removed') : x('exportJob.cancelled'));
+      } catch (e) { toast(errText(e, x('exportFailed')), true); }
+      setBusy(false);
+    }, { danger: true });
+  };
+  const goToExport = () => document.getElementById('dw-export')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const ctx = {
     session, federated, ov, failed, names, consents, active, revokedList, targets, people, folded, kinds, events, trail, shownTrail,
     days, reloading, deniedCount, deniedGroups, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
-    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, risk, parties,
-    setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, toggleBucket, loadBucketGroups, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exportPlan, exportJob, exportParts, busy, ConfirmUI, cls, content, risk, parties,
+    setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, toggleBucket, loadBucketGroups, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke,
+    toggleExportPart, startExport, cancelExport, goToExport,
     openOrganisms: () => openTab('organisms'),
     openAgents: () => openTab('agents'),
     groupId,

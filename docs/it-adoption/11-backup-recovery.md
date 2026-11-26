@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.3.1 (commit 519bf074f) on 2026-11-23. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a74da06ee) on 2026-11-26. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
@@ -17,6 +17,7 @@ A node is its data, its secrets and its identity key. Back up all three at the s
 | Node identity key | `AIMEAT_NODE_KEY_PATH`, default `~/.aimeat/nodes/<node id>/node-key.json` | The node's identity. A node whose sealed copy does not open and that finds no key file refuses to start rather than make a new identity, which would break every issued token and every federation peer | [Backup and restore](../operations/backup-and-restore.md) |
 | The rest of `.env` | The working directory or the process manager | Every other setting: base URL, sign-in providers, SMTP, file store credentials | [Backup and restore](../operations/backup-and-restore.md) |
 | Refusal log | `AIMEAT_AUTH_LOG_PATH` | Refusal history (optional; it is a log, not state) | `aimeat/src/config/security.ts` |
+| Data exports waiting for their download | `AIMEAT_EXPORT_DIR`, default data/exports under the working directory | Nothing to restore: a person's ZIP export is a copy of what the database holds, removed after `AIMEAT_EXPORT_KEEP_DAYS`. Leave it out of backups; size the disk for `AIMEAT_EXPORT_MAX_DISK_GB` | `aimeat/src/config/node-limits.ts` |
 
 Rules that follow from this:
 

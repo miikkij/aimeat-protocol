@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-26 — Section 1: the account export is a background job of the parts the person chooses, with
+ *     the file contents in ZIP files; an AI starts it with aimeat_account_export and never gets the
+ *     links (services/owner-export/, routes/owners/exports.ts).
  *   2026-11-25 — Section 2: an import or a copy of a knowledge package manifest the package schema
  *     refuses fails with SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — Section 6: who accepted content risk marks in a workspace gets the pseudonym too.
@@ -162,7 +165,7 @@ it for them.
 
 | What | How | Who |
 |---|---|---|
-| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes, published apps (as a list with their versions), AI provenance records, outside-account connections (never their credentials), messages with their agents, apps they took, their message threads and contacts, companies (never a mail password), invoices, receipts, fiscal years, outbound contacts and mail, their agents' tasks with events, schedules, capabilities, installed packages, help questions, sharing groups, decision results and account events | the Data Wallet page, \`/v1/profile?tab=dataWallet\` (\`GET /v1/owners/{name}/export\`) | the person in their own session |
+| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes, published apps (as a list with their versions), AI provenance records, outside-account connections (never their credentials), messages with their agents, apps they took, their message threads and contacts, companies (never a mail password), invoices, receipts, fiscal years, outbound contacts and mail, their agents' tasks with events, schedules, capabilities, installed packages, help questions, sharing groups, decision results and account events | the Data Wallet page, \`/v1/profile?tab=dataWallet\`, or \`aimeat_account_export\`: the parts the person chooses, with their sizes shown first, as ZIP files written in the background (\`POST /v1/owners/{name}/exports\`); one JSON answer without the file contents is \`GET /v1/owners/{name}/export\` | the person; their AI may start it and read its state, and the download links go to the person only |
 | Memory as one JSON file, optionally one key prefix or one agent | the Memory page, \`/v1/profile?tab=memory\`, backup section (\`GET /v1/memory/export\`) | the person; an agent exports its own records |
 | Chosen records and files as one ZIP | the Memory page, select and download (\`POST /v1/memory/bundle\`) | the person |
 | An organism, or one workspace in it, as a ZIP | \`aimeat_organism_export\`, \`aimeat_workspace_transfer\` with \`direction: "export"\` | a member; a workspace needs its creator or an organism admin |
@@ -191,7 +194,10 @@ What an export leaves out, and why:
 
 - **Credentials** (AI keys, payment keys, tokens) are written as "configured", never the secret. The
   person sets them again on the new system.
-- **Files** in the account export are listed, not included; take them with the bundle or one by one.
+- **Files** are in the account export's ZIP files when the person chooses them; the files in a storage
+  they connected themselves are left out unless chosen, because they hold those already. The JSON
+  answer lists files without their contents. The node writes one export at a time, keeps the ZIP files
+  for a week, and refuses an export that does not fit its disk before it starts.
 - **The account export is logged** as an answered access request in the node's list of data subject
   requests (the account name and when), so the people who run the node can show it was answered.
   Nothing of the content goes there.

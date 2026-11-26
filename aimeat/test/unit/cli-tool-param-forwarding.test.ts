@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-26 — aimeat_account_export is probed on action 'start', the branch that carries `parts`.
  *   2026-11-25 — aimeat_knowledge_contribute calls the node (POST /v1/knowledge/:id/entries) and is
  *     probed like every other tool.
  *   2026-11-21 — aimeat_content_risk's status rides only on action='list'; the probe holds action at release.
@@ -125,6 +126,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // action='settings' (the enum sentinel) carries only package and auto_agree; 'decline' carries the
     // negotiation and the reason. The list and settings branches are measured in dataspace-dispatch.test.ts.
     aimeat_dataspace: { always: { action: 'decline' } },
+    // action='plan' (the enum sentinel) is a GET that carries nothing; `parts` rides on 'start', the
+    // POST. The other actions are covered by e2e-owner-export-job.
+    aimeat_account_export: { always: { action: 'start' } },
     // action='list' (the default) reads nothing; 'decide' carries owner and app in the path and the
     // decision and reason in the body, so the probe holds the decision's companions (WP9b).
     aimeat_admin_app_party_registrations: { always: { action: 'decide', owner: 'zqxownerzqx', app: 'zqxappzqx', decision: 'approve' } },

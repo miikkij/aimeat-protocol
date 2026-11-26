@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-11-26 — The data export as a background job is mounted beside the JSON export (owners/exports.ts).
  *   2026-11-19 — eraseOwner takes the config: the erasure removes each app as the owner's delete does.
  *   2026-10-27 — The operator claim reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — The operator claim reads requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
@@ -69,6 +70,7 @@ import { emitChange } from '../services/event-bus.js';
 import { eraseOwner } from '../services/owner/erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
+import { registerOwnerExportJobRoutes } from './owners/exports.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator/override.js';
 import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
@@ -309,6 +311,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   // GDPR export lives in its own file (max-file-lines); mounted here so the route table is
   // still one list.
   registerOwnerExportRoute(router, config, storage);
+  registerOwnerExportJobRoutes(router, config, storage);
 
   // DELETE /v1/owners/:name — GDPR delete (cascade) (account holder or operator)
   // The check below says which ACCOUNT may be erased; requireOwnerPrincipal says which of that

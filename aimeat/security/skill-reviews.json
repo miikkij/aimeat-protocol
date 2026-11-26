@@ -451,7 +451,7 @@
       "digest": "sha256:fd789c80ceb4ca0bd991aaab"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -462,7 +462,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:45dd447e0236365484de0ffd",
+      "digest": "sha256:7930def2cb5a83293e4fa436",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -643,7 +643,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:5b0630bd608af586e899da29",
+      "digest": "sha256:3fc2bc67833e81d65b5d97d6",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -660,7 +660,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:5b0630bd608af586e899da29",
+      "digest": "sha256:3fc2bc67833e81d65b5d97d6",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -955,7 +955,7 @@
       "aimeat/src/routes/memory/key.ts": "bf3cfef1d609da32",
       "aimeat/src/services/memory/bin.ts": "edad9406121f44e5",
       "aimeat/src/routes/memory-hands.ts": "f1a6339a62d0a7d3",
-      "aimeat/src/routes/owners/export.ts": "c7913eda009f7f9a",
+      "aimeat/src/routes/owners/export.ts": "d696d107f043c4e5",
       "aimeat/src/services/owner/erasure.ts": "2c6ebdeb7b3b1633",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
       "aimeat/src/mcp/organisms.ts": "cd717aff84700658"
@@ -1059,14 +1059,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "a79518d01e0e2cb7"
+      "aimeat/test/run-e2e-ci.ts": "452d7d8ab327500e"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "ff5667f45f677f32"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "a79518d01e0e2cb7"
+      "aimeat/test/run-e2e-ci.ts": "452d7d8ab327500e"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

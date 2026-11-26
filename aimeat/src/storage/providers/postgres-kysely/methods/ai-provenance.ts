@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.11.0 — 2026-11-26 — listAiProvenance({ before }): a keyset page, ordered by generatedAt and then
+ *     id, for a reader that walks every record (the owner export, which took 108 s on offsets).
  *   v1.10.0 — 2026-11-26 — aiProvenanceActivity(): counts by principal, pipeline, model, public and
  *     reviewed, in one statement with JIT off.
  *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
@@ -274,12 +276,16 @@ export const aiProvenanceMethods = {
         .select(sql<string>`COUNT(*)`.as('n'))
         .where(conditions)
         .executeTakeFirst();
-      const rows = await this.db.selectFrom('AiProvenance as p').selectAll()
+      const before = query?.before;
+      let q = this.db.selectFrom('AiProvenance as p').selectAll()
         .where(conditions)
         .orderBy('p.generatedAt', 'desc')
-        .limit(limit)
-        .offset(Math.max(query?.offset ?? 0, 0))
-        .execute();
+        .orderBy('p.id', 'desc')
+        .limit(limit);
+      // The keyset: the row tuple after the cursor in this order, so no earlier row is read again.
+      if (before) q = q.where(sql<boolean>`(p."generatedAt", p."id") < (${before.generatedAt}, ${before.id})`);
+      else q = q.offset(Math.max(query?.offset ?? 0, 0));
+      const rows = await q.execute();
       return { items: rows.map(toRecord), total: query?.noTotal ? -1 : Number(counted?.n ?? 0) };
     };
     // Only the public test makes these statements whole-population ones (withoutJit).

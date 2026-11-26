@@ -10,8 +10,11 @@
  *   - listAuditEntries: fetch consent audit-log entries for a day range
  *   - getPermissionSummary / getKeyPermissions: effective permission rules & visibility per key
  *   - exportGdpr: full owner data export
+ *   - getExportPlan / getExportCurrent / startExport / cancelExport: the data export as a background job (ZIP files)
  *
  * @version-history
+ *   2026-11-26 — getExportPlan, startExport, cancelExport: the data export as a background job of the
+ *     parts the person chooses (routes/owners/exports.ts).
  *   2026-11-09 — getDataWalletOverview passes group_limit and the reader's midnights and returns the
  *     day buckets and the refusal totals; listAuditGroups reads one window's groups; listAuditRows
  *     takes from and to.
@@ -130,4 +133,29 @@ export async function getKeyPermissions(key) {
 /** Export all owner data (GDPR). Returns the full export object. */
 export async function exportGdpr(ownerName) {
   return apiGet('/v1/owners/' + encodeURIComponent(ownerName) + '/export');
+}
+
+/** The export's parts with their sizes on this account, and the current export (with its links). */
+export async function getExportPlan(ownerName) {
+  return (await apiGet('/v1/owners/' + encodeURIComponent(ownerName) + '/exports/plan'))?.data ?? null;
+}
+
+/** The account's current export (with its links), or null when it has none. */
+export async function getExportCurrent(ownerName) {
+  try {
+    return (await apiGet('/v1/owners/' + encodeURIComponent(ownerName) + '/exports/current'))?.data?.export ?? null;
+  } catch (e) {
+    if (e?.code === 'NO_EXPORT') return null;
+    throw e;
+  }
+}
+
+/** Queue an export of these parts. Throws with the server's words when it cannot start. */
+export async function startExport(ownerName, parts) {
+  return (await api('/v1/owners/' + encodeURIComponent(ownerName) + '/exports', { method: 'POST', body: JSON.stringify({ parts }) }))?.data ?? null;
+}
+
+/** Stop the waiting or running export, or remove a finished one's files. */
+export async function cancelExport(ownerName) {
+  return (await api('/v1/owners/' + encodeURIComponent(ownerName) + '/exports/current', { method: 'DELETE' }))?.data ?? null;
 }

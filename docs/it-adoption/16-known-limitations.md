@@ -1,6 +1,6 @@
 # 16 Known limitations
 
-> Checked against AIMEAT node 4.3.1 (commit 519bf074f) on 2026-11-23. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a74da06ee) on 2026-11-26. Maintained with the code: see the README for how.
 
 Every known limitation of AIMEAT in one place, for the IT, security and data protection staff deciding whether to run it. Each row says what the limitation is, what follows from it, what the organisation can do about it, and where it is recorded. A limitation that has a setting is listed with that setting; "off by default" means the protection exists and the organisation must turn it on. The pages of this package have their own `## Limits`; those the tables do not already list are in the section "From the other pages" below.
 
@@ -131,7 +131,8 @@ list are below, grouped by topic, each with the page that explains it.
 - Account deletion is immediate, with no grace period and no undo. It continues past a clean-up step that fails, logs the failed step, and leaves that subsystem's data in place.
 - AI provenance records, workspace rows, finance records and other shared records survive account deletion under a pseudonym.
 - An outside file store with no folder prefix is never swept, so its objects stay after their rows are gone.
-- The account export lists files as metadata, not bytes. The account export, the memory export and account erasure have no MCP tool.
+- The account export's JSON answer lists files as metadata, not bytes; the ZIP export (`aimeat_account_export`) carries them. The memory export and account erasure have no MCP tool.
+- The ZIP export is written to the disk of the process that ran it (`AIMEAT_EXPORT_DIR`). With several node processes (`AIMEAT_NODE_PROCESSES=multiple`) the folder must be shared between them, or a download that reaches another process answers 404.
 - The per-day AI usage records (`ai-usage.<account>.<day>`, written with no time limit) and the account event archive are never pruned by a job, and no tool prunes them (`aimeat/src/services/ai/usage-record.ts`). The archived usage call and event rows have an operator route, `POST /v1/admin/usage/archive/prune`, which removes rows before a date the operator gives; no MCP tool does this (`aimeat/src/routes/admin/usage.ts`).
 - No automatic retention was found for workspace rows and their revisions, AI provenance, agent activity or direct messages.
 - Content written while classification is off has no label until a rule, a scan or a person gives it one.

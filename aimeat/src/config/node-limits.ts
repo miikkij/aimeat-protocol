@@ -13,6 +13,8 @@
  *   import { nodeLimitsDefaults } from './node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-11-26 — exportDir, exportKeepDays, exportVolumeMb, exportMaxDiskGb: the owner data export as a
+ *     background job (wish-owner-data-export-as-a-chosen-parts-background-job).
  *   2026-11-25 — mcpToolAnswerChars: the size of one tool answer is a setting, default 250 000.
  *   2026-11-08 — mcpLegacySessionsPerOwner (secaudit2026nov08 round 14, mcp-legacy-session-node-cap-evicts-other-owners).
  *   2026-11-04 — dbRequestStatementMs (codebase analysis 2026-11-03, item C8), mcpLegacySessionsPerPrincipal
@@ -156,6 +158,22 @@ export interface NodeLimitsConfig {
    * default 250000; 0 is no limit.
    */
   mcpToolAnswerChars: number;
+  /**
+   * The folder the owner data export writes its ZIP volumes into (services/owner-export/), one folder
+   * per account under it. On the data disk, never the system temp folder: an export can be gigabytes.
+   * AIMEAT_EXPORT_DIR, default ./data/exports under the working directory.
+   */
+  exportDir: string;
+  /** Days a finished export waits for its download before the hourly sweep removes it.
+   *  AIMEAT_EXPORT_KEEP_DAYS, default 7, 1 to 90. */
+  exportKeepDays: number;
+  /** The most bytes one ZIP volume of an export holds, in megabytes; a larger export is several volumes,
+   *  so one broken download costs one volume. AIMEAT_EXPORT_VOLUME_MB, default 1024, 16 to 4096. */
+  exportVolumeMb: number;
+  /** The most disk all exports waiting for their download take together, in gigabytes. An export whose
+   *  estimate does not fit is refused before it starts. AIMEAT_EXPORT_MAX_DISK_GB, default 50; 0 is no
+   *  limit (the free disk is still checked). */
+  exportMaxDiskGb: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -186,5 +204,9 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     mcpLegacySessionsPerOwner: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_OWNER, 300),
     mcpLegacySessionsTotal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, 1000),
     mcpToolAnswerChars: wholeOr(env.AIMEAT_MCP_TOOL_ANSWER_CHARS, 250_000),
+    exportDir: (env.AIMEAT_EXPORT_DIR ?? '').trim() || './data/exports',
+    exportKeepDays: Math.min(90, Math.max(1, wholeOr(env.AIMEAT_EXPORT_KEEP_DAYS, 7))),
+    exportVolumeMb: Math.min(4096, Math.max(16, wholeOr(env.AIMEAT_EXPORT_VOLUME_MB, 1024))),
+    exportMaxDiskGb: wholeOr(env.AIMEAT_EXPORT_MAX_DISK_GB, 50),
   };
 }

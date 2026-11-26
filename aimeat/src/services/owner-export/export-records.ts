@@ -1,5 +1,5 @@
 /**
- * @file src/routes/owners/export-records.ts
+ * @file src/services/owner-export/export-records.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The parts of the GDPR export (GET /v1/owners/:name/export, export.ts) that it did
@@ -25,6 +25,8 @@
  * @usage
  *   const records = ghii ? await exportAccountRecords(storage, ghii, [ghii, ...agentGaiis]) : null;
  * @version-history
+ *   2026-11-26 — Moved from routes/owners/ to services/owner-export/, unchanged: the export's sections
+ *     are read by a service now (account-sections.ts), and a service imports no route file.
  *   v1.0.0 — 2026-11-19 — Initial (feature audit 2026-11-19, item 4.2).
  */
 import type { Storage } from '../../storage/interface.js';

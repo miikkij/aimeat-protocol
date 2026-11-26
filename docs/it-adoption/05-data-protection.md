@@ -1,6 +1,6 @@
 # 05 Data protection
 
-> Checked against AIMEAT node 4.3.1 (commit 519bf074f) on 2026-11-23. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a74da06ee) on 2026-11-26. Maintained with the code: see the README for how.
 
 This page is for the DPO, the security officer and the database administrator. It answers: which data the node keeps, where it keeps it, whether it is personal data, how long it stays and how it is deleted; what the node encrypts itself and what it leaves to the operator; how data classification works and how to set it for an organisation; what the GDPR export and the account deletion do; and which data leaves the operator's own systems.
 
@@ -98,6 +98,7 @@ The retention settings an operator decides at adoption. Everything else in the i
 | `AIMEAT_DECIDE_RETENTION_DAYS` | 365 | decision runs |
 | `AIMEAT_EXECUTION_LOG_RETENTION_DAYS` | 30 | run execution log |
 | `AIMEAT_AI_JOB_LOG_RETENTION_DAYS` | 30 | AI job logs |
+| `AIMEAT_EXPORT_KEEP_DAYS` | 7 | a person's finished ZIP data export, on the node's disk |
 | `AIMEAT_MESSAGE_RETRY_TTL_HOURS` | 168 | retries of a message to another node |
 | `AIMEAT_REPLICATION_QUEUE_TTL_HOURS` | 72 | federation replication queue |
 | classification policy audit retention | 365 days | classification audit |
@@ -110,7 +111,7 @@ Source: `aimeat/.env.example`, `aimeat/src/config/data-access.ts`.
 
 | Right | Route | What it does | Source |
 |---|---|---|---|
-| Access and portability (Art. 15, 20) | `GET /v1/owners/:name/export` | the person or an operator; one JSON document with the account, profile, memory records, file metadata (not the bytes), agents with their memory and messages, organism memberships, published apps, AI provenance, connections (never the credential), purchases, the person's message threads (attachments named, not included) and contacts, companies (never the mail password), invoices, vouchers, fiscal years, outbound contacts and messages, agent tasks with their events, schedules, capabilities, package installations, help questions, sharing groups, decision-model results, account events and the person's classified organism content. Stored credentials are redacted. Each export is logged as a completed data subject request. There is no MCP tool for it | `aimeat/src/routes/owners/export.ts`, `aimeat/src/routes/owners/export-sections.ts`, `aimeat/src/routes/owners/export-records.ts`, `aimeat/src/data/builtin-skills.data-ownership.ts` |
+| Access and portability (Art. 15, 20) | `GET /v1/owners/:name/export` | the person or an operator; one JSON document with the account, profile, memory records, file metadata (not the bytes), agents with their memory and messages, organism memberships, published apps, AI provenance, connections (never the credential), purchases, the person's message threads (attachments named, not included) and contacts, companies (never the mail password), invoices, vouchers, fiscal years, outbound contacts and messages, agent tasks with their events, schedules, capabilities, package installations, help questions, sharing groups, decision-model results, account events and the person's classified organism content. Stored credentials are redacted. Each export is logged as a completed data subject request. The same content with the file contents, as ZIP files: `POST /v1/owners/:name/exports` with the parts the person chooses (MCP `aimeat_account_export`), written in the background one export at a time on the node, kept `AIMEAT_EXPORT_KEEP_DAYS` (7) days in `AIMEAT_EXPORT_DIR` and then removed; the download links go to the person or the operator in person, never to an agent | `aimeat/src/routes/owners/export.ts`, `aimeat/src/routes/owners/exports.ts`, `aimeat/src/services/owner-export/`, `aimeat/src/data/builtin-skills.data-ownership.ts` |
 | Erasure (Art. 17) | `DELETE /v1/owners/:name` | the person in their own local session, or an operator. Immediate, no grace period, one database transaction with a savepoint per step | `aimeat/src/routes/owners.ts`, `aimeat/src/services/owner/erasure.ts` |
 | An organism's data | `aimeat_organism_export` | an organism's export for its members | [Data ownership](../data-ownership.md) |
 
@@ -157,7 +158,7 @@ Everything in the inventory is stored in the operator's database and, when confi
 - Account deletion continues past a clean-up step that fails, records what it cleared, and logs the failed step as a warning; a failed step leaves that subsystem's data in place.
 - AI provenance records, workspace rows, finance records and other shared records survive account deletion under a pseudonym, not deleted.
 - Files in an outside file store are removed by a daily sweep after the rows are gone, and a store with no folder prefix is never swept, so its objects stay.
-- The GDPR export lists files as metadata only, not their bytes, and has no MCP tool.
+- The GDPR export's JSON answer lists files as metadata only; their bytes are in the ZIP export when the person chooses them. A finished ZIP export stays on the node's disk until its days end or the person removes it.
 - No job deletes AI usage records or the account event archive. An operator prunes archived usage records before a date with `POST /v1/admin/usage/archive/prune` (date and `confirm: true` required, `aimeat/src/routes/admin/usage.ts`). No tool prunes `AccountEventArchive`; it shrinks only through account deletion.
 - No automatic retention was found for workspace rows and their revisions, AI provenance, agent activity or direct messages.
 - Classification is off by default; content written while it is off has no label until a rule, a scan or a person gives it one.

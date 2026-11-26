@@ -11453,6 +11453,11 @@ paths:
         `vouchers`, `fiscal_years`, `outbound_contacts`, `outbound_messages`, `agent_tasks` (each
         with its events), `scheduled_jobs`, `capabilities`, `package_instances`, `help_questions`,
         `sharing_groups`, `group_shares`, `ai_decisions` and `account_events`.
+
+        Since 2026-11-26 the answer is written a section at a time and the AI provenance records are
+        read in keyset pages, so a large account no longer ends in an error; its keys and their order
+        are unchanged. For an account with gigabytes of files, the background export
+        (POST /v1/owners/{name}/exports) writes ZIP files with the parts the person chooses.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -11467,6 +11472,130 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /v1/owners/{name}/exports/plan:
+    get:
+      operationId: ownerExportPlan
+      summary: The parts of a data export and their size on this account
+      tags: [Identity]
+      description: >
+        `{ account, parts: [{ id, what, count, bytes, default }], current, file_mb, keep_days }`. The
+        parts are memories, ai_provenance, app_code (the code of every app version), files (the files
+        the node keeps) and files_own_store (the files in a store the person connected; not in the
+        default). The account itself (profile, agents, messages, tasks, bookkeeping, the facts of every
+        app and file) is always in an export. `current` is the account's export now (see
+        GET .../exports/current). The account holder, their agents (memory:read) and the operator ask.
+        MCP: aimeat_account_export { action: plan }.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/owners/{name}/exports:
+    post:
+      operationId: ownerExportStart
+      summary: Queue a data export of the chosen parts
+      tags: [Identity]
+      description: >
+        Body `{ parts? }` (default: every part but files_own_store). The export is written in the
+        background as ZIP files of at most `storage.export_volume_mb` each, one export at a time on the
+        node, and waits `storage.export_keep_days` for its download. Answers 202 with the export and its
+        place in the queue. 409 EXPORT_RUNNING when one of this account already waits or runs; 507
+        EXPORT_TOO_LARGE, before anything is written, when its size does not fit the free disk or the
+        operator's limit on all waiting exports. A new export replaces a finished one. The account
+        holder, their agents (memory:write) and the operator ask. MCP: aimeat_account_export { action: start }.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                parts:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, enum: [memories, ai_provenance, app_code, files, files_own_store] }
+      responses:
+        '202': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '507': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/owners/{name}/exports/current:
+    get:
+      operationId: ownerExportStatus
+      summary: The account's data export and its state
+      tags: [Identity]
+      description: >
+        `{ export: { id, state, parts, place_in_queue?, progress?, estimate_bytes, expires_at?, files? } }`.
+        `state` is queued, running, ready, failed, cancelled or expired. When ready, `files` lists each
+        ZIP file with its bytes and SHA-256, and with a signed `url` that works for an hour, given to
+        the account holder and the operator in person only; an agent is told the export is ready.
+        MCP: aimeat_account_export { action: status }.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: ownerExportCancel
+      summary: Cancel the data export, or remove a finished one
+      tags: [Identity]
+      description: >
+        A waiting export leaves the queue, a running one stops at its next step, and a ready one's files
+        are removed. `{ export: { id, state: cancelled, was } }`. MCP: aimeat_account_export { action: cancel }.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/exports/download/{token}:
+    get:
+      operationId: ownerExportDownload
+      summary: Download one ZIP file of a ready data export
+      tags: [Identity]
+      description: >
+        The signed link from GET /v1/owners/{name}/exports/current is the credential: it names one file
+        of one ready export and works for an hour. Range requests work, so a broken download resumes.
+        410 TOKEN_EXPIRED for an old link (open the export again for new ones); 404 when the export
+        expired, was cancelled or was replaced.
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The ZIP file.
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '206':
+          description: The requested range of the ZIP file.
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/AimeatError' }
 
   /v1/owners/{name}:
     get:
