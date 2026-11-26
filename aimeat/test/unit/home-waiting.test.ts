@@ -8,6 +8,8 @@
  *   `partial` while the rest answers, a source the caller may not read named in `withheld`, and the
  *   shown names of people read only for the items that are kept.
  * @version-history
+ *   v1.1.0 — 2026-11-26 — The list of kinds has approval and join_request; an agent holding only
+ *     memory:read still reads the same two kinds, because both new kinds ask organism:read.
  *   v1.0.0 — 2026-11-25 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -119,8 +121,8 @@ describe('homeWaitingFor', () => {
 
     it('lists every kind of the contract once, each source reading the word its route asks', () => {
         expect(WAITING_SOURCES.map(s => s.kind).sort()).toEqual([
-            'agent_proposal', 'agent_sign_in', 'help_question', 'invitation', 'open_item',
-            'publish_request', 'reply', 'team', 'unread', 'workflow_input',
+            'agent_proposal', 'agent_sign_in', 'approval', 'help_question', 'invitation', 'join_request',
+            'open_item', 'publish_request', 'reply', 'team', 'unread', 'workflow_input',
         ]);
         // The person in person reads every kind; an agent holding only memory:read reads the two its word covers.
         expect(WAITING_SOURCES.filter(s => !s.readable(alice, deps)).map(s => s.kind)).toEqual([]);
