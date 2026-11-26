@@ -1096,6 +1096,7 @@
     "src/routes/apps/fork-manage.ts:DELETE:/v1/apps/:filename": ["app:manage"],
     "src/routes/apps/fork-manage.ts:PATCH:/v1/apps/:filename": ["app:write"],
     "src/routes/apps/fork-manage.ts:POST:/v1/apps/:owner/:filename/fork": ["app:write"],
+    "src/routes/apps/freshness.ts:GET:/v1/apps/:owner/:filename/freshness": ["app:write"],
     "src/routes/apps/icon.ts:GET:/v1/apps/:owner/:filename/icon": [],
     "src/routes/apps/icon.ts:POST:/v1/apps/:owner/:filename/icon": ["app:write"],
     "src/routes/apps/legal.ts:GET:/v1/apps/:owner/:filename/audit": ["app:write"],
