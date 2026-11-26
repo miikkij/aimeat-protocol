@@ -20,6 +20,8 @@
  * @usage
  *   import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
  * @version-history
+ *   v1.7.0 — 2026-11-26 — aiProvenanceActivity(): counts by principal, pipeline, model, public and
+ *     reviewed, for the register draft, which read pages of the newest records. No migration.
  *   v1.6.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
  *     workspaces only, so a report asks about the workspaces whose share is open. No migration.
  *   v1.5.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every share candidate in a report's
@@ -38,7 +40,7 @@
  */
 import type {
   AiProvenanceRecordRow, AiProvenanceHashQuery,
-  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery, AiProvenanceActivity,
 } from '../interface.js';
 
 export interface AiProvenanceRepository {
@@ -95,6 +97,15 @@ export interface AiProvenanceRepository {
    * whole population, one row per distinct combination.
    */
   aiProvenanceFacets(query?: AiProvenanceFacetQuery): Promise<AiProvenanceFacet[]>;
+
+  /**
+   * Who generated what, as counts: every record in scope grouped by its principal, its generator's
+   * pipeline and model, whether its content is public now and whether a person reviewed it. The
+   * register draft reads it to say which agent publishes and which app ran which model. Counted in
+   * SQL over the whole population for the reason the facets are: a page of the newest records
+   * answers for the newest records only.
+   */
+  aiProvenanceActivity(query?: AiProvenanceFacetQuery): Promise<AiProvenanceActivity[]>;
 
   /**
    * Records themselves, newest first, for the two surfaces that show a LIST rather than a count:

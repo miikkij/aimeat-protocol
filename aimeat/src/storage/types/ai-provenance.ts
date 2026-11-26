@@ -148,6 +148,24 @@ export interface AiProvenanceFacet {
   count: number;
 }
 
+/**
+ * One distinct combination of who generated, through what and on which model, whether the content
+ * is public and whether a person reviewed it, and how many records fall in it (aiProvenanceActivity).
+ */
+export interface AiProvenanceActivity {
+  /** The principal that produced the content, as the record's row names it. */
+  principal: string;
+  /** `record.generator.pipeline`, or null for a record that names none. A call by an app is `owner/filename`. */
+  pipeline: string | null;
+  /** `record.generator.model`, or null. */
+  model: string | null;
+  /** Is the content this record describes readable by an anonymous visitor right now? */
+  publiclyLinked: boolean;
+  /** A person was recorded reviewing the substance: `editorial-control` or `full-human`. */
+  reviewed: boolean;
+  count: number;
+}
+
 export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
   /**
    * Only records whose content is public and where nobody reviewed the substance: the population

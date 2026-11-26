@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.10.0 — 2026-11-26 — aiProvenanceActivity(): counts by principal, pipeline, model, public and
+ *     reviewed. Mirrors the Postgres provider.
  *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
  *     workspaces only. Mirrors the Postgres provider.
  *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
@@ -51,7 +53,7 @@
  */
 import type {
   AiProvenanceRecordRow, AiProvenanceHashQuery,
-  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery, AiProvenanceActivity,
 } from '../../../interface.js';
 import type { AiProvenance } from '../../../../models/ai-provenance-schemas.js';
 import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
@@ -124,6 +126,8 @@ const LEVEL = "json_extract(p.record, '$.level')";
 const DISCLOSURE_REQUIRED = "json_extract(p.record, '$.disclosure.required') = 1";
 const REASON = "json_extract(p.record, '$.disclosure.reason')";
 const MEDIA_KIND = "json_extract(p.record, '$.mediaKind')";
+const PIPELINE = "json_extract(p.record, '$.generator.pipeline')";
+const MODEL = "json_extract(p.record, '$.generator.model')";
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: SqliteStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -213,6 +217,28 @@ export const aiProvenanceMethods = {
       reason: r.rsn ?? null,
       mediaKind: r.mk ?? null,
       count: r.n,
+    }));
+  },
+
+  async aiProvenanceActivity(
+    this: SqliteStorage, query?: AiProvenanceFacetQuery,
+  ): Promise<AiProvenanceActivity[]> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (query?.ownerGhii) { where.push('p.ownerGhii = ?'); params.push(query.ownerGhii); }
+    if (query?.since) { where.push('p.generatedAt >= ?'); params.push(query.since); }
+    const rows = this.db.prepare(
+      `SELECT p.principal AS who, ${PIPELINE} AS pipe, ${MODEL} AS mdl,
+              CASE WHEN ${PUBLICLY_LINKED} THEN 1 ELSE 0 END AS pub,
+              CASE WHEN ${HUMAN_INVOLVEMENT} IN ('editorial-control', 'full-human') THEN 1 ELSE 0 END AS rev,
+              COUNT(*) AS n
+         FROM ai_provenance p
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        GROUP BY who, pipe, mdl, pub, rev`
+    ).all(...params) as Array<{ who: string; pipe: string | null; mdl: string | null; pub: number; rev: number; n: number }>;
+    return rows.map((r) => ({
+      principal: r.who, pipeline: r.pipe ?? null, model: r.mdl ?? null,
+      publiclyLinked: r.pub === 1, reviewed: r.rev === 1, count: r.n,
     }));
   },
 

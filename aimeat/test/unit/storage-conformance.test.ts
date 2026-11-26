@@ -910,6 +910,50 @@ describe('storage providers agree on what they do, not just on their signatures'
         }
     }, 60_000);
 
+    // The register draft reads who generated, who published and which app ran which model as counts
+    // over the whole period (services/compliance/draft.ts readActivity).
+    it('aiProvenanceActivity groups by principal, pipeline, model, public and reviewed', async () => {
+        for (const { name, storage } of provs) {
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const owner = `confact${tag}@aimeat-conformance-001`;
+            const agent = `bot#${owner}`;
+            const now = new Date().toISOString();
+            const old = new Date(Date.now() - 40 * 86_400_000).toISOString();
+            const rows: Array<{ principal: string; at: string; visibility: 'public' | 'private'; doc: Record<string, unknown> }> = [
+                { principal: agent, at: now, visibility: 'public', doc: { humanInvolvement: 'editorial-control', generator: { pipeline: 'alice/app.html', model: 'm/one' } } },
+                { principal: agent, at: now, visibility: 'public', doc: { humanInvolvement: 'editorial-control', generator: { pipeline: 'alice/app.html', model: 'm/one' } } },
+                { principal: agent, at: now, visibility: 'private', doc: { humanInvolvement: 'full-human', generator: { pipeline: 'alice/app.html', model: 'm/two' } } },
+                { principal: agent, at: now, visibility: 'public', doc: { humanInvolvement: 'none' } },
+                { principal: owner, at: now, visibility: 'private', doc: {} },
+                { principal: owner, at: old, visibility: 'public', doc: { humanInvolvement: 'none' } },
+            ];
+            for (const r of rows) {
+                const id = randomUUID();
+                await storage.createAiProvenance({
+                    id, ownerGhii: owner, principal: r.principal, contentHash: null, generatedAt: r.at, createdAt: r.at,
+                    record: { spec: 'aimeat.provenance/v1', generatedAt: r.at, level: 'ai-generated', ...r.doc } as never,
+                });
+                await storage.setMemory({
+                    key: `confact.${id}`, ownerGaii: owner, value: { n: 1 }, visibility: r.visibility, tags: [], ttlHours: null,
+                    version: 1, createdAt: r.at, updatedAt: r.at, aiProvenanceId: id,
+                } as never);
+            }
+            const shape = (groups: Array<{ principal: string; pipeline: string | null; model: string | null; publiclyLinked: boolean; reviewed: boolean; count: number }>) =>
+                groups.map(g => `${g.principal === agent ? 'agent' : 'owner'}|${g.pipeline}|${g.model}|${g.publiclyLinked ? 'public' : 'private'}|${g.reviewed ? 'reviewed' : 'unreviewed'}|${g.count}`).sort();
+            const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+            expect.soft(shape(await storage.aiProvenanceActivity({ ownerGhii: owner, since })), `${name}: the period's groups`).toEqual([
+                'agent|alice/app.html|m/one|public|reviewed|2',
+                'agent|alice/app.html|m/two|private|reviewed|1',
+                'agent|null|null|public|unreviewed|1',
+                // An absent involvement is not a review.
+                'owner|null|null|private|unreviewed|1',
+            ]);
+            expect.soft(shape(await storage.aiProvenanceActivity({ ownerGhii: owner })).includes('owner|null|null|public|unreviewed|1'),
+                `${name}: without a start, the older record too`).toBe(true);
+        }
+    }, 60_000);
+
     // A report's share scan asks for candidates in the workspaces whose share is open
     // (services/share/provenance.ts sharePublicInScope): `keyPrefixes` narrows the scan to them.
     it('workspaceProvenanceLinks scans the named workspaces only, and nothing for an empty list', async () => {

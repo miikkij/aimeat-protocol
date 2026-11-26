@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.10.0 — 2026-11-26 — aiProvenanceActivity(): counts by principal, pipeline, model, public and
+ *     reviewed, in one statement with JIT off.
  *   v1.9.0 — 2026-11-26 — workspaceProvenanceLinks({ scan: { keyPrefixes } }): a scan of the named
  *     workspaces only, so a report's scan reads the workspaces whose share is open.
  *   v1.8.0 — 2026-11-26 — listAiProvenance({ facts, noTotal }): the rows of named fact combinations,
@@ -54,7 +56,7 @@
 import { sql, type Selectable } from 'kysely';
 import type {
   AiProvenanceRecordRow, AiProvenanceHashQuery,
-  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery, AiProvenanceFacts,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery, AiProvenanceFacts, AiProvenanceActivity,
 } from '../../../interface.js';
 import type { AiProvenance as AiProvenanceDoc } from '../../../../models/ai-provenance-schemas.js';
 import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
@@ -125,6 +127,10 @@ const LEVEL = sql<string | null>`p."record"->>'level'`;
 const DISCLOSURE_REQUIRED = sql<boolean>`COALESCE((p."record"->'disclosure'->>'required')::boolean, false)`;
 const REASON = sql<string | null>`p."record"->'disclosure'->>'reason'`;
 const MEDIA_KIND = sql<string | null>`p."record"->>'mediaKind'`;
+const PIPELINE = sql<string | null>`p."record"->'generator'->>'pipeline'`;
+const MODEL = sql<string | null>`p."record"->'generator'->>'model'`;
+/** A person was recorded reviewing the substance; an absent involvement is not a review. */
+const REVIEWED = sql<boolean>`COALESCE(p."record"->>'humanInvolvement' IN ('editorial-control', 'full-human'), false)`;
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: PostgresKyselyStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -220,6 +226,29 @@ export const aiProvenanceMethods = {
       // COUNT() comes back as a bigint string on this driver; Number() is exact well past any
       // plausible record count.
       count: Number(r.n),
+    }));
+  },
+
+  async aiProvenanceActivity(
+    this: PostgresKyselyStorage, query?: AiProvenanceFacetQuery,
+  ): Promise<AiProvenanceActivity[]> {
+    let q = this.db.selectFrom('AiProvenance as p')
+      .select([
+        'p.principal as who',
+        PIPELINE.as('pipe'),
+        MODEL.as('mdl'),
+        publiclyLinked('p."id"').as('pub'),
+        REVIEWED.as('rev'),
+        sql<string>`COUNT(*)`.as('n'),
+      ])
+      .groupBy(['who', 'pipe', 'mdl', 'pub', 'rev']);
+    if (query?.ownerGhii) q = q.where('p.ownerGhii', '=', query.ownerGhii);
+    if (query?.since) q = q.where('p.generatedAt', '>=', query.since);
+    // The public test over a whole population, as the facets: JIT off (withoutJit).
+    const rows = await withoutJit(this, () => q.execute());
+    return rows.map((r) => ({
+      principal: r.who, pipeline: r.pipe ?? null, model: r.mdl ?? null,
+      publiclyLinked: r.pub === true, reviewed: r.rev === true, count: Number(r.n),
     }));
   },
 

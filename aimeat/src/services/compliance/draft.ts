@@ -40,6 +40,10 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.4.0 — 2026-11-26 — The evidence of who generated, who published and which app ran which model
+ *     is one grouped statement over the whole period (storage aiProvenanceActivity). It was the
+ *     newest 2 000 records and the newest 2 000 public ones in eight pages: an agent whose public
+ *     content was older than the sample was answered "does not publish" as evidence.
  *   v1.3.4 — 2026-11-26 — Every app's data map is read in one batch (report-reads.ts); it was one
  *     read an app.
  *   v1.3.3 — 2026-11-26 — The provenance pages are read without the count (`noTotal`): each page
@@ -68,7 +72,6 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { AiProvenanceListQuery, AiProvenanceRecordRow } from '../../storage/types/ai-provenance.js';
 import type { ComplianceAnswerSource, ComplianceUseCase } from './register.js';
 import { classifyUseCase, effectiveQuestionnaire, readUseCases, type ComplianceRiskVerdict } from './register.js';
 import { appAiSignals } from './app-signals.js';
@@ -78,10 +81,6 @@ import type { AiActStatement } from '../data-map/data-map-types.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { appDataMapId } from '../app/app-ref.js';
 
-/** Provenance rows read per draft. Bounded: this is a page of recent activity, not a scan. */
-const PROVENANCE_SAMPLE = 2000;
-/** The storage's own page cap (listAiProvenance clamps `limit` to it). */
-const PROVENANCE_PAGE = 500;
 /** How many apps are read, as the records-of-processing drafts read them. */
 const APP_SCAN = 1000;
 
@@ -135,18 +134,6 @@ export interface RegisterDraft {
   notes: string[];
 }
 
-/** Read a provenance query page by page, up to the sample. */
-async function provenanceRows(storage: Storage, query: AiProvenanceListQuery): Promise<AiProvenanceRecordRow[]> {
-  const out: AiProvenanceRecordRow[] = [];
-  for (let offset = 0; offset < PROVENANCE_SAMPLE; offset += PROVENANCE_PAGE) {
-    // noTotal: the count is not read here, and with it every page ran the count statement again.
-    const { items } = await storage.listAiProvenance({ ...query, limit: PROVENANCE_PAGE, offset, noTotal: true });
-    out.push(...items);
-    if (items.length < PROVENANCE_PAGE) break;
-  }
-  return out;
-}
-
 /** What one principal's provenance rows say about it. */
 interface PrincipalEvidence {
   /** It generated something during the period. */
@@ -164,45 +151,40 @@ const appKey = (owner: string, filename: string): string =>
 /**
  * Publishing evidence per principal and models per app, read once for the whole draft.
  *
- * Two reads: every record of the period, and the public ones. A record existing says only that
- * something was generated; whether anyone outside can read it is the public read's answer, which is
- * the same visibility rule the transparency report counts with.
+ * One grouped statement over every record of the period (storage aiProvenanceActivity). A record
+ * existing says only that something was generated; whether anyone outside can read it is the
+ * group's public flag, the same visibility rule the transparency report counts with.
+ *
+ * It was two samples, the newest 2 000 records and the newest 2 000 public ones, read 500 at a
+ * time. On a node with more public records than that in the period, an agent whose public content
+ * was older than the sample was answered "does not publish", marked as evidence, and the eight
+ * pages, four of them evaluating the public test again, were most of the draft's time.
  */
 async function readActivity(storage: Storage, since: string): Promise<{
   byPrincipal: Map<string, PrincipalEvidence>;
   modelsByApp: Map<string, Set<string>>;
 }> {
-  const [all, pub] = await Promise.all([
-    provenanceRows(storage, { since }),
-    provenanceRows(storage, { since, publicOnly: true }),
-  ]);
   const byPrincipal = new Map<string, PrincipalEvidence>();
   const modelsByApp = new Map<string, Set<string>>();
-  const at = (p: string) => {
-    const e = byPrincipal.get(p) ?? { generated: false, published: false, reviewed: false };
-    byPrincipal.set(p, e);
-    return e;
-  };
-  for (const row of all) {
-    at(row.principal).generated = true;
+  for (const group of await storage.aiProvenanceActivity({ since })) {
+    const e = byPrincipal.get(group.principal) ?? { generated: false, published: false, reviewed: false };
+    byPrincipal.set(group.principal, e);
+    e.generated = true;
+    if (group.publiclyLinked) {
+      e.published = true;
+      // A review counts for the public part only: that is what the question asks about.
+      if (group.reviewed) e.reviewed = true;
+    }
     // The node records the calling app as the generator's pipeline: `owner/filename` from the app's
     // grant, never a name the request body chose (services/ai/completion.ts).
-    const pipeline = row.record?.generator?.pipeline;
-    const model = row.record?.generator?.model;
+    const { pipeline, model } = group;
     if (pipeline && model && pipeline.includes('/')) {
       const [owner, ...rest] = pipeline.split('/');
-      const key = appKey(owner, rest.join('/'));
+      const key = appKey(owner!, rest.join('/'));
       const set = modelsByApp.get(key) ?? new Set<string>();
       set.add(model);
       modelsByApp.set(key, set);
     }
-  }
-  for (const row of pub) {
-    const e = at(row.principal);
-    e.generated = true;
-    e.published = true;
-    const involvement = row.record?.humanInvolvement;
-    if (involvement === 'editorial-control' || involvement === 'full-human') e.reviewed = true;
   }
   return { byPrincipal, modelsByApp };
 }

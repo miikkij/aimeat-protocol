@@ -15,6 +15,8 @@
  *   failure the whole feature exists to prevent.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-draft.test.ts
  * @version-history
+ *   2026-11-26 — The stub answers the grouped evidence read (aiProvenanceActivity) in place of pages of
+ *     records. The setup no longer matched the draft's reads; the source was right.
  *   2026-11-26 — The stub answers the batch read of the data maps (getMemoryByKeysAnyOwner): the
  *     draft reads them in one batch. The setup no longer matched the draft's reads; the source was right.
  *   v1.1.0 — 2026-10-28 — Every app that uses AI is an entry (TaskGrid on orgnode.example had
@@ -53,18 +55,13 @@ function storageWith(opts: {
       ...a, owner: 'alice', publicKey: '', trustScore: 0, morselBalance: 0,
       createdAt: '', lastSeen: '', capabilities: a.capabilities ?? [],
     })),
-    listAiProvenance: async (q?: { publicOnly?: boolean; offset?: number }) => {
-      // One page: the draft pages by offset, and a second page must come back empty.
-      const rows = (q?.offset ?? 0) > 0 ? [] : (opts.provenance ?? []).filter(p => !q?.publicOnly || p.public !== false);
-      return {
-        items: rows.map((p, i) => ({
-          id: `p${i}`, ownerGhii: 'alice@test-node', principal: p.principal, contentHash: null,
-          generatedAt: '2026-08-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z',
-          record: { humanInvolvement: p.humanInvolvement, generator: { pipeline: p.pipeline, model: p.model } },
-        })),
-        total: rows.length,
-      };
-    },
+    // The draft reads its evidence as one grouped answer (storage aiProvenanceActivity): one group a record here.
+    aiProvenanceActivity: async () => (opts.provenance ?? []).map(p => ({
+      principal: p.principal, pipeline: p.pipeline ?? null, model: p.model ?? null,
+      publiclyLinked: p.public !== false,
+      reviewed: p.humanInvolvement === 'editorial-control' || p.humanInvolvement === 'full-human',
+      count: 1,
+    })),
     listApps: async () => ({
       apps: [
         ...(opts.appsWithGap ?? []).map(a => ({
