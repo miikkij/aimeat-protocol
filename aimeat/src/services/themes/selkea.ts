@@ -24,6 +24,9 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.1.0 — 2026-11-26 — The Settings menu: a group that folds has the bold name the others have,
+ *     rows have no rule between them, the row under the pointer gets a ground and the open row is
+ *     the one filled box. "Show all tools" is an outlined button, as every action of the theme is.
  *   v1.0.1 — 2026-11-25 — The boards list's visibility column rule left the theme: listing.css now
  *     sizes that column to its tag in every theme.
  *   v1.0.0 — 2026-11-25 — Initial.
@@ -108,6 +111,20 @@ function themeCss(): string {
 
 /* The side menu's group names are ink words in sentence case. */
 .side-menu-group-title { color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 800; font-size: 1rem; }
+/* A group that folds has the same name: its button inherits the face, so the weight is said here. */
+.pf .side-menu-group-toggle { font-weight: 800; font-size: 1rem; }
+/* The Settings menu's rows have no rule between them. The group's name and the room above it
+   separate the groups, the row under the pointer gets a ground, and the open row is the one filled
+   box, so a look at the menu finds where the person is and where something waits. */
+.settings-frame-menu .side-menu-group { margin-top: 1.35rem; }
+.settings-frame-menu .side-menu-group-title { padding-bottom: .3rem; border-bottom: 0; }
+.settings-frame-menu .side-menu-item { box-sizing: border-box; width: calc(100% + 1.2rem); margin: 0 -.6rem; padding: .4rem .6rem; border-bottom: 0; border-radius: var(--shape-corner-control); }
+.settings-frame-menu .side-menu-item:hover { background: var(--bg-surface); color: var(--text); }
+.settings-frame-menu .side-menu-item--active, .settings-frame-menu .side-menu-item--active:hover { background: var(--sun); color: var(--on-sun); }
+.settings-frame-menu .side-menu-home { margin-bottom: .6rem; }
+/* "Show all tools" is an action, so it is an outlined button here like every other action of the theme. */
+.settings-frame-menu .side-menu-more { width: 100%; height: 40px; margin: 1.2rem 0 0; padding: 0 12px; justify-content: center; border: 1.5px solid var(--text-dim); background: var(--card-bg); color: var(--text); font-family: inherit; font-size: .875rem; font-weight: 700; text-decoration: none; }
+.settings-frame-menu .side-menu-more:hover { background: var(--sun); color: var(--on-sun); }
 .og-strip b.og-strip-coral { color: var(--sun); }
 
 /* The loud action is the accent. */
