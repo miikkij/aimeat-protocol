@@ -19,7 +19,7 @@
  *   v1.0.0 — 2026-11-27 — Initial.
  */
 import type { HandMade, PublishTrace } from './bench-measure.js';
-import { handMadeCount } from './bench-measure.js';
+import { HAND_MADE_HABITS, handMadeCount } from './bench-measure.js';
 import type { SessionFacts } from './session-transcript.js';
 import type { RunRecord } from './report.js';
 
@@ -71,12 +71,12 @@ export function renderBenchReport(meta: BenchMeta, runs: BenchRun[]): string {
         if (r.missing) { lines.push(`| ${r.brief} | no session | | | | | | | | | | | | | |`); continue; }
         const worked = r.session?.apiMs === null || r.session?.apiMs === undefined ? null : r.session.apiMs + (r.session.toolMs ?? 0);
         lines.push(`| ${r.brief} | ${r.ok ? 'pass' : 'FAIL'} | ${r.session?.humanTurns ?? '-'} | ${min(worked)} | ${min(r.session?.wallMs)} | ${r.trace?.nodeCalls ?? '-'} | ${r.trace?.allCalls ?? '-'} `
-            + `| ${r.trace?.refusals.length ?? '-'} | ${r.trace?.publishAttempts ?? '-'} | ${r.versions ?? '-'} | ${r.metrics.outputTokens} | ${r.hand ? `${handMadeCount(r.hand)}/7` : '-'} `
+            + `| ${r.trace?.refusals.length ?? '-'} | ${r.trace?.publishAttempts ?? '-'} | ${r.versions ?? '-'} | ${r.metrics.outputTokens} | ${r.hand ? `${handMadeCount(r.hand)}/${HAND_MADE_HABITS.length}` : '-'} `
             + `| ${r.buildNotes ? `${r.buildNotes.took} / ${r.buildNotes.passed} / ${r.buildNotes.made}` : 'none written'} | ${r.kitComponents.length} | ${r.playtest ? (r.playtest.ran ? (r.playtest.ok ? 'ok' : `${r.playtest.failed.length} failed`) : 'not run') : '-'} |`);
     }
     lines.push('',
         'Person spoke: how many messages the person wrote, the order included. Worked: the model\'s time plus the tools\' time, as the client counted it. '
-        + 'Node errors: node tool calls that came back as an error, a refusal or an answer too large for the client. By hand: how many of seven habits the page has (its own translation function, DOM helper, toast, clipboard call, HTML escape, direct REST call, storage wrapper).',
+        + 'Node errors: node tool calls that came back as an error, a refusal or an answer too large for the client. By hand: how many of six habits the page has (a translation function, a DOM helper or a toast of its own that does not call the kit\'s, a clipboard call, an HTML escape, a direct REST call).',
         '');
 
     for (const r of done) {
@@ -89,8 +89,8 @@ export function renderBenchReport(meta: BenchMeta, runs: BenchRun[]): string {
         if (r.trace?.shellRefusals.length) lines.push(`- the node refused a shell command's request: ${r.trace.shellRefusals.join(', ')}`);
         if (r.trace) lines.push(`- ${r.trace.callsBeforeFirstPublish === null ? 'never tried to publish' : `${r.trace.callsBeforeFirstPublish} node calls before the first publish`}; ${r.trace.publishAttempts} publish call(s), ${r.trace.publishRefusals.length} refused${r.trace.publishRefusals.length ? ` (${r.trace.publishRefusals.join(', ')})` : ''}`);
         if (r.hand) {
-            const habits = (['ownT', 'ownEl', 'ownToast', 'ownClipboard', 'ownEsc', 'rawFetch', 'dataWrapper'] as const).filter(k => r.hand![k]);
-            lines.push(`- by hand: ${habits.join(', ') || 'none of the seven'}; createElement ${r.hand.createElement}, innerHTML ${r.hand.innerHtml}, own styles ${Math.round(r.hand.styleShare * 100)} % of the page`);
+            const habits = HAND_MADE_HABITS.filter(k => r.hand![k]);
+            lines.push(`- by hand: ${habits.join(', ') || 'none of the six'}; createElement ${r.hand.createElement}, innerHTML ${r.hand.innerHtml}, own styles ${Math.round(r.hand.styleShare * 100)} % of the page`);
         }
         lines.push(`- kit parts: ${r.kitComponents.join(' ') || 'none'}`);
         lines.push(`- beside the app: agent face ${yes(r.agentFace)}, bound skills ${r.boundSkills ?? '-'}${r.behind.length ? `; behind: ${r.behind.join('; ')}` : '; nothing behind'}`);

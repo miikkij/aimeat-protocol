@@ -20,7 +20,7 @@ import { parseTranscript, type ToolCall } from '../../scripts/cold-agent/transcr
 const call = (name: string, isError = false, resultHead = ''): ToolCall => ({ name, input: {}, isError, resultHead });
 
 describe('handMade', () => {
-    it('finds each of the seven habits and counts them', () => {
+    it('finds each of the six habits and counts them', () => {
         const page = [
             '<style>.x{color:red}</style>',
             '<script>',
@@ -30,14 +30,25 @@ describe('handMade', () => {
             'navigator.clipboard.writeText(text);',
             'function escapeHtml(s) { return s; }',
             'fetch(\'/v1/memory/\' + key);',
-            'async function saveList(items) { await AIMEAT.data.set(\'errands.list\', items); }',
             '</script>',
         ].join('\n');
         const h = handMade(page);
-        expect(h).toMatchObject({ ownT: true, ownEl: true, ownToast: true, ownClipboard: true, ownEsc: true, rawFetch: true, dataWrapper: true, createElement: 1, innerHtml: 1 });
-        expect(handMadeCount(h)).toBe(7);
+        expect(h).toMatchObject({ ownT: true, ownEl: true, ownToast: true, ownClipboard: true, ownEsc: true, rawFetch: true, createElement: 1, innerHtml: 1 });
+        expect(handMadeCount(h)).toBe(6);
         expect(h.styleChars).toBe('<style>.x{color:red}</style>'.length);
         expect(handMade('<script>function el(tag) { return 1; }</script>').ownEl).toBe(true);
+    });
+
+    it('does not count a function that passes the work on to the kit', () => {
+        // The three shapes the first baseline round's pages had, each counted as by hand at first.
+        const alias = handMade('<script>var i18n = AIMEAT.atelier.i18n; var t = function (k, v) { return i18n.t(k, v); };</script>');
+        const wrapper = handMade('<script>function t(key, vars) {\n  var s = i18n.t(key);\n  if (vars) Object.keys(vars).forEach(function (k) { s = s.split("{" + k + "}").join(vars[k]); });\n  return s;\n}</script>');
+        const toast = handMade('<script>function failToast(err) {\n  A.toast({ title: t("failed"), sub: String(err), tone: "err" });\n}</script>');
+        const store = handMade('<script>async function saveList(items) { await AIMEAT.data.set("errands.list", items); }</script>');
+        expect([alias.ownT, wrapper.ownT, toast.ownToast]).toEqual([false, false, false]);
+        expect(handMadeCount(store)).toBe(0);
+        // One own function among aliases is still found.
+        expect(handMade('<script>function t(k) { return i18n.t(k); }\nfunction showToast(m) { document.title = m; }</script>')).toMatchObject({ ownT: false, ownToast: true });
     });
 
     it('answers nothing for a page that calls the kit', () => {
@@ -132,7 +143,7 @@ describe('renderBenchReport', () => {
     it('gives one row per brief with the numbers two rounds are compared on', () => {
         const text = renderBenchReport(meta('r1'), [run({})]);
         expect(text).toContain('**1 of 1 builds gave the person the app they ordered.**');
-        expect(text).toContain('| list | pass | 1 | 5.0 | 10.0 | 12 | 14 | 1 | 2 | 2 | 1000 | 1/7 | 2 / 1 / 3 | 2 | ok |');
+        expect(text).toContain('| list | pass | 1 | 5.0 | 10.0 | 12 | 14 | 1 | 2 | 2 | 1000 | 1/6 | 2 / 1 / 3 | 2 | ok |');
         expect(text).toContain('9 node calls before the first publish; 2 publish call(s), 1 refused (APP_OWES_ITEMS)');
         expect(text).toContain('by hand: ownT;');
     });
