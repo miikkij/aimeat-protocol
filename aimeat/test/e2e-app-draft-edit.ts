@@ -181,6 +181,10 @@ await test('Seeding from a genre the node ships puts the whole genre in the slot
     const read = await json(`/v1/apps/${ownerAName}/${FORK}/draft`, aAuthed());
     const text = Buffer.from(read.body.data.content, 'base64').toString('utf8');
     assert(shipped.length > 20000 && text === shipped, `the draft is the shipped genre, byte for byte: ${text.length} against ${shipped.length}`);
+    // The same page as a file, for a builder that works in files: plain text, a download, the same bytes.
+    const file = await fetch(`${BASE}/v1/app-templates/genre-workbench?format=raw`);
+    assert(file.status === 200 && String(file.headers.get('content-type')).startsWith('text/plain') && String(file.headers.get('content-disposition')).startsWith('attachment'), `the raw form is a plain-text download: ${file.status} ${file.headers.get('content-type')}`);
+    assert(await file.text() === shipped, 'and it is the shipped page byte for byte');
     const title = /<title>([^<]*)<\/title>/.exec(shipped)![0];
     const rep = await json(`/v1/apps/${ownerAName}/${FORK}/draft/replace`, aAuthed({
         method: 'POST', body: JSON.stringify({ old_string: title, new_string: '<title>Tool shed</title>' }),

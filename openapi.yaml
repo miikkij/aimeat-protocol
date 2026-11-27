@@ -20273,9 +20273,17 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [raw] }
+          description: >
+            `raw` answers a shipped template's page itself, as plain text and a download, in place of
+            the JSON envelope: a builder that works in files saves it and changes it in place. A
+            genre that grew out of an app has no raw form.
       responses:
         '200':
-          description: The template with content (data.template)
+          description: The template with content (data.template); with `format=raw`, the page's text.
         '404':
           description: No such template
 

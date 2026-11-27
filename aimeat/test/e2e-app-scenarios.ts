@@ -123,8 +123,11 @@ const SCENARIOS = [
         if (!run.ran) skip(`no browser on this node: ${run.reason}`);
         // The run has 35 seconds. On a machine busy with other suites some runs may not start, and
         // the answer must then say so; the cases about what the runs showed need all of them.
-        const left = (run.scenarios as any[]).flatMap(s => s.not_run as string[]);
-        assert((left.length === 0) === (run.reason === undefined), `what did not run is said: ${JSON.stringify(left)} / ${run.reason}`);
+        // A scenario that failed at the first two sizes is not run at the other six, and that is said too.
+        const failedFirst = (s: any) => s.runs.some((x: any) => !x.ok);
+        const left = (run.scenarios as any[]).filter(s => !failedFirst(s)).flatMap(s => s.not_run as string[]);
+        const stopped = (run.scenarios as any[]).filter(failedFirst).flatMap(s => s.not_run as string[]);
+        assert((left.length + stopped.length === 0) === (run.reason === undefined), `what did not run is said: ${JSON.stringify({ left, stopped })} / ${run.reason}`);
         if (left.length) { run = { ...run, incomplete: true }; skip(`${left.length} run(s) did not fit the deadline on this machine: ${run.reason}`); }
         const byId = new Map((run.scenarios as any[]).map(s => [s.id, s]));
         const saves = byId.get('saves');
@@ -132,6 +135,9 @@ const SCENARIOS = [
         assert(saves.runs.some((x: any) => x.size === '390x844' && x.theme === 'dark') && saves.runs.some((x: any) => x.size === '1920x1080' && x.theme === 'light'), 'every size and both themes ran');
         const broken = byId.get('broken');
         assert(broken.ok === false && broken.runs.every((x: any) => x.failed_step?.index === 0 && x.failed_step?.do === 'expect_text'), `the broken step is named: ${JSON.stringify(broken.runs[0])}`);
+        // It failed at the phone and the desktop in the light theme, so the other six runs were left.
+        assert(broken.runs.length === 2 && broken.runs.every((x: any) => x.theme === 'light') && broken.not_run.length === 6, `a failing scenario stops after the first two: ${JSON.stringify({ runs: broken.runs.map((x: any) => `${x.size} ${x.theme}`), not_run: broken.not_run.length })}`);
+        assert(/were not started/.test(String(run.reason)), `and the answer says why: ${run.reason}`);
         const stranger = byId.get('stranger');
         assert(stranger.ok === true && stranger.signed_in === false, `the signed-out scenario: ${JSON.stringify(stranger.runs[0])}`);
         assert(String(run.member).includes('throwaway'), `the member is said: ${run.member}`);

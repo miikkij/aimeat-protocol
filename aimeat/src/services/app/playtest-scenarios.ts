@@ -28,6 +28,9 @@
  *   waits 60 seconds for a tool got no answer at all from a run that was allowed 170.
  * @structure runAppScenarios(storage, config, app, scenarios, opts) · ScenarioRunResult
  * @version-history
+ *   v1.2.0 — 2026-11-27 — Two stages: the phone and the desktop in the light theme first, and the
+ *     other six runs only for a scenario that passed them. The answer says which runs were left
+ *     for that reason, apart from the ones the deadline left. `deadlineMs` is the caller's.
  *   v1.1.0 — 2026-11-27 — A member per run of one size and theme, four runs at a time, and a
  *     deadline of 35 seconds with the finished runs answered when it passes
  *     (wish-rakentajan-skenaarioajo-vastaa-mcp-kutsun-aikana-ja-jokainen). Measured on five builds
@@ -54,6 +57,13 @@ import { SCENARIO_SIZES, SCENARIO_THEMES, type AppScenario, type ScenarioStep } 
 const RUN_DEADLINE_MS = 35_000;
 /** Runs of one size and theme in the browser at the same time. */
 const RUNS_AT_ONCE = 4;
+/**
+ * How many sizes of the matrix, in the light theme, a scenario runs at first: the phone and the
+ * desktop. Only a scenario that passes those runs at the other sizes and in the dark theme. Measured
+ * on five builds on 2026-11-27: with every scenario run at all eight each time, the builders spent
+ * about ten minutes a build on runs of scenarios they were still correcting.
+ */
+const FIRST_SIZES = 2;
 const STEP_DEFAULT_MS = 3000;
 const BOOT_SETTLE_MS = 800;
 const MAX_QUOTED = 5;
@@ -269,26 +279,38 @@ export async function runAppScenarios(
   };
   const results: ScenarioResult[] = scenarios.map(s => ({ id: s.id, name: s.name, criteria: s.criteria, signed_in: s.signed_in && canSignIn, ok: false, runs: [], not_run: [] }));
   // One job per scenario, size and theme, in the order the answer lists them.
-  const jobs = scenarios.flatMap((scenario, i) => SCENARIO_SIZES.flatMap(size => SCENARIO_THEMES.map(theme => ({ scenario, i, size, theme, run: null as ScenarioRun | null }))));
+  const jobs = scenarios.flatMap((scenario, i) => SCENARIO_SIZES.flatMap((size, s) => SCENARIO_THEMES.map((theme, t) => ({
+    scenario, i, size, theme, run: null as ScenarioRun | null, skipped: false,
+    // FIRST: the phone and the desktop in the light theme. A scenario that fails there is being
+    // corrected, and its six other runs would say the same thing six more times.
+    first: s < FIRST_SIZES && t === 0,
+  }))));
   let cutShort = false;
   try {
     // New runs stop early enough for the ones in the browser to end before the deadline closes it.
     const endsAt = now() + deadlineMs - 8_000;
     const out = await withHeadlessContext(config, SCENARIO_SIZES[0], async (ctx) => {
-      let next = 0;
-      const worker = async (): Promise<void> => {
-        for (;;) {
-          const job = jobs[next++];
-          if (!job || now() > endsAt) return;
-          const member = job.scenario.signed_in && canSignIn ? await freshMember() : null;
-          try {
-            job.run = await runOnce(ctx, config, app.html, url, origin, job.scenario, job.size, job.theme, member);
-          } finally {
-            await member?.erase();
+      const runAll = async (list: typeof jobs): Promise<void> => {
+        let next = 0;
+        const worker = async (): Promise<void> => {
+          for (;;) {
+            const job = list[next++];
+            if (!job || now() > endsAt) return;
+            const member = job.scenario.signed_in && canSignIn ? await freshMember() : null;
+            try {
+              job.run = await runOnce(ctx, config, app.html, url, origin, job.scenario, job.size, job.theme, member);
+            } finally {
+              await member?.erase();
+            }
           }
-        }
+        };
+        await Promise.all(Array.from({ length: RUNS_AT_ONCE }, worker));
       };
-      await Promise.all(Array.from({ length: RUNS_AT_ONCE }, worker));
+      await runAll(jobs.filter(j => j.first));
+      // The other sizes and the dark theme, for the scenarios that passed the first ones.
+      const passedFirst = new Set(scenarios.map((_, i) => i).filter(i => jobs.filter(j => j.i === i && j.first).every(j => j.run?.ok)));
+      for (const j of jobs) if (!j.first && !passedFirst.has(j.i)) j.skipped = true;
+      await runAll(jobs.filter(j => !j.first && !j.skipped));
       return true;
     }, { deadlineMs, ...(opts.launch ? { launch: opts.launch } : {}) });
     if (out === null) return { ran: false, reason: NO_HEADLESS_BROWSER, member: memberLine, scenarios: [], criteria_evidence: [] };
@@ -317,10 +339,18 @@ export async function runAppScenarios(
       evidence.push({ id: c, evidence: `Playtest scenario "${r.id}" passed ${r.signed_in ? 'signed in' : 'signed out'} at ${SCENARIO_SIZES.length} sizes in both themes (${new Date(now()).toISOString().slice(0, 10)}).` });
     }
   }
-  // The answer still says what ran. What did not fit is named, with the two ways to make it fit.
-  const reason = notRun > 0
-    ? `${notRun} run(s) of size and theme did not ${cutShort ? 'finish' : 'start'} within the ${Math.round(deadlineMs / 1000)} seconds a scenario run gets; each is listed under not_run. `
-      + 'Fewer scenarios, fewer steps or shorter waits fit: a step that waits for something that never comes costs its whole wait at every size and theme.'
-    : undefined;
-  return { ran: true, ...(reason ? { reason } : {}), member: memberLine, scenarios: results, criteria_evidence: evidence };
+  // The answer still says what ran. What was left is named, apart by why: a scenario that failed at
+  // the first sizes is not run at the others, and a run the deadline left is another matter.
+  const skipped = jobs.filter(j => j.skipped).length;
+  const late = notRun - skipped;
+  const reasons = [
+    ...(skipped > 0
+      ? [`${skipped} run(s) were not started: their scenario failed at the phone or the desktop size in the light theme, so the other sizes and the dark theme were left until it passes there. Correct what the failed step names and ask again.`]
+      : []),
+    ...(late > 0
+      ? [`${late} run(s) of size and theme did not ${cutShort ? 'finish' : 'start'} within the ${Math.round(deadlineMs / 1000)} seconds a scenario run gets; each is listed under not_run. `
+        + 'Fewer scenarios, fewer steps or shorter waits fit: a step that waits for something that never comes costs its whole wait at every size and theme.']
+      : []),
+  ];
+  return { ran: true, ...(reasons.length ? { reason: reasons.join(' ') } : {}), member: memberLine, scenarios: results, criteria_evidence: evidence };
 }

@@ -9,6 +9,8 @@
  * @structure appTemplatesRouter(config, storage) → Router
  * @usage app.use(appTemplatesRouter(config, storage)) from the server setup.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — GET /v1/app-templates/:id?format=raw answers a shipped template's page as
+ *     a file: measured builds wrote a forked genre out again because the node gave it only inside JSON.
  *   v1.2.0 — 2026-11-19 — A genre grown out of an app opened to some people only is listed and handed
  *     over to those people alone: the signed-in caller is the reader (feature audit 2026-11-19, 1.2).
  *   v1.1.0 — 2026-09-20 — Both routes also answer for a genre that grew out of an app, while that
@@ -51,6 +53,16 @@ export function appTemplatesRouter(config: AimeatConfig, storage: Storage): Rout
     const id = req.params.id as string;
     const tpl = getAppTemplates().find(t => t.id === id);
     if (tpl) {
+      // `?format=raw`: the template's own file, for a builder that works in files. It saves the
+      // page with one request and changes it in place, and the page never passes through its
+      // output. Plain text and a download, so a browser on this origin does not run it.
+      if (req.query.format === 'raw') {
+        res.type('text/plain; charset=utf-8')
+          .set('Content-Disposition', 'attachment')
+          .set('X-Content-Type-Options', 'nosniff')
+          .send(tpl.content);
+        return;
+      }
       res.json(success(config.nodeId, { template: tpl }));
       return;
     }

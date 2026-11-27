@@ -227,7 +227,7 @@ motion — is in the kit and is served to your app by the node.
 \`\`\`
 GET /v1/prompts/build-app-atelier   ← the Atelier spec (re-fetch every time, it changes)
 GET /v1/designbook?kind=genre       ← the genres: complete pages in a committed register. A build STARTS here
-GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the motion rules); fork it on the node with aimeat_app_draft_seed { filename, template: "genre-<id>" } and change it with aimeat_app_draft_replace, never by writing it out again
+GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the motion rules); FORK BY COPYING: with files of your own save ...?format=raw as the app's file and EDIT it in place; without files aimeat_app_draft_seed { filename, template: "genre-<id>" } then aimeat_app_draft_replace. Writing the genre out again costs minutes and loses details
 GET /v1/app-templates/genre-living  ← when the numbers depend on each other: the document is a record, not code
 GET /v1/app-templates/shell-atelier ← the frame the genres are built on (read it for the structure; never publish it bare)
 GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired

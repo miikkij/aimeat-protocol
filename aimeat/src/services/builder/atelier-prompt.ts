@@ -401,8 +401,9 @@ function composeBody(config: AimeatConfig): string {
     + 'register, never from the bare shell: list the genres with `GET ' + base
     + '/v1/designbook?kind=genre`, fork the one that has the page\'s register with `GET ' + base
     + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
-    + 'below has the menu). FORK ON THE NODE, NEVER BY RETYPING: `aimeat_app_draft_seed { filename, template: "genre-<id>" }` '
-    + 'puts the genre (or `shell-atelier`) in your draft; change it with `aimeat_app_draft_replace`, then `aimeat_app_draft_publish`. '
+    + 'below has the menu). FORK BY COPYING, NEVER BY RETYPING. With files of your own: save `' + base
+    + '/v1/app-templates/genre-<id>?format=raw` (or `shell-atelier`) as the app\'s file, EDIT that file in place, publish it. '
+    + 'Without files: `aimeat_app_draft_seed { filename, template }`, `aimeat_app_draft_replace`, `aimeat_app_draft_publish`. '
     + 'Every Atelier app declares the register it committed to — '
     + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already has, '
     + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '

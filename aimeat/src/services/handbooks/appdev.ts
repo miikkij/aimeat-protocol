@@ -449,7 +449,9 @@ with \`audit\` \`{ playtest: true }\`: the node opens the published app signed i
 at four sizes and both themes, and answers pass or fail per size and theme. A scenario that passes
 at all of them marks the criteria it names as evidenced by itself (\`criteria_evidenced\`): no
 \`criteria_set\` is owed for those. Write the criteria first: a scenario names them. Every run
-of a size and theme is on an account of its own that holds nothing. A short run is answered in the
+of a size and theme is on an account of its own that holds nothing. A scenario runs at the phone and
+the desktop size in the light theme first, and at the other six only when it passed there, so a
+scenario you are still correcting costs two runs. A short run is answered in the
 same call. A longer one goes on on the node for up to eight minutes and the answer says
 \`running\`: ask for the same audit again at once, which waits up to 45 seconds for the run, reads it
 when it has ended and starts nothing new while the app's version and its scenarios are unchanged.
