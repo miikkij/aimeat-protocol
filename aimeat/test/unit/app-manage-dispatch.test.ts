@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-27 — member_plan_set sends `sale`.
  *   2026-11-26 — scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 — freshness reaches GET /v1/apps/:owner/:filename/freshness.
  *   2026-11-26 — criteria_set reaches PUT /v1/apps/:owner/:filename/design-spec/criteria.
@@ -78,7 +79,7 @@ const VALUE: Record<string, unknown> = {
     roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
-    manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
+    manage_roles: ['zqxmgr'], sale: { zqxrole: { amount: 4900000, currency: 'EUR', renews: true, stripePrices: ['price_zqx'] } }, year: '2026', keep: '12345', dev_level: 'publisher',
     markdown: '# zqxspec', confirm: true, expected_revision: 4, words: ['zqxword'],
     criteria: [{ id: 'zqxline', text: 'zqxtext', check: 'person', status: 'open' }],
     scenarios: [{ id: 'zqxscene', name: 'zqxname', steps: [{ do: 'wait', ms: 10 }] }],
@@ -232,6 +233,7 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
         expect(b.sent[0]!.body).toEqual({
             roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
             access: 'members-only', rosterVisibility: 'members', manageRoles: ['zqxmgr'],
+            sale: { zqxrole: { amount: 4900000, currency: 'EUR', renews: true, stripePrices: ['price_zqx'] } },
         });
     });
 

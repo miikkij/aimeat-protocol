@@ -403,7 +403,7 @@ export const SDK_PACKS: LibraryPack[] = [
     status: 'stable',
     modelTier: 'needs-doc',
     promptGroup: 'core',
-    promptLine: "- aimeat-iam.js — your app's own members and roles (`AIMEAT.iam`), for EVERY member, account holders and people registered without an account alike: init({ app, roles: { member: ['use'] } }), can()/gate() to paint, guard() to refuse, MemberAdmin({target}) for the owner, JoinPanel({target}) for the applicant, membership.buy(role) to sell a role the owner priced in the plan (sale). The node keeps the roster; to enforce on the server, add a gate from aimeat_iam_define and init({ app, ext }).",
+    promptLine: "- aimeat-iam.js — your app's own members and roles (`AIMEAT.iam`), for EVERY member, account holders and people registered without an account alike: init({ app, roles: { member: ['use'] } }), can()/gate() to paint, guard() to refuse, MemberAdmin({target}) for the owner, JoinPanel({target}) for the applicant. The node keeps the roster; to enforce on the server, add a gate from aimeat_iam_define and init({ app, ext }).",
   },
   {
     id: 'aimeat-wallet',

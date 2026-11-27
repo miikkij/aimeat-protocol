@@ -449,12 +449,8 @@ changed after you fetched it says so.
    \`aimeat-auth.js\` and use \`AIMEAT.atelier.members({ target, app, roles })\` for the owner's
    screen, \`joinRequest({ target, app })\` for the visitor's ask and
    \`accessState({ target, app, cap, render })\` around a members-only area; never write a member
-   list, a role select or a join form of your own. **A membership the owner sells is the node's
-   too:** the owner prices the role in the plan (\`sale\` with \`terms.<role>.days\`, set by their
-   AI through \`aimeat_app_manage member_plan_set\` or the plan tab), and \`joinRequest\` then shows
-   the price, the period and a Buy button; in code it is \`AIMEAT.iam.membership\` (status, buy,
-   finish, cancel, joinUrl). Never build a checkout, a Stripe call or an outside payment service
-   of your own for it: the node renews, ends and refunds the membership itself. The same holds for the other libraries: a
+   list, a role select or a join form of your own. A paid membership is the plan's \`sale\`
+   (member_plan_set): joinRequest sells it; never build a checkout or payment service for it. The same holds for the other libraries: a
    workspace's people are \`workspaceTeam({ target, org, ws })\` and the first-run choice of where the
    app keeps its data is \`workspacePicker({ target, app, onReady })\` (both over
    \`aimeat-organism.js\`), a public form is \`intakeForm({ target, org, ws, formId })\` and the
