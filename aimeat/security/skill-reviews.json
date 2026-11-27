@@ -137,13 +137,13 @@
       "note": "The order an AI follows (find, show, ask), the AI level the node enforces on an answer, the close with thanks and keep, the owner's choices an AI may only lower, and the operator's report tools are decided in these five files."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:85dea819213e35ec87e6a7c9",
+      "digest": "sha256:b0fd8caf362015253ebe18c9",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -925,7 +925,7 @@
     },
     "node:aimeat-guided-journey": {
       "aimeat/src/services/journey-state.ts": "c50367fb9a2a399b",
-      "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
+      "aimeat/public/views/home/journey-roads.js": "36751702d4907f50",
       "aimeat/public/views/home/journey-prompts.js": "45c0115656dff6c3"
     },
     "node:aimeat-organisms": {
