@@ -31,6 +31,7 @@ import { proactiveGuidance } from '../proactive-mode.js';
 import { resolveSupportRoute } from '../message/alias.js';
 import { contextIndexLine } from '../context/index-line.js';
 import { teamIndexLine } from '../team/index-line.js';
+import { situationIndexLine } from '../situation/index-line.js';
 import type { ContentReader } from '../classification/reader.js';
 
 export interface BuildInputs { guidance: string | null; supportAnsweredBy: string | null; contexts: string | null }
@@ -55,11 +56,13 @@ const contextsByReader = new Map<string, { at: number; value: string | null }>()
 
 /** The owner's contexts, then the teams they are in: one block of the instructions. */
 async function contextAndTeamLines(storage: Storage, config: AimeatConfig, owner: string, reader: BuildReader, now: number): Promise<string | null> {
-    const [contexts, teams] = await Promise.all([
+    const [situation, contexts, teams] = await Promise.all([
+        situationIndexLine(storage, config, owner, reader.agentSession),
         contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content),
         teamIndexLine(storage, owner),
     ]);
-    return [contexts, teams].filter(Boolean).join('\n\n') || null;
+    // The picture first: it is one short paragraph, and a client that cuts the instructions keeps it.
+    return [situation, contexts, teams].filter(Boolean).join('\n\n') || null;
 }
 
 async function readContexts(storage: Storage, config: AimeatConfig, owner: string | undefined, reader: BuildReader, cached: boolean, now: number): Promise<string | null> {
