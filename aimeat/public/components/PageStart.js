@@ -33,11 +33,16 @@
  *
  *   Built from the library's parts (Label, Note, Action, PromptCard); its sheet,
  *   css/components/page-start.css, only lays the parts out. The catalogue entry is `page-start`.
- * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done, title, concept }) ·
+ *   - inline: the start in the head's row of a page whose work area takes the screen (SettingsPage
+ *     `desk`, the messenger): closed it is only the word that opens it, open it is the same block
+ *     across the head's full width.
+ * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done, title, concept, inline }) ·
  *   PageInfo (context: { title, desc, help })
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — `inline`: closed, the start is one word in the head's row of a page whose
+ *     work area takes the screen; the messenger's closed start took a row of 76 px.
  *   v1.2.0 — 2026-11-26 — The block is closed on every page until the person opens it (it was open
  *     on a page whose first action was not done). One row stands above the page's own content
  *     instead of about 400 px (Jouni, 2026-11-26).
@@ -131,9 +136,9 @@ function ExplainPrompt({ id, title, desc, concept, forWords, nextWords }) {
  * @param {{ id: string, vars?: Record<string, any>, purpose?: any, prompt?: string, next?: any,
  *   action?: { onClick?: () => void, href?: string, copy?: string, label?: any } | null,
  *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null,
- *   title?: string, concept?: string }} props
+ *   title?: string, concept?: string, inline?: boolean }} props
  */
-export function PageStart({ id, vars, purpose, prompt, next, action, link, title, concept }) {
+export function PageStart({ id, vars, purpose, prompt, next, action, link, title, concept, inline }) {
   const info = useContext(PageInfo) || {};
   const [choice, setChoice] = useState(() => readChoice(id));
   const part = (name) => words(`pageStart.${id}.${name}`, vars);
@@ -149,8 +154,16 @@ export function PageStart({ id, vars, purpose, prompt, next, action, link, title
   const actionLabel = action ? (action.label ?? part('action')) : '';
   const linkLabel = link ? (link.label ?? part('link')) : '';
 
+  // `inline`: a page whose work area takes the screen (the messenger) keeps the start in its head's
+  // row. Closed, it is only the word that opens it; open, the same block takes the head's full width.
+  if (inline && folded) {
+    return html`
+      <section class="page-start page-start--inline page-start--folded" aria-label=${t('pageStart.label')}>
+        <${Action} small soft expanded=${false} onClick=${toggle}>${t('pageStart.show')}<//>
+      </section>`;
+  }
   return html`
-    <section class=${cx('page-start', folded && 'page-start--folded')} aria-label=${t('pageStart.label')}>
+    <section class=${cx('page-start', folded && 'page-start--folded', inline && 'page-start--inline')} aria-label=${t('pageStart.label')}>
       <div class="page-start-head">
         <${Label}>${t('pageStart.label')}<//>
         <${Action} small soft expanded=${!folded} onClick=${toggle}>${folded ? t('pageStart.show') : t('pageStart.hide')}<//>

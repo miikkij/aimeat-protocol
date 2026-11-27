@@ -24,6 +24,8 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.3.1 — 2026-11-27 — The start closed in a head's row (PageStart inline) has no box: the
+ *     messenger's head showed an empty framed box with a sun offset around one word.
  *   v1.3.0 — 2026-11-27 — A soft action is a third weight: a hairline frame and lighter words. It was
  *     drawn as the outlined action with a greyer frame, so a page head with one main action and four
  *     others showed five buttons of the same weight.
@@ -146,6 +148,8 @@ function themeCss(): string {
 
 /* The page start is a white box with an ink frame and a solid sun offset; its label stands on the sun. */
 .page-start { background: var(--card-bg); border: 2px solid var(--text); border-radius: var(--shape-corner); box-shadow: 6px 6px 0 var(--sun); padding: 16px 20px; margin-bottom: 14px; }
+/* Closed in the head's row (PageStart inline), the start is only its word: no box around it. */
+.page-start.page-start--inline.page-start--folded { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
 .page-start-head .poster-label { background: var(--sun); color: var(--on-sun); padding: 4px 10px; border-radius: var(--shape-corner-control); }
 
 /* A prompt to copy is a white box with an ink frame, and its copy action is a filled button. */

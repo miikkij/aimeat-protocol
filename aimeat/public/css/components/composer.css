@@ -11,6 +11,8 @@
  *   the field over the whole width, the tools and the loud action on the line under it, the files
  *   waiting as chips above, the Markdown fallback and the Toast UI editor behind ⤢.
  * @version-history
+ *   v1.6.0 — 2026-11-27 — The message field starts at three lines and grows to 40 % of the window
+ *     (at most 320px); it stopped at 132px.
  *   v1.5.0 — 2026-09-26 — The list over the field (`suggest`, .composer-suggest*): an agent's slash
  *     commands, with main's values (css/views/agents-detail.css .pf-agd-autocomplete*,
  *     .pf-agd-command-name/-desc); its frame and corner read the theme's shape tokens.
@@ -131,7 +133,9 @@
   gap: 8px;
   background: var(--card-bg);
 }
-.poster-composer--message .poster-composer-input { flex: none; display: block; width: 100%; height: auto; min-height: 44px; max-height: 132px; overflow-y: auto; }
+/* The field grows with what is written up to 40 % of the window (at most 320px), so a long message is
+   written in sight; it stopped at 132px, five lines. */
+.poster-composer--message .poster-composer-input { flex: none; display: block; width: 100%; height: auto; min-height: 64px; max-height: min(40vh, 320px); overflow-y: auto; }
 /* flex:none so the tool line can never absorb the composer's slack and grow into the reading area. */
 .poster-composer-bar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
 .poster-composer-tools { display: flex; align-items: center; gap: 8px; }

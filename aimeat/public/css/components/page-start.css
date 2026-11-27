@@ -9,6 +9,8 @@
  *   the prompt card keep their own looks. Reads the theme's tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-27 — .page-start--inline: the start in the head's row (PageStart inline): closed,
+ *     only its word with no hairlines; open, the block across the row's full width.
  *   v1.1.0 — 2026-11-09 — .page-start-explain: "Explain this page to me" under the purpose.
  *   v1.0.0 — 2026-10-03 — Initial (guidance for normal people, part B).
  */
@@ -20,6 +22,10 @@
   border-bottom: 1px solid var(--border);
 }
 .page-start--folded { padding: .55rem 0; }
+/* In the head's row (PageStart inline): closed, only the word; open, the whole block on a line of
+   its own under the head's words and actions. */
+.page-start--inline.page-start--folded { margin: 0; padding: 0; border: 0; flex: none; }
+.page-start--inline:not(.page-start--folded) { flex: 1 0 100%; order: 2; margin-top: .6rem; }
 
 .page-start-head {
   display: flex;

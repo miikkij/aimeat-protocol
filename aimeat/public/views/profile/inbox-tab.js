@@ -201,6 +201,7 @@ import { isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailu
 import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { Composer } from '/components/Composer.js';
 import { Action, Actions, Loud } from '/components/Action.js';
+import { CardMenu } from '/components/CardMenu.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { TextField } from '/components/TextField.js';
@@ -727,11 +728,11 @@ export default function InboxTab({ showToast }) {
   };
 
   return html`
-    <${SettingsPage} name="ib" page
+    <${SettingsPage} name="ib" page desk=${!isPage}
       crumb=${[t('nav.profile') || 'Settings', ...(isPage ? [{ label: t('inbox.title'), onClick: goIdle }, pageTitle] : [t('inbox.title')])]}
       title=${isPage ? pageTitle : t('inbox.title')}
       help=${isPage ? undefined : 'concept.message'}
-      start=${isPage ? null : html`<${PageStart} id="messages" done=${listsKnown ? (conversations.length + requests.length) > 0 : null}
+      start=${isPage ? null : html`<${PageStart} id="messages" inline done=${listsKnown ? (conversations.length + requests.length) > 0 : null}
         action=${{ onClick: startCompose }} />`}
       sub=${isPage ? null : html`
         <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
@@ -743,10 +744,15 @@ export default function InboxTab({ showToast }) {
       actions=${isPage ? null : html`<${Actions}>
           <${Loud} onClick=${startCompose}>${t('inbox.new')}<//>
           <${Action} small onClick=${startGroup}>${t('inbox.group.new')}<//>
-          <${Action} small soft onClick=${startBroadcast}>${t('inbox.broadcast')}<//>
-          <${Action} small soft=${!awaitingCount} onClick=${showTracked} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}<//>
-          ${recentBroadcasts.length ? html`<${Action} small soft onClick=${openResultsList}>${t('inbox.results')}<//>` : null}
-          <${Action} small soft onClick=${openOrganize}>${t('inbox.org.door')}<//>
+          ${/* Tracked responses stand in the row only while an answer waits; the rest are in More,
+                so the head stays one row and the conversation gets the window. */''}
+          ${awaitingCount ? html`<${Action} small onClick=${showTracked} title=${t('inbox.trackReady')}>${t('inbox.trackedTitle')} ${activeTracked.length || ''}<//>` : null}
+          <${CardMenu} word=${t('inbox.more')} framed actions=${[
+            { label: t('inbox.broadcast'), run: startBroadcast },
+            awaitingCount ? null : { label: `${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}`, run: showTracked },
+            recentBroadcasts.length ? { label: t('inbox.results'), run: openResultsList } : null,
+            { label: t('inbox.org.door'), run: openOrganize },
+          ].filter(Boolean)} />
         <//>`}
       rail=${isPage ? rail : null}
       after=${html`

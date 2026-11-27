@@ -26,7 +26,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
         summary: 'A whole Settings & Controls page from data: the crumb, the head, the figure strip, and under them the page\'s sections beside the dark contents rail, which stands under the page on a phone. Without a rail the head stands in its own block over the content; a page inside a page has the smaller head and a heavy rule over its column.',
         module: '/components/SettingsPage.js', sheet: '/css/components/settings-page.css',
         data: {
-            shape: 'SettingsPage({ name, page, crumb, label, title, sub, marks, desc, actions, edit, asKey, strip, railTitle, back, sections, railItems, pagesLabel, pages, rail, side, aside, after, children }) · settingsRail({ railTitle, sections, back, pages, pagesLabel, railItems })',
+            shape: 'SettingsPage({ name, page, crumb, label, title, sub, marks, desc, actions, edit, asKey, strip, railTitle, back, sections, railItems, pagesLabel, pages, rail, side, aside, after, start, desk, children }) · settingsRail({ railTitle, sections, back, pages, pagesLabel, railItems })',
             fields: {
                 name: 'the page\'s short name: the root gets .og-<name>, which the page\'s own sheet keys its rules on until that sheet goes',
                 page: 'a page inside a page (a record, a board, a person): the smaller head, and a heavy rule over the page column',
@@ -52,6 +52,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'without a rail', class: 'settings-page-head', prop: 'crumb, title and children only', when: 'a classic page (Security, Services, Nodes, Fleet, Usage, Work, Chat sessions): the head in its own block, 1rem over the content' },
             { name: 'page', prop: 'page', when: 'a page inside a page: the smaller head and a heavy rule over the page column' },
             { name: 'two rails', class: 'settings-page-side', prop: 'rail (a list of two) | aside', when: 'a side column that stacks two rails, or a record\'s own settings over the rail (Memory); the rails do not stick' },
+            { name: 'desk', class: 'settings-page-head--desk', prop: 'desk', when: 'a page whose work area takes the screen (the messenger): the head is one row (the title at 2rem with its figures, the actions, the start\'s word), no rail' },
         ],
         example: {
             name: 'skills', crumb: ['Settings', 'Build and share', 'Skills'], title: 'Skills', sub: '12 own', desc: 'What your agents know how to do.',

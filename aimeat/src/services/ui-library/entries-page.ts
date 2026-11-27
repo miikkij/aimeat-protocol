@@ -163,7 +163,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         summary: 'The start of a page for a person who has not used it yet: one quiet block under the head that says what the page is for, gives one first action (a prompt to paste into their own AI, and the page\'s own button for the same) and says what happens next. It is one closed row until the person opens it, and the browser remembers their choice per page.',
         module: '/components/PageStart.js', sheet: '/css/components/page-start.css',
         data: {
-            shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done }) · in a Settings page: SettingsPage({ start })',
+            shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done, inline }) · in a Settings page: SettingsPage({ start })',
             fields: {
                 id: 'the page: its words are the locale\'s pageStart.<id>.* (purpose, prompt, next, action, link), and its fold is remembered under it',
                 vars: 'the values the prompt\'s {placeholders} take (an address)',
@@ -176,7 +176,10 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
             },
         },
         useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.'],
-        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'the person\'s choice', when: 'until the person opens it, and again after they close it: one line with the control to open it' }],
+        variants: [
+            { name: 'folded', class: 'page-start--folded', prop: 'the person\'s choice', when: 'until the person opens it, and again after they close it: one line with the control to open it' },
+            { name: 'inline', class: 'page-start--inline', prop: 'inline', when: 'in the one-row head of a page whose work area takes the screen (SettingsPage desk): closed it is only the word that opens it; open, the block across the head\'s full width' },
+        ],
         example: {
             id: 'memory',
             purpose: 'Memory keeps what every AI you connect should know about you and your work.',

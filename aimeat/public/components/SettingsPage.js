@@ -41,12 +41,17 @@
  *   - help: a term whose question mark stands after the title words (see PageHead.js).
  *   - start: what stands under the head, before the figure strip (a slot: the PageStart component,
  *     what the page is for, what to do first and what happens next).
+ *   - desk: a page whose work area takes the screen (the messenger): the crumb, then one row of the
+ *     title with its figures, the actions and the start (pass PageStart `inline`); no rail.
  * @structure SettingsPage(props) · settingsRail(props) · railFold(rails)
  * @usage html`<${SettingsPage} name="skills" crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('skills.tabLabel')]}
  *          title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${marks} desc=${x('desc')} actions=${actions}
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.8.0 — 2026-11-27 — `desk`: the head of a page whose work area takes the screen is one row. The
+ *     messenger's head and closed start took 262 px of a 767 px window, and an open conversation
+ *     showed 156 px of messages.
  *   v1.7.0 — 2026-11-26 — The figures stand before the page's start on every page; `stripFirst`, which
  *     asked for that order on one page, is gone. 27 pages showed their guide box above their figures.
  *   v1.6.0 — 2026-11-24 — `stripFirst`: the figures stand over the page's start, for a page whose first
@@ -114,7 +119,22 @@ export function railFold(rails) {
 }
 
 export function SettingsPage(props) {
-  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, help, start, children } = props;
+  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, help, start, desk, children } = props;
+  // desk: a page whose work area takes the screen (the messenger). The head is one row (the title
+  // with its figures, the actions, the start's word), so the work area under it gets the window.
+  if (desk) {
+    return html`
+      <div class=${cx('og', name && `og-${name}`, page && 'og-page')}>
+        <div class="settings-page-head settings-page-head--desk">
+          ${crumb ? html`<${Crumb} steps=${crumb} />` : null}
+          <${PageHead} title=${title} sub=${sub} marks=${marks} desc=${desc} actions=${actions} page=${page} help=${help} />
+          ${start ? html`<${PageInfo.Provider} value=${{ title, desc, help }}>${start}<//>` : null}
+        </div>
+        ${strip}
+        ${children}
+        ${after}
+      </div>`;
+  }
   const rails = (Array.isArray(rail) ? rail : [rail || settingsRail(props)]).filter(Boolean);
   const head = html`
     ${crumb ? html`<${Crumb} steps=${crumb} />` : null}
