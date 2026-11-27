@@ -38,6 +38,8 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
+ *   2026-11-27 — The record carries `scenarioRun`, the node's note of its latest scenario run,
+ *     written by writeAppScenarioRun without moving the revision (services/app/scenario-run.ts).
  *   2026-11-26 — The record carries `criteria` (services/app/acceptance-criteria.ts) and `scenarios`
  *     (services/app/scenarios.ts), each written alone by writeAppSpecParts; a write of the prose keeps them.
  *   2026-11-19 — eraseAppDesignSpecsOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
@@ -79,6 +81,22 @@ export interface AppDesignSpec {
   criteria?: AppCriterion[];
   /** The builder's playtest scenarios, which prove the criteria they name (services/app/scenarios.ts). */
   scenarios?: AppScenario[];
+  /** The node's latest run of those scenarios, running or finished (services/app/scenario-run.ts). */
+  scenarioRun?: AppScenarioRunNote;
+}
+
+/**
+ * The node's own note of a scenario run. `key` names what was run (the app's version and the
+ * scenarios as they were), so a run is neither started twice nor answered for another version.
+ */
+export interface AppScenarioRunNote {
+  key: string;
+  appVersion: number;
+  state: 'running' | 'done';
+  startedAt: string;
+  finishedAt?: string;
+  /** The run's answer, as playtest-scenarios.ts gives it; present when the run is done. */
+  result?: unknown;
 }
 
 /** What the manifest carries, so a listing never has to load the prose. */
@@ -179,6 +197,7 @@ export async function writeAppDesignSpec(
       // prose keeps them.
       ...(live?.criteria ? { criteria: live.criteria } : {}),
       ...(live?.scenarios ? { scenarios: live.scenarios } : {}),
+      ...(live?.scenarioRun ? { scenarioRun: live.scenarioRun } : {}),
     };
     const record = {
       key: appDesignSpecKey(input.appId), ownerGaii: NS_SPEC, value: spec,
@@ -214,6 +233,30 @@ export async function writeAppSpecParts(
     };
     const saved = await storage.setMemoryIfVersion({ ...existing, value: spec, version: existing.version + 1, updatedAt: now }, existing.version);
     if (saved) return { spec };
+  }
+  throw new Error('The design spec changed repeatedly. Retry this write.');
+}
+
+/**
+ * Write the node's note of a scenario run, and nothing else. The revision, the version and who
+ * last wrote the spec stay: this is the node keeping a result beside the scenarios, not somebody
+ * editing the document, so a builder's `expected_revision` still names the record they read.
+ * `onlyIfKey` writes only while the note there is the same run's, so a run that finishes after a
+ * newer one started does not overwrite it. False when there is no spec or the note moved on.
+ */
+export async function writeAppScenarioRun(
+  storage: Storage, appId: string, note: AppScenarioRunNote, opts: { onlyIfKey?: string } = {},
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
+    const current = existing?.value as AppDesignSpec | undefined;
+    if (!existing || !current || current.spec !== APP_DESIGN_SPEC_SPEC) return false;
+    if (opts.onlyIfKey !== undefined && current.scenarioRun?.key !== opts.onlyIfKey) return false;
+    const saved = await storage.setMemoryIfVersion(
+      { ...existing, value: { ...current, scenarioRun: note }, version: existing.version + 1, updatedAt: new Date().toISOString() },
+      existing.version,
+    );
+    if (saved) return true;
   }
   throw new Error('The design spec changed repeatedly. Retry this write.');
 }

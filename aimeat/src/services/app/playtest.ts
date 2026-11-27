@@ -54,7 +54,7 @@ import { serveDocumentOnce, type HeadlessRoutable } from '../headless/network.js
 import { lintAppArtifact, type AppArtifactLintResult } from './artifact-lint.js';
 import { logger } from '../../utils/logger.js';
 import { readAppDesignSpec } from './design-spec.js';
-import { runAppScenarios, type ScenarioRunResult } from './playtest-scenarios.js';
+import { scenarioRunFor, type ScenarioRunAnswer } from './scenario-run.js';
 
 /** The phone the app has to work on, and the desktop it has to survive being stretched to. */
 const MOBILE = { width: 390, height: 844 };
@@ -668,8 +668,8 @@ export interface AppPlaytestBundle {
   artifact: AppArtifactLintResult;
   /** What the browser saw. */
   playtest: AppPlaytestResult;
-  /** The builder's own scenarios, when the design spec has any (services/app/playtest-scenarios.ts). */
-  scenarios?: ScenarioRunResult;
+  /** The builder's own scenarios, when the design spec has any: the finished run, or that it is running (services/app/scenario-run.ts). */
+  scenarios?: ScenarioRunAnswer;
 }
 
 /**
@@ -684,17 +684,14 @@ export async function auditAppWithPlaytest(
   const html = Buffer.from(record.data).toString('utf8');
   const artifact = await lintAppArtifact(html, config);
   const playtest = await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
-  // The builder's own scenarios, in the slot and hourly count every playtest takes.
+  // The builder's own scenarios. A run that starts takes the slot and the hourly count every
+  // playtest takes; reading a run that is under way or finished takes neither (scenario-run.ts).
   const scenarios = (await readAppDesignSpec(storage, `${app.ownerName}/${app.filename}`))?.scenarios ?? [];
   if (scenarios.length === 0) return { artifact, playtest };
-  const slot = takePlaytestSlot(app.ownerName);
-  if ('reason' in slot) {
-    return { artifact, playtest, scenarios: { ran: false, reason: slot.reason, member: 'Not started.', scenarios: [], criteria_evidence: [] } };
-  }
-  try {
-    const run = await runAppScenarios(storage, config, { ownerName: app.ownerName, filename: app.filename, html, appName: record.manifest?.name ?? app.filename }, scenarios);
-    return { artifact, playtest, scenarios: run };
-  } finally {
-    slot.release();
-  }
+  const run = await scenarioRunFor(
+    storage, config,
+    { ownerName: app.ownerName, filename: app.filename, html, appName: record.manifest?.name ?? app.filename, appVersion: record.versionNumber },
+    scenarios, () => takePlaytestSlot(app.ownerName),
+  );
+  return { artifact, playtest, scenarios: run };
 }

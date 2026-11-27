@@ -15,6 +15,9 @@
  *   A node with no headless browser (CI) answers ran:false with the reason, and the run cases skip.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-scenarios
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The run is started once and read with the same request: a run under way
+ *     answers `running`, asking again reads the kept run, the node's note leaves the spec's revision
+ *     alone, and changed scenarios start a new run (services/app/scenario-run.ts).
  *   v1.1.0 — 2026-11-27 — The scenario `fresh` and its case: seen red on the runner that kept one
  *     member for the whole run (it read the item `saves` had written), green with a member per run.
  *   v1.0.0 — 2026-11-26 — Initial (wish-builder-scenarios-in-the-playtest-signed-in-four-widths-both).
@@ -106,10 +109,17 @@ const SCENARIOS = [
 
     let run: any = null;
     await test('the playtest runs them: the signed-in save passes everywhere, the broken step is named, the visitor sees the signed-out line', async () => {
-        const r = await json(`/v1/apps/me/${encodeURIComponent(f)}/audit?limit=5&playtest=true`, { headers: auth });
-        assert(r.status === 200, `audit: ${r.status} ${JSON.stringify(r.body?.error)}`);
-        run = r.body.data.live?.scenarios;
-        assert(run, `the bundle carries scenarios: ${JSON.stringify(Object.keys(r.body.data.live ?? {}))}`);
+        // The call that starts the run waits for it a while; a run still going answers `running`, and
+        // the same call reads it when it has ended.
+        for (let i = 0; i < 12; i++) {
+            const r = await json(`/v1/apps/me/${encodeURIComponent(f)}/audit?limit=5&playtest=true`, { headers: auth });
+            assert(r.status === 200, `audit: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            run = r.body.data.live?.scenarios;
+            assert(run, `the bundle carries scenarios: ${JSON.stringify(Object.keys(r.body.data.live ?? {}))}`);
+            if (!run.running) break;
+            assert(run.ran === false && typeof run.started_at === 'string' && /again/.test(run.reason), `a run under way says so: ${JSON.stringify(run).slice(0, 300)}`);
+        }
+        assert(!run.running, 'the run ended within the calls this test makes');
         if (!run.ran) skip(`no browser on this node: ${run.reason}`);
         // The run has 35 seconds. On a machine busy with other suites some runs may not start, and
         // the answer must then say so; the cases about what the runs showed need all of them.
@@ -131,6 +141,25 @@ const SCENARIOS = [
         if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
         const fresh = (run.scenarios as any[]).find(s => s.id === 'fresh');
         assert(fresh.ok === true && fresh.runs.length === 8, `fresh: ${JSON.stringify({ ok: fresh.ok, first: fresh.runs.find((x: any) => !x.ok) ?? null, not_run: fresh.not_run })}`);
+    });
+
+    await test('asking again reads the run the node kept and starts no new one; changed scenarios start one', async () => {
+        if (!run?.ran) skip('no browser on this node');
+        const again = await json(`/v1/apps/me/${encodeURIComponent(f)}/audit?limit=5&playtest=true`, { headers: auth });
+        const kept = again.body.data.live?.scenarios;
+        assert(kept?.ran === true && kept.finished_at === run.finished_at && kept.started_at === run.started_at, `the same run is answered: ${JSON.stringify({ a: run.finished_at, b: kept?.finished_at, running: kept?.running })}`);
+        // The builder reads the spec by its revision: the node's note of a run does not move it.
+        const spec = await json(`${app}/design-spec`, { headers: auth });
+        const before = spec.body.data.design_spec?.revision ?? spec.body.data.revision;
+        const stranger = [SCENARIOS[2]];
+        const w = await json(`${app}/design-spec/scenarios`, { method: 'PUT', headers: auth, body: JSON.stringify({ scenarios: stranger, expected_revision: before }) });
+        assert(w.status === 200, `the revision the builder read is still the one stored: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        let next: any = null;
+        for (let i = 0; i < 12; i++) {
+            next = (await json(`/v1/apps/me/${encodeURIComponent(f)}/audit?limit=5&playtest=true`, { headers: auth })).body.data.live?.scenarios;
+            if (!next?.running) break;
+        }
+        assert(next?.ran === true && next.started_at !== run.started_at && next.scenarios.length === 1 && next.scenarios[0].id === 'stranger', `a new run for the new list: ${JSON.stringify(next).slice(0, 300)}`);
     });
 
     await test('the passing scenario gives an evidence line for its criterion, and the throwaway account is gone', async () => {

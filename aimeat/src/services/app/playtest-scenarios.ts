@@ -46,9 +46,10 @@ import { makePlaytestMember, type PlaytestMember } from './playtest-member.js';
 import { SCENARIO_SIZES, SCENARIO_THEMES, type AppScenario, type ScenarioStep } from './scenarios.js';
 
 /**
- * The whole run: launch, every scenario at every size and theme, and the close. An MCP client waits
- * 60 seconds for a tool's answer, and the audit's own playtest (10 to 17 seconds, measured) runs
- * before this, so the two together have to end inside that minute.
+ * The whole run when the caller names no deadline: launch, every scenario at every size and theme,
+ * and the close. An MCP client waits 60 seconds for a tool's answer, and the audit's own playtest
+ * (10 to 17 seconds, measured) runs before this, so a run that is waited for has to end inside that
+ * minute. The audit starts its run in the background with a longer deadline (scenario-run.ts).
  */
 const RUN_DEADLINE_MS = 35_000;
 /** Runs of one size and theme in the browser at the same time. */
@@ -236,11 +237,12 @@ export async function runAppScenarios(
   storage: Storage, config: AimeatConfig,
   app: { ownerName: string; filename: string; html: string; appName: string },
   scenarios: readonly AppScenario[],
-  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number } = {},
+  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; deadlineMs?: number } = {},
 ): Promise<ScenarioRunResult> {
   const origin = `http://127.0.0.1:${config.port}`;
   const url = `${origin}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
   const now = opts.now ?? Date.now;
+  const deadlineMs = Math.max(10_000, opts.deadlineMs ?? RUN_DEADLINE_MS);
   const needsMember = scenarios.some(s => s.signed_in);
   const memberOf = { id: `${app.ownerName}/${app.filename}`, name: app.appName, origin, scopes: parseAppScopes(app.html) };
   // Every member a run made, so each is erased whichever way the run ends.
@@ -271,7 +273,7 @@ export async function runAppScenarios(
   let cutShort = false;
   try {
     // New runs stop early enough for the ones in the browser to end before the deadline closes it.
-    const endsAt = now() + RUN_DEADLINE_MS - 8_000;
+    const endsAt = now() + deadlineMs - 8_000;
     const out = await withHeadlessContext(config, SCENARIO_SIZES[0], async (ctx) => {
       let next = 0;
       const worker = async (): Promise<void> => {
@@ -288,7 +290,7 @@ export async function runAppScenarios(
       };
       await Promise.all(Array.from({ length: RUNS_AT_ONCE }, worker));
       return true;
-    }, { deadlineMs: RUN_DEADLINE_MS, ...(opts.launch ? { launch: opts.launch } : {}) });
+    }, { deadlineMs, ...(opts.launch ? { launch: opts.launch } : {}) });
     if (out === null) return { ran: false, reason: NO_HEADLESS_BROWSER, member: memberLine, scenarios: [], criteria_evidence: [] };
   } catch (err) {
     // The deadline closed the browser under the runs still in it: what finished is answered, and
@@ -317,7 +319,7 @@ export async function runAppScenarios(
   }
   // The answer still says what ran. What did not fit is named, with the two ways to make it fit.
   const reason = notRun > 0
-    ? `${notRun} run(s) of size and theme did not ${cutShort ? 'finish' : 'start'} within the ${Math.round(RUN_DEADLINE_MS / 1000)} seconds a scenario run gets; each is listed under not_run. `
+    ? `${notRun} run(s) of size and theme did not ${cutShort ? 'finish' : 'start'} within the ${Math.round(deadlineMs / 1000)} seconds a scenario run gets; each is listed under not_run. `
       + 'Fewer scenarios, fewer steps or shorter waits fit: a step that waits for something that never comes costs its whole wait at every size and theme.'
     : undefined;
   return { ran: true, ...(reason ? { reason } : {}), member: memberLine, scenarios: results, criteria_evidence: evidence };

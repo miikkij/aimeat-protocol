@@ -84813,7 +84813,13 @@ paths:
                                   Present when the design spec has playtest scenarios (PUT .../design-spec/scenarios).
                                   { ran, reason?, member, scenarios: [{ id, name, criteria, signed_in, ok, runs:
                                   [{ size, theme, ok, failed_step?, console_errors, bad_responses }], not_run }],
-                                  criteria_evidence: [{ id, evidence }] }.
+                                  criteria_evidence: [{ id, evidence }], running?, app_version?, started_at?,
+                                  finished_at? }. The request that starts a run waits about 25 seconds for it. A
+                                  longer run goes on on the node for up to eight minutes and this answers
+                                  `running: true` with `ran: false` and no scenarios: the same request again reads
+                                  the finished run, and starts no new one while the app's version and its
+                                  scenarios are unchanged. Each run of a size and theme signs in as a throwaway
+                                  member of its own.
                               artifact:
                                 type: object
                                 description: The same check every publish runs on the app's bytes.
