@@ -18,6 +18,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-26 — operator:service-provision, outside every wildcard: an operator service's credential.
+ *     Its checkbox in the operator row of SCOPE_DOMAINS, with its sentence in the locales
+ *     (profile.agents.scopeUi.scopeText.operator.service-provision).
  *   2026-11-14 — help:ask and help:answer, outside every wildcard: asking and answering other members.
  *   2026-11-14 — secrets:share, outside every wildcard: making, filling and picking up secret shares.
  *   2026-11-14 — consent:read-as-owner, outside every wildcard: seeing the account's consents, the
@@ -201,6 +204,11 @@ export const NOT_IN_WILDCARD = [
   // asked only whether the account runs the node, so every agent an operator connected held all of
   // them. Only an operator's own agent can be given it at all.
   'operator:admin',
+  // ── Added 2026-11-26 ─────────────────────────────────────────────────────────────────────────
+  // An operator service's credential: the operator's agent that asks for each person's agent of an
+  // outside service the operator switched on for every account. Only an operator's own agent can be
+  // given it at all.
+  'operator:service-provision',
   // ── Added 2026-10-15 ─────────────────────────────────────────────────────────────────────────
   // Reading memory as the owner: with owner_scope, every record the owner and their other agents
   // hold, private ones included. Without it the agent sees what visibility gives it. A read leaves
@@ -427,7 +435,11 @@ export const SCOPE_DOMAINS = [
   // operator:admin — administer the node through this agent: the admin tools, the MCP registry and
   //   the search-engine announcement (2026-09-24). Same caveat as the repair word: on a normal
   //   account it grants nothing. The operator in person needs no box; the admin pages are theirs.
-  { key: 'operator',   permissions: ['organism-repair', 'admin'] },
+  // operator:service-provision — this agent is the credential of an outside service the operator
+  //   switched on for every account (agents.operator_services): it asks for each person's agent of
+  //   that service and reads the accounts the service covers (2026-11-26). Same caveat: on a normal
+  //   account it grants nothing.
+  { key: 'operator',   permissions: ['organism-repair', 'admin', 'service-provision'] },
 
   // ── Added 2026-08-23 (BR-02) ─────────────────────────────────────────────────────────────────
   // compliance:read / compliance:write — the node-wide compliance report, and the use-case register

@@ -54,6 +54,8 @@
  *   const setAside = applyStartSettings(process.env);           // in loadConfig, before the config is built
  *   const fallbacks = startSettingFallbacks(setAside, config);  // after: one log line per setting
  * @version-history
+ *   v2.2.0 — 2026-11-26 — A JSON row with `refusalFor` (agents.operator_services) is checked, and its
+ *     refusal names the field: the node starts on the default and the Security page says why.
  *   v2.1.0 — 2026-10-25 — START_ONLY_CHOICES is gone: capability publishing, capability webhooks and
  *     the package creation role have Config-tab rows with their words, so the rows' check covers them.
  *   v2.0.0 — 2026-10-16 — A value the node does not accept no longer refuses the start: it is set
@@ -151,11 +153,13 @@ export function startSettingProblems(env: NodeJS.ProcessEnv = process.env): Star
     if (raw === undefined || raw.trim() === '' || field.type === 'boolean') continue;
     // A JSON-object row is stored as JSON, but several of them take comma-separated text in the
     // environment (AIMEAT_SEALED_CONFIG_KEYS, AIMEAT_SEO_SAME_AS), parsed by their own loader line.
-    if (field.type === 'object' && !field.list) continue;
-    const ok = field.choices
-      ? field.choices.includes(raw)
-      : field.validate(parseConfigValue(field, raw));
-    if (!ok) problems.push({ variable: field.envVar, value: raw, takes: describe(field) });
+    // A JSON row whose check names the field it refuses (`refusalFor`, agents.operator_services) is
+    // checked here, so its refusal becomes a Security page incident naming the reason.
+    if (field.type === 'object' && !field.list && !field.refusalFor) continue;
+    const parsed = parseConfigValue(field, raw);
+    const ok = field.choices ? field.choices.includes(raw) : field.validate(parsed);
+    const why = !ok && field.refusalFor ? field.refusalFor(parsed) : null;
+    if (!ok) problems.push({ variable: field.envVar, value: raw, takes: why ? `is refused: ${why}` : describe(field) });
   }
   return problems;
 }

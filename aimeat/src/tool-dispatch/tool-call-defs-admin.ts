@@ -9,6 +9,10 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   2026-11-26 -- aimeat_admin_service_access actions account_off and account_on (PUT
+ *     /v1/operator-services/:id/accounts/:account, body on and reason).
+ *   2026-11-26 -- aimeat_admin_service_access (GET /v1/operator-services, GET /v1/operator-services/:id/accounts
+ *     with limit and cursor).
  *   2026-11-19 -- aimeat_admin_hook_set forwards `when_missing`, and `actions` only when given.
  *   2026-11-14 -- aimeat_admin_usage forwards report, owner, from, to, grain, series and limit to
  *     GET /v1/admin/usage/summary when any report parameter is given.
@@ -244,6 +248,27 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => (optionalString(input, 'action') === 'start'
             ? client.post('/v1/admin/encryption/reencrypt', {})
             : client.get('/v1/admin/encryption/reencrypt')),
+    },
+    {
+        // → GET /v1/operator-services, GET /v1/operator-services/:id/accounts,
+        //   PUT /v1/operator-services/:id/accounts/:account
+        name: 'aimeat_admin_service_access',
+        handler: ({ client }, input) => {
+            const action = optionalString(input, 'action') ?? 'list';
+            if (action === 'list') return client.get('/v1/operator-services');
+            if (action === 'accounts') {
+                return client.get(`/v1/operator-services/${encodeURIComponent(requiredString(input, 'service'))}/accounts${query({
+                    limit: optionalNumber(input, 'limit'), cursor: optionalString(input, 'cursor'),
+                })}`);
+            }
+            if (action === 'account_off' || action === 'account_on') {
+                const reason = optionalString(input, 'reason');
+                return client.put(`/v1/operator-services/${encodeURIComponent(requiredString(input, 'service'))}/accounts/${encodeURIComponent(requiredString(input, 'account'))}`, {
+                    on: action === 'account_on', ...(reason !== undefined ? { reason } : {}),
+                });
+            }
+            return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message: 'action is list, accounts, account_off or account_on.' } });
+        },
     },
     {
         // → GET /v1/admin/disputes, GET /v1/admin/disputes/:id

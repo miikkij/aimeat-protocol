@@ -15,6 +15,8 @@
  *   2026-11-26 -- e2e-stray-agent-faces.ts joins the list (not the guard tier): the copies of an app's agent
  *     face in visitors' memory are one Security page incident, once, on its own node on 28591.
  *   2026-11-26 -- Add e2e-owner-export-job.ts: the data export as a background job of chosen parts.
+ *   2026-11-26 -- Add e2e-operator-service-phase2.ts: operator services' audience, required, private read and per-account switch.
+ *   2026-11-26 -- Add e2e-operator-service-agents.ts: operator services (agents.operator_services).
  *   2026-11-26 -- Add e2e-evals.ts: stored eval sets scored per revision.
  *   2026-11-26 -- Add e2e-trail-recorded.ts: the node's own record of an agent's calls.
  *   2026-11-26 -- Add e2e-app-scenarios.ts: the builder's playtest scenarios, signed in, at every size.
@@ -1482,6 +1484,8 @@ const ALL_SUITES = [
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
     'test/e2e-colleagues.ts',               // a company server: everyone on it sees each other (members see each other)
+    'test/e2e-operator-service-agents.ts',  // an operator service gets every person's agent without a press, and each person turns it off
+    'test/e2e-operator-service-phase2.ts',  // its audience, a required agent only the operator removes, the private read, the per-account switch
     'test/e2e-cross-owner-dm.ts',           // a co-member of a closed organism is past the first-contact gate
     // Too long, a control character, NUL and a broken character are refused with the field named, on REST and MCP.
     'test/e2e-input-validation.ts',

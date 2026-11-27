@@ -33,6 +33,12 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-26 -- The Agents group shows the operator services' accounts and the operator's switch per account
+ *     under its settings (config-operator-services.js).
+ *   2026-11-26 -- A row the admin view marks `json: true` (a list of JSON objects: agents.operator_services,
+ *     site.contacts) is edited as pretty-printed JSON and sent as the parsed list (./config-json-list.js); a
+ *     text that does not parse is refused on its line and not sent, and the node's refusal is shown as it is.
+ *     It had been edited one item per line, which showed and would have saved "[object Object]".
  *   2026-11-21 -- The `content_risk` group in the AI domain: the content risk marks' switch, defaults and floors.
  *   2026-11-15 -- consent.app_party_max in Data out, after the signup hours: the most people one app holds.
  *   2026-11-14 -- The `help` section (Ask someone who knows) stands in Money and pacing, beside the morsel policy.
@@ -126,6 +132,7 @@ import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
 import { DataOutStatus } from './config-data-out.js';
 import { KeyRingStatus } from './config-key-ring.js';
+import { OperatorServiceAccounts } from './config-operator-services.js';
 import { SettingsIndex, SettingLine, ChangeList } from '/components/SettingsIndex.js';
 import { Section } from '/components/Section.js';
 import { Action, Loud } from '/components/Action.js';
@@ -135,6 +142,7 @@ import { Tinted } from '/components/Figure.js';
 import { Tabs } from '/components/Tabs.js';
 import { Check } from '/components/Check.js';
 import { TextField, TextArea } from '/components/TextField.js';
+import { jsonListText, jsonListFromText } from './config-json-list.js';
 import { Select } from '/components/Select.js';
 
 // Map config source to Badge type for visual distinction
@@ -198,6 +206,8 @@ const SECTION_ACTIONS = {
   decide: DecideKeyTest,
   data_out: DataOutStatus,
   node: KeyRingStatus,
+  // The operator services' accounts and the operator's switch per account (config-operator-services.js).
+  agents: OperatorServiceAccounts,
 };
 
 function domainOf(group) {
@@ -251,6 +261,8 @@ function shown(v) {
 }
 /** shown(), with a fixed value in its words rather than the raw value the API stores. */
 function shownIn(path, e, v) {
+  // A list of JSON objects in one line, never "[object Object]"; the edited text is shown as typed.
+  if (e && e.json) return typeof v === 'string' ? shown(v.replace(/\s+/g, ' ')) : shown(JSON.stringify(v ?? []));
   return hasChoices(e) && typeof v === 'string' && v !== '' ? choiceLabel(path, v) : shown(v);
 }
 
@@ -285,7 +297,9 @@ function rangeMin(e) {
  * node's own reason follows when it says more than "invalid value" (the database refused the write).
  */
 function refusalWords(p, e, value, reason) {
-  const v = typeof value === 'number' && Number.isNaN(value) ? shown('') : shownIn(p, e, value);
+  // A JSON list: the node's own sentence names the entry and the field, and the value is too long to repeat.
+  if (e.json) return reason ? `${t('dashboard.cfgJsonRefused')} ${reason}` : t('dashboard.cfgJsonRefused');
+  const v =typeof value === 'number' && Number.isNaN(value) ? shown('') : shownIn(p, e, value);
   const min = rangeMin(e);
   if (min !== null && e.rangeKind === 'recommended') {
     return tr('dashboard.cfgRefusedMin', 'Not saved: {value} is not accepted. The minimum is {min}.').replace('{value}', v).replace('{min}', min);
@@ -342,6 +356,15 @@ function fieldEditor(p, e, val, editable, pending, onChange, bad) {
   }
   if (e.type === 'string') {
     return html`<${TextField} size="medium" ariaLabel=${label(p)} value=${val || ''} invalid=${bad} onInput=${(v) => onChange(p, v)} disabled=${!editable} />`;
+  }
+  if (e.type === 'object' && e.json) {
+    // A list of JSON objects (the admin view's `json: true`): pretty-printed JSON, parsed on save
+    // (./config-json-list.js). Never the one-per-line editor below, which turned an entry into
+    // "[object Object]".
+    return html`<${TextArea} code rows=${10} ariaLabel=${label(p)} disabled=${!editable} invalid=${bad}
+        value=${pending[p] !== undefined ? pending[p] : jsonListText(e.value)}
+        onInput=${(v) => onChange(p, v)} />
+      <${Note} kind="meta">${t('dashboard.cfgJsonListHint')}<//>`;
   }
   if (e.type === 'object') {
     return Array.isArray(e.value)
@@ -447,8 +470,20 @@ export default function ConfigTab({ data, reload, configFind }) {
   }
 
   async function save() {
+    // A JSON list that does not parse is refused here, on its own line, and is not sent.
+    const unparsed = {};
     const changes = Object.entries(pending).map(([path, value]) => {
       const entry = schema[path];
+      if (entry && entry.json && typeof value === 'string') {
+        const r = jsonListFromText(value);
+        if (!r.ok) {
+          unparsed[path] = r.error === 'not-a-list'
+            ? t('dashboard.cfgJsonNotList')
+            : r.at ? t('dashboard.cfgJsonInvalidAt', r.at) : t('dashboard.cfgJsonInvalid');
+          return null;
+        }
+        return { path, value: r.value };
+      }
       // Array-of-strings fields (e.g. agent.system_principles) are edited as
       // one item per line; split the raw text back into an array on save so it
       // matches what the API validator expects.
@@ -456,8 +491,8 @@ export default function ConfigTab({ data, reload, configFind }) {
         return { path, value: value.split('\n').map(l => l.trim()).filter(Boolean) };
       }
       return { path, value };
-    });
-    if (!changes.length) return;
+    }).filter(Boolean);
+    if (!changes.length) { setRefused(unparsed); return; }
     setSaving(true);
     const sent = Object.fromEntries(changes.map(c => [c.path, c.value]));
     try {
@@ -465,14 +500,14 @@ export default function ConfigTab({ data, reload, configFind }) {
       // here; it used to leave the list with the saved ones under "Changes saved".
       const r = await saveConfig(changes.map(c => ({ path: sendPath(c.path), value: c.value })));
       const saved = new Set((r.data.applied || []).map(a => rowPath(a.path)));
-      setRefused(refusalsOf(r.data.errors, sent));
+      setRefused({ ...refusalsOf(r.data.errors, sent), ...unparsed });
       setResult({ ok: true, msg: t('dashboard.savedChanges').replace('{count}', saved.size) });
       setPending(prev => Object.fromEntries(Object.entries(prev).filter(([p]) => !saved.has(p))));
       reload();
     } catch (err) {
       // Nothing was saved. When the node says which setting and why, each line says it and the
       // pinned row names them; the box at the top of the page is out of sight while editing.
-      const named = refusalsOf(err.response?.error?.details?.errors, sent);
+      const named = { ...refusalsOf(err.response?.error?.details?.errors, sent), ...unparsed };
       setRefused(named);
       setResult(Object.keys(named).length > 0 ? null : { ok: false, msg: err.message });
     } finally {

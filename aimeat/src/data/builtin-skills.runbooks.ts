@@ -12,6 +12,15 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-27 -- node-operations: an operator service's id is reserved for it while the entry exists.
+ *   2026-11-27 -- manage-my-agents: an operator service is switched on for the owner's account, not "for everyone".
+ *   2026-11-26 -- Phase 2 of the operator services: node-operations names audience, required, the private read
+ *     and the per-account switch; manage-my-agents says a required agent is the operator's, and the private read.
+ *   2026-11-26 -- manage-my-agents: set_by_operator carries the operator's description, the answer to "what
+ *     is this agent"; node-operations: an entry's description is required.
+ *   2026-11-26 -- node-operations: an outside service for every account (agents.operator_services,
+ *     aimeat_admin_service_access); manage-my-agents: an agent the operator set up (set_by_operator), and
+ *     what removing it does.
  *   2026-11-19 -- manage-my-agents: an app's start of a waiting task, and task_start_app_waits on
  *     aimeat_agent_task_start_set.
  *   2026-11-15 -- node-operations: a dispute that waits for a ruling, with aimeat_admin_disputes and
@@ -188,6 +197,25 @@ in order. Read each one first, show the operator what you found, and change a se
 Report the result as a short list: ready, missing (with what fills it and who provides it), and
 the operator's decisions still open.
 
+## An outside service for every account
+\`agents.operator_services\` (an empty list, so off, by default) names outside services that get an agent
+in every active account with no approval by the person. Change it with \`aimeat_admin_config_set\` only on
+the operator's word: a refused entry is answered with the field it is in (no \`description\` of 20 to 300
+characters saying what the service does for a person and why it is on, a wildcard, a permission a
+person gives only themselves other than memory:read-as-owner, memory:read-as-owner without a
+\`private_read_reason\` every person reads, one that makes or changes agents, keys, consents or shares, or
+\`memory:write-as-owner\` without \`write_prefixes\`), and removing an entry or setting its \`enabled\` to
+false removes every agent it made in the same call. \`audience\` names whom it covers (all, or named
+accounts), and \`required: true\` takes the person's off switch away: they cannot remove, stop or narrow
+the agent. \`aimeat_admin_service_access\` lists the services with how many people have the agent,
+turned it off, wait or were turned off by the operator; with \`action: "accounts"\` the accounts one
+covers, a page at a time; and with \`account_off\` (an optional \`reason\`) and \`account_on\` it switches
+the service for one account, only on the operator's word. A person can turn a service that is not
+required off for themselves, and only they turn it on again. An entry's \`id\` is the service's agent name
+and is reserved for it while the entry exists, enabled or not: nobody else makes a new agent under it, so
+suggest an id nobody uses; a person's own agent that already has the name keeps it, and the service gets
+no agent for that person.
+
 ## A dispute that waits for a ruling
 When one agent's work is disputed and the two parties do not settle it, one escalates it to the
 operator, or the 30-day timeout sends it there because the provider's balance does not cover the
@@ -323,6 +351,18 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   cover \`organism:invite\`: it can invite people into the shared spaces the owner belongs to, and an
   invitation can create a new account. That is allowed. When you describe the agent to the owner,
   say it.
+- **An agent the operator set up.** \`set_by_operator\` on an agent's row (\`{ service, display_name,
+  description }\`) means an outside service the people who run this AIMEAT switched on for the owner's
+  account made it, with no approval of the owner, and only with the permissions the operator named. When the owner asks
+  what the agent is, answer from \`description\`, the operator's own words on what the service does for them
+  and why it is on. The owner removing it on
+  the Agents page turns that service off for them, and it stays off
+  until they turn it on again under "Services that are off for you" on the Agents page
+  (\`POST /v1/operator-services/<service>/me\`); what it wrote stays theirs. Say that when they ask how
+  to be rid of it. When \`required\` is true, only the operator turns it off: do not try to remove, stop
+  or narrow it (each answers 403 OPERATOR_SERVICE_REQUIRED), tell the owner why and that they can ask
+  at \`support@operators\`. When \`private_read\` is true it reads their private records, and
+  \`private_read_reason\` is the operator's reason: say both.
 
 Where agents run, for the owner:
 
@@ -403,7 +443,8 @@ flowchart LR
 - **Give an agent expertise:** browse \`aimeat_skill_list\` (view "library"), then
   \`aimeat_skill_link\` with the skill's ref and the target \`agent_name\`. Links are
   references — the agent loads current content at start.
-- **A NEW agent, two ways, and never implicitly.** An agent this node makes and runs (a worker,
+- **A NEW agent, two ways, and never implicitly** (an agent the operator set up, above, is the one
+  the owner did not add). An agent this node makes and runs (a worker,
   above) is proposed with \`aimeat_agent_propose\`, and the owner's approval at its
   \`approval_url\` creates it. An AI the owner already runs somewhere else (another chat app, a
   coding tool, their own program) connects itself with the device-authorization flow (RFC 8628),

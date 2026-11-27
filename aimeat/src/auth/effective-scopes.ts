@@ -12,6 +12,9 @@
  *   callAuthority(auth) → both, for the remote MCP chokepoint
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   2026-11-26 -- withCurrentScopes drops memory:read-as-owner from an operator service's agent while the
+ *     present setting does not grant the entry's private read (services/operator-services/private-read.ts;
+ *     operator services review, S5).
  *   2026-11-04 -- The agent and the owner record are read through the request memo
  *     (services/request-memo.ts): the revocation check of the same request already read them, and
  *     the answer is shared. Uncached across requests, as before (codebase analysis 2026-11-03, item C2).
@@ -43,6 +46,9 @@ import { logger } from '../utils/logger.js';
 import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
 import { memoGetAgent, memoGetOwner } from '../services/request/memo.js';
 import { visitorPeerScopes } from './visitor-peer.js';
+import { sessionConfig } from './node-auth.js';
+import { PRIVATE_READ_WORD } from '../config/operator-services.js';
+import { privateReadHolds } from '../services/operator-services/private-read.js';
 
 /**
  * The permissions a principal holding `token` has, given that its record currently allows `record`.
@@ -126,7 +132,13 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
   if (!agent) return v;
 
   const current = agent.defaultScopes ?? [];
-  const effective = intersectScopes(v.scopes, current);
+  let effective = intersectScopes(v.scopes, current);
+  // An operator service's agent: the private read an entry gave counts only while the present setting
+  // grants it (services/operator-services/private-read.ts, S5). Asked only when the word is held.
+  const config = sessionConfig();
+  if (config &&effective.includes(PRIVATE_READ_WORD) && !(await privateReadHolds(storage, config, agent))) {
+    effective = effective.filter((s) => s !== PRIVATE_READ_WORD);
+  }
   if (effective.length === v.scopes.length && effective.every((s, i) => s === v.scopes[i])) return v;
   logger.info('effective-scopes: narrowed to the agent record', {
     sub: v.sub, token: v.scopes.join(','), record: current.join(','), effective: effective.join(','),

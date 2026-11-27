@@ -61,6 +61,24 @@ Di en una frase en el [chat](/v1/chat) o en tu [Inicio](/v1/home) lo que quieres
 
 Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Ves el trabajo terminado en tu Inicio, en Lo que ha pasado. Si quieres, el agente también te lo envía por correo. Puedes detener un agente cuando quieras.
 
+## Un agente con la marca “Activado por quien gestiona el servidor” {#operator-agent}
+
+Quien gestiona este servidor puede activar un servicio externo para tu cuenta, por ejemplo un servicio que escribe el resumen de cada reunión en tus notas. El servicio recibe entonces un agente en tu cuenta, y no lo aprobaste tú. Lo ves en la [página Agentes](/v1/profile?tab=agents) con la marca “Activado por quien gestiona el servidor”.
+
+Recibiste un aviso cuando llegó. El aviso, la marca y la tarjeta del agente dicen qué es el servicio, con las palabras de quien gestiona el servidor, y qué puede hacer. Si escribe en tu memoria en tu nombre, solo escribe en las claves que nombra el aviso.
+
+Si el servicio también lee tus registros privados, el aviso y la tarjeta lo dicen en una frase aparte, con el motivo de quien gestiona el servidor. Ese derecho solo se da con un motivo que lee cada persona, por ejemplo una norma que la organización debe cumplir sobre lo que se guarda.
+
+Si la tarjeta dice cómo puedes ayudar, hazlo: te dice qué puedes darle al servicio para que funcione mejor para ti. También puedes darle al agente instrucciones y material en su tarjeta.
+
+Puedes desactivar el servicio para ti: elimina su agente en la página Agentes. Después, el servicio no recibe un agente para ti hasta que presiones Volver a activar en “Servicios desactivados para ti”, en la misma página. Lo que escribió en tu memoria sigue siendo tuyo.
+
+Un agente con la marca “Exigido por quien gestiona el servidor” no lo puedes desactivar. Estos servicios existen para un trabajo que quien gestiona el servidor debe ver hecho en cada cuenta que cubre el servicio, por ejemplo que cada persona nueva termine de configurar su cuenta. No puedes eliminarlo, detenerlo ni limitarlo, pero puedes verlo, leer lo que hizo, darle instrucciones y agregarle permisos propios. Solo quien gestiona el servidor lo desactiva.
+
+Si un servicio aparece con “Quien gestiona el servidor desactivó este servicio para tu cuenta”, lo desactivó solo para ti, y solo esa persona puede volver a activarlo.
+
+Pregunta más a quien gestiona el servidor con un mensaje a support@operators.
+
 <!--store-->
 ## IA y agentes de fuera {#outside}
 

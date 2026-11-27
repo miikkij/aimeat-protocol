@@ -31,6 +31,7 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-11-27 — aimeat_agent_propose: a name an operator service holds is refused OPERATOR_SERVICE_KEY.
  *   2026-11-05 — Section 5: an `ai` schedule's answer at `group` needs an output record that has a group (services/schedule-write.ts).
  *   2026-11-02 — Section 5: an agent_task schedule's `deliver: "owner"`, the node hands the result to the
  *     owner when the person was promised it (services/task-result-delivery.ts), and the target agent's
@@ -190,8 +191,9 @@ First read what it will work on: \`aimeat_organism_list\` and \`aimeat_workspace
 morning, gather my open deals" is about the deals in their own sales workspace, so read that
 workspace's record shape and design the agent for it.
 
-\`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from (name their data in
-it), the scopes the agent needs (never more than you hold yourself; the node adds \`memory:read\`
+\`aimeat_agent_propose\` takes a name (one the person's agents do not have, and not one an operator
+service holds: that is refused with 403 \`OPERATOR_SERVICE_KEY\`, so pick another), a \`purpose\` the
+person can decide from (name their data in it), the scopes the agent needs (never more than you hold yourself; the node adds \`memory:read\`
 and \`memory:write\`, which a crew runtime needs for itself, and \`ai:use\` when the person's crews
 use this node's AI) and a \`crew_def\`, the JSON document that says what the agent is: its
 roles, its tasks and its tools. Leave \`run_mode\` out: a worker per piece of work is what the

@@ -9,6 +9,8 @@
  * @structure registerRekeyRoute(router, config, storage)
  * @usage registerRekeyRoute(router, config, storage) inside registerManagementRoutes (./management.ts).
  * @version-history
+ *   2026-11-26 — An agent an operator service made, required or not, is not rekeyed by the person: 403
+ *     OPERATOR_SERVICE_KEY (services/operator-services/service-key.ts).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-25 — Moved out of ./management.ts (max-file-lines). The rotation now ends the agent's MCP
@@ -27,6 +29,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { nodeContext } from '../../services/node/context.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
+import { serviceKeyRefusal } from '../../services/operator-services/service-key.js';
 
 /** What the answer tells the owner, in plain words. */
 const REKEY_NOTE = 'New keys generated. Store the private key securely. Every token issued to this agent before now has stopped working. '
@@ -43,6 +46,13 @@ export function registerRekeyRoute(router: Router, config: AimeatConfig, storage
     }
     if (agent.owner !== req.auth!.owner) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only rekey your own agents'));
+      return;
+    }
+    // The key of any agent an operator service made is the service's, required or not: a rekey would
+    // make it the person's own and break the service's proof (services/operator-services/service-key.ts).
+    const serviceKey = await serviceKeyRefusal(storage, config, gaii, 'rotating its key');
+    if (serviceKey) {
+      res.status(403).json(error(config.nodeId, serviceKey.code, serviceKey.message));
       return;
     }
 

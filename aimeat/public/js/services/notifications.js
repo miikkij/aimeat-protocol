@@ -10,6 +10,12 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   2026-11-27 — saidNotice: a place the stored notice does not carry says nothing, so a notice stored
+ *     before its template gained a variable shows no brace.
+ *   2026-11-26 — readerVars says an operator service's `off`, `private_read` and `help` in the reader's language.
+ *   2026-11-26 — readerVars quotes `prefix_words` in the reader's quotation marks as `write_prefixes`.
+ *   2026-11-26 — bodyOf says `scope_words` and `description` again in the reader's language (readerVars):
+ *     an operator service's notice listed its permissions in the sender's language inside a Finnish body.
  *   2026-10-31 — HELP_ALIAS: the question about a welcome page changed outside the editor shares the
  *     explanation of the welcome page question (audit H-9).
  *   v1.4.0 — 2026-10-27 — helpTermOf: a notice whose kind has an explanation gets a question mark that
@@ -157,9 +163,68 @@ export function answerChangeOf(n) {
 
 /* ── The words ─────────────────────────────────────────────────────────────────────────────── */
 const said = (key, vars) => { const s = t(key, vars); return s && s !== key ? s : null; };
+/**
+ * A notice template filled from the variables its record carries. A place the record does not carry
+ * says nothing: a notice stored before its template gained a variable never shows a brace.
+ */
+export function saidNotice(key, vars) {
+  const tpl = t(key);
+  if (!tpl || tpl === key) return null;
+  const all = { ...(vars || {}) };
+  for (const [, name] of String(tpl).matchAll(/\{(\w+)\}/g)) if (!(name in all)) all[name] = '';
+  return said(key, all);
+}
 /** The title in the reader's language when the record says how; else what the sender wrote. */
-export function titleOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key}.title`, n.i18n.vars || {})) || n?.title || ''; }
-export function bodyOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key}.body`, n.i18n.vars || {})) || n?.body || ''; }
+export function titleOf(n) { return (n?.i18n?.key && saidNotice(`notiftext.${n.i18n.key}.title`, n.i18n.vars || {})) || n?.title || ''; }
+export function bodyOf(n) { return (n?.i18n?.key && saidNotice(`notiftext.${n.i18n.key}.body`, readerVars(n.i18n.key, n.i18n.vars || {}))) || n?.body || ''; }
+
+/**
+ * Variables the sender filled in its own words, said again in the reader's language: `scope_words`
+ * (permission words, comma-joined) becomes `permissions`, each word's sentence from the agent page
+ * (profile.agents.scopeUi.scopeText.*); `description` (the operator's own text, kept as written)
+ * becomes `about`, a sentence of its own with a lead-in, or nothing. A word with no sentence stays as
+ * it is; a notice without these variables is untouched.
+ */
+function readerVars(key, vars) {
+  const out = { ...vars };
+  // A service notice stored before it carried `contact` still names whom to ask: it is always the operators.
+  if (String(key).startsWith('operator_service') && !out.contact) out.contact = 'support@operators';
+  if (typeof vars.scope_words === 'string' && vars.scope_words) {
+    // Each sentence named in the language's quotation marks, separated by semicolons.
+    const base = String(key).replace(/_fenced$/, '');
+    out.permissions = vars.scope_words.split(',').filter(Boolean).map((w) => {
+      const [d, a] = w.split(':');
+      const text = (said(`profile.agents.scopeUi.scopeText.${d}.${a}`, {}) || w).replace(/\.$/, '');
+      return said(`notiftext.${base}.quoted`, { text }) || `"${text}"`;
+    }).join('; ');
+  }
+  // `prefix_words` (key prefixes, comma-joined) become `write_prefixes`, each in the quotation marks.
+  if (typeof vars.prefix_words === 'string' && vars.prefix_words) {
+    const base = String(key).replace(/_fenced$/, '');
+    out.write_prefixes = vars.prefix_words.split(',').filter(Boolean)
+      .map((p) => said(`notiftext.${base}.quoted`, { text: p }) || `"${p}"`).join(', ');
+  }
+  // The operator-service sentences in the reader's language from their raw values: whether the person
+  // may turn it off (`required`), the private read with the operator's reason, and how to help.
+  if ('required' in vars) {
+    const base = 'operator_service_on';
+    const ends = (s) => { const x = String(s || '').trim(); return x && !/[.!?]$/.test(x) ? `${x}.` : x; };
+    out.off = said(`notiftext.${base}.${vars.required === 'true' ? 'off_required' : 'off_self'}`, {}) || vars.off || '';
+    const reason = ends(vars.private_read_reason);
+    out.private_read = reason ? `${said(`notiftext.${base}.private_read`, { reason }) || vars.private_read || ''} ` : '';
+    const help = ends(vars.how_to_help);
+    out.help = help ? `${said(`notiftext.${base}.how_to_help`, { how_to_help: help }) || vars.help || ''} ` : '';
+  }
+  if ('description' in vars) {
+    const text = typeof vars.description === 'string' ? vars.description.trim() : '';
+    // Ends as a sentence, once: the operator's text may or may not carry its own full stop.
+    const words = text && !/[.!?]$/.test(text) ? `${text}.` : text;
+    // Every operator-service notice (on, fenced, required) shares the one lead-in.
+    const aboutKey = String(key).startsWith('operator_service') ? 'operator_service_on' : String(key).replace(/_fenced$/, '');
+    out.about = words ? `${said(`notiftext.${aboutKey}.about`, { description: words }) || words} ` : '';
+  }
+  return out;
+}
 /** A button's words in the reader's language when the button says how (a key under `notiftext.`); else null. */
 export function actionTextOf(a) { return (a?.i18n?.key && said(`notiftext.${a.i18n.key}`, a.i18n.vars || {})) || null; }
 

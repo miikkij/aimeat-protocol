@@ -29,6 +29,12 @@
  *     { owner: req.auth!.owner, principal: req.auth!.sub, ownerInPerson }, name);
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.2.0 — 2026-11-26 — An ordinary removal of an agent the operator requires answers 403
+ *     OPERATOR_SERVICE_REQUIRED (services/operator-services/required.ts).
+ *   v1.1.0 — 2026-11-26 — Removing the agent an operator service made for the person marks the
+ *     service `removed` for them, before the delete, and a ledger failure fails the removal
+ *     (services/operator-services/agent-removed.ts); `opts.operatorServiceLine: 'leave'` for the
+ *     callers that write the line themselves.
  *   v1.0.0 — 2026-11-12 — Extracted from routes/agents/management.ts
  *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a), with one addition: the
  *     schedules somebody else made to give the agent work are turned off and named in the answer
@@ -45,6 +51,8 @@ import { forgetAgentAccess } from '../agent/refusals.js';
 import { evictAgentTelemetry } from '../telemetry-buffer.js';
 import { nodeContext } from '../node/context.js';
 import { emitChange } from '../event-bus.js';
+import { noteAgentRemoved } from '../operator-services/agent-removed.js';
+import { requiredAgentRefusal } from '../operator-services/required.js';
 import { logger } from '../../utils/logger.js';
 
 export interface AgentRemoveDeps {
@@ -87,8 +95,16 @@ export type AgentRemoveResult =
     | { ok: true; data: AgentRemoved }
     | { ok: false; status: number; code: string; message: string };
 
-/** Remove the agent `agentName` of the caller's account. The caller already holds what the entry point asks (the owner role or agent:delete). */
-export async function removeAgent(deps: AgentRemoveDeps, caller: AgentRemoveCaller, agentName: string): Promise<AgentRemoveResult> {
+/**
+ * Remove the agent `agentName` of the caller's account. The caller already holds what the entry point asks (the owner role or agent:delete).
+ * `opts.operatorServiceLine`: 'mark' (the default, an ordinary removal) marks an operator service's line
+ * `removed` before the delete; 'leave' is for the callers that write the line themselves (the
+ * operator-services sweep, a rolled-back approval, the person's own off switch).
+ */
+export async function removeAgent(
+    deps: AgentRemoveDeps, caller: AgentRemoveCaller, agentName: string,
+    opts: { operatorServiceLine?: 'mark' | 'leave' } = {},
+): Promise<AgentRemoveResult> {
     const { storage } = deps;
     const ownerName = caller.owner;
 
@@ -120,6 +136,17 @@ export async function removeAgent(deps: AgentRemoveDeps, caller: AgentRemoveCall
     //
     // Order matters: revoke, then delete. The other way round, a failure here would leave a live
     // credential for a record nobody can look up any more.
+    //
+    // First of all: the agent an operator service made for this person. Removing it is the person
+    // turning the service off, remembered until they turn it on, and the line is written BEFORE the
+    // delete; a ledger that cannot be written fails the removal here, with nothing changed
+    // (services/operator-services/agent-removed.ts).
+    if ((opts.operatorServiceLine ?? 'mark') === 'mark') {
+        // An agent the operator requires is removed only by the operator (services/operator-services/required.ts).
+        const required = await requiredAgentRefusal(storage, deps.config, agent.gaii, 'removing it');
+        if (required) return required;
+        await noteAgentRemoved(storage, deps.config, agent);
+    }
     const endedSessions = await storage.revokeSessionsByGaii(agent.gaii);
     // What the agent made that keeps standing: it stops with the agent, and a new agent under the
     // same name runs it again; the owner is told both (services/agent/standing-work.ts).

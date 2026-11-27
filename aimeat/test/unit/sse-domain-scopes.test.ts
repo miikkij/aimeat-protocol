@@ -6,6 +6,8 @@
  *   so a newly added domain elsewhere in the node cannot silently start leaking to apps.
  * @usage cd aimeat && pnpm test -- sse-domain-scopes
  * @version-history
+ *   v1.1.0 — 2026-11-26 — operator-services reaches only operator:service-provision, a '*' principal
+ *     included (WILDCARD_NEVER_OPENS); every other domain is answered for '*' as before.
  *   v1.0.0 — 2026-07-25 — Initial, with the SSE scope gate.
  */
 import { describe, it, expect } from 'vitest';
@@ -71,7 +73,21 @@ describe('allowedDomains', () => {
     });
 
     it('disables filtering for the wildcard scope', () => {
-        expect(allowedDomains(['*'])).toBeNull();
+        expect(allowedDomains(['*', 'operator:service-provision'])).toBeNull();
+        // The existing domains fenced by a word outside the wildcard reach a '*' principal as before.
+        expect(filterDomains(['memory', 'config', 'secrets', 'secret-shares', 'help', 'kyc'], allowedDomains(['*'])))
+            .toEqual(['memory', 'config', 'secrets', 'secret-shares', 'help', 'kyc']);
+    });
+
+    it('a wildcard never opens operator-services without its own word', () => {
+        expect(filterDomains(['operator-services', 'config'], allowedDomains(['*']))).toEqual(['config']);
+        expect(filterDomains(['operator-services', 'config'], allowedDomains(['*', 'operator:service-provision']))).toEqual(['operator-services', 'config']);
+    });
+
+    it('operator-services reaches only a principal holding operator:service-provision', () => {
+        expect(allowedDomains(['operator:admin', 'memory:read'])!.has('operator-services')).toBe(false);
+        expect(allowedDomains(['operator:*'])!.has('operator-services')).toBe(false);
+        expect(allowedDomains(['operator:service-provision'])!.has('operator-services')).toBe(true);
     });
 
     it('never maps an operator or infra domain to an app scope', () => {

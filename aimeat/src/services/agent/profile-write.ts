@@ -29,10 +29,16 @@
  *   - syncOnboardingFlowToMode(): re-derive the Hello Integration steps after a mode change
  *   - setAgentCapabilities(): validated capability self-report
  *   - recordSelfReportedPlatform(): the platform/model stamp written by the identify_platform step
+ *   - requiredAgentFence(): the refusal for a required operator service's agent, shared by the setters
  * @usage
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-11-26 — setAgentRuntimeSource takes the caller's principal and is fenced for a required operator
+ *     service's agent like the other setters (operator services review, S10).
+ *   2026-11-26 — requiredAgentFence and the OPERATOR_SERVICE_REQUIRED code: the person and their other agents
+ *     do not change the mode, the run mode or the entry's words of an agent an operator service made
+ *     required (services/operator-services/required.ts; operator services phase 2).
  *   2026-11-15 — The mode-change notice opens the agent's card (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-13 — VALID_MODES comes from models/agent-onboarding-schemas.ts, not from a route file
  *     (structure programme 2026-11, unit 4).
@@ -84,6 +90,7 @@ import { inferModeFromPlatform } from '../platform-detector.js';
 import { logger } from '../../utils/logger.js';
 import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { notify } from '../notify.js';
+import { requiredAgentRefusal, requiredScopeRefusal, OPERATOR_SERVICE_REQUIRED_CODE } from '../operator-services/required.js';
 
 export interface AgentWriteDeps {
     storage: Storage;
@@ -93,11 +100,25 @@ export interface AgentWriteDeps {
 /** A refusal carries a code so HTTP can pick a status and a translated message of its own. */
 export interface AgentWriteRefusal {
     ok: false;
-    code: 'AGENT_NOT_FOUND' | 'ACCESS_DENIED' | 'INVALID_INPUT' | 'UPDATE_FAILED';
+    code: 'AGENT_NOT_FOUND' | 'ACCESS_DENIED' | 'INVALID_INPUT' | 'UPDATE_FAILED' | typeof OPERATOR_SERVICE_REQUIRED_CODE;
     message: string;
 }
 
 export type AgentWriteOutcome = { ok: true; agent: AgentRecord } | AgentWriteRefusal;
+
+/**
+ * The fence for an agent an operator service made required (services/operator-services/required.ts):
+ * the person and their other agents may not change how it runs; `what` names the change in the
+ * refusal. The agent itself is not fenced (a runtime sets its own mode at start), and neither is any
+ * agent that is not a required service's. HTTP renders the code as 403.
+ */
+export async function requiredAgentFence(
+    deps: AgentWriteDeps, gaii: string, callerPrincipal: string | undefined, what: string,
+): Promise<AgentWriteRefusal | null> {
+    if (callerPrincipal === gaii) return null;
+    const refused = await requiredAgentRefusal(deps.storage, deps.config, gaii, what);
+    return refused ? { ok: false, code: refused.code, message: refused.message } : null;
+}
 
 // Colons are allowed so faceted tags (source:crewai, role:researcher) validate and compose
 // with aimeat_discover's `tags` CSV filter; '@' stays excluded to keep tags distinct from GAII.
@@ -371,6 +392,15 @@ export async function setAgentProfile(
     if (Object.keys(normalised.updates).length === 0) {
         return { ok: false, code: 'INVALID_INPUT', message: 'No fields to change' };
     }
+    // A required operator service's agent: its mode stays, and its list keeps every word the entry gave.
+    if (normalised.updates.mode && normalised.updates.mode !== (target.agent.mode ?? 'interactive')) {
+        const fenced = await requiredAgentFence(deps, target.gaii, undefined, 'changing its mode');
+        if (fenced) return fenced;
+    }
+    if (normalised.updates.defaultScopes) {
+        const refused = await requiredScopeRefusal(deps.storage, deps.config, target.gaii, normalised.updates.defaultScopes);
+        if (refused) return { ok: false, code: refused.code, message: refused.message };
+    }
 
     const updated = await deps.storage.updateAgent(target.gaii, normalised.updates);
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
@@ -467,10 +497,13 @@ export async function setAgentRunMode(
     callerOwner: string,
     identifier: string,
     rawRunMode: unknown,
+    callerPrincipal?: string,
 ): Promise<AgentWriteOutcome> {
     const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
         'You can only set the run mode of agents owned by the same owner');
     if (!target.ok) return target;
+    const fenced = await requiredAgentFence(deps, target.gaii, callerPrincipal, 'changing its run mode');
+    if (fenced) return fenced;
 
     // `null` clears. `undefined` does not: it is a caller that sent no field, and wiping a setting
     // because a key was missing is the kind of write nobody can see coming.
@@ -500,10 +533,15 @@ export async function setAgentRuntimeSource(
     callerOwner: string,
     identifier: string,
     raw: unknown,
+    callerPrincipal?: string,
 ): Promise<AgentWriteOutcome> {
     const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
         'You can only report the runtime of agents owned by the same owner');
     if (!target.ok) return target;
+    // Clearing a local-model mark hides records labelled against outside AI, as a lowered clearance does:
+    // for a required operator service's agent only its own runtime reports it (S10).
+    const fenced = await requiredAgentFence(deps, target.gaii, callerPrincipal, 'changing what it reports it runs on');
+    if (fenced) return fenced;
 
     if (raw === null) {
         const cleared = await deps.storage.updateAgent(target.gaii, { runtimeSource: null });
@@ -551,6 +589,8 @@ export async function setAgentMode(
     const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
         'You can only update the mode of agents owned by the same owner');
     if (!target.ok) return target;
+    const fenced = await requiredAgentFence(deps, target.gaii, callerSub, 'changing its mode');
+    if (fenced) return fenced;
 
     const checked = normaliseMode(rawMode);
     if (!checked.ok) return checked;

@@ -11,6 +11,11 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   2026-11-27 — Without the marker, a new agent under an operator service entry's id is refused too
+ *     (services/operator-services/service-key.ts serviceNameRefusal).
+ *   2026-11-26 — `operatorService` marker: without it an agent an operator service made is refused
+ *     OPERATOR_SERVICE_KEY before anything runs (every caller inherits it); with it no place default and no
+ *     "Allow always" word is added (operator services review, S1 and S7).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-11-02 — On a store place an agent approver passes on the place's words its own scopes cover, at
@@ -55,6 +60,7 @@ import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent/standing-work.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
+import { serviceKeyRefusal, serviceNameRefusal } from '../../services/operator-services/service-key.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 export function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -100,8 +106,29 @@ export async function approveDeviceAuth(
    * the owner chose to sign the agent's other sessions out, as a key rotation does, before the new
    * credential is issued.
    */
-  opts: { takeover?: boolean; endOtherSessions?: boolean } = {},
+  opts: {
+    takeover?: boolean; endOtherSessions?: boolean;
+    /**
+     * Set only by the operator-service branch (routes/agents/device-auth-operator-service.ts): the one
+     * caller that may rotate the key of an agent an operator service made. Every other caller (the
+     * same-owner auto-approval, the owner's consent on /verify, a sibling agent's approval, any later
+     * one) is refused OPERATOR_SERVICE_KEY for such an agent, here, so none can forget to ask (S1). It
+     * also gives the agent no place default and no "Allow always" word: the entry is the only source
+     * of its entry words (S7).
+     */
+    operatorService?: boolean;
+  } = {},
 ): Promise<{ ok: true; gaii: string; existing: boolean; otherSessionsEnded: boolean } | { ok: false; status: number; code: string; message: string }> {
+  // An agent an operator service made: its key is the service's (services/operator-services/service-key.ts).
+  // Asked before anything runs, the registration hook included.
+  if (!opts.operatorService) {
+    const target = buildGAII(request.agentName, request.ownerName, config.nodeId);
+    const serviceKey = await serviceKeyRefusal(storage, config, target, 'connecting it again with a new key');
+    if (serviceKey) return { ok: false, status: serviceKey.status, code: serviceKey.code, message: serviceKey.message };
+    // A NEW agent under an operator service's name (a request an older build stored): the name is the service's.
+    const reserved = (await storage.getAgent(target)) ? null : serviceNameRefusal(config, request.agentName);
+    if (reserved) return { ok: false, status: reserved.status, code: reserved.code, message: reserved.message };
+  }
   // Pre-registration hook
   const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
     name: request.agentName,
@@ -145,7 +172,9 @@ export async function approveDeviceAuth(
   // the place's words its own scopes cover, here, and the agent is marked as having had its default,
   // so its first token mint adds nothing beyond that bound (secaudit2026nov02d round 13).
   // Once per agent, so a re-approval does not undo what the owner took away since.
-  const placeDefault = async (scopes: string[]) => applyPlaceDefault(storage, config, gaii, scopes, approverAgentScopes);
+  const placeDefault = async (scopes: string[]) => (opts.operatorService
+    ? [...scopes]
+    : applyPlaceDefault(storage, config, gaii, scopes, approverAgentScopes));
   let grantedScopes: string[];
 
   // An AGENT approver passes on no more clearance than it holds, the clearance half of the rule

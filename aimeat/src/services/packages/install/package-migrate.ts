@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   2026-11-26 — An operator service's agent migrates no component that writes the person's memory
+ *     (services/operator-services/write-fence.ts).
  *   2026-11-08 — Each registration names the migrating caller (`lockCaller`), so a cortex's schema parts
  *     ask the schema lock rule as that caller, the dry run before the delete included (secaudit2026nov08
  *     round 14).
@@ -75,6 +77,7 @@ import {
 } from '../../component/registrar.js';
 import { registeredNameFor, codeWriterOf } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
+import { operatorServiceWholeRefusal } from '../../operator-services/write-fence.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { forkedUpdateRefusal } from './package-managed.js';
 import { packageCapabilities, widenedItems } from './package-capabilities.js';
@@ -368,6 +371,9 @@ export async function applyInstanceMigration(
                 };
             }
             // The component writes into the owner's memory, so the caller answers for that write.
+            const fenced = type === 'memory' || type === 'skill'
+                ? await operatorServiceWholeRefusal(storage, config, caller.sub, 'a package component that writes into the person\'s memory') : null;
+            if (fenced) return { ok: false, status: fenced.status, code: fenced.code, message: `${fenced.message} Nothing was changed.` };
             const writeRefusal = memoryComponentWriteRefusal([{ id: compId, type }], caller, ownerGhii);
             if (writeRefusal && writeRefusal.missing.length === 0) {
                 return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was changed.` };

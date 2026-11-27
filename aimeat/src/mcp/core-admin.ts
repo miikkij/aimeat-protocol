@@ -13,6 +13,9 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-26 — aimeat_admin_service_access registered (mcp/operator-services.ts): the operator services
+ *     and the accounts one covers, through services/operator-services/listing.ts.
+ *   2026-11-26 — aimeat_admin_config_set hands the MCP session closer to the operator-services sweep.
  *   2026-11-15 — aimeat_admin_disputes and aimeat_admin_dispute_rule registered (mcp/disputes.ts).
  *   2026-11-15 — aimeat_admin_teams: every team on the node, counts only, through
  *     services/node-admin/teams-view.ts as GET /v1/admin/teams reads it (team setup T16).
@@ -74,8 +77,10 @@ import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { registerKeyReencryptTool } from './key-reencrypt.js';
 import { registerDisputeTools } from './disputes.js';
+import { registerOperatorServiceTools } from './operator-services.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { operatorAgentList } from '../services/node-admin/agent-list.js';
+import { closeMcpSessionsForGaii } from './session-registry.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -213,7 +218,7 @@ export function registerCoreAdminTools(
             if (!caller || !(await isOperator())) return notOperator;
             // PUT /v1/admin/config's function: sealed paths and the classification switch are refused
             // before anything is applied, and the change is written to the operator trail.
-            const r = await changeNodeSettings({ config, storage, provenance: provenanceOf(config) }, caller().auth, changes);
+            const r = await changeNodeSettings({ config, storage, provenance: provenanceOf(config), closeMcpSessions: closeMcpSessionsForGaii }, caller().auth, changes);
             if (!r.ok) return toolError(r.code, `${r.message}${r.details ? ` ${JSON.stringify(r.details)}` : ''}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ applied: r.applied, errors: r.errors, note: r.note }) }] };
         },
@@ -321,4 +326,7 @@ export function registerCoreAdminTools(
 
     // ── aimeat_admin_disputes, aimeat_admin_dispute_rule: the disputes that wait for a ruling (mcp/disputes.ts) ──
     if (caller) registerDisputeTools(mcp, config, storage, caller);
+
+    // ── aimeat_admin_service_access: the operator services and the accounts they cover (mcp/operator-services.ts) ──
+    if (caller) registerOperatorServiceTools(mcp, config, storage, caller);
 }

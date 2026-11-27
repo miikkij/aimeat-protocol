@@ -6,9 +6,18 @@
  *   runs on, the model it reports and how far its onboarding got. Pure extraction from
  *   ../agent-card.js (max-file-lines); the bodies are unchanged and their history stays below.
  * @structure deliveryLabel(delivery) · renderPlatformBadge(onboarding) · renderModelBadge(agent) ·
- *   stepTone(status) · renderReadinessBadge(state, onboarding)
+ *   renderOperatorBadge(agent) · OPERATOR_CONTACT · operatorServiceAbout(by) · stepTone(status) ·
+ *   renderReadinessBadge(state, onboarding)
  * @usage import { deliveryLabel, renderReadinessBadge } from './agent-card-badges.js';
  * @version-history
+ *   v1.7.0 — 2026-11-26 — A required service's tag reads "Required by the operator" with its own explanation
+ *     (agent.required_by_operator); the dialog states the private read and the operator's reason.
+ *   v1.6.0 — 2026-11-26 — The operator tag's dialog names this service: its name, the operator's own
+ *     description, where its permissions are listed and whom to ask (operatorServiceAbout).
+ *   v1.5.1 — 2026-11-26 — The operator tag explains itself through the guidance tooltip and dialog
+ *     (HelpLabel, explain.agent.set_by_operator) in place of a title, and stays on one line.
+ *   v1.5.0 — 2026-11-26 — renderOperatorBadge: "Set by the operator" on an agent an operator service set
+ *     up for the person (agents.operator_services), the dim tag the mode badge wears.
  *   v1.4.0 — 2026-09-26 — The badges are the Mark component (components/Mark.js: a tag, or a status
  *     with its tone); stepStatusClass becomes stepTone, the tone rather than a class (page group G1a).
  *   v1.3.0 — 2026-09-26 — renderDeliveryIndicator goes: nothing called it (Jouni: code that nothing uses may be removed).
@@ -23,6 +32,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Mark } from '/components/Mark.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const html = htm.bind(h);
 
@@ -50,6 +60,43 @@ export function renderPlatformBadge(onboarding) {
 export function renderModelBadge(agent) {
   if (!agent?.model) return null;
   return html`<${Mark} title=${t('profile.agents.modelBadgeTitle')}>${agent.model}<//>`;
+}
+
+/**
+ * The tag an agent wears when an operator service set it up for the person (GET /v1/agents
+ * `set_by_operator`, services/operator-services/marks.ts): who set it, and in its title how to turn
+ * it off. Nothing for any other agent.
+ */
+export function renderOperatorBadge(agent) {
+  const by = agent?.set_by_operator;
+  if (!by) return null;
+  // The guidance tooltip and dialog (HelpLabel, explain.agent.set_by_operator), which a touch also opens;
+  // a press on it opens the explanation and not the row. One line at every width: the words are joined
+  // with no-break spaces, so no CSS changes for the other chips.
+  // A required service reads differently, with an explanation of its own: only the operator turns it off.
+  const words = t(by.required ? 'profile.agents.operatorService.markRequired' : 'profile.agents.operatorService.mark');
+  const term = by.required ? 'agent.required_by_operator' : 'agent.set_by_operator';
+  // This service in the dialog: its name, the operator's own description, the private read and its
+  // reason when it has one, where its permissions are listed and whom to ask (OPERATOR_CONTACT).
+  const mine = operatorServiceAbout(by);
+  // The span keeps a press on the question mark from also opening the agent row it stands in.
+  return html`<span onClick=${(e) => e.stopPropagation()}><${Mark} tone="dim"><${HelpLabel} term=${term} label=${words} mine=${mine}>${words.replace(/ /g, ' ')}<//><//></span>`;
+}
+
+/** The address that reaches this server's operators, the one the chat notice gives (components/ChatAi.js). */
+export const OPERATOR_CONTACT = 'support@operators';
+
+/**
+ * One operator service in a person's words: its name, the operator's own description with the notice's
+ * lead-in, where its permissions are listed, and whom to ask. The tag's dialog shows it.
+ */
+export function operatorServiceAbout(by) {
+  const sentence = (raw) => { const s = (raw || '').trim(); return s && !/[.!?]$/.test(s) ? `${s}.` : s; };
+  const description = sentence(by.description);
+  const about = description ? ` ${t('notiftext.operator_service_on.about', { description })}` : '';
+  const reason = sentence(by.private_read_reason);
+  const reads = by.private_read && reason ? ` ${t('notiftext.operator_service_on.private_read', { reason })}` : '';
+  return `${by.display_name}.${about}${reads} ${t('profile.agents.operatorService.dialogMine', { contact: OPERATOR_CONTACT })}`;
 }
 
 /** The Status tone an onboarding step wears: passed is fine, failed is danger, a warning needs a look,

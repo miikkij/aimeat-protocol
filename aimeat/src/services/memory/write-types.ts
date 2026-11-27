@@ -10,6 +10,7 @@
  *   MemoryWriteWarning · AfterMemoryWriteReport · MemoryWriteResult
  * @usage import type { MemoryWriteCaller, MemoryWriteResult } from './write.js';
  * @version-history
+ *   2026-11-26 — The refusal code OPERATOR_SERVICE_PREFIX (services/operator-services/write-fence.ts).
  *   2026-11-21 — The refusal code PERSON_DECIDES (services/app-tools/decision-binding.ts).
  *   2026-11-21 — MemoryWriteWarning code APP_READS_OWNER_NAMESPACE (services/memory/write-shadow.ts).
  *   2026-11-04 — Moved verbatim from services/memory-write.ts (codebase analysis 2026-11-03, item C3).
@@ -184,7 +185,9 @@ export type MemoryWriteResult =
             // Making it public, by a caller with nobody on this node to ask (services/publish-gate.ts).
             | 'PUBLISH_NOT_ALLOWED'
             // A level wider than the record's label allows (services/classification/audience-cap.ts).
-            | 'LABEL_CAPS_AUDIENCE';
+            | 'LABEL_CAPS_AUDIENCE'
+            // An operator service's agent outside its entry's write prefixes (services/operator-services/write-fence.ts).
+            | 'OPERATOR_SERVICE_PREFIX';
         message: string;
         details?: unknown;
     };

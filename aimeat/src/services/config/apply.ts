@@ -17,6 +17,9 @@
  *   ConfigResetResult · resetConfigValue(deps, path)
  * @usage const r = await applyConfigChanges({ config, storage, provenance, caller: req.auth }, [{ path, value }]);
  * @version-history
+ *   2026-11-26 — A change of agents.operator_services or scopes.max_agent_scopes runs the operator-services
+ *     sweep before the answer (services/operator-services/sweep.ts); `deps.closeMcpSessions` reaches it.
+ *     A refused value is answered with the row's `refusalFor` when it has one.
  *   2026-11-05 — Setting site.purchase_plan gives the store place's default to every agent that has not had it, before
  *     the answer (services/place-agent-scopes.ts; codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — `deps.caller` and the tighten-only check before anything is written; resetConfigValue,
@@ -46,6 +49,7 @@ import { sealSettingForStorage } from './at-rest-rows.js';
 import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf, asList } from './schema-validators.js';
 import { syncRateLimitTiers } from './rate-limit-sync.js';
 import { placeDefaultAfterSettings } from '../place-agent-scopes.js';
+import { operatorServicesAfterSettings } from '../operator-services/sweep.js';
 import { requestLooseningRefusal, resetRefusal, type TightenRefusal } from './strictness.js';
 import type { ReaderCredential } from '../classification/reader-kind.js';
 import { logger, setLogLevel } from '../../utils/logger.js';
@@ -63,7 +67,15 @@ export interface ConfigApplyResult {
 }
 
 /** Who asks for the write: the request's or the tool session's credential (classification/reader-kind.ts reads it). */
-export interface ConfigWriteDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance; caller?: ReaderCredential | null }
+export interface ConfigWriteDeps {
+    config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance; caller?: ReaderCredential | null;
+    /**
+     * Closes an agent's open MCP sessions (mcp/session-registry.ts), handed in by a route or a tool
+     * because a service does not import the MCP layer: the operator-services sweep ends the agents an
+     * entry made. Without it their sockets are refused at their next request, the agent being gone.
+     */
+    closeMcpSessions?: (gaii: string) => number;
+}
 
 /**
  * Store one setting's raw text, a secret row encrypted with the node key (config-at-rest.ts). The one
@@ -112,7 +124,7 @@ export async function applyConfigChanges(
             const min = rangeKindOf(mapping) === 'recommended' ? numericRangeOf(mapping)?.min : undefined;
             const hint = min !== undefined ? ` (the minimum is ${min}; ${mapping.range} is the recommended range)`
                 : mapping.range ? ` (range ${mapping.range})` : '';
-            errors.push({ path, reason: mapping.refusal ?? `Invalid value for ${path}${hint}` });
+            errors.push({ path, reason: mapping.refusalFor?.(value) ?? mapping.refusal ?? `Invalid value for ${path}${hint}` });
             continue;
         }
         const oldValue = readConfigField(config, mapping);
@@ -159,6 +171,10 @@ export async function applyConfigChanges(
     // A purchase plan set now makes this a store place: every agent that has not had the place's default
     // gets it in this request, before the answer (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
     await placeDefaultAfterSettings(storage, config, applied.filter(a => !a.applies).map(a => a.path));
+    // An operator service switched off, removed or narrowed takes its agents with it, in this request
+    // (services/operator-services/sweep.ts). It logs its own failure, and the next start runs it again.
+    await operatorServicesAfterSettings({ storage, config, ...(deps.closeMcpSessions ? { closeMcpSessions: deps.closeMcpSessions } : {}) },
+        applied.filter(a => !a.applies).map(a => a.path));
     return { applied, errors };
 }
 

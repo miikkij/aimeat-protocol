@@ -6,6 +6,8 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
+ *   v1.25.0 -- 2026-11-26 -- An agent the operator set up (set_by_operator) shows one line in place of the
+ *     onboarding checklist and the connect steps: the operator connected the service.
  *   v1.24.1 -- 2026-11-15 -- Saving an emptied webhook address removes the webhook (DELETE, after a
  *     confirmation) instead of sending url "" to PUT, which refuses it.
  *   v1.24.0 -- 2026-09-26 -- onto the components: the sections are the section Card in a CardGrid (their
@@ -302,6 +304,11 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
   // device-auth "Hello Integration" onboarding — show a short note instead of the 0/11 checklist.
   if (state === 'system') {
     return html`<${Note} kind="quiet">${t('profile.agents.detail.internalAgentNote')}<//>`;
+  }
+  // An agent the operator set up for an outside service: the operator connected it, and the person
+  // has nothing to connect or onboard, so neither the checklist nor the connect steps apply.
+  if (agent?.set_by_operator && (state === 'new' || state === 'onboarding')) {
+    return html`<${Note} kind="quiet">${t('profile.agents.operatorService.integrationNote', { service: agent.set_by_operator.display_name })}<//>`;
   }
 
   const isOnboarding = state === 'new' || state === 'onboarding';

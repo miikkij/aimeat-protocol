@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-26 — aimeat_agents_list carries set_by_operator, as GET /v1/agents does (services/operator-services/marks.ts).
  *   2026-11-21 — aimeat_memory_read gives the risk read the record's provenance id, so its writer decides
  *     whether the words are checked (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  *   2026-11-21 — aimeat_memory_read carries content_risk (and content_risk_warning) beside the value, and
@@ -248,6 +249,7 @@ import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
 import { invitesPeople } from '../services/agent/invites.js';
 import { avatarView, readAvatarsOrEmpty } from '../services/agent/avatar.js';
+import { operatorServiceMarks } from '../services/operator-services/marks.js';
 import { riskForRead } from '../services/content/risk-read.js';
 import { contentRiskTextOf } from '../services/content/risk-intake.js';
 
@@ -448,6 +450,8 @@ export function registerCoreTools(
             const access = await readOwnerAgentAccessOrMarker(storage, ownerGhiiOf(agentGaii), 'aimeat_agents_list');
             const useOf = await scopeUseLookup(storage, agents);
             const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_agents_list');
+            // The agents an operator service set up, as GET /v1/agents names them (services/operator-services/marks.ts).
+            const setByOperator = await operatorServiceMarks(storage, config, localAccountName(agentGaii), agents);
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
                     gaii: a.gaii,
@@ -471,6 +475,7 @@ export function registerCoreTools(
                     // said, which is NOT the same as 'spawn' — a runtime filtering for what it
                     // should serve has to be able to tell those apart.
                     run_mode: a.runMode ?? null,
+                    set_by_operator: setByOperator.get(a.gaii) ?? null,
                     // Whether its tasks start on their own, and what holds them for the owner.
                     ...taskStartView(a, useOf(a)),
                     // Whether the owner stopped it: a stopped agent starts no new work until it is

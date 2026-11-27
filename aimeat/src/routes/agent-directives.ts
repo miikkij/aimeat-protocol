@@ -10,6 +10,9 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   2026-11-26 — PUT refuses budget_limits on a required operator service's agent with 403
+ *     OPERATOR_SERVICE_REQUIRED; purpose, rules, memory areas and resources stay the person's
+ *     (services/operator-services/required.ts).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.8.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.8.0 -- 2026-09-04 -- An APP principal needs task:read to read an agent's directives, and only
@@ -51,6 +54,7 @@ import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createAgentDataAccessOverviewService } from '../services/db/agent-data-access-overview-db-service.js';
 import { logger } from '../utils/logger.js';
+import { requiredAgentRefusal } from '../services/operator-services/required.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -233,13 +237,24 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
 
     const body = parsed.data;
     const now = new Date().toISOString();
+    const raw = (req.body ?? {}) as Record<string, unknown>;
+
+    // A required operator service's agent (services/operator-services/required.ts), field by field:
+    // purpose, rules, memory areas and resources are the person's instructions and material, and stay
+    // open. budget_limits caps how much the agent runs, which is the operator's to decide.
+    if ('budget_limits' in raw) {
+      const required = await requiredAgentRefusal(storage, config, agentGaii, 'setting its budget limits');
+      if (required) {
+        res.status(403).json(error(config.nodeId, required.code, required.message));
+        return;
+      }
+    }
 
     // PARTIAL UPDATE / MERGE: the directives record is edited from several tabs
     // (Directives sends purpose+rules, Data Access sends memory_areas, etc.).
     // The Zod schema fills omitted fields with defaults ([]/''), so a naive
     // full replace would wipe whatever the other tab set. Detect which fields
-    // the caller actually sent via the RAW body keys and preserve the rest.
-    const raw = (req.body ?? {}) as Record<string, unknown>;
+    // the caller actually sent via the RAW body keys (`raw` above) and preserve the rest.
     const existing = await storage.getAgentDirectives(agentGaii);
 
     // Convert snake_case to camelCase for storage

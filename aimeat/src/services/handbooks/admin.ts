@@ -6,6 +6,13 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.46.1 -- 2026-11-27 -- An operator service's id is reserved for it while the entry exists; a refused
+ *     request from the service is answered OPERATOR_SERVICE_REFUSED and stored nowhere.
+ *   v1.46.0 -- 2026-11-26 -- Operator services phase 2: audience, required, the private read with its reason,
+ *     how to help, and the per-account switch (account_off, account_on).
+ *   v1.45.1 -- 2026-11-26 -- An operator service's entry needs its description.
+ *   v1.45.0 -- 2026-11-26 -- agents.operator_services and aimeat_admin_service_access: an outside service
+ *     with an agent in every account.
  *   v1.44.0 -- 2026-11-26 -- The incident stray_agent_faces and its two decisions, delete and keep.
  *   v1.43.0 -- 2026-11-21 -- The incident workspace_write_role and its two decisions, enforce and keep.
  *   v1.42.0 -- 2026-11-21 -- compliance.regulated_ai_modes: what an outside AI model gets of regulated
@@ -268,6 +275,34 @@ background, and every secret keeps opening while it runs; with no action it answ
 run, and \`says\`, what the operator can do now. A value that opens with neither key is counted and
 left as it is. The old key may be removed only when \`old_key_removable\` is true, and that is the
 operator's own step. The Config page's group Node shows the same.
+
+**An outside service for every account (operator).** The setting \`agents.operator_services\` (off: an
+empty list) names outside services that get an agent in every active account with nobody approving
+it. Change it with \`aimeat_admin_config_set\` only as the operator says. An entry names the service,
+a required \`description\` of 20 to 300 characters in the operator's own words (what the service does for
+a person and why it is on, which every person reads), the agent name each person gets (\`id\`: reserved
+for the service while the entry exists, enabled or not, so nobody else makes a new agent under it; pick an
+id nobody uses, since a person's own agent that already has the name keeps it and the service gets no agent
+for that person), the operator's agent that asks for those agents
+(\`credential_agent\`, which holds operator:service-provision) and the permissions; never a wildcard,
+never one that makes or changes agents, keys, consents or shares, never a permission a person gives
+only themselves except memory:read-as-owner (every covered person's private records), which needs
+\`private_read_reason\`, the reason each person reads; and \`write_prefixes\` with memory:write-as-owner.
+\`audience\` is "all" or \`{ "accounts": [...] }\`; \`required: true\` means the person cannot remove,
+stop, rekey or narrow the agent (their controls answer 403 OPERATOR_SERVICE_REQUIRED) and only the
+operator turns it off; \`how_to_help\` tells each person what to give the service. Each person sees the
+agent marked as set (or required) by the operator and is told once; a person can turn a service that is
+not required off for themselves, and it stays off until they turn it on. \`aimeat_admin_service_access\`
+(operator:admin, like the other operator tools) lists the entries with their counts, with
+\`action: "accounts"\` the accounts one covers, a page at a time, and with \`account_off\` (an optional
+\`reason\` the person reads) and \`account_on\` switches the service for one account, only on the
+operator's word; the Config tab's Agents group shows the same list with a switch per account. A request
+the service makes that the node refuses (an account outside the audience, a person who turned it off, an
+entry that is off, a word outside the entry) answers 403 OPERATOR_SERVICE_REFUSED and nothing is stored,
+so no person gets a request from it to approve.
+operator:service-provision is for the service's own credential agent only: it asks for the agents and
+reads its own service's accounts. Removing an entry or setting its \`enabled\` to false removes every
+agent it made; what they wrote stays with each person.
 
 **Where stored files keep their bytes (operator).** By default the node's database holds them. The
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any

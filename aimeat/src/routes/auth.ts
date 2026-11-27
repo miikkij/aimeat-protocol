@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-11-26 — DELETE /v1/auth/sessions/:id refuses the session of a required operator service's agent
+ *     with 403 OPERATOR_SERVICE_REQUIRED (services/operator-services/required.ts).
  *   2026-11-05 — An agent's token and refresh copy its record and add nothing: a store place's default is given at
  *     approval and when the plan is set (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The challenge Map and its sweep timer are removed: GET /v1/auth/challenge wrote to it and no code read it, so its answer is unchanged. The signatures POST /v1/auth/token spends are kept in the node's storage (auth/signed-request.ts; codebase analysis 2026-11-03, HA stage 2).
@@ -121,6 +123,7 @@ import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ec
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
+import { requiredAgentRefusal } from '../services/operator-services/required.js';
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -746,6 +749,13 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     const target = sessions.find(s => s.sessionId === sessionId);
     if (!target) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Session not found or already revoked'));
+      return;
+    }
+    // The list above shows only the person's own sign-ins, but an agent's session id reaches this route
+    // too: a required operator service's agent keeps its sign-in (services/operator-services/required.ts).
+    const required = await requiredAgentRefusal(storage, config, target.gaii, 'signing it out');
+    if (required) {
+      res.status(403).json(error(config.nodeId, required.code, required.message));
       return;
     }
     await storage.revokeSession(sessionId);

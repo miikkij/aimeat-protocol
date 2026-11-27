@@ -12277,7 +12277,7 @@ paths:
                             description: One sentence for the person, naming approval_url.
                           proposal: { type: object }
         '400': { description: 'A name, purpose or crew definition that could not work, or a connector the account does not have (UNKNOWN_CONNECTOR, AMBIGUOUS_CONNECTOR)' }
-        '403': { description: "Another owner, an app or ecosystem principal, or more scope than the proposer holds" }
+        '403': { description: "Another owner, an app or ecosystem principal, or more scope than the proposer holds; or OPERATOR_SERVICE_KEY: the name is an operator service entry's id, its service's while the entry exists" }
         '409': { description: An agent of that name already exists on this account }
     get:
       operationId: listAgentProposals
@@ -12459,7 +12459,7 @@ paths:
                               asked: { type: string }
                               reason: { type: string }
         '400': { description: 'A model choice the node does not store (INVALID_CHOICE, SECRET_IN_CHOICE, UNSAFE_CHOICE). Nothing was created.' }
-        '403': { description: Not the account holder in person }
+        '403': { description: "Not the account holder in person, or OPERATOR_SERVICE_KEY: the name is an operator service entry's id, its service's while the entry exists" }
         '404': { description: No such proposal on this account }
         '409': { description: 'Already settled, the name has been taken since, or a connector the account does not have (UNKNOWN_CONNECTOR)' }
         '502': { description: "The definition could not be seeded, so nothing was created" }
@@ -12833,7 +12833,7 @@ paths:
                               reason: { type: string }
                           agent: { type: object, nullable: true }
                           next_step: { type: string }
-        '403': { description: Not the account holder in person }
+        '403': { description: 'Not the account holder in person, or OPERATOR_SERVICE_KEY: an operator service made this agent and holds its key (remove the agent to turn the service off, or ask the operators)' }
         '404': { description: No agent of this account by that name }
         '409': { description: 'No such connector (UNKNOWN_CONNECTOR), the agent already runs there (ALREADY_THERE), the connector is not connected (DAEMON_NOT_CONNECTED), or a v1 agent (V1_AGENT)' }
         '502': { description: "The connector could not be reached, or did not take the agent" }
@@ -12976,6 +12976,7 @@ paths:
                                 identity_version: { type: integer }
                           skipped:
                             type: array
+                            description: Agents not moved, each with why; an agent an operator service made is always skipped, because the service holds its key (OPERATOR_SERVICE_KEY's sentence).
                             items:
                               type: object
                               properties:
@@ -14957,7 +14958,7 @@ paths:
         '400':
           description: Not an object with a `kind`, and not null; or an `llm` other than `node` or `machine`
         '403':
-          description: Not your agent
+          description: Not your agent; or OPERATOR_SERVICE_REQUIRED, an agent an operator service made required whose report only its own runtime gives
         '404':
           description: No such agent
 
@@ -14976,6 +14977,25 @@ paths:
         credentials — no manual consent step. Never cross-owner; an agent approver cannot
         grant scopes beyond its own token's (such requests stay pending for manual consent).
         Operators can disable with AIMEAT_SAME_OWNER_AUTO_APPROVE=false.
+
+        OPERATOR SERVICE (tested before the same-owner auto-approval): the operator's setting
+        `agents.operator_services` names outside services every account gets an agent of; each entry
+        carries a required `description` (20 to 300 characters) that every person reads. The
+        service's credential, an agent of an operator account holding `operator:service-provision`,
+        calls this with its own token, `agent_name` = the entry's `id` and `owner` = the person. The
+        request is approved at once when the caller is the entry's `credential_agent`, the entry is
+        enabled and its permissions pass the node now, every requested scope is one of the entry's,
+        the person is an active account of this node in the entry's present `audience`, the operator
+        has not switched the service off for that account, the person has not turned it off (unless the
+        entry is `required` now: then the agent is set up again and the person is told it is required),
+        and an agent of that name under the person, if any, is the one this service made. When the
+        entry's own credential asks for its own name and a condition fails, the answer is 403
+        OPERATOR_SERVICE_REFUSED with the condition (one sentence for every condition about the account)
+        and NOTHING is stored, so the person is never offered a request to approve. A caller that is not
+        the entry's credential, or asks for another entry's name, stays pending as before, and
+        `user_instructions` names the condition about the caller. A request for an operator service's
+        name is never listed in the person's pending requests. Only an approval on this branch is
+        exempt from the ten-pending limit per owner.
       tags: [Identity]
       requestBody:
         required: true
@@ -15098,6 +15118,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           description: '`owner` was an email with no matching verified account (NO_ACCOUNT)'
+        '403':
+          description: 'OPERATOR_SERVICE_KEY: the name is an agent an operator service made, whose key only that service connects again; or, while an entry with that id exists (enabled or not), a request for a NEW agent under its name from anyone but that entry''s credential (a person''s own agent made under the name before the entry keeps the ordinary rules). OPERATOR_SERVICE_REFUSED: an operator service''s own credential asked for its own entry''s name and a condition failed (the entry is off or not usable, a word outside the entry, or the one account sentence for every reason about the account). In both cases nothing is written, so no request waits for the person to approve.'
         '409':
           description: '`owner` email maps to more than one account (AMBIGUOUS — invariant violation)'
         '429':
@@ -15518,6 +15540,19 @@ paths:
                                     invites_people:
                                       type: boolean
                                       description: True when the agent's permissions cover organism:invite. It may then invite people into the organisms its owner belongs to, and an invitation can create a new account. Read from default_scopes on every call.
+                                    set_by_operator:
+                                      type: object
+                                      nullable: true
+                                      description: The operator service that set this agent up for the person (agents.operator_services), from that service's ledger; null for every other agent. `description` is the operator's own sentence (required in every entry, 20 to 300 characters) saying what the service does for a person and why it is on, so the person's AI can answer what the agent is from this one call. The person turns it off with DELETE /v1/operator-services/{id}/me, unless `required` is true; then the person sees it, reads its activity, gives it instructions and material and adds permissions of their own, and only the operator removes or limits it (403 OPERATOR_SERVICE_REQUIRED). `private_read` is true when the agent holds memory:read-as-owner because the entry gave it (the one outside-wildcard word an entry may name, with `private_read_reason`).
+                                      properties:
+                                        service: { type: string }
+                                        display_name: { type: string }
+                                        description: { type: string }
+                                        required: { type: boolean }
+                                        private_read: { type: boolean }
+                                        private_read_reason: { type: string, nullable: true }
+                                        how_to_help: { type: string, nullable: true, description: "How the person can help the service, in the operator's words; null when the entry has none" }
+                                        given: { type: array, items: { type: string }, description: "The words the entry gave this agent (the ledger line's list that the sweep narrows by); the agent's other words are the person's own" }
                                     install_id:
                                       type: string
                                       nullable: true
@@ -15723,6 +15758,8 @@ paths:
                             type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: "OPERATOR_SERVICE_KEY: the name is an operator service entry's id, its service's while the entry exists"
 
   /v1/agents/{gaii}:
     get:
@@ -16522,7 +16559,7 @@ paths:
                           public_key:
                             type: string
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: "Not your own owner identity, or OPERATOR_SERVICE_KEY: the name is an operator service entry's id, its service's while the entry exists"
         '409':
           description: Agent name already taken on this node
 
@@ -16581,7 +16618,11 @@ paths:
                             type: string
                             description: What happened and what the owner sees next, in plain words.
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: >-
+            Not the owner of the agent, or OPERATOR_SERVICE_KEY: an operator service made this agent and
+            holds its key, required or not; the service's own reconnect through device authorization is
+            the one way it changes. The sentence says the person can remove the agent to turn the service
+            off, or ask the operators when the service is required.
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -19778,6 +19819,170 @@ paths:
           description: enabled must be true or false
         '403':
           description: Not the account holder's own session
+
+  /v1/operator-services:
+    get:
+      operationId: listOperatorServices
+      summary: The outside services the operator switched on for every account
+      description: >-
+        The operator's setting `agents.operator_services` names outside services each person of this
+        node gets an agent of without approving it. The operator in person, or an operator's agent
+        holding `operator:admin` (the word of the other operator read tools, aimeat_admin_service_access),
+        reads every entry (`view: operator`)
+        with how many accounts in its audience are active, removed (the person turned it off),
+        operator_off (the operator switched it off for that account) and pending.
+        Anyone else of this node reads the enabled entries that cover them, and any entry they still
+        have a line in (`view: person`), with their own account's state: `active` with the agent's
+        GAII, `removed`, `operator_off`, or `pending`. While an entry is `required`, a person's earlier
+        `removed` reads `pending`: the next request sets the agent up again. A session from another node is
+        refused. Something acting for a person needs `agent:read` or `operator:admin`; `operator:admin`
+        is asked of the account as well, so a non-operator's agent holding it reads only its own state.
+        Both views carry the entry's present policy: `required`, `private_read` (the entry names
+        memory:read-as-owner with its reason), `private_read_reason` and `how_to_help`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: >-
+            `{ view: 'operator', services: [{ id, display_name, description, credential_agent, scopes,
+            allowed_scopes, write_prefixes, enabled, usable, problem, audience, required, private_read,
+            private_read_reason, how_to_help, counts: { covered, active, removed, pending, operator_off }, state, at, agent }] }`
+            (`state`, `at` and `agent` are the operator's own account's, as in the person's view;
+            `audience` is `all` or `{ accounts: [...] }`; `counts.covered` is the people in the audience)
+            or `{ view: 'person', services: [{ id, display_name, description, scopes, write_prefixes, required,
+            private_read, private_read_reason, how_to_help, in_audience, state, at, agent, operator_off_reason, may_turn_off }] }`
+            (`operator_off_reason`: why the operator switched the service off for this person, in the operator's
+            words, at most 300 characters; null unless `state` is operator_off)
+            (`may_turn_off`: DELETE /v1/operator-services/{id}/me is theirs to use: in the audience, not
+            required, and not switched off by the operator).
+            `write_prefixes` are the key prefixes under which the service's agent may write in a person's
+            memory as the person; outside them such a write, patch, delete or restore answers
+            403 OPERATOR_SERVICE_PREFIX.
+        '401':
+          description: No credential
+        '403':
+          description: A session from another node, or a caller holding neither agent:read nor operator:admin
+
+  /v1/operator-services/{id}/accounts:
+    get:
+      operationId: listOperatorServiceAccounts
+      summary: The accounts one operator service covers
+      description: >-
+        For the operator in person, an operator's agent holding `operator:admin`, and that service's own
+        credential agent (an agent of an operator account holding `operator:service-provision` whose
+        name is the entry's `credential_agent`; it reads no other entry's accounts):
+        every active person of this node in the entry's present audience, in account-name order, each
+        with what the service needs to enrol it: the account name, its GHII, its state (`pending`,
+        `active`, `removed`, `operator_off`) and when that state began. A page at a time; `next_cursor` names the next page. The service listens for the
+        `operator-services` live event and reads this again when it arrives.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: The last account name of the page before }
+      responses:
+        '200':
+          description: '`{ service, enabled, accounts: [{ account, ghii, state, at, by?, reason? }], next_cursor, total }`. In state operator_off, `at` is when the operator switched it off, `by` who did and `reason` why (at most 300 characters, or null); the three go when the operator switches it on again.'
+        '401':
+          description: No credential
+        '403':
+          description: Not the operator in person, not an operator's agent holding operator:admin, and not this service's credential agent
+        '404':
+          description: No such operator service
+
+  /v1/operator-services/{id}/accounts/{account}:
+    put:
+      operationId: setOperatorServiceForAccount
+      summary: The operator switches one operator service off or on for one account
+      description: >-
+        The operator in person, or an operator's agent holding `operator:admin`; never an entry's own
+        credential agent. `on: false` switches the service off for that account: its agent there is
+        ended at once (its credentials first, then the agent; what it wrote stays the person's), and no
+        approval sets one up until `on: true`, whatever the entry's `required` says. `on: true` takes only
+        this switch back: a person who turned the service off themselves stays off. Each switch is an
+        operator action in the person's account feed and an `operator-services` live event. The same
+        as the actions `account_off` and `account_on` of aimeat_admin_service_access.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: account, in: path, required: true, schema: { type: string }, description: The account name on this node }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [on]
+              properties:
+                on: { type: boolean }
+                reason: { type: string, maxLength: 300, description: "Why, with on false; the person reads it in their account feed" }
+      responses:
+        '200':
+          description: '`{ service, account, on, changed, agent_ended, reason? }`'
+        '400':
+          description: on is not true or false, or reason is not text of at most 300 characters
+        '401':
+          description: No credential
+        '403':
+          description: Not the operator in person nor an operator's agent holding operator:admin, or an operator service's own credential agent
+        '404':
+          description: No such operator service, or no such account
+
+  /v1/operator-services/{id}/me:
+    delete:
+      operationId: turnOffOperatorServiceForMe
+      summary: Turn an operator service off for yourself
+      description: >-
+        The account holder in person turns the service off for their own account: the service's agent
+        in their account is removed (what it wrote into their memory stays theirs), and the service
+        gets no agent for them again until they turn it back on. A person's own agent that shares the
+        service's name is not touched. Removing the service's agent the ordinary way
+        (DELETE /v1/agents/{name}) has the same effect. While the entry is `required`, both are refused
+        with 403 OPERATOR_SERVICE_REQUIRED and a sentence naming whom to ask; so are stopping it,
+        changing its mode, run mode or task start, porting it, signing out its session, setting or
+        removing its webhook, lowering its clearance, setting its budget limits, and any write of its
+        permissions that drops a word the entry gives. Its key is the service's whether or not the
+        entry is required: the person's rekey, move and migration are refused with 403
+        OPERATOR_SERVICE_KEY.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`{ service, state: removed, agent_removed }`'
+        '401':
+          description: No credential
+        '403':
+          description: Not the account holder in person, or OPERATOR_SERVICE_REQUIRED (the entry is required; only the operator turns it off)
+        '404':
+          description: No such operator service
+    post:
+      operationId: turnOnOperatorServiceForMe
+      summary: Turn an operator service back on for yourself
+      description: >-
+        Clears the account holder's own off switch. The service hears the `operator-services` live event
+        and may then ask for the person's agent again through POST /v1/agents/device-authorize.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`{ service, state: pending, was_off }`'
+        '401':
+          description: No credential
+        '403':
+          description: Not the account holder in person
+        '404':
+          description: No such operator service
 
   /v1/home/ai-client:
     post:
@@ -39897,6 +40102,10 @@ paths:
         value above the maximum. `recommended`: the range is the recommended range, and PUT accepts
         and applies a larger value. The minimum is enforced in both cases.
 
+        An object field whose value is a list of JSON objects (entries, such as `agents.operator_services`
+        and `site.contacts`) has `json: true`: `value` is the list itself, and PUT takes the list, never
+        its text.
+
         A field has `restartPending: true` when its database override was removed (DELETE
         /v1/admin/config/{path}) since the node started: `value` is still the removed value, which
         the node runs with until a restart, and `source` names where the value comes from after it.
@@ -40027,6 +40236,8 @@ paths:
           description: >-
             Config persistence unavailable (`READONLY_CONFIG`), or a path in the request was sealed
             by the node's host (`SEALED_CONFIG`) — in which case nothing in the request was applied.
+            Also `ACCESS_DENIED` when an agent that is an operator service's `credential_agent` (in the
+            stored value or the one written) writes `agents.operator_services`.
             Also `PERSON_REQUIRED` when an AI credential makes the sign-in policy or
             `mcp.capability_use_approval` more open; nothing in the request was applied then either.
           $ref: '#/components/responses/Forbidden'
@@ -87754,7 +87965,8 @@ paths:
         access token) gets 403 `PERSON_REQUIRED` for a setting it may only make stricter
         (`classification.mode`, `auth.two_step_required`, `auth.password_sign_in`,
         `auth.sign_in_lockout`, `mcp.capability_use_approval`), because the value it falls back to can
-        be less strict; it may still set a stricter value with PUT /v1/admin/config.
+        be less strict; it may still set a stricter value with PUT /v1/admin/config. An agent that is an
+        operator service's `credential_agent` gets 403 `ACCESS_DENIED` for `agents.operator_services`.
       security:
         - BearerAuth: []
       parameters:
@@ -93877,7 +94089,8 @@ paths:
         '403':
           description: >-
             access_denied. The principal is not the account holder, or the agent belongs to someone
-            else.
+            else, or (`reason: OPERATOR_SERVICE_KEY`) an operator service made the agent and holds its
+            key: only a signature by that key authorizes it (the authorize step's signature path).
           content:
             application/json:
               schema:
@@ -93885,3 +94098,4 @@ paths:
                 properties:
                   error: { type: string, example: access_denied }
                   error_description: { type: string }
+                  reason: { type: string, example: OPERATOR_SERVICE_KEY }

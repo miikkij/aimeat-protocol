@@ -17,6 +17,9 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-11-26 — aimeat_operator_agent_configure: an agent an operator service made never adds scopes to
+ *     another agent (services/operator-services/agent-check.ts); aimeat_operator_ai_config refuses it
+ *     the owner's AI settings (services/operator-services/write-fence.ts).
  *   2026-10-29 — aimeat_operator_agent_configure adds scopes for a caller holding agent:permissions-add,
  *     on the rule PATCH /v1/agents/:name/scopes asks (services/agent-scope-add.ts), and tells the
  *     owner of each addition (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
@@ -81,6 +84,8 @@ import {
     type AgentProfileFields,
 } from '../services/agent/profile-write.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { isOperatorServiceAgent } from '../services/operator-services/agent-check.js';
+import { operatorServiceWriteRefusal } from '../services/operator-services/write-fence.js';
 import { setAgentClearance } from '../services/agent/clearance.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
@@ -198,7 +203,8 @@ export function registerOperatorConfigTools(
             let scopesAdded: string[] = [];
             if (proposed.scopes) {
                 const c = caller();
-                const check = checkScopeAddition({ gaii: c.principal, scopes: c.scopes, inPerson: c.inPerson }, agent, proposed.scopes);
+                const check = checkScopeAddition({ gaii: c.principal, scopes: c.scopes, inPerson: c.inPerson,
+                    operatorService: !c.inPerson && await isOperatorServiceAgent(storage, config, c.principal) }, agent, proposed.scopes);
                 if (!check.ok) {
                     const asked = (check.details.added as string[] | undefined) ?? [];
                     return err(`${check.code}: ${check.message}${asked.length ? ` Asked to add: ${asked.join(', ')}.` : ''}`);
@@ -312,6 +318,9 @@ export function registerOperatorConfigTools(
                 scopes: sessionScopes, key: AI_SETTINGS_KEY, ownerScope: true,
             });
             if ('deny' in target) return err(`${target.deny.error}: ${target.deny.message} ${target.deny.how_to_fix}`);
+            // openrouter.settings is no operator service's prefix: its agent never writes it (operator-services/write-fence.ts).
+            const fenced = await operatorServiceWriteRefusal(storage, config, agentGaii, AI_SETTINGS_KEY);
+            if (fenced) return err(`${fenced.code}: ${fenced.message}`);
             const ownerGhii = target.gaii;
             // One read, made again when the versioned write below finds a write made in between.
             const readSettings = () => storage.getMemory(ownerGhii, AI_SETTINGS_KEY);

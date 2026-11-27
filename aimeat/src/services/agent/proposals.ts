@@ -32,6 +32,7 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.12.1 — 2026-11-27 — A proposal for an operator service entry's id is refused 403 OPERATOR_SERVICE_KEY.
  *   v1.12.0 — 2026-11-12 — A proposal's `warnings` name a permission that holds every task of the
  *     agent for the owner's OK (heldTaskWarnings, code TASKS_WAIT_FOR_OWNER).
  *   v1.11.0 — 2026-11-11 — A proposal made from an app's bundled agent carries `source_app` (the app,
@@ -84,6 +85,7 @@ import { browserDomainsError } from '../crews/browser-domains.js';
 import { withInvitesSentence } from './invites.js';
 import { isValidCron } from '../schedule/gate.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { serviceNameRefusal } from '../operator-services/service-key.js';
 
 /**
  * The warning for a proposal whose permissions hold every task of the agent for the owner's OK
@@ -327,6 +329,9 @@ export async function proposeAgent(
   if (existing.some(a => a.name === name)) {
     return fail(409, 'NAME_TAKEN', `You already have an agent called "${name}".`);
   }
+  // An operator service's name is its service's while the entry exists (services/operator-services/service-key.ts).
+  const reserved = serviceNameRefusal(config, name);
+  if (reserved) return fail(reserved.status, reserved.code, reserved.message);
 
   // ALREADY WAITING IS NOT A NEW ASK. Two agents reaching the same conclusion about what this
   // account needs is the normal case, and a second line on the owner's open items for the same name

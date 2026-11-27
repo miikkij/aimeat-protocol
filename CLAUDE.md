@@ -163,7 +163,7 @@ Name the pass-criterion before accepting a checkpoint, then verify against that 
 
 ## Identity
 
-Three principal types: a person (GHII, `alice@node-id`), who owns everything and sees and can remove every agent; an AI agent (GAII, `claude#alice@node-id`) with scoped permissions, which may approve another agent of the same owner; and an ecosystem app (GEAI, `eco:drum-news#alice@node-id`), consented like an agent. **A morsel is a pacer, not a currency and not a credit**: it paces what agents may push into the store so that what lands is refined, it buys nothing, and it belongs to the human in whose name an agent acts. The code detail is in `security.md` and `docs/coding-guidelines/identity-model.md`.
+Three principal types: a person (GHII, `alice@node-id`), who owns everything and sees and can remove every agent, except an agent the operator made required (`agents.operator_services`), which the person sees and only the operator removes; an AI agent (GAII, `claude#alice@node-id`) with scoped permissions, which may approve another agent of the same owner; and an ecosystem app (GEAI, `eco:drum-news#alice@node-id`), consented like an agent. **A morsel is a pacer, not a currency and not a credit**: it paces what agents may push into the store so that what lands is refined, it buys nothing, and it belongs to the human in whose name an agent acts. The code detail is in `security.md` and `docs/coding-guidelines/identity-model.md`.
 
 ## Commands
 

@@ -6,6 +6,11 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-11-26 -- A required operator service's agent has no delete control: the box says only the operator
+ *     removes it, and whom to ask.
+ *   2026-11-26 -- For an agent the operator set up, the delete box says that removing it turns the service
+ *     off for the person and that they can turn it on again (operatorService.removeDesc), not that it
+ *     cannot be undone, and the box drops its can't-be-undone frame.
  *   2026-11-08 -- The delete box says which receivers the agent made, that they keep working, and
  *     offers one press that pauses them (MakerReceivers; secaudit2026nov08 round 14, ruling 3).
  *   2026-10-15 -- Save sends the version the list read; an upload is created with POST into the
@@ -139,10 +144,23 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
   if (!onDeleteClick) return null;
+  // An agent the operator set up: removing it turns the service off for the person, which they can
+  // turn on again on the Agents page, so "cannot be undone" would not be true.
+  const by = agent?.set_by_operator;
+  // A required one is removed only by the operator: no delete control, one line that says so.
+  if (by?.required) {
+    return html`
+      <${SettingBox} label=${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}>
+        <${Note}>${t('profile.agents.operatorService.requiredLine', { service: by.display_name, contact: 'support@operators' })}<//>
+      <//>`;
+  }
+  const desc = by
+    ? t('profile.agents.operatorService.removeDesc', { service: by.display_name })
+    : (t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.');
   return html`
-    <${SettingBox} irreversible label=${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}>
+    <${SettingBox} irreversible=${!by} label=${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}>
       <${SettingRow}>
-        <${Note} inline>${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}<//>
+        <${Note} inline>${desc}<//>
         <${Action} small tone="danger" expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
       <//>
       ${open && html`<${MakerReceivers} maker=${agent?.gaii} label=${agentName} />`}

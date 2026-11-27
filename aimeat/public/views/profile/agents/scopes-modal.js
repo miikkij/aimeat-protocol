@@ -6,6 +6,12 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.18.0 — 2026-11-27 — An operator service's agent: each word its entry gave is marked as the
+ *     operator's setting's; a required entry's words are locked (presets and an area's "All" keep them),
+ *     while on an entry that is not required the person may take them away, as the server allows. A
+ *     refused save keeps the dialog open and says the server's reason in the reader's language.
+ *   v1.17.0 — 2026-11-26 — An operator service's agent: a note says its permissions came from the operator's
+ *     setting (and that a required one keeps them), and that its private read is the operator's, with a reason.
  *   v1.16.0 — 2026-10-16 — A find field above the permission list: every typed word must appear in a
  *     row's sentence, its scope string or its area's name; areas with no matching row drop out, the
  *     count beside the field says how many rows show, and typing opens the folded editor.
@@ -46,7 +52,7 @@
  *   v1.5.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -74,10 +80,23 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   // one they cannot revoke.
   const unknown = unknownScopes(scopes);
 
-  const [checked, setChecked] = useState(() => expandScopes(scopes));
+  // An agent the operator set up: the words its entry gave are marked as the operator's setting's. A
+  // required entry keeps them (the server refuses a list that drops one, services/operator-services/
+  // required.ts requiredScopeRefusal), so they are locked here; on an entry that is not required the
+  // person may take them away, as the server allows. The person's own words stay theirs either way.
+  const by = agent.set_by_operator || null;
+  const given = by ? operatorGiven(by, agent) : new Set();
+  const locked = by?.required ? given : new Set();
+
+  const [checked, setChecked] = useState(() => withLocked(expandScopes(scopes), locked));
   const [advanced, setAdvanced] = useState(() => detectTemplate(scopes) === 'custom');
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  // The sentence of a refused save, in the reader's language, shown in the dialog itself.
+  const [refusal, setRefusal] = useState('');
+  const refusalRef = useRef(null);
+  // The sentence stands under the list, so the dialog scrolls to it when it appears.
+  useEffect(() => { if (refusal) refusalRef.current?.scrollIntoView?.({ block: 'nearest' }); }, [refusal]);
   // Read from what would be SAVED, not from the expanded checkbox set — otherwise a fully-ticked
   // editor never matches a template and "Full access" stays unlit while being exactly what it is.
   const currentTemplate = detectTemplate(collapseScopes(checked, scopes));
@@ -88,10 +107,11 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
     const carried = [...checked].filter(s => unknown.includes(s));
     const next = name === 'full' ? wildcardScopes() : new Set(SCOPE_TEMPLATES[name] || []);
     carried.forEach(s => next.add(s));
-    setChecked(next);
+    setChecked(withLocked(next, locked));
   }
 
   function toggleScope(scope) {
+    if (locked.has(scope)) return;
     setChecked(prev => {
       const next = new Set(prev);
       if (next.has(scope)) next.delete(scope);
@@ -108,13 +128,16 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
     setChecked(prev => {
       const next = new Set(prev);
       domScopes.forEach(s => allChecked ? next.delete(s) : next.add(s));
-      return next;
+      return withLocked(next, locked);
     });
   }
 
   async function handleSave() {
     setSaving(true);
-    await onSave(agent.name, collapseScopes(checked, scopes));
+    setRefusal('');
+    // onSave answers { ok: false, message } when the server refused; the dialog stays open and says why.
+    const out = await onSave(agent.name, collapseScopes(checked, scopes));
+    if (out && out.ok === false) setRefusal(out.message || t('profile.agents.scopeUi.saveError'));
     setSaving(false);
   }
 
@@ -157,6 +180,12 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
           ${agent.gaii ? html`<${Icon} small href=${inboxLinkHref(agent.gaii)} label=${t('inbox.messageThis')}>${MAIL_ICON}<//>` : null}
         <//>
 
+        ${/* An agent the operator set up: its words came from the operator's setting, not from a tick of
+              the person's, the private read above all; and a required one keeps them. */''}
+        ${agent.set_by_operator ? html`<${Note}>${t(agent.set_by_operator.required ? 'profile.agents.operatorService.scopesRequired' : 'profile.agents.operatorService.scopesGiven',
+          { service: agent.set_by_operator.display_name })}${agent.set_by_operator.private_read
+            ? ` ${t('profile.agents.operatorService.scopesPrivateRead')}` : ''}<//>` : null}
+
         ${isReadOnly ? html`
           <${Note}>${t('profile.agents.scopeUi.readOnlyView')}<//>
           <${Marks}>
@@ -194,7 +223,8 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                   <${List} cols="check-name-desc" keepCols dense>
                     ${perms.map(p => {
                       const scope = `${d.key}:${p}`;
-                      const isLocked = isCatalogue && p === 'read';
+                      const isAlwaysOn = isCatalogue && p === 'read';
+                      const isLocked = isAlwaysOn || locked.has(scope);
                       const isExtra = NOT_IN_WILDCARD.includes(scope);
                       return html`
                         <${ListRow} key=${scope} picked=${checked.has(scope) || isLocked} pickOff=${isLocked}
@@ -202,7 +232,8 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                           <${Name}>${permLabel(p, d.key)}<//>
                           <${Cell} line>
                             <${Code}>${scope}<//>
-                            ${isLocked && html`<${Mark}>${t('profile.agents.scopeUi.alwaysOn')}<//>`}
+                            ${isAlwaysOn && html`<${Mark}>${t('profile.agents.scopeUi.alwaysOn')}<//>`}
+                            ${given.has(scope) && html`<${Mark}>${t(locked.has(scope) ? 'profile.agents.operatorService.givenLocked' : 'profile.agents.operatorService.givenMark')}<//>`}
                             ${isExtra && html`<${Mark} tone="coral">${t('profile.agents.scopeUi.notInFullAccess')}<//>`}
                           <//>
                         <//>`;
@@ -217,9 +248,12 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                 <${Note}>${t('profile.agents.scopeUi.otherScopesHint')}<//>
                 <${List} cols="check-name-desc" keepCols dense>
                   ${shownUnknown.map(scope => html`
-                    <${ListRow} key=${scope} picked=${checked.has(scope)} pickLabel=${scope} onPick=${() => toggleScope(scope)}>
+                    <${ListRow} key=${scope} picked=${checked.has(scope) || locked.has(scope)} pickOff=${locked.has(scope)}
+                      pickLabel=${scope} onPick=${() => toggleScope(scope)}>
                       <${Name} code>${scope}<//>
-                      <${Cell} />
+                      <${Cell} line>
+                        ${given.has(scope) && html`<${Mark}>${t(locked.has(scope) ? 'profile.agents.operatorService.givenLocked' : 'profile.agents.operatorService.givenMark')}<//>`}
+                      <//>
                     <//>`)}
                 <//>
               <//>
@@ -229,6 +263,41 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
           <${Split} heavy above="large">
             <${Note}>${t('profile.agents.scopeUi.reconnectNote')}<//>
           <//>
+          <div ref=${refusalRef}>${refusal ? html`<${Note} kind="message" error>${refusal}<//>` : null}</div>
         `}
     <//>`;
+}
+
+/**
+ * A refused save of an agent's permissions (PATCH /v1/agents/:name/scopes) in the reader's language.
+ * The operator-service codes arrive already worded by /js/api.js; the route's other refusals are
+ * worded here, and anything else is the dialog's general sentence.
+ */
+const SCOPE_REFUSALS = {
+  INVALID_SCOPES: 'profile.agents.scopeUi.refusedCeiling',
+  INVALID_INPUT: 'profile.agents.scopeUi.refusedEmpty',
+  NOT_FOUND: 'profile.agents.scopeUi.refusedGone',
+};
+export function scopeRefusalWords(code, message) {
+  if (typeof code === 'string' && code.startsWith('OPERATOR_SERVICE')) return message || t('profile.agents.operatorService.refusedRequired', { contact: 'support@operators' });
+  return t(SCOPE_REFUSALS[code] || 'profile.agents.scopeUi.saveError', { contact: 'support@operators' });
+}
+
+/**
+ * The words an operator service's entry gave this agent: the mark's `given` (the service's ledger,
+ * what the entry still gives), else what the approval recorded as granted. No wildcard: an entry
+ * never names one.
+ */
+function operatorGiven(by, agent) {
+  const words = Array.isArray(by.given) ? by.given
+    : Array.isArray(agent.scope_request?.granted) ? agent.scope_request.granted : [];
+  return new Set(words.filter((w) => typeof w === 'string' && !w.includes('*')));
+}
+
+/** `set` with every locked word in it: a locked word is never unticked by a preset or an area's "All". */
+function withLocked(set, locked) {
+  if (!locked.size) return set;
+  const next = new Set(set);
+  locked.forEach((w) => next.add(w));
+  return next;
 }

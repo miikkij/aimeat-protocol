@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-26 — aimeat_agent_scope_narrow passes the config to narrowOwnAgent, which refuses a required
+ *     operator service's agent (services/operator-services/required.ts).
  *   2026-11-19 — aimeat_agent_task_start_set takes task_start_app_waits (setAgentTaskStartSettings).
  *   2026-11-13 — aimeat_task_create, _propose_todos, _event, _todo, _complete, _fail and _decline read
  *     their agent or task through services/agent/task-access.ts (taskCreateTarget, taskToActOn), the
@@ -602,7 +604,7 @@ export function registerAgentTaskTools(
         async ({ target_agent_name }) => {
             // The lookup among the account's own agents and the narrowing are
             // services/agent/narrow-own-agent.ts, which POST /v1/agents/:name/scope-narrowing calls too.
-            const out = await narrowOwnAgent(storage, config.nodeId, localAccountName(agentGaii), target_agent_name);
+            const out = await narrowOwnAgent(storage, config, localAccountName(agentGaii), target_agent_name);
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used }) }] };
         },

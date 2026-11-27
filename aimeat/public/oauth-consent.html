@@ -9,6 +9,14 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.15.1 — 2026-11-27 — Creating an agent under a name an operator service's entry reserves (refused
+      OPERATOR_SERVICE_KEY) says the name is the service's.
+    v1.15.0 — 2026-11-27 — A refused create or save is said in the reader's language: a taken name (one that
+      is an operator service's agent's says so) and the operator-service codes, OPERATOR_SERVICE_REFUSED
+      included. A person whose only agents are services' is told why none is offered, and a suggested
+      name never repeats an agent that is not offered.
+    v1.14.0 — 2026-11-27 — An operator service's agent is not offered (its key is the service's), and a refusal
+      OPERATOR_SERVICE_KEY or OPERATOR_SERVICE_REQUIRED is said in the reader's language.
     v1.13.0 — 2026-11-14 — A new agent's name and shown name are filled in from the connecting service
       (unique among the person's agents), so creating it is one press, and it is made in the
       workstation mode, so an AI connected over MCP does not stay "onboarding" (team setup T4).
@@ -445,6 +453,9 @@
 
     let session = null;
     let agents = [];
+    // The agents not offered here (the node's own and the operator services'), and of those the services'.
+    let hiddenNames = new Set();
+    let serviceNames = new Set();
     let selectedAgent = null;
     // The name the person already gave their agent at home (memory key `home.agent-name`,
     // written by home's step 2). Empty when they never named one. It decides which agent is
@@ -496,6 +507,25 @@
     const httpError = (status, message) => Object.assign(new Error(message), { status });
 
     /**
+     * The node's refusal code said in the reader's language, or '' to keep the server's own words: an
+     * operator service's codes, and a taken name (a service's agent's name says so).
+     */
+    const SERVICE_CODES = {
+      OPERATOR_SERVICE_KEY: 'profile.agents.operatorService.refusedKey',
+      OPERATOR_SERVICE_REQUIRED: 'profile.agents.operatorService.refusedRequired',
+      OPERATOR_SERVICE_REFUSED: 'profile.agents.operatorService.refusedService',
+    };
+    function refusalWords(code, name) {
+      // A new agent's name an operator service's entry reserves: the create is refused OPERATOR_SERVICE_KEY.
+      if (code === 'OPERATOR_SERVICE_KEY' && name) return t('profile.agents.operatorService.nameIsService', { name });
+      if (SERVICE_CODES[code]) return t(SERVICE_CODES[code], { contact: 'support@operators' });
+      if (code === 'NAME_TAKEN' && name) {
+        return t(serviceNames.has(name) ? 'profile.agents.operatorService.nameIsService' : 'profile.agents.nameTaken', { name });
+      }
+      return '';
+    }
+
+    /**
      * Runs a signed-in request with the session's access token. The token was read when the page
      * loaded and lasts fifteen minutes on a shipped node, so a page left open sends an expired one. On
      * a 401 this renews it from the refresh cookie and runs the request once more. When the cookie
@@ -544,8 +574,15 @@
       // By name as well as by tag: the agents' runtime can rewrite an agent's tags, and on crew59 the
       // concierge was still listed (data/basic-agents.ts names them concierge and workflow-manager).
       const RESIDENT_NAMES = ['chat', 'concierge', 'workflow-manager'];
-      const resident = (a) => RESIDENT_NAMES.includes(a?.name) || (Array.isArray(a?.tags) && a.tags.includes('crew.basic'));
-      const list = (d.data?.agents || d.data || []).filter((a) => !resident(a));
+      // An operator service's agent (set_by_operator) acts only on the service's own key, and the consent
+      // below is refused for it (OPERATOR_SERVICE_KEY): it is not offered.
+      const resident = (a) => RESIDENT_NAMES.includes(a?.name) || (Array.isArray(a?.tags) && a.tags.includes('crew.basic')) || !!a?.set_by_operator;
+      const every = Array.isArray(d.data?.agents || d.data) ? (d.data?.agents || d.data) : [];
+      // Remembered for the words: a new agent's name never repeats a hidden one, a taken name that is a
+      // service's says so, and an empty list that hid services' agents says why.
+      hiddenNames = new Set(every.filter(resident).map((a) => a.name));
+      serviceNames = new Set(every.filter((a) => !!a?.set_by_operator).map((a) => a.name));
+      const list = every.filter((a) => !resident(a));
       // Alphabetical by the name a person sees (the node returns creation order); the browser's own
       // language decides the alphabet, as this page loads none of the SPA's format settings.
       const shown = (a) => a.display_name || a.displayName || a.name || '';
@@ -561,7 +598,7 @@
         body: JSON.stringify({ name, owner: ownerName, display_name: displayName || name, mode: 'workstation' }),
       });
       const d = await r.json();
-      if (!d.ok) throw httpError(r.status, d.error?.message || 'Failed to create agent');
+      if (!d.ok) throw httpError(r.status, refusalWords(d.error?.code, name) || d.error?.message || t('errorGeneric'));
       return d.data?.agent;
     }
 
@@ -578,7 +615,7 @@
         body: JSON.stringify({ scopes }),
       });
       const d = await r.json();
-      if (!d.ok) throw httpError(r.status, d.error?.message || t('scopeSaveFailed'));
+      if (!d.ok) throw httpError(r.status, refusalWords(d.error?.code) || d.error?.message || t('scopeSaveFailed'));
     }
 
     function deny() {
@@ -622,10 +659,11 @@
       const suggested = (() => {
         const base = slug.length >= 3 ? slug : `${slug || 'my'}-ai`;
         let name = base;
-        for (let i = 2; agents.some((a) => a.name === name); i++) name = `${base}-${i}`;
+        const taken = (n) => agents.some((a) => a.name === n) || hiddenNames.has(n);
+        for (let i = 2; taken(name); i++) name = `${base}-${i}`;
         return name;
       })();
-      const fromHome = homeAgentName && !agents.some((a) => a.name === homeAgentName) ? homeAgentName : '';
+      const fromHome = homeAgentName && !agents.some((a) => a.name === homeAgentName) && !hiddenNames.has(homeAgentName) ? homeAgentName : '';
       const prefill = fromHome || suggested;
       container.innerHTML = `
         <div class="create-agent-form">
@@ -765,7 +803,7 @@
       if (agents.length === 0) {
         app.innerHTML = `
           ${introHtml()}
-          <p class="select-agent-title">${escHtml(t('noAgentsCreate', { client: aiInline }))}</p>
+          <p class="select-agent-title">${escHtml(t(serviceNames.size ? 'onlyServiceAgents' : 'noAgentsCreate', { client: aiInline }))}</p>
           <div id="createContainer"></div>
           ${boundaryHtml()}
           ${accountLineHtml()}
@@ -939,7 +977,9 @@
             // d.error may be an OAuth string ("invalid_request") OR an AIMEAT
             // envelope object ({code,message}); never stringify the object as
             // "[object Object]" — surface the real message.
-            const msg = d.error_description
+            // An operator service's agent: the node's code beside OAuth's `error`, said in the reader's language.
+            const own = refusalWords(d.reason);
+            const msg = own || d.error_description
               || (typeof d.error === 'string' ? d.error : d.error && d.error.message)
               || t('errorGeneric');
             throw new Error(msg);

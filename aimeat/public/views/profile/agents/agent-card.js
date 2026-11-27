@@ -5,6 +5,20 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.34.1 -- 2026-11-27 -- The required line stands under the service's line (AccessLine draws it), so the
+ *     order is Service, Required, Private records, How you can help, Permissions.
+ *   v2.34.0 -- 2026-11-26 -- A required operator service's agent: no run-mode change, stop switch, task-start
+ *     setting, narrowing or clearance control (the server refuses them); RequiredLine says why and whom to ask.
+ *   v2.33.4 -- 2026-11-26 -- The open card of an agent the operator set up draws no readiness badge: it owes
+ *     no onboarding, so the badge could only say "--".
+ *   v2.33.3 -- 2026-11-26 -- An agent the operator set up opens on its Activity tab and shows no onboarding
+ *     notice, which does not apply to it (the operator connected the service).
+ *   v2.33.2 -- 2026-11-26 -- The closed row's operator tag stands in the name's line of marks under the
+ *     name (Name `marks`, .list-marks: the list's gap, left-aligned with the name), at every width.
+ *   v2.33.1 -- 2026-11-26 -- The closed row's operator tag stands after the name (Name `tag`, beside the
+ *     refusals mark), which the row keeps at every width; the tag column is hidden on narrow screens.
+ *   v2.33.0 -- 2026-11-26 -- An agent an operator service set up for the person wears "Set by the
+ *     operator" (renderOperatorBadge) first in the closed row's tag column and in the open card's marks.
  *   v2.32.1 -- 2026-11-15 -- The problem panel's address field: saving it emptied removes the webhook
  *     (DELETE, after a confirmation) instead of sending url "" to PUT, which refuses it.
  *   v2.32.0 -- 2026-10-19 -- The closed row (Jouni, 2026-10-19): the mode, platform and federation tags stand in their own column before how it runs; what the agent works on now stands in brackets after its name (`doing`, the title of its active task), nothing while it is idle; something unseen is a short line under the picture (Name `flag`) in place of the dot before it.
@@ -152,7 +166,7 @@ import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
-import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
+import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderOperatorBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
 import { FactsLine, LastTaskLine, PurchaseLimitLine, AutonomyLine, StoppedLine, WildcardLine } from './agent-card-autonomy.js';
 import { RefusalNote, AccessLine, InvitesLine, hasRefusals } from './agent-card-access.js';
@@ -294,7 +308,8 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     // undefined) before locking in a default, so an existing README wins the
     // first-tab/default slot instead of being beaten by the state default.
     if (readme === undefined) return;
-    setActiveTab(hasReadme ? 'readme' : getDefaultTab(state));
+    // An agent the operator set up owes no onboarding, so it opens on what it did, not on connecting.
+    setActiveTab(hasReadme ? 'readme' : agent.set_by_operator ? 'activity' : getDefaultTab(state));
     // Lock the default tab once, on expand + README-resolve. hasReadme derives from readme (already
     // a dep); adding `state` would re-run and override the resolved default when the detected state
     // shifts under the user.
@@ -338,6 +353,8 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
   // What the agent may reach, as the word the scope dialog uses for the same set. The list
   // projection carries default_scopes; a missing list is the legacy everything (detectTemplate).
   const accessLabel = templateLabel(detectTemplate(agent.default_scopes ?? ['*']));
+  // An agent the operator requires: only the operator stops, narrows or removes it.
+  const required = !!agent.set_by_operator?.required;
   const platform = onboarding?.platformName || onboarding?.detectedPlatform || null;
   const runsWord = agent.run_mode ? t(`profile.agents.runMode.${agent.run_mode}`) : t('profile.agents.runMode.unset');
 
@@ -362,6 +379,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           onDragStart=${drag?.onDragStart} onDragOver=${drag?.onDragOver} onDrop=${drag?.onDrop} onDragEnd=${drag?.onDragEnd}>
           <${Name} attention=${state === 'problem' || hasRefusals(agent)} flag=${change?.flag} flagTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
             tag=${hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null}
+            marks=${renderOperatorBadge(agent)}
             after=${working}>${agent.display_name || agent.name}<//>
           <${Cell} line>
             ${agent.mode && agent.mode !== 'interactive' ? html`<${Mark} tone="dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}<//>` : null}
@@ -418,10 +436,12 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     <${OpenCard} title=${cardTitle} onClose=${handleCollapse}
       id=${html`<${GaiiChip} agent=${agent} />`}
       marks=${html`
+        ${renderOperatorBadge(agent)}
         ${renderModeBadge(agent)}
         ${renderPlatformBadge(onboarding)}
         ${renderModelBadge(agent)}
-        ${renderReadinessBadge(state, onboarding)}
+        ${/* An agent the operator set up owes no onboarding, so it has no readiness to show ("--"). */''}
+        ${agent.set_by_operator ? null : renderReadinessBadge(state, onboarding)}
         ${agent.last_seen ? html`<${Mark} kind="status" tone=${seenTone}>${agent?.health?.delivery ? deliveryLabel(agent.health.delivery) : t('profile.agents.detail.lastSeen')} · ${timeAgo(agent.last_seen)}<//>` : null}
         ${caps.summary ? html`<${Mark} tone="dim" expanded=${capsOpen} onClick=${() => setCapsOpen(o => !o)}>${caps.summary} ${capsOpen ? '↑' : '↓'}<//>` : null}
         ${onFederateToggle
@@ -443,19 +463,23 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             node stores and shows this and never enforces it; the sentence says what is true. */''}
       <${CardLine} label=${html`<${HelpLabel} term="agent.run_mode" label=${t('profile.agents.runMode.label')}>${t('profile.agents.runMode.label')}<//>`} below=${runsOpen && html`<${RunModeSwitch} agent=${agent} showToast=${showToast} />`}>
         <span>${t(`profile.agents.page.runs.${agent.run_mode || 'unset'}`)}</span>
-        <${Action} small soft onClick=${() => setRunsOpen(v => !v)}>
+        ${required ? null : html`<${Action} small soft onClick=${() => setRunsOpen(v => !v)}>
           ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →
-        <//>
+        <//>`}
       <//>
       ${/* Where it runs, what it thinks with, who pays, and whether it starts work by itself. */''}
       <${FactsLine} agent=${agent} />
       <${LastTaskLine} agent=${agent} />
       <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
-      <${StoppedLine} agent=${agent} showToast=${showToast} />
-      <${AutonomyLine} agent=${agent} showToast=${showToast} />
-      <${WildcardLine} agent=${agent} showToast=${showToast} />
+      ${/* A required operator service's agent: stopping, the task-start setting, narrowing and a lower
+            clearance are the operator's (403 OPERATOR_SERVICE_REQUIRED), so one line says so in their place;
+            AccessLine draws it, under the service's own line. */''}
+      ${required ? null : html`
+        <${StoppedLine} agent=${agent} showToast=${showToast} />
+        <${AutonomyLine} agent=${agent} showToast=${showToast} />
+        <${WildcardLine} agent=${agent} showToast=${showToast} />`}
       <${AccessLine} agent=${agent} />
-      <${ClearanceLine} agent=${agent} showToast=${showToast} />
+      ${required ? null : html`<${ClearanceLine} agent=${agent} showToast=${showToast} />`}
       <${InvitesLine} agent=${agent} />
 
       ${/* What your AIMEAT refused this agent for a missing permission, with the way to grant it. */''}
@@ -546,6 +570,9 @@ const zoneTitle = (words, next) => html`<${SubHeading}>${words}${next ? html` <$
 // of figures (idle, production) was hidden on the agents page on main (the rows and the marks say
 // the same); it shows in the agent's own window, as it did.
 function renderZone2(state, agent, onboarding, setActiveTab, showToast, soloMode) {
+  // An agent the operator set up: the operator connected the service and it owes no onboarding, so
+  // the "not started" notice and its way to the connect steps do not apply.
+  if (agent?.set_by_operator && (state === 'new' || state === 'onboarding')) return null;
   switch (state) {
     case 'system':
       // Internal (auto-provisioned) agents skip the Hello Integration banner.

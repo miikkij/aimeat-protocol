@@ -39,6 +39,8 @@
  * @usage
  *   const out = await setAgentStopped({ storage, config }, req.auth!.owner, principal, name, true);
  * @version-history
+ *   2026-11-26 — A required operator service's agent is not stopped by the person or their other agents
+ *     (requiredAgentFence, 403 OPERATOR_SERVICE_REQUIRED); a start stays open.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-10-28 — releaseWaitingTasks decides on the agent record as it is: the node no longer
@@ -53,7 +55,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AgentRecord, AgentTaskRecord } from '../../storage/interface.js';
-import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteRefusal } from './profile-write.js';
+import { resolveAgentTarget, requiredAgentFence, type AgentWriteDeps, type AgentWriteRefusal } from './profile-write.js';
 import { decideTaskStart, autoStartEvent } from './task-rules.js';
 import { readAgentDmInbox } from './dm-reads.js';
 import { messagePreview } from '../../utils/messaging.js';
@@ -191,6 +193,12 @@ export async function setAgentStopped(
   if (callerPrincipal === gaii) {
     return { ok: false, code: 'ACCESS_DENIED',
       message: 'An agent cannot stop or start itself. Ask the owner, or another of their agents with agent:write.' };
+  }
+
+  // A required operator service's agent is stopped only by the operator; starting it stays open.
+  if (stop) {
+    const fenced = await requiredAgentFence(deps, gaii, callerPrincipal, 'stopping it');
+    if (fenced) return fenced;
   }
 
   if (isStopped(agent) === stop) return { ok: true, agent, changed: false, released: 0 };

@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-26 — operatorServicesRouter (routes/agents/operator-services.ts): the operator services setting's routes.
  *   2026-11-26 — evalsRouter (routes/evals/evals.ts): stored eval sets for crews, skills and library packs.
  *   2026-11-21 — The eight routers behind a feature flag (calibrator, portfolio, extensions, cortex,
  *     packages with instances, templates, connector tunnel, personal nodes) mount through
@@ -138,6 +139,7 @@ import { appGrantsRouter } from '../routes/app-grants.js';
 import { appGrantsManageRouter } from '../routes/app-grants-manage.js';
 import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
+import { operatorServicesRouter } from '../routes/agents/operator-services.js';
 import { agentsV2Router } from '../routes/agents-v2.js';
 import { a2aRouter } from '../routes/a2a.js';
 import { aguiRouter } from '../routes/agui.js';
@@ -488,6 +490,7 @@ export async function mountRoutes(
   app.use(outboundRouter(config, storage));               // Outbound door: contact registry, policied send, public unsubscribe
   app.use(signalsRouter(config, storage));                // Signals: hit collection (tracking image + JSON hit), owner reports
   app.use(companiesRouter(config, storage));              // Company registry — {slug}.co.<apex> addresses
+  app.use(operatorServicesRouter(config, storage));       // Operator services: an agent for every account by an operator setting
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   //

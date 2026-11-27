@@ -14,6 +14,7 @@
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
  *   v1.x -- 2026-11-26 -- ownerExportTools: aimeat_account_export (definitions/owner-export.ts).
+ *   v1.x -- 2026-11-26 -- definitions/operator-services.ts: aimeat_admin_service_access.
  *   v1.x -- 2026-11-26 -- evalTools: aimeat_eval_set, _get and _run (definitions/evals.ts).
  *   v1.x -- 2026-11-19 -- CatalogTool is the union of the groups' entry types and CATALOG is typed by
  *     it: the inferred literal type of the whole list passed what a declaration file can hold (TS7056).
@@ -168,6 +169,7 @@ import { keyReencryptTools } from './definitions/key-reencrypt.js';
 import { disputeTools } from './definitions/disputes.js';
 import { csmTools } from './definitions/csm.js';
 import { kycTools } from './definitions/kyc.js';
+import { operatorServiceTools } from './definitions/operator-services.js';
 
 // Typed by CatalogTool below, a union that names each group: inferred, the whole array's literal
 // type grew past what the compiler writes into a declaration file (TS7056, 2026-11-19).
@@ -245,6 +247,7 @@ const CATALOG: CatalogTool[] = [
     ...livingTools,
     ...calibratorTools,
     ...kycTools,
+    ...operatorServiceTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;
@@ -276,7 +279,7 @@ export type CatalogTool =
     | (typeof keyReencryptTools)[number] | (typeof disputeTools)[number] | (typeof csmTools)[number]
     | (typeof ecosystemAppTools)[number] | (typeof moderationTools)[number] | (typeof broadcastSummaryTools)[number]
     | (typeof siteTemplateTools)[number] | (typeof livingTools)[number] | (typeof calibratorTools)[number]
-    | (typeof kycTools)[number];
+    | (typeof kycTools)[number] | (typeof operatorServiceTools)[number];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));
 

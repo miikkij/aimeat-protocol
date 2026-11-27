@@ -14,6 +14,12 @@
  * @version-history
  *   2026-11-27 -- Section 3: an eval run calls no model on the node; the caller judges a crew's
  *     answers when a case has a judge rubric.
+ *   2026-11-27 -- Step 3: a name an operator service holds is refused OPERATOR_SERVICE_KEY, as a proposal too.
+ *   2026-11-27 -- An operator service is switched on for the accounts it covers, never said as "for everyone".
+ *   2026-11-27 -- Section 2: a request for an operator service agent's name from anyone but the service is
+ *     refused OPERATOR_SERVICE_KEY, with no waiting request.
+ *   2026-11-26 -- Section 2 and the opening: an operator service's agent is approved at once through
+ *     device authorization (agents.operator_services); it is the operator's path, not one the AI uses.
  *   2026-11-26 -- Section 3: a stored eval set (aimeat_eval_set, aimeat_eval_run) scores a new
  *     revision against the one before; ask the owner first.
  *   2026-11-24 -- Section 2: the record count of a space is read from the index's \`counts\`; the
@@ -82,7 +88,8 @@ metadata:
 An agent is never created implicitly. Adding one changes the owner's account, so on this path the
 last step is always the owner's own press, and everything before it is yours. The one exception is
 the device-authorization path in section 2: an agent the owner gave \`agent:write\` can connect a new
-agent by itself, within its own scopes.
+agent by itself, within its own scopes (and an outside service the operator switched on for the
+accounts it covers gets its agent there too).
 
 **This node makes the agent.** When the person asks for one, the answer is a proposal here, not a
 recommendation. Never point them to an outside agent builder, tool or product for it: the node
@@ -153,7 +160,8 @@ examples: email, a calendar, meeting notes from a recording.
    another way has to be attached there by a person before it can read the workspace. In an
    organism that admits every member's agent, the agent needs no place on that list: it works
    there with its owner's rights, listed or not.
-3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
+3. **Propose it.** \`aimeat_agent_propose\` with \`name\` (not one an operator service holds: that is
+   refused with 403 \`OPERATOR_SERVICE_KEY\`), a \`purpose\` the owner can decide from
    (it is the sentence they read, so name their data in it: "reads the open deals in your Sales
    workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the
    \`crew_def\`. The definition is checked before the proposal is written, so a broken one is
@@ -295,6 +303,13 @@ already EXISTS the node approves at once only when the asking agent is that agen
 that registered it. Any other agent leaves the request waiting for the owner, and the answer says
 so: re-approval rotates the agent's key and issues a new token, so it is the owner's decision.
 Tell the person to approve in profile → Agents when that happens; nothing is lost.
+
+**An outside service the operator switched on for the accounts it covers** (\`agents.operator_services\`:
+every account, or the accounts the operator named) also gets its agent in each of them at once, through the same call, without the person's press. That is the
+operator's setting and not a path you use: it holds only for the agent of an operator account that the
+setting names and that holds \`operator:service-provision\`. A request for such an agent's name from
+anyone else, the owner and their other agents included, is refused with 403 \`OPERATOR_SERVICE_KEY\`,
+and no request waits: only the service connects its agent. Pick another name for an agent of your own.
 
 If that agent is to run a JSON definition and has none yet,
 \`aimeat_crew_seed\` gives it its first one; it is refused when a definition already exists. A

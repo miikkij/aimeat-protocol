@@ -22,6 +22,7 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-26 — A stop refused as OPERATOR_SERVICE_REQUIRED keeps its 403 (services/agent/stop.ts).
  *   2026-11-11 — The caller's own agent is found by the app link on its proposal
  *     (services/app-agents/app-agent-link.ts), not by a derived name. A deploy that names no runner acts on
  *     that agent when it exists: it starts a stopped one, publishes the app's newer definition to
@@ -295,7 +296,7 @@ async function actOnOwnAgent(
     }
     const out = await setAgentStopped(deps, callerOwner, callerPrincipal, agent.name, stop);
     if (!out.ok) {
-      return { ok: false, status: out.code === 'AGENT_NOT_FOUND' ? 404 : out.code === 'ACCESS_DENIED' ? 403 : 400, code: out.code, message: out.message };
+      return { ok: false, status: out.code === 'AGENT_NOT_FOUND' ? 404 : out.code === 'ACCESS_DENIED' || out.code === 'OPERATOR_SERVICE_REQUIRED' ? 403 : 400, code: out.code, message: out.message };
     }
     return null;
   };

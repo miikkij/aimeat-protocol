@@ -18,6 +18,10 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-11-26 -- DELETE /v1/admin/config/agents.operator_services refuses an entry's credential agent
+ *     (services/operator-services/config-write.ts; operator services review, S6).
+ *   2026-11-26 -- PUT /v1/admin/config and the Consul import run the operator-services sweep with the MCP
+ *     session closer (services/operator-services/sweep.ts).
  *   2026-11-08 -- POST /v1/admin/consul/import holds back, for an AI caller, a Consul value that would make
  *     a tighten-only setting looser, and names it in `held_back`; the operator in person imports every
  *     value as before (secaudit2026nov08 round 14, consul-import-skips-tighten-only-rule-for-ai-caller).
@@ -88,6 +92,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { recordOperatorNodeAct } from '../../services/operator/access-audit.js';
 import { placeDefaultAfterSettings } from '../../services/place-agent-scopes.js';
+import { operatorServicesAfterSettings } from '../../services/operator-services/sweep.js';
+import { credentialSettingRefusal } from '../../services/operator-services/config-write.js';
+import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 
 export function adminConfigRouter(
@@ -113,7 +120,7 @@ export function adminConfigRouter(
         // The checks and the apply loop are in services/config/admin-view.ts, which
         // aimeat_admin_config_set calls too: sealed paths and the classification switch are refused
         // before anything in the request is applied.
-        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, req.body?.changes);
+        const r = await changeNodeSettings({ config, storage, provenance, closeMcpSessions: closeMcpSessionsForGaii }, req.auth!, req.body?.changes);
         if (!r.ok) {
             res.status(r.status).json(error(config.nodeId, r.code, r.message, undefined, r.details,
                 r.sealed ? [{ description: 'Ask whoever runs this node to change it.', method: 'GET', url: '/v1/admin/config' }] : undefined));
@@ -148,6 +155,12 @@ export function adminConfigRouter(
         // A setting an AI may only make stricter is not reset by an AI either: the value it falls back to
         // can be less strict. resetConfigValue asks the setting's row before storage is touched
         // (services/config/apply.ts, config-strictness.ts).
+        // An operator service's own agent does not reset the operator services either (S6).
+        const credential = credentialSettingRefusal(config, req.auth!, { path });
+        if (credential) {
+            res.status(credential.status).json(error(config.nodeId, credential.code, credential.message));
+            return;
+        }
         const reset = await resetConfigValue({ storage, caller: req.auth! }, path);
         if (!reset.ok) {
             res.status(reset.status).json(error(config.nodeId, reset.code, reset.message, undefined, reset.details));
@@ -255,6 +268,8 @@ export function adminConfigRouter(
         // A purchase plan that arrived now gives the store place's default to the agents that have not had it
         // (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
         await placeDefaultAfterSettings(storage, config, applied);
+        // An operator service the import switched off or narrowed takes its agents with it (services/operator-services/sweep.ts).
+        await operatorServicesAfterSettings({ storage, config, closeMcpSessions: closeMcpSessionsForGaii }, applied);
 
         res.json(success(config.nodeId, {
             imported: applied.length + atRestart.length, total: Object.keys(values).length + heldBack.length,

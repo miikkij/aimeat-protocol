@@ -31,6 +31,8 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   2026-11-26 — An agent an operator service made, required or not, is skipped with the reason and
+ *     never moved (services/operator-services/service-key.ts, OPERATOR_SERVICE_KEY).
  *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, where they moved from ./card.ts
  *     (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
@@ -58,6 +60,7 @@ import { ENROL_CAPABILITY } from './basic-agents.js';
 import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';
 import { cardUri, jwksUri } from '../../services/agent/card.js';
 import { logger } from '../../utils/logger.js';
+import { serviceKeyRefusal } from '../../services/operator-services/service-key.js';
 
 /** The same wait the basic-agents button allows: keypairs, signatures and one round trip. */
 const ENROL_INVOKE_TIMEOUT_MS = 45_000;
@@ -132,6 +135,13 @@ async function candidates(
   for (const agent of wanted) {
     if (agent.identityVersion === 2 && agent.enrolledAt) {
       skipped.push({ name: agent.name, reason: 'Already has its own key and card.' });
+      continue;
+    }
+    // A migration replaces the key an operator service holds for its agent, required or not
+    // (services/operator-services/service-key.ts): skipped, with the reason.
+    const serviceKey = await serviceKeyRefusal(storage, config, agent.gaii, 'moving it to a key of your own');
+    if (serviceKey) {
+      skipped.push({ name: agent.name, reason: serviceKey.message });
       continue;
     }
     movable.push(agent);

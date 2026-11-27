@@ -46,7 +46,7 @@
       "digest": "sha256:b09223243c720f441c85973e"
     },
     "04-identity-access.md": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/external-login.ts",
         "aimeat/src/services/oidc-providers.ts",
@@ -60,9 +60,22 @@
         "aimeat/src/services/place-agent-scopes.ts",
         "aimeat/src/services/receivers/verify.ts",
         "aimeat/src/services/receivers/policy.ts",
-        "aimeat/src/services/organism/write-role.ts"
+        "aimeat/src/services/organism/write-role.ts",
+        "aimeat/src/config/operator-services.ts",
+        "aimeat/src/services/operator-services/eligibility.ts",
+        "aimeat/src/services/operator-services/person-switch.ts",
+        "aimeat/src/services/operator-services/sweep.ts",
+        "aimeat/src/services/operator-services/write-fence.ts",
+        "aimeat/src/services/operator-services/listing.ts",
+        "aimeat/src/services/operator-services/required.ts",
+        "aimeat/src/services/operator-services/operator-switch.ts",
+        "aimeat/src/services/operator-services/service-key.ts",
+        "aimeat/src/services/operator-services/private-read.ts",
+        "aimeat/src/services/operator-services/config-write.ts",
+        "aimeat/src/services/operator-services/required-restore.ts",
+        "aimeat/src/services/operator-services/pending.ts"
       ],
-      "digest": "sha256:b76cdd66e698030e73b24d5d"
+      "digest": "sha256:7d944bc86976f5a1a8fede2c"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-26",
@@ -210,7 +223,7 @@
       "digest": "sha256:99a08baa2840444c88662167"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/schedule/fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -237,7 +250,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ee34148cced230fed1d67887"
+      "digest": "sha256:88dcdb818c3c6fbf9225454c"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -332,7 +345,20 @@
       "aimeat/src/services/place-agent-scopes.ts": "df815e2e75649ff2",
       "aimeat/src/services/receivers/verify.ts": "a3272e07bddf1ac3",
       "aimeat/src/services/receivers/policy.ts": "be9c20d1ec9ab8bb",
-      "aimeat/src/services/organism/write-role.ts": "87a0aac5bc45be78"
+      "aimeat/src/services/organism/write-role.ts": "87a0aac5bc45be78",
+      "aimeat/src/config/operator-services.ts": "c9ea54e2f220d3ab",
+      "aimeat/src/services/operator-services/eligibility.ts": "c4b7c0cbbd53f8e1",
+      "aimeat/src/services/operator-services/person-switch.ts": "97e549e9fd995443",
+      "aimeat/src/services/operator-services/sweep.ts": "dbd51979b04db101",
+      "aimeat/src/services/operator-services/write-fence.ts": "72d8330cf4d6c0f9",
+      "aimeat/src/services/operator-services/listing.ts": "033af10196721372",
+      "aimeat/src/services/operator-services/required.ts": "7b1b11c5ebc18961",
+      "aimeat/src/services/operator-services/operator-switch.ts": "5395095c25073b49",
+      "aimeat/src/services/operator-services/service-key.ts": "87d46b8278d05aa3",
+      "aimeat/src/services/operator-services/private-read.ts": "bcbe9bcbca61966c",
+      "aimeat/src/services/operator-services/config-write.ts": "2281977dd22bd24a",
+      "aimeat/src/services/operator-services/required-restore.ts": "fdbcbf9a8535579d",
+      "aimeat/src/services/operator-services/pending.ts": "01fc1cefa22d87fe"
     },
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "851cf51b1f331380",
@@ -466,12 +492,12 @@
       "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
       "aimeat/src/services/once-only-step.ts": "afaf629df6d5f1cc",
       "aimeat/src/services/event-bus.ts": "fa4303b35386f9f8",
-      "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
+      "aimeat/src/mcp/oauth.ts": "a47e04669f3a2985",
       "aimeat/src/mcp/legacy-sessions.ts": "00cf232e02a68804",
       "aimeat/src/services/passkeys.ts": "91ed59b8f3c114cc",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "eeff7843acade118",
-      "aimeat/src/services/config/apply.ts": "2c0879b78ab957cd",
+      "aimeat/src/services/config/apply.ts": "a50009bed31d0cf1",
       "aimeat/src/services/operator/access-audit.ts": "0706dd521e11a994",
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "20a4413865f94c1e",

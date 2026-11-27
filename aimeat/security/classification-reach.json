@@ -2616,6 +2616,12 @@
       },
       "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. 2026-10-27 (secaudit2026oct26): the third read is the step's own first-seen record beside the marker, {at} only, under the same system identity. No content is shown to anyone."
     },
+    "src/services/operator-services/ledger.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Written 2026-11-26 (operator services), the node's own reads: each operator service's ledger records (operator-service.<id>.*) under the node's system identity, one line per covered account with its state, the agent's proof and its time, read to reserve, complete and list a service's agents. Never a person's content; served only as states and account names to the operator and the service's credential agent."
+    },
     "src/services/open-items.ts": {
       "reads": {
         "getMemory": 2,

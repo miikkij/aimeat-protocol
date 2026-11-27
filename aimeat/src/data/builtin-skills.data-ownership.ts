@@ -30,6 +30,8 @@
  *   2026-11-26 — Section 1: the account export is a background job of the parts the person chooses, with
  *     the file contents in ZIP files; an AI starts it with aimeat_account_export and never gets the
  *     links (services/owner-export/, routes/owners/exports.ts).
+ *   2026-11-26 — Section 4: an operator service's agent deletes and restores as the person only under its
+ *     entry's key prefixes; section 6: erasure takes the person's line out of each service's ledger.
  *   2026-11-25 — Section 2: an import or a copy of a knowledge package manifest the package schema
  *     refuses fails with SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — Section 6: who accepted content risk marks in a workspace gets the pseudonym too.
@@ -278,6 +280,9 @@ What an export leaves out, and why:
   answers \`KYC_RETAINED\` for everyone, the operator included, and deleting the organism answers
   \`KYC_RECORDS_RETAINED\` while it keeps any. They go on their own five years after the relationship
   ends (\`aimeat_kyc_customer\` action \`end\`); archive the organism meanwhile.
+- An agent an outside service set up for everyone (\`set_by_operator\` on its row) deletes and restores
+  a record as the person only under the key prefixes the operator named for that service; anywhere else
+  it answers 403 \`OPERATOR_SERVICE_PREFIX\`, which names the prefixes.
 - A record that went into the bin PUBLIC comes back out through the same visibility rules a write
   passes, so putting it back can be refused where deleting it was not. \`PUBLISH_NOT_ALLOWED\` means
   this node asks the person before anything of theirs goes public and you are not one of the
@@ -399,7 +404,8 @@ let knowledge age, and you should offer them, not wait to be asked:
   namespace or a group's workspace, that record's count stays with a pseudonym as its maker. The
   content risk marks of what they wrote into someone else's place (a message, a post, a comment, a
   workspace document) stay with the content, naming a pseudonym as the writer (and as who accepted
-  marks in a workspace they ran), and contain none of its words. A notification in another person's inbox stays, as that person's own
+  marks in a workspace they ran), and contain none of its words. Their line in each outside service's
+  list of the accounts it covers goes too, so no service the operator switched on keeps their name. A notification in another person's inbox stays, as that person's own
   copy, and expires within 90 days. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a

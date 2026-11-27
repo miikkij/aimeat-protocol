@@ -9,6 +9,8 @@
  * @structure TightenOnly · ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './schema.js';
  * @version-history
+ *   2026-11-26 — `jsonList`: a list of JSON objects, which the Config tab edits as JSON.
+ *   2026-11-26 — `refusalFor`: the reason a structured setting's check refuses a value, naming the field.
  *   2026-11-21 — TightenOnly.loosens: a row judges a change itself (a list of per-entry orders).
  *   2026-11-04 — `aiMayOnlyTighten`: an AI credential may only make the setting stricter, judged by the
  *     order of its values on every write and reset path (services/config-strictness.ts; codebase
@@ -60,6 +62,17 @@ export interface ConfigFieldShape<K extends string> {
    * range, in place of "Invalid value". A switch that a release does not allow on says why here.
    */
   refusal?: string;
+  /**
+   * The reason `validate` refuses this value, naming the field it is in, for a structured setting
+   * (a list of entries) where one fixed sentence cannot say which entry is wrong. Read before
+   * `refusal`; null or absent falls back to it.
+   */
+  refusalFor?: (v: unknown) => string | null;
+  /**
+   * The value is a list of JSON objects (entries), not of words: the admin view marks the row
+   * `json: true`, and the Config tab edits it as JSON rather than one item per line.
+   */
+  jsonList?: true;
   /** true = cannot be changed after startup */
   immutable: boolean;
   /**

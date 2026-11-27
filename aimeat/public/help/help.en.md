@@ -61,6 +61,24 @@ Say in one sentence in the [chat](/v1/chat) or on your [Home](/v1/home) what you
 
 You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, under What has happened. If you want, the agent also sends it to your email. You can stop an agent at any time.
 
+## An agent marked “Set by the operator” {#operator-agent}
+
+The people who run this server can switch an outside service on for your account, for example a service that writes a summary of each meeting into your notes. The service then gets an agent in your account, and you did not approve it yourself. You see it on the [Agents page](/v1/profile?tab=agents) with the mark “Set by the operator”.
+
+You got one notice when it came. The notice, the mark and the agent's card say what the service is, in the operator's own words, and what it may do. If it writes in your memory in your name, it writes only under the keys the notice names.
+
+If the service also reads your private records, the notice and the card say so in a sentence of their own, with the operator's reason. The operator gives that right only with a reason that every person reads, for example a rule the organisation must follow about what is stored.
+
+If the card says how you can help, do that: it tells what you can give the service so it works better for you. You can also give the agent instructions and material on its card.
+
+You can turn the service off for yourself: remove its agent on the Agents page. It then gets no agent for you again until you press Turn on again under “Services that are off for you” on the same page. What it wrote in your memory stays yours.
+
+An agent marked “Required by the operator” is one you cannot turn off. Such services exist for work the operator must see done in each account the service covers, for example that each new person finishes setting up. You cannot remove, stop or limit it, but you can still see it, read what it did, give it instructions and add permissions of your own. Only the operator turns it off.
+
+If a service is listed with “The operator turned this service off for your account”, the operator turned it off for you alone, and only the operator can turn it on again.
+
+Ask the operator more with a message to support@operators.
+
 <!--store-->
 ## AIs and agents from outside {#outside}
 

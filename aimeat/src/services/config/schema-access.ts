@@ -15,6 +15,11 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.6.2 — 2026-11-26 — agents.operator_services says that an entry's description is required.
+ *   v1.6.1 — 2026-11-26 — agents.operator_services is `jsonList`, so the Config tab edits it as JSON.
+ *   v1.6.0 — 2026-11-26 — agents.operator_services (AIMEAT_OPERATOR_SERVICES, a JSON list, default none),
+ *     mutable: the outside services every account gets an agent of (config/operator-services.ts). A
+ *     refused entry is answered with the field it is in (`refusalFor`).
  *   v1.5.1 — 2026-11-15 — auth.password_sign_in names the operators' password a fallback, not a way in.
  *   v1.5.0 — 2026-11-11 — auth.sign_in_title_{en,fi,es} and auth.sign_in_line_{en,fi,es}, mutable: the
  *     sign-in dialog's headline and line per language, read on every load of /v1/libs/aimeat-auth.js.
@@ -42,6 +47,7 @@ import type { ConfigFieldShape, TightenOnly } from './field-def.js';
 import { isEmptyOrHttpUrl, oneOf } from './schema-validators.js';
 import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES } from '../../config/types-account-security.js';
 import { MCP_CAPABILITY_USE_APPROVAL_VALUES, CAPABILITY_USE_APPROVAL_LABEL } from '../../config/types-agent-access.js';
+import { isOperatorServiceList, operatorServiceProblem } from '../../config/operator-services.js';
 
 /**
  * The sign-in policy (services/sign-in-policy.ts): an AI may only make these stricter, and the three are
@@ -74,7 +80,7 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'ecoJwtTtlSeconds' | 'googleOAuthEnabled' | 'googleOAuthClientId' | 'googleOAuthClientSecret' | 'googleOAuthRedirectUri'
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
-  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
+  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'operatorServices' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
   | 'mcpCapabilityUseApproval' | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout'
   | 'signInTitleEn' | 'signInTitleFi' | 'signInTitleEs' | 'signInLineEn' | 'signInLineFi' | 'signInLineEs';
 
@@ -133,6 +139,7 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'defaultEcoScopes', dotPath: 'scopes.default_eco_scopes', envVar: 'AIMEAT_DEFAULT_ECO_SCOPES', type: 'object', list: true, validate: words, immutable: false, description: 'Permissions an ecosystem app gets when its request names none (default memory:read, memory:write, organism:read)' },
   { key: 'maxEcoScopes', dotPath: 'scopes.max_eco_scopes', envVar: 'AIMEAT_MAX_ECO_SCOPES', type: 'object', list: true, validate: words, immutable: false, description: 'The most an ecosystem app may be granted; * allows any permission the owner approves' },
   { key: 'sameOwnerAutoApprove', dotPath: 'agents.same_owner_auto_approve', envVar: 'AIMEAT_SAME_OWNER_AUTO_APPROVE', type: 'boolean', validate: bool, immutable: false, description: 'An agent connected by its own owner, or by one of the owner\'s agents, is approved without a second press. Never across owners, never with more permissions' },
+  { key: 'operatorServices', dotPath: 'agents.operator_services', envVar: 'AIMEAT_OPERATOR_SERVICES', type: 'object', jsonList: true, validate: isOperatorServiceList, refusalFor: operatorServiceProblem, immutable: false, description: 'Outside services every person of this node gets an agent of, without approving it: a JSON list of at most 8 entries {id, display_name, description, credential_agent, scopes, write_prefixes, enabled}. description is required, 20 to 300 characters in the operator\'s own words: what the service does for a person and why it is on, which each person reads as the one explanation of the agent. An entry with memory:write-as-owner names write_prefixes, the 1 to 8 key prefixes under which its agent writes as the person, and nothing else. id is the agent name each person gets; credential_agent is the name of an operator\'s agent that holds operator:service-provision and asks for those agents; scopes are ordinary permissions inside the node\'s maximum, never a wildcard and never a permission each person gives themselves. A person sees the agent marked as set by the operator, is told once, and can turn it off for themselves; their choice is kept. Removing an entry or setting enabled to false removes every agent it made; what they wrote stays with each person. Empty: none' },
   { key: 'mcpEnforceScopes', dotPath: 'mcp.enforce_scopes', envVar: 'AIMEAT_MCP_ENFORCE_SCOPES', type: 'boolean', validate: bool, immutable: true, description: 'Refuse an MCP tool an agent holds no permission for. Off only logs the call, so every agent can use every tool. Set by whoever runs the node, in the environment' },
   { key: 'mcpCapabilityUseApproval', dotPath: 'mcp.capability_use_approval', envVar: 'AIMEAT_MCP_CAPABILITY_USE_APPROVAL', type: 'string', ...oneOf(...MCP_CAPABILITY_USE_APPROVAL_VALUES), aiMayOnlyTighten: CAPABILITY_USE_APPROVAL_TIGHTEN, immutable: false, description: 'Whether a capability another account published asks first when it runs a tool on an MCP server where each person signs in with their own account, where it acts as the person who uses it. ask: the first use of every other account\'s capability asks that person once, with one press; it costs a press for each new one, the operator\'s own included. operators (default): a capability of an account with the operator role runs without asking and every other account\'s asks once; the operator already holds every right on the node, so this gives no protection away. off: nothing asks, and another account\'s capability runs on the person\'s own sign-in there; it costs the person their say over which tool acts as them. Read on every call. An AI cannot lower it' },
   { key: 'mcpTaskAfterMs', dotPath: 'mcp.task_after_ms', envVar: 'AIMEAT_MCP_TASK_AFTER_MS', type: 'number', validate: v => whole(0)(v) && (v as number) <= 600000, immutable: false, description: 'A tool call from an AI client that supports MCP tasks and runs longer than this many milliseconds answers at once with a task the client checks later (0 = every such call)', range: '0-600000' },

@@ -31,6 +31,8 @@
  *   WAITING_SOURCES · homeWaitingFor(deps, caller, opts) · WAITING_LIMIT_DEFAULT · WAITING_LIMIT_MAX
  * @usage const answer = await homeWaitingFor({ storage, config }, callerOf(req, config.nodeId, storage), { limit: 20 });
  * @version-history
+ *   v1.1.2 — 2026-11-27 — An agent sign-in for an operator service's name is not listed
+ *     (services/operator-services/pending.ts).
  *   v1.1.1 — 2026-11-26 — An approval row names no `act_with`: the tool it named reads the approval
  *     inbox and cannot resolve anything, and the answer's note tells an AI to act with the tool a row
  *     names.
@@ -59,6 +61,7 @@ import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../workflow/engine-human.js';
 import { openCount } from '../open-items.js';
 import { displayNamesOf } from '../app/member-roster.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
+import { offeredPending } from '../operator-services/pending.js';
 
 export type WaitingKind =
     | 'agent_proposal' | 'agent_sign_in' | 'reply' | 'help_question' | 'team'
@@ -201,7 +204,8 @@ const agentSignIns: WaitingSource = {
     kind: 'agent_sign_in',
     readable: c => c.has('memory:read'),
     async read(deps, caller) {
-        const pending = await deps.storage.listPendingDeviceAuthByOwner(caller.owner);
+        // A request for an operator service's name is never offered (services/operator-services/pending.ts).
+        const pending = offeredPending(deps.config, await deps.storage.listPendingDeviceAuthByOwner(caller.owner));
         return pending.map(r => ({
             kind: 'agent_sign_in' as const, id: r.agentName, group: 'decide' as const,
             subject: r.displayName || r.agentName,

@@ -10,6 +10,8 @@
  * @structure emailHashOf; ProvisionEmailTakenError; SetupCodeRefusedError; claimOperatorSetupCode; rolesAtWrite; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   2026-11-26 — announceOwnerRegistered tells the operator services that a new account exists
+ *     (services/operator-services/events.ts).
  *   v1.12.0 — 2026-10-23 — claimOperatorSetupCode, createAccountRows and provisionOwner take
  *     `fromLoopback`, read by the route from the request's socket: a loopback base URL waives the setup
  *     code only for a request from loopback (secaudit2026oct22; Jouni, 2026-10-23).
@@ -63,6 +65,7 @@ import { promoteContactsForVerifiedEmail } from '../contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../app/member-invites.js';
 import { executeHooks } from '../hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
+import { announceOperatorServices } from '../operator-services/events.js';
 import { setupCodeGateFor, setupCodeRefusal, setupCodeRequired, SETUP_CODE_USED_MESSAGE } from '../setup-code.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
@@ -188,6 +191,8 @@ export function announceOwnerRegistered(
   via: RegistrationVia,
 ): void {
   fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles, via });
+  // A new person is a new account every operator service covers (services/operator-services/events.ts).
+  void announceOperatorServices(storage, config);
 }
 
 /**

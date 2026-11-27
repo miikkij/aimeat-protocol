@@ -29,6 +29,8 @@
  *   const r = await setStandingWords({ storage, config }, 'alice@node', ['publish:public'], 'alice@node');
  *   const scopes = await withStandingWords(storage, config, gaii, held);   // at a door that approves an agent
  * @version-history
+ *   v1.1.0 — 2026-11-26 — The sync passes over an agent an operator service made: no word given, none
+ *     taken (operator services review, S7; the approval adds none either, device-auth-approve.ts).
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -43,6 +45,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { mayStand, standingRefusal } from './words.js';
+import { isOperatorServiceAgent } from '../operator-services/agent-check.js';
 
 export const STANDING_PREFIX = 'ai-standing.';
 export const STANDING_KEY = `${STANDING_PREFIX}settings`;
@@ -170,6 +173,9 @@ export async function syncStandingAgents(deps: Deps, ownerGhii: string): Promise
   for (const agent of agents) {
     const { add, take, forget } = planFor(config, rec, agent);
     if (add.length === 0 && take.length === 0 && forget.length === 0) continue;
+    // An agent an operator service made: the setting never gives it a word and never takes one; its
+    // entry is the only source of the entry's words (services/operator-services, S7).
+    if (await isOperatorServiceAgent(storage, config, agent.gaii)) continue;
     try {
       // Read from the list the write is made on: a word the agent holds already is "had", not given.
       let added: string[] = [];

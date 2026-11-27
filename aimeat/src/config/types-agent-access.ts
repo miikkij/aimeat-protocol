@@ -9,6 +9,7 @@
  *   mcpCapabilityUseApprovalFrom · AgentAccessConfig
  * @usage import type { AgentAccessConfig } from './types-agent-access.js';
  * @version-history
+ *   2026-11-26 — operatorServices (agents.operator_services, config/operator-services.ts).
  *   2026-11-20 — standingEnabled, standingMoney, standingDelete (services/ai-standing/words.ts).
  *   2026-11-04 —CAPABILITY_USE_APPROVAL_LABEL moved here from services/mcp-client/capability-use-setting.ts
  *     unchanged, which re-exports it (codebase analysis 2026-11-03, item B4).
@@ -16,6 +17,7 @@
  *     ask; default operators), secaudit2026nov02d round 13b.
  *   v1.0.0 — 2026-10-04 — Moved from config-types.ts (a pure move), with appOriginSignInRefuse added.
  */
+import type { OperatorServiceEntry } from './operator-services.js';
 
 /**
  * Whether another account's capability over an MCP server where each person signs in with their own
@@ -52,6 +54,9 @@ export interface AgentAccessConfig {
   standingDelete: boolean;
   /** Same-owner device-auth auto-approval (owner or same-owner agent; no cross-owner, no scope escalation). Default true. */
   sameOwnerAutoApprove: boolean;
+  /** The outside services the operator switched on for every account (agents.operator_services,
+   *  config/operator-services.ts). Default empty: none. */
+  operatorServices: OperatorServiceEntry[];
   /** Refuse sign-in and registration from an app (middleware/app-origin-sign-in.ts). Default false:
    *  each request that would be refused is logged, and nothing is refused yet. */
   appOriginSignInRefuse: boolean;

@@ -27,6 +27,7 @@
  * @usage
  *   const text = permissionAskText({ baseUrl: config.baseUrl, agentGaii, tool: 'aimeat_dm_send', words: ['messages:send'] });
  * @version-history
+ *   2026-11-26 — OPERATOR_WORDS holds operator:service-provision (an operator service's credential).
  *   2026-11-04 — scopesBehindRecord reads the agent through the request memo (./request-memo.ts), so
  *     the MCP endpoint's stale-grant check shares the revocation check's read (codebase analysis
  *     2026-11-03, item C2).
@@ -39,7 +40,7 @@
 import type { Storage } from '../storage/interface.js';
 import {
   isOutsideWildcard, uncoveredScopes, OPERATOR_ADMIN_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, COMPLIANCE_READ_SCOPE,
-  COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE,
+  COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, OPERATOR_SERVICE_PROVISION_SCOPE,
 } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { POWERFUL_AGENT_SCOPES } from '../config/posture.js';
@@ -54,7 +55,7 @@ import { createT, type Locale } from '../i18n.js';
  */
 export const OPERATOR_WORDS: readonly string[] = [
   OPERATOR_ADMIN_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE,
-  SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE,
+  SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, OPERATOR_SERVICE_PROVISION_SCOPE,
 ];
 
 /** A permission the person may give with one press on the allow page. */

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-27 — POST /v1/agents refuses an operator service entry's id with 403 OPERATOR_SERVICE_KEY.
+ *   2026-11-27 — GET /v1/agents/device-authorize/pending leaves out a request for an operator service's
+ *     name (services/operator-services/pending.ts; operator services, B1).
  *   2026-11-05 — On a store place POST /v1/agents gives the agent the place's default at approval, and the answer
  *     and the record carry it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   v1.11.0 — 2026-10-27 — POST /v1/agents tells the owner when the new agent takes over schedules or
@@ -60,6 +63,8 @@ import { returnProven } from '../../services/device-return-proof.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent/standing-work.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 import { logger } from '../../utils/logger.js';
+import { offeredPending } from '../../services/operator-services/pending.js';
+import { serviceNameRefusal } from '../../services/operator-services/service-key.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -103,6 +108,12 @@ export function registerRegistrationRoutes(
     const existing = await storage.getAgent(gaii);
     if (existing) {
       res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${name}" already exists under owner "${owner}"`));
+      return;
+    }
+    // An operator service's name is its service's while the entry exists (services/operator-services/service-key.ts).
+    const reserved = serviceNameRefusal(config, name);
+    if (reserved) {
+      res.status(reserved.status).json(error(config.nodeId, reserved.code, reserved.message));
       return;
     }
 
@@ -240,7 +251,8 @@ export function registerRegistrationRoutes(
 
   // GET /v1/agents/device-authorize/pending — list pending device auth requests for the logged-in owner
   router.get('/v1/agents/device-authorize/pending', requireAuth(), requireRole('owner'), async (req, res) => {
-    const pending = await storage.listPendingDeviceAuthByOwner(req.auth!.owner);
+    // A request for an operator service's name is never offered (services/operator-services/pending.ts).
+    const pending = offeredPending(config, await storage.listPendingDeviceAuthByOwner(req.auth!.owner));
     // Which of these are agents coming BACK. The consent card preselected "Standard" regardless, so
     // re-approving a full-access agent after its token expired narrowed it on a click that meant
     // "yes, this is mine". The owner is entitled to see their own agent's scopes (the Agents tab

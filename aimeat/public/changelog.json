@@ -38,6 +38,17 @@
       "date": "2026-11-26",
       "version": "4.3.1",
       "kind": "feature",
+      "id": "2026-11-26-operator-agents-a-service-on-for-everyone-or-for-chosen-accounts",
+      "highlight": false,
+      "audience": ["user", "operator"],
+      "title": { "en": "Operator agents: a service on for everyone or for chosen accounts", "fi": "Ylläpitäjän agentit: palvelu käyttöön kaikille tai valituille" },
+      "body": { "en": "An operator can switch an outside service's agent on for every account or for named ones with one setting, with no approval by each person. Each person sees the agent, its purpose and its permissions, and gets a notice. The operator decides whether a person may turn the service off, and can turn it off for one account.", "fi": "Ylläpitäjä voi kytkeä ulkoisen palvelun agentin päälle kaikille tai nimetyille tileille yhdellä asetuksella, ilman että jokainen hyväksyy sen erikseen. Jokainen näkee agentin, sen tarkoituksen ja oikeudet ja saa siitä ilmoituksen. Ylläpitäjä päättää, saako ihminen sammuttaa palvelun itse, ja voi sammuttaa sen yhdeltä tililtä." },
+      "summary": { "en": "An operator switches a service's agent on for everyone or chosen accounts; each person sees it and why.", "fi": "Ylläpitäjä kytkee palvelun agentin kaikille tai valituille; jokainen näkee agentin ja sen syyn." }
+    },
+    {
+      "date": "2026-11-26",
+      "version": "4.3.1",
+      "kind": "feature",
       "id": "2026-11-26-prove-an-app-works-before-people-use-it",
       "highlight": false,
       "audience": ["user", "agent", "developer"],

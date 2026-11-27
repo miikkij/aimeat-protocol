@@ -18,6 +18,7 @@
  * @structure registerStopStartRoutes(router, config, storage)
  * @usage registerStopStartRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-11-26 — OPERATOR_SERVICE_REQUIRED answers 403: a required operator service's agent.
  *   v1.0.0 — 2026-10-11 — Initial (wish-pys-yt-agentti-agentille-pys-ytetty-tila-ja-k-ynnistys-uudel).
  */
 import type { Router, RequestHandler } from 'express';
@@ -29,7 +30,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { setAgentStopped } from '../../services/agent/stop.js';
 import { stoppedView } from '../../services/agent/stop-rules.js';
 
-const STATUS: Record<string, number> = { AGENT_NOT_FOUND: 404, ACCESS_DENIED: 403, INVALID_INPUT: 400 };
+const STATUS: Record<string, number> = { AGENT_NOT_FOUND: 404, ACCESS_DENIED: 403, INVALID_INPUT: 400, OPERATOR_SERVICE_REQUIRED: 403 };
 
 export function registerStopStartRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   const handle = (stop: boolean): RequestHandler => async (req, res) => {

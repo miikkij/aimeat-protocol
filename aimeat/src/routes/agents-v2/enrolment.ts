@@ -34,6 +34,8 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   2026-11-26 — A card for an agent an operator service made is refused, whatever grant names it: its key
+ *     is the service's (operator services review, S2).
  *   2026-11-15 — The ACCESS_DENIED refusal says "The connector daemon makes this call", not door.
  *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, where they moved from ./card.ts
  *     (structure programme 2026-11, unit 4).
@@ -63,6 +65,7 @@ import { nodeContext } from '../../services/node/context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { serviceKeyRefusal } from '../../services/operator-services/service-key.js';
 
 /**
  * More cards than any grant can legitimately carry. A bound, not a policy.
@@ -198,6 +201,12 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
         } else if (record.owner !== grant.owner) {
           defects.push({ field: 'owner', reason: 'That agent belongs to another account.' });
         }
+      }
+      // An agent an operator service made: its key is the service's, whatever grant names it
+      // (services/operator-services/service-key.ts).
+      if (defects.length === 0 && record) {
+        const serviceKey = await serviceKeyRefusal(storage, config, record.gaii, 'giving it a key of your own');
+        if (serviceKey) defects.push({ field: 'name', reason: serviceKey.message });
       }
 
       // Proof of possession: the card verifies against the key it carries. This says "whoever wrote

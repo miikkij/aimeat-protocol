@@ -4,6 +4,21 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-11-27 — While an entry with that id exists, a request for a new agent under an operator service's
+ *     name on any other branch is refused 403 OPERATOR_SERVICE_KEY with nothing stored; a person's own
+ *     existing agent of that name keeps the ordinary rules.
+ *   2026-11-27 — A service's credential refused for its own entry's name gets 403 OPERATOR_SERVICE_REFUSED
+ *     and no row is written (operator services, B1).
+ *   2026-11-26 — A request for an agent an operator service made, on any branch but the service's own, is
+ *     refused 403 OPERATOR_SERVICE_KEY before a row is written (operator services review, S1).
+ *   2026-11-26 — An operator service's request (agents.operator_services) is decided before the record
+ *     is written and approved before the same-owner auto-approval: the credential agent of an operator
+ *     account holding operator:service-provision asks for a person's agent, and every condition in
+ *     services/operator-services/eligibility.ts holds. Only that approval is exempt from the pending
+ *     cap; a refusal falls through with its note (routes/agents/device-auth-operator-service.ts). Another
+ *     approval for the same person in progress answers 409 BUSY before anything is written. An agent an
+ *     operator service made is never a same-owner approver (its request stays pending with a note), and
+ *     `owner` that is not text is refused with 400 before anything else.
  *   2026-11-13 — VALID_MODES comes from models/agent-onboarding-schemas.ts (structure programme 2026-11, unit 4).
  *   2026-11-04 — user_instructions names the approval address and says the person signs in only in their browser.
  *   2026-11-01 — An approval on POST /v1/agents/verify writes the trail line with event agent.approved
@@ -145,6 +160,11 @@ import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
 import { proofVerifies, spendReturnProof, markReturnProven, returnProven } from '../../services/device-return-proof.js';
 import { recordTrailEvent } from '../../services/place-trail.js';
+import { callerOf } from '../../middleware/caller.js';
+import { operatorServiceDecision, SERVICE_AGENT_NOTE } from '../../services/operator-services/eligibility.js';
+import { isOperatorServiceAgent } from '../../services/operator-services/agent-check.js';
+import { serviceKeyRefusal, serviceNameRefusal } from '../../services/operator-services/service-key.js';
+import { approveForOperatorService } from './device-auth-operator-service.js';
 
 /**
  * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
@@ -193,8 +213,8 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
   router.post('/v1/agents/device-authorize', optionalAuth(), async (req, res) => {
     const { agent_name, display_name, description, owner, mode, scopes } = req.body ?? {};
 
-    if (!owner) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner is required'));
+    if (!owner || typeof owner !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner is required: the account name, or the account\'s verified email address, as text'));
       return;
     }
     if (!agent_name) {
@@ -265,7 +285,30 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // an agent of the owner too, and ten strangers' rows stopped both for two hours
     // (secaudit2026oct22, pending-cap-per-owner-unauthenticated). A request authenticated as this
     // owner, or as one of this owner's agents, is not refused by it; it still counts as a row.
-    const fromOwner = autoApprovePrincipal(req, ownerName) !== null;
+    //
+    // An operator service asking for a person's agent (agents.operator_services) is decided here,
+    // before anything is written, and only an approval on that branch is exempt from the cap
+    // (services/operator-services/eligibility.ts). A refusal leaves its note and falls through.
+    // An unauthenticated request (the ordinary RFC 8628 client, or the anonymous identity where that
+    // mode is on) has no caller to build, and is never an operator service's credential.
+    const caller = req.auth && !isAnonymousPrincipal(req.auth) ? callerOf(req, config.nodeId, storage) : null;
+    const service = await operatorServiceDecision({ storage, config }, {
+      auth: caller && !caller.visitor ? { kind: caller.kind, ...caller.auth } : null,
+      agentName: agent_name, ownerName, requested: requestedScopes,
+    });
+    if (service.kind === 'busy') {
+      // Another approval for this person is in progress: nothing is written, the service asks again.
+      res.status(409).json(error(config.nodeId, 'BUSY', 'Another request for this account is being approved. Ask again in a moment.'));
+      return;
+    }
+    // A service's own credential asking for its own entry's name, refused: answered, and NOTHING stored,
+    // so the person never sees a request to approve that would give the service an agent no ledger line
+    // names. The note is the account sentence for every reason about the account, so nothing leaks.
+    if (service.kind === 'refused' && service.own) {
+      res.status(403).json(error(config.nodeId, 'OPERATOR_SERVICE_REFUSED', service.note));
+      return;
+    }
+    const fromOwner = service.kind === 'approve' || autoApprovePrincipal(req, ownerName) !== null;
     const pendingCount = fromOwner ? 0 : await storage.countPendingDeviceAuthByOwner(ownerName);
     if (pendingCount >= 10) {
       res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'Too many pending authorization requests for this owner'));
@@ -311,6 +354,26 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const targetGaii = buildGAII(agent_name, ownerName, config.nodeId);
     const existingTarget = await storage.getAgent(targetGaii);
     const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
+    // An agent an operator service made: only the operator-service branch connects it again. Any other
+    // request for it is refused here, before a row exists, so nobody approves it later on /verify
+    // (services/operator-services/service-key.ts; approveDeviceAuth asks the same for every caller).
+    if (existingTarget && service.kind !== 'approve') {
+      const serviceKey = await serviceKeyRefusal(storage, config, targetGaii, 'connecting it again with a new key');
+      if (serviceKey) {
+        res.status(serviceKey.status).json(error(config.nodeId, serviceKey.code, serviceKey.message));
+        return;
+      }
+    }
+    // While an entry with this id exists, the name is its service's: a request for a NEW agent under it
+    // on any other branch is refused with nothing stored. A person's own agent that already has the name
+    // (made before the entry) is left to the ordinary rules: its reconnect goes on as before.
+    if (!existingTarget && service.kind !== 'approve') {
+      const reserved = serviceNameRefusal(config, agent_name);
+      if (reserved) {
+        res.status(reserved.status).json(error(config.nodeId, reserved.code, reserved.message));
+        return;
+      }
+    }
     // An existing agent coming back proves it with a signature by its current key; the owner then
     // sees a return, and otherwise a new device taking the agent over (services/device-return-proof.ts).
     // The proof names this node (v2) or no node (v1), and is taken once (secaudit2026oct26). The mark
@@ -341,7 +404,23 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // default, because there is no owner here to choose. The ceiling was checked above, before the
     // record was written.
     const autoScopes: string[] = requestedScopes ?? config.defaultAgentScopes;
-    const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
+    // ── Operator service (agents.operator_services), tested BEFORE the same-owner auto-approval ──
+    // The decision above approved: the credential agent is the approver, and the entry's words are
+    // the most it passes on (routes/agents/device-auth-operator-service.ts).
+    if (service.kind === 'approve') {
+      const out = await approveForOperatorService(config, storage, service, authRequest, req.auth!.sub,
+        req.headers['user-agent'] as string | undefined);
+      if (!out.ok) {
+        await storage.updateDeviceAuth(deviceCode, { status: 'denied' });
+        res.status(out.status).json(error(config.nodeId, out.code, out.message));
+        return;
+      }
+      autoApproved = true;
+      res.locals.trailRecorded = true;
+    } else if (service.kind === 'refused') {
+      autoApproveNote = service.note;
+    }
+    const principal = !autoApproved && config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
       // approver outright, and to read `memory:*` as covering everything under it — both correct
@@ -368,7 +447,13 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       const mayActOnTarget = principal.kind !== 'agent' || !existingTarget
         || mayActOnAgent(req.auth, targetGaii, config.nodeId)
         || existingTarget.registeredBy === req.auth!.sub;
-      if (!principal.mayApprove) {
+      // An agent an operator service made is never an approver: a sibling it asks for would be named by
+      // no ledger line, so the person's off switch, the sweep and the setting would never remove it
+      // (services/operator-services/agent-check.ts).
+      const serviceAgent = principal.kind === 'agent' && await isOperatorServiceAgent(storage, config, req.auth!.sub);
+      if (serviceAgent) {
+        autoApproveNote = SERVICE_AGENT_NOTE;
+      } else if (!principal.mayApprove) {
         // An agent of this owner, but not one the owner allowed to make agents. Same landing as an
         // escalating request: the row stays pending and the owner decides, so nothing is lost —
         // only the settling-it-alone part is refused.
@@ -419,7 +504,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       // An existing agent's request: whether its proof of coming back verified (absent: none was sent).
       ...(returnProof !== undefined ? { return_proof: returnProof ? 'verified' : 'not_verified' } : {}),
       user_instructions: autoApproved
-        ? `Auto-approved (same-owner registration). Fetch your credentials now: POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } — the first poll returns your token.`
+        ? `Auto-approved (${service.kind === 'approve' ? `operator service ${service.entry.id}` : 'same-owner registration'}). Fetch your credentials now: POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } — the first poll returns your token.`
         : `Give your owner this address to approve the request: ${verificationUriComplete}. If they are not signed in, it takes them through the front page and back. They sign in only in their own browser, so never ask them for a password, a sign-in link or a code in chat. They can also find the request in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.${autoApproveNote ? ` NOTE: ${autoApproveNote}` : ''}`,
     }, [
       ...(autoApproved ? [] : [{ description: 'Owner approves in AIMEAT profile -> Agents tab', method: 'GET' as const, url: `${baseUrl}/v1/profile` }]),

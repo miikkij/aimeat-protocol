@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-26 — Step 1b: outside its own namespace an operator service's agent writes only under its
+ *     entry's prefixes, 403 OPERATOR_SERVICE_PREFIX (services/operator-services/write-fence.ts).
  *   2026-11-25 — A knowledge package manifest the manifest schema refuses is refused 422
  *     SCHEMA_VALIDATION_FAILED, as the import refuses it; one already stored that fails stays writable
  *     (services/knowledge/manifest-write.ts).
@@ -207,6 +209,7 @@ import { memoryWriteAsks, fileMemoryWriteAsks } from './write-asks.js';
 import { tallyWriterOf } from '../data-map/tally-writer.js';
 import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';
 import { decisionToolRefusal } from '../app-tools/decision-binding.js';
+import { operatorServiceWriteRefusal } from '../operator-services/write-fence.js';
 import type {
     MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput, MemoryWriteWarning, AfterMemoryWriteReport, MemoryWriteResult,
     ExchangeReconcileReport,
@@ -259,6 +262,14 @@ export async function writeMemoryRecord(
             ok: false, status: 403, code: 'SCOPE_DENIED',
             message: `Writing this needs the "${needed}" permission, which this session does not have.`,
         };
+    }
+
+    // 1b. Outside its own namespace (as the person, or into another of the person's principals), an
+    //     agent an operator service made writes only under its entry's prefixes. Here, in the one writer,
+    //     so every door that writes through it is fenced (services/operator-services/write-fence.ts).
+    if (caller.targetGaii !== caller.principal) {
+        const fenced = await operatorServiceWriteRefusal(storage, config, caller.principal, input.key);
+        if (fenced) return { ok: false, status: fenced.status, code: fenced.code, message: fenced.message };
     }
 
     // 1a. A record that holds a credential is written only by the door that owns it. The generic

@@ -20,6 +20,8 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   2026-11-26 — An operator service's agent installs no package that writes the person's memory
+ *     (services/operator-services/write-fence.ts).
  *   2026-11-20 — An app component's file name comes from htmlFilenameOf (services/app/app-ref.ts); no change in behaviour.
  *   2026-11-08 — A cortex schema part asks the schema lock rule as the installer before anything
  *     registers, on a dry run too: a node-wide pattern, another organism's records or a key another
@@ -98,6 +100,7 @@ import {
     computeHash,
 } from '../../component/registrar.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
+import { operatorServiceWholeRefusal } from '../../operator-services/write-fence.js';
 import { componentCollision } from '../compose/package-component-collisions.js';
 import { packageCapabilities, type PackageCapabilities } from './package-capabilities.js';
 import { codeInstallRefusal, combinedRefusal, packageSourceOf, recordApproval, isOwnPackage } from './package-approvals.js';
@@ -460,6 +463,11 @@ export async function installPackage(
     // packages:install-code (package-approvals.ts). Words the caller lacks are not the end of it: the
     // doors file a request for the owner from this refusal, so it carries what was missing and which
     // version it would have been. A dry run says so instead.
+    // An operator service's agent writes the person's memory only under its entry's prefixes, which a
+    // package's components cannot be held to, so it installs none that write it (operator-services/write-fence.ts).
+    const fenced = pkg.components.some(c => c.type === 'memory' || c.type === 'skill')
+        ? await operatorServiceWholeRefusal(storage, config, caller.sub, 'a package that writes into the person\'s memory') : null;
+    if (fenced) return { ok: false, status: fenced.status, code: fenced.code, message: `${fenced.message} Nothing was installed.` };
     const caps = packageCapabilities(pkg.components, config, owner);
     const writeRefusal = combinedRefusal(memoryComponentWriteRefusal(pkg.components, caller, ownerGhii), codeInstallRefusal(caps, caller));
     const awaitsOwner = writeRefusal?.code === 'SCOPE_DENIED' && writeRefusal.missing.length > 0;

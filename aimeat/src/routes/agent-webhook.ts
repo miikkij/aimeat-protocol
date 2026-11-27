@@ -12,6 +12,8 @@
  *   - GET    /v1/agents/:name/webhook/log   -- Get delivery log
  *   - GET    /v1/agents/:name/integration/overview -- Integration subtab composite (webhook + delivery log + onboarding checklist)
  * @version-history
+ *   2026-11-26 — PUT and DELETE by the owner refuse a required operator service's agent with 403
+ *     OPERATOR_SERVICE_REQUIRED (services/operator-services/required.ts); the agent itself is not refused.
  *   2026-10-24 — PUT, DELETE and POST .../test refuse the shared anonymous principal with 401
  *     AUTH_REQUIRED (refuseAnonymousPrincipal): every holder of that token is the same agent, so a
  *     webhook one holder set received the events of the others (secaudit2026oct22).
@@ -31,7 +33,8 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
-import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, mayActOnAgent, resolveIdentity } from '../utils/gaii.js';
+import { requiredAgentRefusal } from '../services/operator-services/required.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { createAgentIntegrationOverviewService } from '../services/db/agent-integration-overview-db-service.js';
@@ -56,6 +59,18 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
     // The agent itself, or its own owner in person (QA audit 2026-10-14, K1).
     return mayActOnAgent(req.auth, resolveAgentGaii(req, agentName), config.nodeId);
+  }
+
+  /**
+   * Where a required operator service's agent is told about its work is the service's: the owner
+   * may not point it elsewhere or remove it (services/operator-services/required.ts). The agent itself may.
+   */
+  async function requiredRefused(req: Express.Request, res: import('express').Response, agentGaii: string, what: string): Promise<boolean> {
+    if (resolveIdentity(req.auth!, config.nodeId) === agentGaii) return false;
+    const refused = await requiredAgentRefusal(storage, config, agentGaii, what);
+    if (!refused) return false;
+    res.status(403).json(error(config.nodeId, refused.code, refused.message));
+    return true;
   }
 
   /* ── GET /v1/agents/:name/integration/overview -- Integration subtab composite (mount fold) ──
@@ -101,6 +116,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
       return;
     }
+    if (await requiredRefused(req, res, agentGaii, 'changing where it is told about its work')) return;
 
     // Validate body
     const parsed = WebhookPutSchema.safeParse(req.body);
@@ -188,6 +204,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
       return;
     }
+    if (await requiredRefused(req, res, agentGaii, 'removing where it is told about its work')) return;
 
     // Use null (cast through any) to clear nullable fields in MongoDB/Prisma.
     // Prisma treats undefined as "don't update" but null as "set to null".

@@ -12,6 +12,7 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   2026-11-26 — The Consul watch runs the operator-services sweep after a change (services/operator-services/sweep.ts).
  *   2026-11-19 — A stored `hooks.<name>.when_missing` row loads into the running config (services/hooks/when-missing.ts).
  *   2026-11-05 — A purchase plan the Consul watch applies gives the store place's default to the agents that have
  *     not had it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
@@ -81,6 +82,7 @@ import type { Storage } from '../storage/interface.js';
 import { installFileStores } from '../services/file-store/file-store-resolver.js';
 import { logger } from '../utils/logger.js';
 import { placeDefaultAfterSettings } from '../services/place-agent-scopes.js';
+import { operatorServicesAfterSettings } from '../services/operator-services/sweep.js';
 import type { ConfigSources } from '../server.js';
 
 export interface ConfigInitResult {
@@ -170,6 +172,8 @@ export async function initializeConfig(
         // A purchase plan that arrived now gives the store place's default to the agents that have not
         // had it (services/place-agent-scopes.ts; decision 8b of 2026-11-05). It logs its own failure.
         void placeDefaultAfterSettings(storage, config, applied);
+        // An operator service Consul switched off or narrowed takes its agents with it; it logs its own failure.
+        void operatorServicesAfterSettings({ storage, config }, applied);
       });
     } catch (err) {
       logger.warn(`Consul config load failed: ${(err as Error).message}`);

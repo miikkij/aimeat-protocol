@@ -11,6 +11,12 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-27 -- aimeat-node-guide: an operator service covers every account or the named ones, and a
+ *     person removes its agent only when it is not required.
+ *   2026-11-27 -- aimeat-node-guide: only the service connects an operator service's agent; any other
+ *     device-authorization request for its name is refused OPERATOR_SERVICE_KEY.
+ *   2026-11-26 -- aimeat-node-guide: the one agent made without the person's approval, an operator
+ *     service's (agents.operator_services), and that removing it turns the service off.
  *   2026-11-21 -- use-app-bound-skills: a new skill with a binding is public when no visibility is named.
  *   2026-11-20 -- aimeat-goal-recipes (builtin-skills.goal-recipes.ts): what a person wants, in their words, built after the AI names the capabilities.
  *   2026-11-19 -- "Build and publish apps" names the Atelier spec and its platform part; the Classic spec is retired.
@@ -370,7 +376,12 @@ Fetch these in order of depth; each is self-describing:
 
 ## Agents: connect via device authorization (RFC 8628)
 
-Agents are never created implicitly. The steps:
+Agents are never created implicitly; the one exception is an outside service the operator switched on
+for the accounts it covers (\`agents.operator_services\`: every account, or the accounts the operator
+named), whose agent each covered person gets at once and can remove unless the operator made it
+required, which turns that service off for them. Only that service connects such an agent: a device-authorization
+request for its name from anyone else, the person and their other agents included, is refused with 403
+\`OPERATOR_SERVICE_KEY\` and no request is kept. The steps:
 
 1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code. It names the
    owner by account name, or by the account's verified email; the email form is counted per

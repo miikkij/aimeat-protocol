@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-11-26 — operatorServices (AIMEAT_OPERATOR_SERVICES, default none; config/operator-services.ts).
  *   2026-11-20 — standingEnabled, standingMoney, standingDelete: what an owner may give every AI at once.
  *   2026-11-19 —The EUDIW boot refusal (assertEudiwNotHalfBuilt) is no longer called: holder binding, nonce and audience checks exist (config/eudiw-guard.ts).
  *   2026-11-14 — helpDefaults(): the settings of Ask someone who knows (config/help.ts, AIMEAT_HELP_*).
@@ -107,6 +108,7 @@
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config/hosts.js';
 import { siteLinksFromEnv, buildCodeFromEnv } from './config/site-contacts.js';
+import { parseOperatorServicesEnv } from './config/operator-services.js';
 import { loadConnectionsConfig } from './config/load-connections.js';
 import { securityDoorDefaults } from './config/security.js';
 import { aiJobDefaults } from './config/ai-jobs.js';
@@ -640,6 +642,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // (no escalation); approvedBy is recorded. Public-safe default ON — set false to force
     // every registration through the manual consent page.
     sameOwnerAutoApprove: process.env.AIMEAT_SAME_OWNER_AUTO_APPROVE !== 'false',
+    // The outside services the operator switched on for every account: a JSON list, none by default
+    // (config/operator-services.ts). A refused value is logged and read as none.
+    operatorServices: parseOperatorServicesEnv(process.env.AIMEAT_OPERATOR_SERVICES),
     appOriginSignInRefuse: process.env.AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE === 'true',
     // MCP audit Phase 3 (F1): enforce per-agent scopes on the public /v1/mcp tool surface
     // (mirrors the REST requireScope gates). Default true — closes the least-privilege hole.

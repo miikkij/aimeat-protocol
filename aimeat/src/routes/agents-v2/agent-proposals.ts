@@ -23,6 +23,7 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-11-27 — Approving a proposal for an operator service entry's id is refused 403 OPERATOR_SERVICE_KEY.
  *   2026-11-05 — On a store place the approval gives the agent the place's default (codebase analysis 2026-11-03,
  *     decision 8b of 2026-11-05).
  *   2026-10-31 — approval_url is the proposal's own page on the home (v31 K51).
@@ -91,6 +92,7 @@ import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent/clearance.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
+import { serviceNameRefusal } from '../../services/operator-services/service-key.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
@@ -197,6 +199,12 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     if (existing.some(a => a.name === proposal.name)) {
       res.status(409).json(error(config.nodeId, 'NAME_TAKEN',
         `You already have an agent called "${proposal.name}". Nothing was created.`));
+      return;
+    }
+    // The operator may have set a service under the name since the proposal (services/operator-services/service-key.ts).
+    const reserved = serviceNameRefusal(config, proposal.name);
+    if (reserved) {
+      res.status(reserved.status).json(error(config.nodeId, reserved.code, reserved.message));
       return;
     }
 

@@ -35,6 +35,7 @@
  *   if (!check.ok) return res.status(403).json(error(nodeId, check.code, check.message, 403, check.details));
  *   await recordScopeAddition({ storage, config }, gaii, updated, check.added);
  * @version-history
+ *   v1.1.0 — 2026-11-26 — `operatorService`: an agent an operator service made adds nothing to another agent.
  *   v1.0.0 — 2026-10-29 — Initial (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -55,6 +56,11 @@ export interface ScopeAdditionCaller {
   scopes: readonly string[];
   /** The account holder in person, who sets any list the ceiling allows. */
   inPerson: boolean;
+  /**
+   * The caller is an agent an operator service made (services/operator-services/agent-check.ts). Such
+   * an agent never adds permissions to another agent: it is never an approver.
+   */
+  operatorService?: boolean;
 }
 
 export type ScopeAdditionCheck =
@@ -78,6 +84,13 @@ export function checkScopeAddition(
   // agent's page is gone here though a token minted before still names it.
   const holds = (w: string) => scopeIsCovered(caller.scopes, w);
 
+  if (caller.operatorService) {
+    return {
+      ok: false, code: 'SCOPE_ADDITION_REFUSED',
+      message: 'An agent an operator service set up does not add permissions to other agents. Your owner adds them on the other agent\'s page.',
+      details: { added },
+    };
+  }
   if (!holds(PERMISSIONS_ADD_SCOPE)) {
     return {
       ok: false, code: 'SCOPE_ADDITION_REFUSED',

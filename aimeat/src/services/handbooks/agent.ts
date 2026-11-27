@@ -7,6 +7,11 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.89.1 -- 2026-11-27 -- An operator service is switched on for the owner's account, not "for everyone".
+ *   v1.89.0 -- 2026-11-26 -- A required operator agent: do not try to remove, stop or narrow it; say why and
+ *     whom to ask; say the private read and its reason.
+ *   v1.88.0 -- 2026-11-26 -- An agent the operator set up: set_by_operator in aimeat_agents_list
+ *     (agents.operator_services), and what removing it does.
  *   v1.87.0 -- 2026-11-25 -- aimeat_home_waiting: what waits for the person, every kind in one call.
  *   v1.86.2 -- 2026-11-25 -- The knowledge paragraph names aimeat_knowledge_create and the other two
  *     kinds of package.
@@ -199,6 +204,17 @@ to lower each one; an \`excepted\` item is one your owner chose to keep open.
 this node your owner connected (a help desk, a CRM), with what each may do and when it last called;
 \`aimeat_ecosystem_app_revoke\` removes one when the person says so: its sign-ins end at once, and
 what it already wrote stays. Both need account:security, which your owner gives you on its own.
+
+**An agent the operator set up.** In \`aimeat_agents_list\`, an agent with \`set_by_operator\` belongs to
+an outside service the operator of this node switched on for your owner's account (\`agents.operator_services\`):
+the service got it with no approval of your owner, and only with the permissions the operator named.
+When the person asks what it is, say so in their words, from its \`description\`. Removing it on their
+Agents page turns the service off for them and is remembered; they turn it on again on the same page.
+What it wrote stays theirs. When \`set_by_operator.required\` is true, the operator requires the service:
+do not try to remove, stop, rekey or narrow it, because each of those answers 403
+OPERATOR_SERVICE_REQUIRED; tell the person why, and that the operator decides (a message to
+support@operators). When \`private_read\` is true it reads their private records, and
+\`private_read_reason\` is the operator's reason: say both when they ask what it can see.
 
 **One app open to the internet on a closed node.** Where this node shows its content to its signed-in
 accounts only, \`aimeat_app_internet_open\` opens one of your owner's apps, with the intake forms its

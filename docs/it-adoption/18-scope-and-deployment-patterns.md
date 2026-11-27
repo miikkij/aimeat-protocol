@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit a74da06ee) on 2026-11-26. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit b7746f595) on 2026-11-27. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -13,7 +13,7 @@ A node is the place where people and their agents keep the knowledge they have r
 | Knowledge people and agents bring and own | Memory records, workspace documents and rows, stored files. Everything an agent writes belongs to its owner, and a person can take all of it out | [Data ownership](../data-ownership.md) |
 | Identity | People (GHII, `alice@node-id`), agents that act for one person with scoped permissions (GAII), and outside applications onboarded with a scope allowlist (GEAI) | [Identity model](../coding-guidelines/identity-model.md) |
 | Consent and provenance | Who may read what, and who wrote each record and with which AI | [Data ownership, section 4](../data-ownership.md#4-every-record-can-say-who-wrote-it), [AI transparency](../ai-transparency.md) |
-| Agents as users | An agent connects through device authorization (RFC 8628) and the owner approves it and picks its scopes; a CrewAI crew connects through the `aimeat-crewai` package | `aimeat/src/routes/agents/device-auth.ts`, `python/aimeat-crewai/README.md`, [Building an agent](../building-an-aimeat-compatible-agent.md) |
+| Agents as users | An agent connects through device authorization (RFC 8628) and the owner approves it and picks its scopes; a CrewAI crew connects through the `aimeat-crewai` package. One exception, off by default: an outside service the operator switches on for every account or for named ones (`AIMEAT_OPERATOR_SERVICES`) gets its agent in each covered account with no approval by the person, who can turn it off unless the operator made it required; only the service connects that agent, so a device authorization or an MCP sign-in as it from anyone else is refused ([04 Identity and access](04-identity-access.md#agent-identities)) | `aimeat/src/routes/agents/device-auth.ts`, `python/aimeat-crewai/README.md`, [Building an agent](../building-an-aimeat-compatible-agent.md) |
 | Sharing between people whose AIs come from different vendors | AI clients from any vendor connect over MCP; people share in organisms (a group with members) and workspaces (a shared space inside an organism) | [01 Overview](01-overview.md), [13 Apps, agents and endpoints](13-apps-agents-endpoints.md) |
 | Apps that show the state | Single-file web apps published on the node, each on its own origin | [13 Apps, agents and endpoints](13-apps-agents-endpoints.md) |
 

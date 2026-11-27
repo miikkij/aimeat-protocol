@@ -28,6 +28,8 @@
  * @usage
  *   import { readHomeFeed, homeFeedAnswer } from './feed.js';
  * @version-history
+ *   v2.5.1 — 2026-11-27 — The pending-agent count leaves out a request for an operator service's name
+ *     (services/operator-services/pending.ts).
  *   v2.5.0 — 2026-11-02 — `at_local` is words in the chat's language with the day said relative to today
  *     ("tänään klo 7.00", "yesterday at 22:56"), from localTimeWriter (crew73: the model misread "2.11.").
  *   v2.4.0 — 2026-11-02 — Each row carries `at_local`, its time on the person's clock (their zone, else
@@ -52,6 +54,7 @@ import { isNodeResidentAgent } from '../node/resident-agent.js';
 import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
 import { personZone, personLocale } from '../person-zone.js';
 import { createT, toLocale, type Locale } from '../../i18n.js';
+import { offeredPending } from '../operator-services/pending.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -133,7 +136,7 @@ export async function readHomeFeed(
 export async function homeFeedAnswer(
     storage: Storage, config: AimeatConfig, owner: string, reader: AccountEventReader,
 ): Promise<{ items: FeedItem[]; total: number; note?: string }> {
-    const pending = await storage.listPendingDeviceAuthByOwner(owner);
+    const pending = offeredPending(config, await storage.listPendingDeviceAuthByOwner(owner));
     const items = await readHomeFeed(storage, config, owner, { pendingAgents: pending.length, reader });
     const withheld = items.some(i => !!i.withheld);
     return homeFeedAsShown(storage, config, owner, { items, total: items.length, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}) });

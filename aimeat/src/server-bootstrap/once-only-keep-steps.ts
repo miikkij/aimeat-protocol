@@ -24,6 +24,8 @@
  *   2026-11-26 -- reportStrayAgentFacesOnce, after the anonymous-records step: the copies of an app's agent
  *     face in the memory of accounts that do not own the app are named on the Security page, nothing
  *     changed (owner ruling 2026-11-26; services/app/stray-agent-faces.ts).
+ *   2026-11-26 -- sweepOperatorServices, last: an operator service switched off or narrowed while the node
+ *     was down takes its agents with it at start (services/operator-services/sweep.ts). Idempotent.
  *   2026-11-21 -- holdMemberWrittenSpacesOnce, after the accountant grant step: the workspace spaces whose
  *     writeRole members already wrote past keep working until the operator decides (ruling 2026-11-21).
  *   2026-11-15 -- moveAppPartiesToTablesOnce, after moveCsmLockHoldersOnce: the people registered to apps
@@ -126,6 +128,7 @@ import { settleUnknownCapabilityVisibilityOnce } from '../services/capabilities/
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
 import { givePlaceDefaultToEveryAgent } from '../services/place-agent-scopes.js';
+import { sweepOperatorServices } from '../services/operator-services/sweep.js';
 import { holdMemberWrittenSpacesOnce } from '../services/workspace/write-role-hold.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
@@ -292,4 +295,9 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // place it reads nothing.
   await givePlaceDefaultToEveryAgent(storage, config)
     .catch(err => logger.error('Failed to give the store place\'s default to the existing agents; the next boot tries again', { error: String(err) }));
+  // An operator service the operator switched off, removed or narrowed while the node was down: its
+  // agents lose their credentials and go, or are narrowed (services/operator-services/sweep.ts). A node
+  // that never had an operator service reads one key prefix and finds nothing.
+  await sweepOperatorServices({ storage, config })
+    .catch(err => logger.error('Failed to sweep the operator services; the next boot tries again', { error: String(err) }));
 }

@@ -22,6 +22,9 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.18.0 — 2026-11-26 — `operator-services` → operator:service-provision (services/operator-services/
+ *     events.ts), in WILDCARD_NEVER_OPENS: a '*' principal hears it only while holding that word too.
+ *     Every other domain is answered for '*' as before.
  *   v1.17.0 — 2026-11-19 — `crew-try` → memory:read: a trial run of an agent's crew ended (feature audit
  *     2026-11-19, 4.6).
  *   2026-11-19 — `kyc`: customer due diligence (services/kyc/store.ts), on compliance:read.
@@ -181,6 +184,11 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // This row stands for every `ext:<installer>/<name>` domain (filterDomains): the word is the one
   // a page needs to call an extension, so a page that cannot call it is not told about it either.
   'extension-data': 'ext:invoke',
+
+  // The accounts an operator service covers changed, or the setting did (services/operator-services/
+  // events.ts). Sent only to the operator accounts; among the things acting for them only the service's
+  // credential, which holds this word no wildcard carries, hears it.
+  'operator-services': 'operator:service-provision',
 });
 
 /**
@@ -196,13 +204,29 @@ export function isOwnerPrincipal(auth: { roles?: string[] }): boolean {
 }
 
 /**
+ * The domains a wildcard scope ('*') never opens: a '*' principal hears one of these only while it
+ * also holds the domain's own word (DOMAIN_SCOPE) exactly. One member, the operator services' domain,
+ * whose word is outside every wildcard. The other domains fenced by such a word keep the '*'
+ * behaviour they had; whether they belong here is a question of its own.
+ */
+export const WILDCARD_NEVER_OPENS: ReadonlySet<string> = new Set(['operator-services']);
+
+/** The entry of an allow-set that passes every domain except the ones written `-<domain>` beside it. */
+const ALL_EXCEPT = '*';
+
+/**
  * The domains a restricted principal holding `scopes` may be told about, or `null` when no
  * filtering applies (owner sessions). A wildcard scope ('*') also disables filtering — the
- * node's own dev/default-scope escape hatch, unchanged in meaning here.
+ * node's own dev/default-scope escape hatch — except for the domains in WILDCARD_NEVER_OPENS whose
+ * word the principal does not hold: the answer is then the set `{'*', '-<domain>', …}`, which
+ * filterDomains reads as every domain but those.
  */
 export function allowedDomains(scopes: string[] | undefined): Set<string> | null {
   const held = scopes ?? [];
-  if (held.includes('*')) return null;
+  if (held.includes('*')) {
+    const withheld = [...WILDCARD_NEVER_OPENS].filter((d) => !held.includes(DOMAIN_SCOPE[d])).map((d) => `-${d}`);
+    return withheld.length ? new Set([ALL_EXCEPT, ...withheld]) : null;
+  }
   const out = new Set<string>();
   for (const [domain, needed] of Object.entries(DOMAIN_SCOPE)) {
     // scopeIsCovered, not an exact-set lookup: a principal holding `memory:*` passes every
@@ -221,6 +245,7 @@ export function allowedDomains(scopes: string[] | undefined): Set<string> | null
  */
 export function filterDomains(domains: string[], allow: Set<string> | null): string[] {
   if (!allow) return domains;
+  if (allow.has(ALL_EXCEPT)) return domains.filter(d => !allow.has(`-${d}`));
   return domains.filter(d => allow.has(d)
     || (d.startsWith(WORKSPACE_DOMAIN_PREFIX) && allow.has('organisms'))
     || (d.startsWith(EXTENSION_DOMAIN_PREFIX) && allow.has('extension-data')));

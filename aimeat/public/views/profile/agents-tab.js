@@ -7,6 +7,13 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.29.1 -- 2026-11-27 -- A refused permission save keeps the dialog open and answers it the refusal in
+ *     the reader's language (scopeRefusalWords), where a toast behind the dialog said nothing. An approval an
+ *     operator service's rule refuses says that rule's sentence, and the request leaves the list.
+ *   v4.29.0 -- 2026-11-26 -- Operator services (agents.operator_services): removing an agent a service
+ *     set up asks with words that say this turns the service off for the person and where it is turned
+ *     on again; section 01 ends with the services the person turned off, each with Turn on again
+ *     (agents/operator-services-off.js).
  *   v4.28.0 -- 2026-11-24 -- The page is ordered by what a person has and then what they add: 01 The
  *     agents, 02 Add an agent with its four parts (02.1 the question, 02.2 the two ready agents, 02.3 an
  *     agent of your own, 02.4 connecting an AI), 03 Allow always. A section no longer moves: what waits
@@ -169,6 +176,7 @@ import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
 import { AllowAlwaysSection } from './agents/allow-always-section.js';
+import { OperatorServicesOff } from './agents/operator-services-off.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
@@ -182,7 +190,7 @@ import { buildAgentPrompt, buildTaskRunnerPrompt, PLATFORMS, PLATFORM_KEYS, PLAT
 import { loadAgentOrder, saveAgentOrder, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
-import ScopesModal from './agents/scopes-modal.js';
+import ScopesModal, { scopeRefusalWords } from './agents/scopes-modal.js';
 import { hasRefusals } from './agents/agent-card-access.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
@@ -486,6 +494,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
     });
   }
 
+  // The dialog stays open on a refusal and says it (scopes-modal.js): { ok: false, message } in the
+  // reader's language. The operator-service codes come worded from api.js; the others the page words.
   async function handleSaveScopes(agentName, newScopes) {
     try {
       const resp = await updateAgentScopes(agentName, newScopes);
@@ -493,12 +503,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
         showToast(t('profile.agents.scopeUi.saved'));
         setScopesModal(null);
         loadData();
-      } else {
-        showToast(resp?.error?.message || t('profile.agents.scopeUi.saveError'), true);
+        return { ok: true };
       }
+      return { ok: false, message: scopeRefusalWords(resp?.error?.code, resp?.error?.message) };
     } catch (err) {
       swallowed('agents-tab: handleSaveScopes', err);
-      showToast(t('profile.agents.scopeUi.saveError'), true);
+      return { ok: false, message: scopeRefusalWords(err?.code, err?.message) };
     }
   }
 
@@ -526,19 +536,30 @@ export default function AgentsTab({ session, showToast, onStats }) {
       }
     } catch (err) {
       swallowed('agents-tab: handleApprove', err);
-      showToast(t('profile.agents.pendingRequests.approveError'), true);
+      // An operator service's refusal arrives worded by api.js; the request it refused is gone, so it leaves the list.
+      const service = typeof err?.code === 'string' && err.code.startsWith('OPERATOR_SERVICE');
+      if (service) setPendingRequests(prev => prev.filter(r => r.user_code !== userCode));
+      showToast(service ? err.message : t('profile.agents.pendingRequests.approveError'), true);
     }
     setConsentBusy(null);
   }
 
   function handleDeleteAgent(name) {
-    confirm(t('profile.agents.deleteConfirm') + ': ' + name + '?', async () => {
+    // An agent an operator service set up: removing it turns the service off for this person, and the
+    // confirmation says so and where it is turned on again (services/operator-services/agent-removed.ts).
+    const by = (agents || []).find(a => a.name === name)?.set_by_operator;
+    const words = by
+      ? { message: t('profile.agents.operatorService.removeConfirm', { service: by.display_name }),
+          opts: { danger: true, title: t('profile.agents.operatorService.removeTitle', { service: by.display_name }), confirmLabel: t('profile.agents.operatorService.removeLabel') },
+          done: t('profile.agents.operatorService.turnedOff', { service: by.display_name }) }
+      : { message: t('profile.agents.deleteConfirm') + ': ' + name + '?', opts: undefined, done: t('profile.agents.deleted') };
+    confirm(words.message, async () => {
       try {
         await deleteAgent(name);
-        showToast(t('profile.agents.deleted'));
+        showToast(words.done);
         loadData();
       } catch (err) { swallowed('agents-tab', err); showToast(t('profile.unknownError'), true); }
-    });
+    }, words.opts);
   }
 
   async function handleDeny(userCode) {
@@ -700,6 +721,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   groupDnd,
                 })}
               `}
+            ${/* The services the operator switched on that this person turned off, each with Turn on again. */''}
+            <${OperatorServicesOff} showToast=${showToast} />
           <//>
 
           ${/* The ways to get an agent, as the parts of one section: the question, the two ready agents,

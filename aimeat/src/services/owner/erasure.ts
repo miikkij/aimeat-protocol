@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name, config) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
  * @version-history
+ *   2026-11-26 — The person's line leaves every operator service's ledger (step operator_service_lines),
+ *     and the operators are told that a covered account is gone.
  *   2026-11-20 — holdValueSignalsForErasure joins the write buffers held for the erasure.
  *   2026-11-20 — holdStandingUseForErasure: the buffer of acts an agent did without asking holds the
  *     account like the other write buffers (services/ai-standing/use.ts).
@@ -194,6 +196,8 @@ import { serviceNamespaceOf } from '../../utils/service-namespace.js';
 import { isValidGHII } from '../../utils/gaii.js';
 import { nodeContext } from '../node/context.js';
 import { emitAccountErased } from '../event-bus.js';
+import { forgetPerson } from '../operator-services/ledger.js';
+import { announceOperatorServices } from '../operator-services/events.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -308,6 +312,13 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
     await step('content_risk', async () => {
       const n = await eraseContentRiskOf(storage, nodeId, name, [name, ghii, ...agents.map(a => a.gaii)], logPseudonym);
       return n ? `content_risk:${n}` : null;
+    }, deletionLog, storage);
+
+    // The person's line in every operator service's ledger, records of system@<node> keyed by their
+    // account name (services/operator-services/ledger.ts): the next holder of the name starts with none.
+    await step('operator_service_lines', async () => {
+      const n = await forgetPerson(storage, nodeId, name);
+      return n ? `operator_service_lines:${n}` : null;
     }, deletionLog, storage);
 
     await step('consents', async () => {
@@ -718,6 +729,8 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
   } catch (err) {
     logger.warn('eraseOwner: the MCP sessions of the erased account were not told to close', { owner: name, error: String(err) });
   }
+  //    An account the operator services covered is gone (services/operator-services/events.ts).
+  await announceOperatorServices(storage, config);
 
   // The account's AI jobs live in the runner of this process, beside their stored records, and a job
   // that waited for a deactivated account or sat in the queue would otherwise run now, pay, and write

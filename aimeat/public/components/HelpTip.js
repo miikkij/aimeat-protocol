@@ -15,6 +15,8 @@
  *        html`<${TextField} label=${x('param.temperature')} help="ai.temperature" … />`
  *        Facts row: { k: html`<${HelpLabel} term="ai.fallback" label=${x('rt.fallback')}>${x('rt.fallback')}<//>`, v }
  * @version-history
+ *   v2.2.0 — 2026-11-26 — HelpLabel takes `mine` as HelpTip does, handed to the dialog (an operator
+ *     service's own name and description on the agent's mark). Additive.
  *   v2.1.0 — 2026-10-31 — `mine`: the person's own figures, handed to the dialog and its prompt.
  *   v2.0.0 — 2026-10-31 — HelpLabel's words open the help themselves (HelpWord): a dotted line, the
  *     help cursor, the short help after the pointer rests 0.6 s (a setting turns that off), the
@@ -75,7 +77,7 @@ const WORD_MS = 600;
  * question mark that is drawn only while it has the focus. A click on a field's word opens the
  * explanation instead of moving the focus into the field.
  */
-function HelpWord({ term, label, children }) {
+function HelpWord({ term, label, mine, children }) {
   const [open, setOpen] = useState(false);
   const [settling, setSettling] = useState(false);
   const settle = useRef(0);
@@ -97,7 +99,7 @@ function HelpWord({ term, label, children }) {
             aria-label=${t('explain.open', { term: title })} onClick=${() => setOpen(true)}>?</button>
         </span>
       <//>
-      <span class="help-word-dialog"><${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} /></span>
+      <span class="help-word-dialog"><${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} mine=${mine} /></span>
     </span>`;
 }
 
@@ -106,12 +108,13 @@ function HelpWord({ term, label, children }) {
  * 2026-10-31 the label's own words open the help (HelpWord); before, a question mark stood after
  * it. A Check keeps the question mark (HelpTip), because pressing its words ticks the box. Without a
  * term it gives the label back alone.
- * @param {{ term?: string, label?: string, children: any }} props `children` the label as drawn;
- *   `label` its words, the dialog's title when the locale gives none.
+ * @param {{ term?: string, label?: string, mine?: string, children: any }} props `children` the label as
+ *   drawn; `label` its words, the dialog's title when the locale gives none; `mine` the person's own
+ *   words for this topic, shown in the dialog.
  */
-export function HelpLabel({ term, label, children }) {
+export function HelpLabel({ term, label, mine, children }) {
   if (!term) return children;
-  return html`<${HelpWord} term=${term} label=${label}>${children}<//>`;
+  return html`<${HelpWord} term=${term} label=${label} mine=${mine}>${children}<//>`;
 }
 
 export default HelpTip;

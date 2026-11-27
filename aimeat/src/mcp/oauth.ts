@@ -12,6 +12,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   2026-11-26 — An agent an operator service made: the owner's consent (POST /v1/mcp/authorize-consent) is
+ *     refused OPERATOR_SERVICE_KEY, a code without the key's signature (`keyProof`) redeems nothing, and a
+ *     refresh token mints nothing; the signature path stays (operator services review, S2).
  *   2026-11-25 — POST /v1/mcp/register honours token_endpoint_auth_method "none": a public client gets
  *     no secret and owes none on either grant (mcp/oauth-client-auth.ts). A native client that keeps
  *     only its client_id (Codex) was refused `invalid_client` on its first refresh after a restart.
@@ -91,6 +94,7 @@ import { registerOAuthConsentInfo } from './oauth-consent-info.js';
 import { clientAuthFails, PUBLIC_CLIENT_SECRET_HASH, registeredAuthMethod } from './oauth-client-auth.js';
 import { LOCALES } from '../i18n.js';
 import { oneTimeStore } from '../services/ephemeral-claims.js';
+import { serviceKeyRefusal } from '../services/operator-services/service-key.js';
 import {
     hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
 } from './oauth-binding.js';
@@ -113,6 +117,11 @@ interface AuthorizationCode {
     expiresAt: number;
     /** When it was issued: the exchange refuses a code from before the agent's credential cut. */
     issuedAt: string;
+    /**
+     * Issued on a signature by the agent's own key (the authorize step's path A). Only such a code is
+     * redeemed for an agent an operator service made, whose key is the service's (S2).
+     */
+    keyProof?: boolean;
 }
 
 /**
@@ -330,6 +339,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 resources,
                 expiresAt: Date.now() + 600_000,
                 issuedAt: new Date().toISOString(),
+                keyProof: true,
             };
             await authCodes.put(code, authCode, authCode.expiresAt + CODE_ROW_KEPT_MS);
             noteIssuedCode(config, codeChallenge, resources);
@@ -492,6 +502,14 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             res.status(403).json({ error: 'access_denied', error_description: 'Agent does not belong to you' });
             return;
         }
+        // An agent an operator service made acts only on the service's key: an owner's consent proves no
+        // possession of it, so it mints no credential for that agent (services/operator-services/service-key.ts, S2).
+        const serviceKey = await serviceKeyRefusal(storage, config, gaii, 'connecting an AI as it');
+        if (serviceKey) {
+            // `reason` carries the node's code beside OAuth's own `error`: `code` is the authorization code here.
+            res.status(403).json({ error: 'access_denied', error_description: serviceKey.message, reason: serviceKey.code });
+            return;
+        }
 
         // Issue authorization code
         const code = randomBytes(32).toString('hex');
@@ -640,6 +658,15 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
             const codeAgent = cut.agent;
+            // A code that proves no possession of the agent's key redeems nothing for an agent an
+            // operator service made (a consent issued before that check, S2).
+            if (!authCode.keyProof) {
+                const serviceKey = await serviceKeyRefusal(storage, config, authCode.gaii, 'connecting an AI as it');
+                if (serviceKey) {
+                    res.status(400).json({ error: 'invalid_grant', error_description: serviceKey.message });
+                    return;
+                }
+            }
             const accessToken = await issueJWT({
                 sub: authCode.gaii,
                 owner: authCode.owner,
@@ -702,6 +729,13 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             const cut = await grantCutRefusal(storage, existing.gaii, recordIssuedAt(existing.createdAt));
             if (!cut.ok) {
                 res.status(400).json({ error: 'invalid_grant', error_description: cut.refusal });
+                return;
+            }
+            // A refresh proves no possession of the agent's key: for an agent an operator service made it
+            // mints nothing, and the service signs a new authorization with its key instead (S2).
+            const serviceKey = await serviceKeyRefusal(storage, config, existing.gaii, 'renewing an AI connection as it');
+            if (serviceKey) {
+                res.status(400).json({ error: 'invalid_grant', error_description: serviceKey.message });
                 return;
             }
             // A refresh must not widen what the original grant carried.

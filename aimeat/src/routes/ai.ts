@@ -22,6 +22,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-11-26 — POST /v1/ai/settings refuses an operator service's agent (operator-services/write-fence.ts).
  *   2026-11-14 — GET /v1/ai/settings admits the caller POST /v1/ai/settings admits, through the same gate:
  *     the owner's agent holding memory:write-reserved and memory:write-as-owner reads its owner's
  *     settings, as aimeat_operator_ai_config shows them (structure programme 2026-11, unit 2b, B17).
@@ -150,6 +151,7 @@ import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator/override.js';
 import { resolveWriteTarget } from '../services/write-target.js';
+import { operatorServiceWriteRefusal } from '../services/operator-services/write-fence.js';
 import { parseGenRulesBypass } from '../services/ai/gen-rules.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
@@ -612,6 +614,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
     async (req: Request, res: Response) => {
       const target = resolveWriteTarget(req, config, true);
       if ('deny' in target) return res.status(403).json(error(config.nodeId, target.deny.code, target.deny.message));
+      // openrouter.settings is no operator service's prefix: its agent never writes it (operator-services/write-fence.ts).
+      const fenced = await operatorServiceWriteRefusal(storage, config, req.auth!.sub, 'openrouter.settings');
+      if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message));
       const gaii = target.gaii;
       const { daily_budget_usd, app_quotas, app_allowlist } = req.body as {
         daily_budget_usd?: number;

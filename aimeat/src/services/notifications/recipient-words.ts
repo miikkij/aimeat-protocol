@@ -13,6 +13,8 @@
  * @structure recipientLocale · fillNotifTemplate · notifWords
  * @usage const words = await notifWords(storage, recipientGhii, input.i18n, { title, body });
  * @version-history
+ *   v1.1.0 — 2026-11-27 — fillNotifTemplate: a place with no value says nothing instead of keeping
+ *     its braces.
  *   v1.0.0 — 2026-11-14 — Initial: notifications are written in the recipient's language
  *     (Jouni, 2026-11-14).
  */
@@ -34,9 +36,12 @@ export async function recipientLocale(storage: Storage, recipientGhii: string): 
     }
 }
 
-/** A notiftext template's `{name}` places filled from `vars`; a place with no value is left as it is. */
+/**
+ * A notiftext template's `{name}` places filled from `vars`. A place with no value says nothing: a
+ * stored notice never shows a brace, whatever variables its caller had when it was written.
+ */
 export function fillNotifTemplate(tpl: string, vars: Record<string, string | number> | undefined): string {
-    return tpl.replace(/\{(\w+)\}/g, (all, name: string) => (vars && name in vars ? String(vars[name]) : all));
+    return tpl.replace(/\{(\w+)\}/g, (_all, name: string) => (vars && name in vars ? String(vars[name]) : ''));
 }
 
 /**

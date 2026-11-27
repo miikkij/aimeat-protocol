@@ -26,6 +26,10 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.18.1 -- 2026-11-27 -- A name an operator service's entry reserves (OPERATOR_SERVICE_KEY) says so, on
+ *     Create and on approving a waiting proposal (nameRefusalWords).
+ *   v2.18.0 -- 2026-11-27 -- A press that made nothing says why under the form, in the reader's language: a
+ *     taken name (an operator service's agent's name says so) or the server's refusal.
  *   v2.17.0 -- 2026-11-24 -- `num`: the Agents page numbers the panel 02.3, a part of its "Add an
  *     agent" section, and no longer moves it to the top (agents-tab.js v4.28.0).
  *   v2.16.0 -- 2026-10-18 -- A waiting proposal whose permissions cover organism:invite says that the agent may invite people.
@@ -88,6 +92,19 @@ const p = (key, vars) => t('profile.agents.page.' + key, vars);
 /** The name shape the node enforces, checked here so the person is told before they press. */
 const NAME_SHAPE = /^[a-z][a-z0-9-]{2,39}$/;
 
+/**
+ * A refused new agent's name in the reader's language, or null for any other refusal. A name an operator
+ * service's entry holds (OPERATOR_SERVICE_KEY: reserved while the entry exists; or NAME_TAKEN by the
+ * service's own agent) says so; another taken name says it is taken.
+ */
+function nameRefusalWords(err, name, agents) {
+  if (!name) return null;
+  if (err?.code === 'OPERATOR_SERVICE_KEY') return t('profile.agents.operatorService.nameIsService', { name });
+  if (err?.code !== 'NAME_TAKEN') return null;
+  const service = (agents || []).some(a => a.name === name && a.set_by_operator);
+  return t(service ? 'profile.agents.operatorService.nameIsService' : 'profile.agents.nameTaken', { name });
+}
+
 const BLANK = {
   name: '', displayName: '', purpose: '',
   template: 'researcher', scopes: 'standard', runMode: 'spawn',
@@ -97,6 +114,8 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState([]);
+  // Why the last press made nothing, in the reader's language (a taken name, a refusal).
+  const [refusal, setRefusal] = useState('');
 
   // An example picked on the page (agents/agent-guide.js NoAgentsYet) fills the name and the purpose;
   // the person still reads and presses Create.
@@ -145,6 +164,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
     if (form.purpose.trim().length < 10) { showToast(t('profile.agents.new.badPurpose'), true); return; }
 
     setBusy(true);
+    setRefusal('');
     try {
       // Two calls, because the second one is the gate: proposing creates nothing, and the owner's
       // own press is what creates. Here the same person does both in one action.
@@ -165,7 +185,10 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
       await load();
       onCreated?.();
     } catch (err) {
-      showToast(err?.message || t('profile.agents.new.failed'), true);
+      // A taken or reserved name in the reader's language; the sentence stays under the form until the next press.
+      const words = nameRefusalWords(err, name, agents) || err?.message || t('profile.agents.new.failed');
+      setRefusal(words);
+      showToast(words, true);
     } finally {
       setBusy(false);
     }
@@ -182,7 +205,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
       await load();
       onCreated?.();
     } catch (err) {
-      showToast(err?.message || t('profile.agents.new.failed'), true);
+      showToast(nameRefusalWords(err, proposal.name, agents) || err?.message || t('profile.agents.new.failed'), true);
     } finally {
       setBusy(false);
     }
@@ -245,6 +268,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
             hint=${form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint')}
             value=${form.runMode} onChange=${pick('runMode')}
             options=${['spawn', 'resident'].map(v => ({ value: v, label: t('profile.agents.runMode.' + v) }))} />
+          ${refusal ? html`<${Note} kind="message" error>${refusal}<//>` : null}
           <${FormActions}>
             <${Loud} control disabled=${busy} onClick=${create}>
               ${busy ? t('profile.agents.new.working') : t('profile.agents.new.create')}

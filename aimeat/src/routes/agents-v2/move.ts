@@ -27,6 +27,8 @@
  * @structure registerAgentMoveRoute(router, config, storage)
  * @usage registerAgentMoveRoute(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-11-26 — An agent an operator service made, required or not, is not moved: 403
+ *     OPERATOR_SERVICE_KEY (services/operator-services/service-key.ts).
  *   v1.1.0 — 2026-10-11 — A resident agent moved to a connector that keeps no agent running
  *     becomes spawn, and the answer says so (`run_mode`, `run_mode_corrected`). It kept `resident`
  *     and nobody ran it.
@@ -41,6 +43,7 @@ import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { findConnector, setWanted } from '../../services/connector/registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { serviceKeyRefusal } from '../../services/operator-services/service-key.js';
 
 /** The refusals that mean the named connector is not connected. */
 const NOT_CONNECTED = new Set(['NO_DAEMON', 'DAEMON_NOT_CONNECTED']);
@@ -58,6 +61,13 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
       return;
     }
     const label = record.displayName ?? name;
+    // A move replaces the key an operator service holds for its agent, required or not
+    // (services/operator-services/service-key.ts).
+    const serviceKey = await serviceKeyRefusal(storage, config, record.gaii, 'moving it to another machine');
+    if (serviceKey) {
+      res.status(403).json(error(config.nodeId, serviceKey.code, serviceKey.message));
+      return;
+    }
     if (record.identityVersion !== 2) {
       res.status(409).json(error(config.nodeId, 'V1_AGENT',
         `${label} is an older agent. Move it to a key and card with the migration on your Agents page first.`));

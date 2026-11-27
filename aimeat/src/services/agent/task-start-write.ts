@@ -14,6 +14,8 @@
  *   const out = await setAgentTaskStart({ storage, config }, req.auth!.owner, resolve(req), name, req.body?.task_start);
  *   res.json(success(nodeId, { name: out.agent.name, ...taskStartView(out.agent) }));
  * @version-history
+ *   v1.5.0 — 2026-11-26 — task_start of a required operator service's agent is the operator's
+ *     (requiredAgentFence, 403 OPERATOR_SERVICE_REQUIRED); the floor and app waits stay the person's.
  *   v1.4.0 — 2026-11-19 — setAgentTaskStartSettings() and `task_start_app_waits` in the view: the owner
  *     makes a task that waits for them wait also when an app starts it (feature audit 2026-11-19, 2.1).
  *   v1.3.1 — 2026-10-28 — task_start_wildcard describes the narrowing the owner may apply, never one
@@ -28,7 +30,7 @@
  */
 import type { AgentRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
-import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteOutcome } from './profile-write.js';
+import { resolveAgentTarget, requiredAgentFence, type AgentWriteDeps, type AgentWriteOutcome } from './profile-write.js';
 import { agentStartDefault, floorScopesOf, acceptedFloorOf, appStartWaits, TASK_START_FLOOR } from './task-rules.js';
 import { readScopeUse, wildcardStatus, flushScopeUse, type AgentScopeUse, type ScopeUseRecord } from '../scope/use.js';
 import type { Storage } from '../../storage/interface.js';
@@ -113,6 +115,9 @@ export async function setAgentTaskStart(
     if (!clearing && raw !== 'automatic' && raw !== 'confirm') {
         return { ok: false, code: 'INVALID_INPUT', message: "task_start must be 'automatic', 'confirm', or null to leave it to the agent's mode" };
     }
+    // 'confirm' would hold every task of a required operator service's agent: the operator's to set.
+    const fenced = await requiredAgentFence(deps, gaii, callerPrincipal, 'changing how its tasks start');
+    if (fenced) return fenced;
     const updated = await deps.storage.updateAgent(gaii, { taskStart: clearing ? null : raw });
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
     emitChange('agents');
@@ -155,6 +160,12 @@ export async function setAgentTaskStartSettings(
     }
     if (caller.isApp && input.appWaits !== undefined && input.appWaits !== true) {
         return { ok: false, code: 'ACCESS_DENIED', message: 'An app cannot let itself start tasks that wait for the owner. Ask the owner to change it on the agent card.' };
+    }
+    // How a required operator service's agent starts its tasks is the operator's; appWaits, which
+    // constrains the person's apps, stays the person's.
+    if (input.taskStart !== undefined) {
+        const fenced = await requiredAgentFence(deps, gaii, caller.principal, 'changing how its tasks start');
+        if (fenced) return fenced;
     }
     const updates: Partial<AgentRecord> = {};
     if (input.taskStart !== undefined) updates.taskStart = input.taskStart as AgentRecord['taskStart'];

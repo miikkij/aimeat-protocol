@@ -21,6 +21,8 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-26 — A delete or restore under another of the person's principals by an operator service's
+ *     agent is fenced by its entry's prefixes: 403 OPERATOR_SERVICE_PREFIX (services/operator-services/write-fence.ts).
  *   2026-11-21 — A restore of an app tool manifest that binds an action marked `decision: person` is
  *     refused 422 PERSON_DECIDES, as the write refuses it (services/app-tools/decision-binding.ts).
  *   2026-11-21 — Delete and restore tell the namespace principal's MCP listen streams that the key
@@ -114,6 +116,7 @@ import { isServiceNamespace } from '../../utils/service-namespace.js';
 import { serviceRecordRefusal } from '../../utils/own-door-keys.js';
 import { flipWithinCeilings } from './ceilings.js';
 import { teamDeleteGate, type TeamGateRefusal } from '../team/action-gate.js';
+import { operatorServiceWriteRefusal, type OPERATOR_SERVICE_PREFIX_CODE } from '../operator-services/write-fence.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
@@ -121,7 +124,7 @@ export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
     | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED' | 'KYC_RETAINED'
-    | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'] | DecisionToolRefusal['code'];
+    | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'] | DecisionToolRefusal['code'] | typeof OPERATOR_SERVICE_PREFIX_CODE;
   message: string;
   /** The team gate's approval: its id and where a lead decides it (services/team/action-gate.ts). */
   details?: Record<string, unknown>;
@@ -379,6 +382,10 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
         : ''),
     };
   }
+  // Under another of the person's principals: an operator service's agent removes only under its
+  // entry's prefixes (services/operator-services/write-fence.ts).
+  const fenced = found !== req.caller && !req.ownerOverride ? await operatorServiceWriteRefusal(deps.storage, deps.config, req.caller, req.key) : null;
+  if (fenced) return { ok: false, code: fenced.code, message: fenced.message, status: fenced.status };
   const deleted = await deps.storage.deleteMemory(found, req.key, req.caller);
   if (!deleted) {
     return { ok: false, code: 'NOT_FOUND', message: `Memory key not found: ${req.key}` };
@@ -495,6 +502,10 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
     return !!record;
   };
   const found = await locate(deps, req, inBin);
+  // Under another of the person's principals: an operator service's agent puts back only under its
+  // entry's prefixes (services/operator-services/write-fence.ts).
+  const fenced = found && found !== req.caller && !req.ownerOverride ? await operatorServiceWriteRefusal(deps.storage, deps.config, req.caller, req.key) : null;
+  if (fenced) return { ok: false, code: fenced.code, message: fenced.message, status: fenced.status };
   // A restore writes the record back, so it answers to the write path's rule on the old morsel
   // price: a tool manifest or an offers document deleted with `price.morsels` in it stays in the
   // bin from 4.0.0, as the same document is refused on POST, PUT and PATCH (feature-list audit #205).

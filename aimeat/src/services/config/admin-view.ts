@@ -18,6 +18,10 @@
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-11-26 — changeNodeSettings refuses an operator service's credential agent a write of
+ *     agents.operator_services (services/operator-services/config-write.ts; operator services review, S6).
+ *   2026-11-26 — A row of a list of JSON objects carries `json: true` (field-def.ts jsonList).
+ *   2026-11-26 — ConfigViewDeps.closeMcpSessions, handed to applyConfigChanges for the operator-services sweep.
  *   2026-11-04 — The three checks of the settings an AI may only make stricter and the hand list of their
  *     five paths are one check read from each setting's row (config-strictness.ts), asked in the same
  *     order before the sign-in policy's cross-checks and after them; applyConfigChanges is told the
@@ -52,6 +56,7 @@ import { emitChange } from '../event-bus.js';
 import { CLASSIFICATION_MODE_PATH, recordSwitchChange, type SwitchCaller } from '../classification-run/switch.js';
 import { offerDefaultCapsWhenSwitchedOn } from '../classification/default-caps.js';
 import { recordOperatorNodeAct } from '../operator/access-audit.js';
+import { credentialSettingRefusal } from '../operator-services/config-write.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, TOTP_ENABLED_PATH, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal } from '../sign-in-policy.js';
 import { requestLooseningRefusal, resetRefusal, tightenOnlyRank, type TightenRefusal } from './strictness.js';
@@ -67,10 +72,16 @@ export function resetNodeSettingRefusal(caller: SwitchCaller, path: string): { s
     return resetRefusal(caller, path);
 }
 
-export interface ConfigViewDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance }
+export interface ConfigViewDeps {
+    config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance;
+    /** Handed to applyConfigChanges for the operator-services sweep (services/config/apply.ts). */
+    closeMcpSessions?: (gaii: string) => number;
+}
 
 export interface ConfigViewEntry {
     value: unknown; type: string; description: string; range?: string; rangeKind?: 'limit' | 'recommended'; choices?: readonly string[];
+    /** The value is a list of JSON objects; the page edits it as JSON and sends the list. */
+    json?: true;
     mutable: boolean; editable: boolean; path: string;
     source?: string; canReset?: boolean; sealed?: boolean; restartPending?: boolean;
     /** The code reads the setting once at start: a saved value takes effect at the next start. */
@@ -150,6 +161,8 @@ export function buildConfigView({ config, storage, provenance }: ConfigViewDeps,
             ...(field.range ? { range: field.range } : {}),
             ...(rangeKind ? { rangeKind } : {}),
             ...(field.choices ? { choices: field.choices } : {}),
+            // A list of JSON objects, which the Config tab edits as JSON (field-def.ts jsonList).
+            ...(field.jsonList ? { json: true as const } : {}),
             mutable: !field.immutable && !sealed,
             editable: editable && !field.immutable && !sealed,
             path: field.dotPath,
@@ -220,6 +233,10 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
                 ? refusal.message
                 : `${sealedPaths.join(', ')} are set by whoever runs this node and cannot be changed here. Nothing in this request was applied.` };
     }
+
+    // An operator service's own agent does not write the operator services (services/operator-services/config-write.ts, S6).
+    const credential = credentialSettingRefusal(config, caller, { changes });
+    if (credential) return { ok: false, ...credential, message: `${credential.message} Nothing in this request was applied.` };
 
     // A setting an AI may only make stricter (its row's `aiMayOnlyTighten`: the classification switch,
     // the sign-in policy, who is asked before another account's capability uses a person's sign-in, and

@@ -7,6 +7,9 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   2026-11-26 -- e2e-operator-service-phase2 joins ANONYMOUS_OFF_SUITES, for the same reason.
+ *   2026-11-26 -- e2e-operator-service-agents joins ANONYMOUS_OFF_SUITES (operator services: a refused
+ *            credential must not read as the anonymous identity).
  *   2026-11-21 -- startServer waits for `seeds: settled` on GET /v1/build after the node answers, so no
  *     suite races a boot seeder (the seeding bullet of docs/pitfalls.md §19, now deleted).
  *   2026-11-15 -- perSuiteCoverageEnv(): with AIMEAT_COVERAGE_PER_SUITE=<dir>, a suite's node and the
@@ -263,6 +266,14 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     // A private or members CSM answers 404 to a caller with no sign-in: with the setting on, that caller
     // would be the anonymous identity, and the members refusal could not be proved (developer ruling 2026-11-07).
     'e2e-csm',
+    // An operator service's agent token refused after the operator switched the service off, and the
+    // branch refused to every caller without the word: with the setting on, a refused credential would
+    // read as the anonymous identity. Not yet measured three times.
+    'e2e-operator-service-agents',
+    // The same, for phase 2: a refused credential (the credential on the operator's switch, a token
+    // after the operator switched a service off for an account) must not read as the anonymous identity.
+    // Not yet measured three times.
+    'e2e-operator-service-phase2',
 ];
 
 /**

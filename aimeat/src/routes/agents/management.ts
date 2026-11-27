@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-27 — POST /v1/agents/import refuses an operator service entry's id with 403 OPERATOR_SERVICE_KEY.
+ *   2026-11-26 — A required operator service's agent (services/operator-services/required.ts): PATCH scopes
+ *     and DELETE read-through refuse a list without a word its entry gives, scope-narrowing and port refuse
+ *     it, each with 403 OPERATOR_SERVICE_REQUIRED.
+ *   2026-11-26 — PATCH /v1/agents/:name/scopes: an agent an operator service made never adds permissions
+ *     to another agent (services/operator-services/agent-check.ts).
  *   2026-11-13 — POST /v1/agents/:name/scope-narrowing runs services/agent/narrow-own-agent.ts, the lookup
  *     and narrowing aimeat_agent_scope_narrow runs (structure programme 2026-11, unit 2b).
  *   2026-11-12 — DELETE /v1/agents/:name runs services/agents/remove-agent.ts (extracted unchanged), which
@@ -103,6 +109,9 @@ import { writeMemoryRecord } from '../../services/memory/write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { checkScopeAddition, recordScopeAddition } from '../../services/agent/scope-add.js';
+import { isOperatorServiceAgent } from '../../services/operator-services/agent-check.js';
+import { requiredAgentRefusal, requiredScopeRefusal } from '../../services/operator-services/required.js';
+import { serviceNameRefusal } from '../../services/operator-services/service-key.js';
 import { READ_THROUGH_SCOPE } from '../../services/app/grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
@@ -219,6 +228,12 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     const existing = await storage.getAgent(newGaii);
     if (existing) {
       res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${agentData.name}" already exists on this node`));
+      return;
+    }
+    // An operator service's name is its service's while the entry exists (services/operator-services/service-key.ts).
+    const reservedName = serviceNameRefusal(config, agentData.name);
+    if (reservedName) {
+      res.status(reservedName.status).json(error(config.nodeId, reservedName.code, reservedName.message));
       return;
     }
 
@@ -357,6 +372,12 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only port your own agents'));
       return;
     }
+    // Porting moves the agent off this node: for a required operator service's agent, the operator's.
+    const required = await requiredAgentRefusal(storage, config, gaii, 'porting it to another node');
+    if (required) {
+      res.status(403).json(error(config.nodeId, required.code, required.message));
+      return;
+    }
 
     const { target_node_url, target_node_id } = req.body ?? {};
     if (!target_node_url) {
@@ -416,9 +437,9 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
   router.post('/v1/agents/:name/scope-narrowing', requireAuth(), requireScope('agent:permissions'), async (req, res) => {
     // The lookup among the account's own agents and the narrowing are services/agent/narrow-own-agent.ts,
     // which aimeat_agent_scope_narrow calls too.
-    const out = await narrowOwnAgent(storage, config.nodeId, req.auth!.owner as string, req.params.name as string);
+    const out = await narrowOwnAgent(storage, config, req.auth!.owner as string, req.params.name as string);
     if (!out.ok) {
-      res.status(out.code === 'NOT_FOUND' ? 404 : 409).json(error(config.nodeId, out.code, out.message));
+      res.status(out.code === 'NOT_FOUND' ? 404 : out.code === 'OPERATOR_SERVICE_REQUIRED' ? 403 : 409).json(error(config.nodeId, out.code, out.message));
       return;
     }
     res.json(success(config.nodeId, {
@@ -469,9 +490,16 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // (services/agent/scope-add.ts, the rule the MCP tool asks as well).
     const caller = callerOf(req, config.nodeId, storage);
     const check = checkScopeAddition(
-      { gaii: caller.principal, scopes: caller.scopes, inPerson: caller.inPerson }, agent, scopes as string[]);
+      { gaii: caller.principal, scopes: caller.scopes, inPerson: caller.inPerson,
+        operatorService: !caller.inPerson && await isOperatorServiceAgent(storage, config, caller.principal) }, agent, scopes as string[]);
     if (!check.ok) {
       res.status(403).json(error(config.nodeId, check.code, check.message, 403, check.details));
+      return;
+    }
+    // A required operator service's agent keeps every word its entry gives (services/operator-services/required.ts).
+    const required = await requiredScopeRefusal(storage, config, agent.gaii, scopes as string[]);
+    if (required) {
+      res.status(403).json(error(config.nodeId, required.code, required.message));
       return;
     }
 
@@ -550,6 +578,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     if (scopes.length === 0) {
       return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'This is the only permission the agent holds. Change its permissions on its page under Agents instead.'));
     }
+    const required = await requiredScopeRefusal(storage, config, agent.gaii, scopes);
+    if (required) return res.status(403).json(error(config.nodeId, required.code, required.message));
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
     if (!updated) {
       return res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the permission could not be saved. It is already reported; try again in a moment.'));

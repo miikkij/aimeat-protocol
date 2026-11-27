@@ -13,6 +13,10 @@
  *   - parseJwtPayload/sleep: internal helpers (unverified JWT expiry check, backoff delay)
  *
  * @version-history
+ *   v1.5.1 -- 2026-11-27 -- OPERATOR_SERVICE_REFUSED (a service's own request the server refused) is said in
+ *     the page's words too.
+ *   v1.5.0 -- 2026-11-26 -- OPERATOR_SERVICE_REQUIRED and OPERATOR_SERVICE_KEY throw with the page's own words
+ *     (operatorServiceWords): a control the operator's setting keeps from the person, in their language.
  *   v1.4.0 -- 2026-10-11 -- A 402 INSUFFICIENT_MORSELS throws with the page's own words: the use needs more
  *     morsels of pacing, get them from the daily allowance or, when the operator sells one, a pacing
  *     pack at its money price (GET /v1/wallet pacing_pack). err.code and err.response are unchanged.
@@ -103,7 +107,8 @@ export async function api(path, opts = {}) {
       }
       const json = await resp.json();
       if (json && json.ok === false && json.error) {
-        const words = json.error.code === 'INSUFFICIENT_MORSELS' ? await insufficientMorselsWords() : '';
+        const words = json.error.code === 'INSUFFICIENT_MORSELS' ? await insufficientMorselsWords()
+          : OPERATOR_SERVICE_CODES[json.error.code] ? await operatorServiceWords(json.error.code) : '';
         const err = new Error(words || json.error.message || json.error.code || 'Request failed');
         err.code = json.error.code;
         err.status = resp.status;
@@ -151,6 +156,30 @@ async function insufficientMorselsWords() {
     return `${t('pacing.insufficient')} ${t('pacing.insufficientPack', { n: pack.morsels, price })}`;
   } catch (err) {
     swallowed('api.insufficientMorselsWords', err);
+    return '';
+  }
+}
+
+/**
+ * A refusal about an operator service's agent, in the reader's language: a control the operator's
+ * setting keeps from the person (OPERATOR_SERVICE_REQUIRED: the operator requires the service;
+ * OPERATOR_SERVICE_KEY: a service's agent keeps the key the service holds; OPERATOR_SERVICE_REFUSED: a
+ * service's own request the server refused). The server's sentence is English; '' keeps it when the
+ * words cannot be loaded.
+ */
+const OPERATOR_SERVICE_CODES = {
+  OPERATOR_SERVICE_REQUIRED: 'profile.agents.operatorService.refusedRequired',
+  OPERATOR_SERVICE_KEY: 'profile.agents.operatorService.refusedKey',
+  OPERATOR_SERVICE_REFUSED: 'profile.agents.operatorService.refusedService',
+};
+async function operatorServiceWords(code) {
+  try {
+    const { t } = await import('/js/i18n.js');
+    const key = OPERATOR_SERVICE_CODES[code];
+    const s = t(key, { contact: 'support@operators' });
+    return s && s !== key ? s : '';
+  } catch (err) {
+    swallowed('api.operatorServiceWords', err);
     return '';
   }
 }

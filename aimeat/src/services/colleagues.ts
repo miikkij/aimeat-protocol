@@ -17,6 +17,7 @@
  * @structure membersSeeEachOther(config) · nodeColleagues(storage, nodeId) · areColleagues(storage, config, a, b)
  * @usage if (await areColleagues(storage, config, recipient, sender)) state = 'accepted';
  * @version-history
+ *   v1.1.0 — 2026-11-26 — isActiveLocalPerson is exported: the accounts an operator service covers.
  *   v1.0.0 — 2026-10-26 — Initial: address book, member directory, DM first-contact gate, group invitation.
  */
 import type { AimeatConfig } from '../config.js';
@@ -49,8 +50,12 @@ export async function nodeColleagues(storage: Storage, nodeId: string): Promise<
   return people.filter(p => p.nodeId === nodeId && p.ownerName !== ANONYMOUS_ACCOUNT && !off.has(p.ownerName));
 }
 
-/** Is `id` a person of this node with an active account? */
-async function isActiveLocalPerson(storage: Storage, nodeId: string, id: string): Promise<boolean> {
+/**
+ * Is `id` a person of this node with an active account? Not the anonymous account, not a disabled
+ * account, not a person of another node. Also the test of which accounts an operator service covers
+ * (services/operator-services/eligibility.ts).
+ */
+export async function isActiveLocalPerson(storage: Storage, nodeId: string, id: string): Promise<boolean> {
   if (identityKind(id) !== 'ghii' || !id.endsWith(`@${nodeId}`)) return false;
   const account = localAccountOf(id);
   if (!account || account === ANONYMOUS_ACCOUNT) return false;

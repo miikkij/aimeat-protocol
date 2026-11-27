@@ -27,6 +27,9 @@
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
  *   2026-11-26 — aimeat_account_export is probed on action 'start', the branch that carries `parts`.
+ *   2026-11-26 — aimeat_admin_service_access: `account` and `reason` ride only on the switch actions,
+ *     measured in test/unit/operator-services-dispatch.test.ts.
+ *   2026-11-26 — aimeat_admin_service_access is probed on its accounts branch.
  *   2026-11-25 — aimeat_knowledge_contribute calls the node (POST /v1/knowledge/:id/entries) and is
  *     probed like every other tool.
  *   2026-11-21 — aimeat_content_risk's status rides only on action='list'; the probe holds action at release.
@@ -135,6 +138,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // The same shape: 'list' (the default) carries only owner; 'decide' carries owner and name in the
     // path and the decision and reason in the body (tool-call-defs-receivers.ts).
     aimeat_admin_receivers: { always: { action: 'decide', owner: 'zqxownerzqx', name: 'zqxnamezqx', decision: 'approve' } },
+    // action='list' (the default) reads GET /v1/operator-services with nothing; 'accounts' carries the
+    // service in the path and limit and cursor in the query.
+    aimeat_admin_service_access: { always: { action: 'accounts', service: 'zqxservicezqx' } },
     // `account` names whose request an operator reads or answers, so it rides on one request (request_id);
     // the list is always the caller's own account.
     aimeat_publish_requests: { always: { request_id: 'zqxrequest_idzqx' } },
@@ -268,6 +274,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
         state: 'Same condition and the same test.',
         request_id: "Conditional, not dropped: it rides only on action='decide'; measured in test/unit/package-sale-dispatch.test.ts.",
         decision: 'Same condition and the same test.',
+    },
+    aimeat_admin_service_access: {
+        account: "Conditional, not dropped: it rides only on action='account_off' or 'account_on', in the path of "
+            + "PUT /v1/operator-services/:id/accounts/:account, and the probe holds `action` at 'accounts'. "
+            + 'Both switch branches are measured in test/unit/operator-services-dispatch.test.ts.',
+        reason: "Same condition (action='account_off', in the body) and the same test.",
     },
     aimeat_dataspace: {
         state: "Conditional, not dropped: it rides only on action='list', and the probe holds `action` at 'decline'. "

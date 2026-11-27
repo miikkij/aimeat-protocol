@@ -31,6 +31,10 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-26 — READ_AS_OWNER_SCOPE's comment names its one exception: an operator service entry with
+ *     private_read_reason (ruling 2026-11-26). Nothing executable changed here.
+ *   2026-11-26 — operator:service-provision (OPERATOR_SERVICE_PROVISION_SCOPE), outside the wildcard: an
+ *     operator service's credential asks for each person's agent of that service.
  *   2026-11-14 — help:ask and help:answer (HELP_ASK_SCOPE, HELP_ANSWER_SCOPE), outside the wildcard: an
  *     agent asks or answers other members in its owner's name (Ask someone who knows).
  *   2026-11-14 — secrets:share (SECRETS_SHARE_SCOPE), outside the wildcard: secret shares hand content out.
@@ -97,7 +101,14 @@
 /** The scope an owner grants an agent to write into the owner's own namespace. */
 export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
 
-/** The scope an owner grants an agent to read the owner's and its siblings' records as the owner. */
+/**
+ * The scope an owner grants an agent to read the owner's and its siblings' records as the owner.
+ * Outside every wildcard, on its own tick. ONE NAMED EXCEPTION (ruling 2026-11-26): an operator
+ * service entry (agents.operator_services) may name it, only with `private_read_reason`, which every
+ * covered person is told; the approval grants it from the entry and the entry's ledger records it as
+ * given, so a narrowed entry or a re-approval takes it back (config/operator-services.ts
+ * OPERATOR_SERVICE_OUTSIDE_WILDCARD_ALLOWED, services/operator-services/entries.ts privateReadGranted).
+ */
 export const READ_AS_OWNER_SCOPE = 'memory:read-as-owner';
 
 /**
@@ -169,6 +180,17 @@ export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
  * agent editor.
  */
 export const OPERATOR_ADMIN_SCOPE = 'operator:admin';
+
+/**
+ * An operator service's credential (config/operator-services.ts, agents.operator_services): the
+ * operator's agent that asks for each person's agent of an outside service the operator switched on
+ * for every account, and reads which accounts the service covers. An approval on this word creates
+ * an agent in another person's account without that person's press, so it is an operator word:
+ * askOperator() reads the account's operator role first, and on any other account the word grants
+ * nothing. Outside every wildcard for the reason operator:admin is, and nobody is grandfathered onto
+ * it: the capability did not exist before, so no agent can lose one it had.
+ */
+export const OPERATOR_SERVICE_PROVISION_SCOPE = 'operator:service-provision';
 
 /**
  * The node-wide compliance report and the register behind it: read, and write.
@@ -415,7 +437,7 @@ const OWN_TICK_SCOPES = [
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE,
-    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
+    OPERATOR_SERVICE_PROVISION_SCOPE, COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
     SECRETS_SHARE_SCOPE, MCP_MANAGE_SCOPE, HELP_ASK_SCOPE, HELP_ANSWER_SCOPE,
     ...OWN_TICK_SCOPES,
 ];

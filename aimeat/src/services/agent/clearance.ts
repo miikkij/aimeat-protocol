@@ -34,6 +34,8 @@
  *   await storage.createAgent({ ..., ...agentListingTags(config), ...newAgentClearance(config) });
  *   const out = await setAgentClearance({ storage, config }, callerOf(req, config.nodeId, storage), name, 'sisainen');
  * @version-history
+ *   v1.2.0 — 2026-11-26 — Lowering the clearance of a required operator service's agent is refused with
+ *     403 OPERATOR_SERVICE_REQUIRED (services/operator-services/required.ts); raising it stays open.
  *   v1.1.0 — 2026-10-25 — clearanceBoundByApprover(): the stricter of an agent's clearance and its
  *     approving agent's (secaudit2026oct22, agent-approver-sibling-skips-clearance).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L2.1, L2.3).
@@ -47,10 +49,11 @@ import { policyFor } from '../classification/policy.js';
 import { recordClassificationAudit } from '../classification/audit.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { requiredAgentRefusal } from '../operator-services/required.js';
 
 export type ClearanceOutcome =
   | { ok: true; agent: AgentRecord; from: string | null; changed: boolean }
-  | { ok: false; status: 400 | 403 | 404 | 500; code: 'INVALID_INPUT' | 'AGENT_NOT_FOUND' | 'ACCESS_DENIED' | 'PERSON_REQUIRED' | 'UPDATE_FAILED'; message: string };
+  | { ok: false; status: 400 | 403 | 404 | 500; code: 'INVALID_INPUT' | 'AGENT_NOT_FOUND' | 'ACCESS_DENIED' | 'PERSON_REQUIRED' | 'UPDATE_FAILED' | 'OPERATOR_SERVICE_REQUIRED'; message: string };
 
 /** The clearance a new agent starts with: the node's setting, or nothing (no limit). */
 export function newAgentClearance(config: Pick<AimeatConfig, 'agentClearanceDefault'>): { clearance?: string } {
@@ -135,6 +138,12 @@ export async function setAgentClearance(
   if (!caller.inPerson && rankOf(policy, next) > rankOf(policy, from)) {
     return { ok: false, status: 403, code: 'PERSON_REQUIRED',
       message: 'Letting an agent read more is the owner\'s decision. The owner raises it or removes the limit on the agent\'s page, signed in themselves. An agent can only lower it.' };
+  }
+  // Lowering what a required operator service's agent may read narrows it: the operator's to decide.
+  // Raising it is the person adding to it, and stays open.
+  if (rankOf(policy, next) < rankOf(policy, from)) {
+    const fenced = await requiredAgentRefusal(deps.storage, deps.config, gaii, 'lowering what it may read');
+    if (fenced) return fenced;
   }
   if (opts.dryRun) return { ok: true, agent: { ...agent, clearance: next }, from, changed: true };
 

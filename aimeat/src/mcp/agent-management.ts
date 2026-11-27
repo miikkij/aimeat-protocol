@@ -17,6 +17,10 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-11-26 — aimeat_agent_runtime_report passes the calling agent too (the fence of S10); the mode and
+ *     run-mode tools answer a refusal as `CODE: message` (toolError), so its code reaches the caller.
+ *   2026-11-26 — aimeat_agent_run_mode_set passes the calling agent, so the fence for a required operator
+ *     service's agent spares the agent itself (services/agent/profile-write.ts requiredAgentFence).
  *   2026-10-31 — aimeat_agent_propose's approval_url is the proposal's own page on the home (v31 K51).
  *   2026-10-27 — aimeat_agent_runtime_report refuses the shared anonymous principal with AUTH_REQUIRED,
  *     as aimeat_agent_tags_set does (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
@@ -178,8 +182,8 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, run_mode }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
-            const outcome = await setAgentRunMode({ storage, config }, localAccountName(agentGaii), target_agent_name, run_mode);
-            if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
+            const outcome = await setAgentRunMode({ storage, config }, localAccountName(agentGaii), target_agent_name, run_mode, agentGaii);
+            if (!outcome.ok) return toolError(outcome.code, outcome.message);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null }) }] };
         },
     );
@@ -205,7 +209,7 @@ export function registerAgentManagementTools(
             if (!self && !scopeIsCovered(sessionScopes, 'agent:write')) {
                 return toolError('SCOPE_DENIED', 'Scope "agent:write" required to report another agent\'s runtime. An agent may report its own without it.');
             }
-            const outcome = await setAgentRuntimeSource({ storage, config }, localAccountName(agentGaii), target_agent_name, src);
+            const outcome = await setAgentRuntimeSource({ storage, config }, localAccountName(agentGaii), target_agent_name, src, agentGaii);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }) }] };
         },
@@ -229,9 +233,8 @@ export function registerAgentManagementTools(
             }
 
             const outcome = await setAgentMode({ storage, config }, localAccountName(agentGaii), target_agent_name, mode, agentGaii);
-            if (!outcome.ok) {
-                return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
-            }
+            // `CODE: message` (mcp/tool-error.ts), so a caller reads OPERATOR_SERVICE_REQUIRED as REST answers it.
+            if (!outcome.ok) return toolError(outcome.code, outcome.message);
             return {
                 content: [{
                     type: 'text' as const,

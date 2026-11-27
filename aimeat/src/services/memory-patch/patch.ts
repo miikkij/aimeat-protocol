@@ -23,6 +23,7 @@
  * @usage
  *   const out = await patchMemoryRecord({ storage, config, stats, peers }, { auth: req.auth!, caller, reader, organismChecked: true }, input);
  * @version-history
+ *   2026-11-26 — A patch as the person by an operator service's agent is fenced by its entry's prefixes.
  *   2026-11-25 — A merge that turns a knowledge package manifest into one the manifest schema refuses
  *     is refused 422 SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
  *   2026-11-21 — A merge that writes an app tool manifest binding an action marked `decision: person`
@@ -68,6 +69,7 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret/records.j
 import { presentMemory } from '../classification/present-memory.js';
 import { classifyAfterWrite } from '../classify-on-write.js';
 import { resolveWriteTarget, type WriteTargetAuth } from '../write-target.js';
+import { operatorServiceWriteRefusal } from '../operator-services/write-fence.js';
 import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../owner/scope-read.js';
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../memory/write-asks.js';
 import { isKeyArchived } from '../archive.js';
@@ -152,6 +154,11 @@ export async function patchMemoryRecord(deps: MemoryPatchDeps, who: MemoryPatchW
     }
     const target = resolveWriteTarget({ auth }, config, input.ownerScope);
     if ('deny' in target) return fail(403, target.deny.code, target.deny.message);
+    // An operator service's agent patches as the person only under its entry's prefixes (operator-services/write-fence.ts).
+    if (target.delegatedOwnerWrite) {
+        const fenced = await operatorServiceWriteRefusal(storage, config, auth.sub, key);
+        if (fenced) return fail(fenced.status, fenced.code, fenced.message);
+    }
     const gaii = target.gaii;
 
     // The organism namespace rule: the REST route ran it as middleware; the MCP door runs it here.

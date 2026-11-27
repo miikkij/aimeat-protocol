@@ -37,6 +37,8 @@
  *   - resolveOperatorAgentName / OPERATOR_AGENT_REFUSAL: re-exported from operator-principal.ts
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   2026-11-26 — The operator's disable and enable acts tell the operator services that a covered account
+ *     changed (services/operator-services/events.ts); OperatorTrail.config carries operatorServices.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-25 -- The header says where background work asks the flag (services/account-deactivated.ts; secaudit2026oct22).
@@ -58,6 +60,7 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import type { AimeatConfig } from '../../config.js';
 import { recordOperatorAction } from '../operator/access-audit.js';
+import { announceOperatorServices } from '../operator-services/events.js';
 import { nodeContext } from '../node/context.js';
 import { inSavepoint } from '../tolerant-step.js';
 
@@ -180,7 +183,7 @@ export type OperatorLifecycleResult =
 
 /** Who did an operator act, for the operator trail: the operator in person, or their agent. */
 export interface OperatorTrail {
-  config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>;
+  config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow' | 'operatorServices'>;
   /** The exact principal that acted (resolveIdentity of the caller). */
   actorGaii: string;
 }
@@ -200,6 +203,7 @@ export async function deactivateOwnerByOperator(storage: Storage, target: string
   if (!(await storage.getOwner(target))) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Owner not found: ${target}` };
   const result = await deactivateOwner(storage, target, by);
   await writeTrail(storage, trail, by, target, 'disable');
+  if (trail) await announceOperatorServices(storage, trail.config);
   return { ok: true, result };
 }
 
@@ -208,5 +212,6 @@ export async function reactivateOwnerByOperator(storage: Storage, target: string
   if (!(await storage.getOwner(target))) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Owner not found: ${target}` };
   await reactivateOwner(storage, target);
   if (by) await writeTrail(storage, trail, by, target, 'enable');
+  if (trail) await announceOperatorServices(storage, trail.config);
   return { ok: true };
 }

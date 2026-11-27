@@ -2,7 +2,7 @@
   "about": "When each section of docs/AIMEAT-Feature-List.md was last read against the code it describes, which files or folders that code is (a folder means every file git tracks under it), and which promises of a refusal or a limit a test holds. pnpm check:feature-list fails when a watched file changes after the review, so whoever changed the code re-reads the section; and when a promise's sentence, its test file or the string the test must contain is gone. The watches are the folders and files the section's rows describe: the routes, services and tool catalog entries behind them, chosen so that the code under one section changes on at most about four days a week (measured with git log over 30 days on 2026-11-19), with a specific subfolder or file preferred to a whole services folder. Re-stamp after reading with: pnpm check:feature-list --record \"<section heading>\". A promise no test holds is rewritten in the list to what the code does, never listed here. Reasoning: aimeat/scripts/check-feature-list.ts.",
   "sections": {
     "1. Connecting an AI": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/mcp/oauth.ts",
         "aimeat/src/mcp/oauth-consent-info.ts",
@@ -15,7 +15,7 @@
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/routes/connect-install.ts"
       ],
-      "digest": "sha256:abeca9994c21a13b06d27373"
+      "digest": "sha256:20ad21af90fc40a422fece92"
     },
     "2. Accounts and sign-in": {
       "reviewedOn": "2026-11-24",
@@ -44,7 +44,7 @@
       "digest": "sha256:bc4a15eeda1aabd14a71c5fb"
     },
     "3. Agents and machine identity": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/agents/rekey.ts",
@@ -64,7 +64,7 @@
         "aimeat/src/routes/docsign.ts",
         "aimeat/src/routes/docsign-wallet.ts"
       ],
-      "digest": "sha256:bdddd8c7a12eea724f90f0c7"
+      "digest": "sha256:c87b643aad2e7e6a621fbc1d"
     },
     "4. Access, consent and sharing": {
       "reviewedOn": "2026-11-26",
@@ -128,7 +128,7 @@
       "digest": "sha256:acc101c61d63252bd53d68cc"
     },
     "7. The agent fleet": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/agent/task-rules.ts",
         "aimeat/src/services/agent/task-start-write.ts",
@@ -146,7 +146,7 @@
         "aimeat/src/routes/connect-tunnel.ts",
         "aimeat/src/services/basic-agents.ts"
       ],
-      "digest": "sha256:3fd4be9b502d6d98aef8572b"
+      "digest": "sha256:ed8f9714ec9dde04ee6ba866"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-25",
@@ -168,7 +168,7 @@
       "digest": "sha256:d873015ecdc8ca651ee32d7d"
     },
     "9. AI on the node": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/tool-catalog/definitions/calibrator.ts",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:fa7937fa8b76dc7b22aba4b5"
+      "digest": "sha256:c98275d7e73889d9ded3a09c"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-27",
@@ -251,7 +251,7 @@
       "digest": "sha256:b9bc29f72e6373e87e514575"
     },
     "13. Notifications, boards and live updates": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/tool-catalog/definitions/boards.ts",
         "aimeat/src/routes/sse.ts",
@@ -270,7 +270,7 @@
         "aimeat/src/services/moderation",
         "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:a25475ab9664d3dd3af45d43"
+      "digest": "sha256:333ba9a61c149fae2fc99060"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-25",
@@ -353,7 +353,7 @@
       "digest": "sha256:cc26dbab2fcea72134d86475"
     },
     "19. Operating a node": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-26",
       "watches": [
         "aimeat/src/services/node-admin",
         "aimeat/src/routes/admin/security.ts",
@@ -369,7 +369,7 @@
         "aimeat/src/services/prometheus.ts",
         "aimeat/src/services/consul-config.ts"
       ],
-      "digest": "sha256:a3c03acdf405a2cbb6c9b901"
+      "digest": "sha256:206d48381c876aa2efce3069"
     },
     "20. Security": {
       "reviewedOn": "2026-11-22",
@@ -430,6 +430,186 @@
     }
   },
   "promises": [
+    {
+      "quote": "A request from the service that the node refuses is refused at once and nothing is stored",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "13. A disabled, an unknown and the anonymous account are refused with one sentence and nothing stored"
+    },
+    {
+      "quote": "so a person never gets a service's request to approve",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "9. Required back to false: the controls return at once; she turns it off"
+    },
+    {
+      "quote": "for an account it does not cover",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "14. The audience: only bob gets the audience service"
+    },
+    {
+      "quote": "for a person who turned it off",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "17. Alice turns it off: the agent goes, its token stops, and the service is refused until she turns it on"
+    },
+    {
+      "quote": "while the service is off",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "20. Switching the service off removes its agents; the old token answers 401; a new request is refused and stored nowhere"
+    },
+    {
+      "quote": "for a permission the operator did not name",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "11. A scope outside the entry, *, memory:* and an own-tick word are refused, and leave bob no request to approve"
+    },
+    {
+      "quote": "A request for a service's agent name is never among the requests a person sees waiting for approval",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "4b. While the entry exists its id is the service"
+    },
+    {
+      "quote": "A request for the agent name of an outside service the operator switched on is never shown to you to approve",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "4b. While the entry exists its id is the service"
+    },
+    {
+      "quote": "its name is reserved for the service",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "4b. While the entry exists its id is the service"
+    },
+    {
+      "quote": "nobody else can create, propose, import or connect a new agent under it",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "4c. POST /v1/agents/import under a present entry"
+    },
+    {
+      "quote": "While a service's entry exists, switched on or not",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "a disabled entry still holds the name; no entry frees it"
+    },
+    {
+      "quote": "A person's own agent that had the name before the entry keeps working",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "made before the entry is not taken over, keeps working, and reconnects by the ordinary rules"
+    },
+    {
+      "quote": "Once no entry has the name, it is free again",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "With no entry left the name is free again"
+    },
+    {
+      "quote": "a request of the service's own that the node refuses is answered at once and kept nowhere",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "18. Removing the service"
+    },
+    {
+      "quote": "the operator's list shows that reason with who gave it and when",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "11. The operator switches the service off for alice"
+    },
+    {
+      "quote": "only that service connects it, so a consent, a code exchange or a refresh for it is refused",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "7b. Nobody but the service gets the agent"
+    },
+    {
+      "quote": "Only the service ever gets a credential for its agent",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "7b. Nobody but the service gets the agent"
+    },
+    {
+      "quote": "The private read counts only while the setting grants it, on every request",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "S5: the private read counts only while the present setting grants it"
+    },
+    {
+      "quote": "Names the node uses for its own agents are refused as a service's names",
+      "holder": "aimeat/test/unit/operator-services-reserved.test.ts",
+      "holds": "are refused as an entry id and as its credential agent, with the reason"
+    },
+    {
+      "quote": "an agent named in an entry cannot change the setting",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "S6: a credential agent does not write the setting"
+    },
+    {
+      "quote": "neither gives a service's agent words nor takes them",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "neither gives nor takes a service agent"
+    },
+    {
+      "quote": "A wider entry reaches the agent at the service's next request",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "S8: a widened entry reaches the agent at the next request"
+    },
+    {
+      "quote": "A person's own off is kept while an entry is required and holds again once it is not",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "off before required, back while required, off again once it is not"
+    },
+    {
+      "quote": "the stop, the lower clearance and the budget limits the person set are put back",
+      "holder": "aimeat/test/unit/operator-services-review.test.ts",
+      "holds": "started, clearance and budget limits as the approval set them"
+    },
+    {
+      "quote": "an agent that is a credential in the value cannot save the setting",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "1b. An operator agent that is a credential in the value does not write the setting"
+    },
+    {
+      "quote": "the person cannot remove, stop, rekey or narrow it",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "5. Alice in person cannot remove, turn off, stop, change, rekey, narrow, point the webhook or cap a required agent"
+    },
+    {
+      "quote": "The operator can also turn a service off for one account",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "11. The operator switches the service off for alice"
+    },
+    {
+      "quote": "An agent the operator requires (a required operator service) is stopped only by the operator",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "5. Alice in person cannot remove, turn off, stop"
+    },
+    {
+      "quote": "only that service changes it, by connecting again",
+      "holder": "aimeat/test/e2e-operator-service-phase2.ts",
+      "holds": "7b. Nobody but the service gets the agent"
+    },
+    {
+      "quote": "never a wildcard, never a permission a person gives only themselves except reading their private records",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "1. The setting refuses *, a domain wildcard, an own-tick word, a word that makes or changes agents, and an unknown word, with the field named"
+    },
+    {
+      "quote": "the service gets no agent for them until they press Turn on again on their Agents page",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "17. Alice turns it off: the agent goes, its token stops, and the service is refused until she turns it on"
+    },
+    {
+      "quote": "A service that writes in a person's memory as the person is held to the key prefixes the operator named",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "9b. The writer service writes as alice under its prefix and nowhere else: write, patch and delete outside it are 403"
+    },
+    {
+      "quote": "Switching the setting off, or removing a service, deletes every agent it made",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "20. Switching the service off removes its agents; the old token answers 401; a new request is refused and stored nowhere"
+    },
+    {
+      "quote": "a person of another node is never covered",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "13. A disabled, an unknown and the anonymous account are refused with one sentence and nothing stored; another node"
+    },
+    {
+      "quote": "changes neither your calibrator projects nor your AI budget, quotas and allowlist, whatever words you gave it",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "9e. Even with the words alice gives it, the writer service changes neither her AI settings nor her calibrator records"
+    },
+    {
+      "quote": "a refused entry is answered with the field it is in, and a save that switches a service off or removes it removes its agents before the answer",
+      "holder": "aimeat/test/e2e-operator-service-agents.ts",
+      "holds": "22. Removing every entry removes the agents; the setting is empty again"
+    },
     {
       "quote": "an agent whose model runs elsewhere finds it absent on every read",
       "holder": "aimeat/test/e2e-classification-packs.ts",
@@ -508,7 +688,7 @@
   ],
   "fileDigests": {
     "1. Connecting an AI": {
-      "aimeat/src/mcp/oauth.ts": "65347f7c28de547a",
+      "aimeat/src/mcp/oauth.ts": "a47e04669f3a2985",
       "aimeat/src/mcp/oauth-consent-info.ts": "36d3fc455b40c6ee",
       "aimeat/src/mcp/protocol-version.ts": "f57eb3836e14df1e",
       "aimeat/src/routes/bootstrap.ts": "0fc4e4a55dff0d37",
@@ -560,8 +740,8 @@
       "aimeat/src/services/vc-issuer.ts": "abcd750b519d38bc"
     },
     "3. Agents and machine identity": {
-      "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
-      "aimeat/src/routes/agents/rekey.ts": "ca523f858e240d3e",
+      "aimeat/src/routes/agents/device-auth.ts": "1e89e130eba9feb8",
+      "aimeat/src/routes/agents/rekey.ts": "b3f2c5f9f467a742",
       "aimeat/src/routes/agents/avatar.ts": "3763b0fbaf724693",
       "aimeat/src/routes/agents/permission-allow.ts": "f5698f57173a2cb5",
       "aimeat/src/services/agent/refusals.ts": "f8353846562df23f",
@@ -677,9 +857,9 @@
     },
     "7. The agent fleet": {
       "aimeat/src/services/agent/task-rules.ts": "6fe6b779efdd6d20",
-      "aimeat/src/services/agent/task-start-write.ts": "bf577e03e34bc2d3",
-      "aimeat/src/services/agent/stop.ts": "53f005c8274cc04b",
-      "aimeat/src/services/agent/proposals.ts": "60453e3d4eb78066",
+      "aimeat/src/services/agent/task-start-write.ts": "12935df1560a57a5",
+      "aimeat/src/services/agent/stop.ts": "6b1365970a010a81",
+      "aimeat/src/services/agent/proposals.ts": "03c261b1f6c08f3f",
       "aimeat/src/services/task/start-op.ts": "4be59ac3ec83da86",
       "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "68d428753b656d0e",
       "aimeat/src/tool-catalog/definitions/goals.ts": "15966fd2c695c2ed",
@@ -689,9 +869,9 @@
       "aimeat/src/routes/agent-tasks/dedupe.ts": "bbfe9654cd06d631",
       "aimeat/src/routes/agent-tasks/helpers.ts": "8e532f5f296ce335",
       "aimeat/src/routes/agent-tasks/lifecycle.ts": "e721781e12c40bd8",
-      "aimeat/src/routes/agents/stop-start.ts": "6103d4376b86a22f",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "18dea18af2f95707",
-      "aimeat/src/routes/agent-webhook.ts": "21ff00354db4c043",
+      "aimeat/src/routes/agents/stop-start.ts": "54a0541d8332600c",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "d2ee0984b1f5a5d8",
+      "aimeat/src/routes/agent-webhook.ts": "452266b4acdca379",
       "aimeat/src/routes/agent-telemetry.ts": "5ef1103a905f5c2a",
       "aimeat/src/routes/connect-tunnel.ts": "537a868bfc4b94fe",
       "aimeat/src/services/basic-agents.ts": "fd280b0ade062a5a"
@@ -746,13 +926,13 @@
       "aimeat/src/services/ai/openrouter-region.ts": "35855149762a3935",
       "aimeat/src/services/ai/transcription.ts": "994b10f23a26e665",
       "aimeat/src/services/ai/voice.ts": "87d6b0f6a2227a69",
-      "aimeat/src/routes/ai.ts": "5a597fdae8434769",
+      "aimeat/src/routes/ai.ts": "438589fb1ceceffa",
       "aimeat/src/routes/llm-proxy.ts": "027d67cf9f0f75cc",
       "aimeat/src/routes/ai-providers.ts": "223c9be9d18fb28c",
       "aimeat/src/routes/ai-decide.ts": "a24ebb94effd126a",
       "aimeat/src/routes/ai-decide-rules.ts": "b365b7b7be6079ea",
       "aimeat/src/routes/ai-jobs.ts": "e63ac7114ec0946d",
-      "aimeat/src/routes/calibrator.ts": "76c47a4541980801",
+      "aimeat/src/routes/calibrator.ts": "9bf7f23b12fb6919",
       "aimeat/src/routes/living.ts": "e1a23e862add5ae0",
       "aimeat/src/tool-catalog/definitions/ai-models.ts": "483ec4bb385c5321",
       "aimeat/src/tool-catalog/definitions/decide.ts": "597e5c74f1e42574"
@@ -846,7 +1026,7 @@
       "aimeat/src/services/notifications/answers.ts": "e8bcccb7bd187a61",
       "aimeat/src/services/notifications/create.ts": "49f7eef0b50f1394",
       "aimeat/src/services/notifications/links.ts": "f103b1adcd714296",
-      "aimeat/src/services/notifications/recipient-words.ts": "b20b509a0664b61b",
+      "aimeat/src/services/notifications/recipient-words.ts": "75bc4beba5d8cbad",
       "aimeat/src/services/notifications/settings.ts": "d701520d4a83b2ea",
       "aimeat/src/services/notifications/sweeps.ts": "8e95bc8733b94507",
       "aimeat/src/services/notifications/templates.ts": "2a4d05bdd0b64a04",
@@ -970,7 +1150,7 @@
       "aimeat/src/services/node-admin/teams-view.ts": "54307d42939f63cb",
       "aimeat/src/routes/admin/security.ts": "d25fa18e477713ad",
       "aimeat/src/routes/health.ts": "446cf4b85eb807bf",
-      "aimeat/src/routes/admin/config.ts": "e45163e637c797b1",
+      "aimeat/src/routes/admin/config.ts": "431c581284872904",
       "aimeat/src/routes/admin/key-reencrypt.ts": "1bfbc050258279cf",
       "aimeat/src/routes/admin/node-update.ts": "6fc2fbb2564bf146",
       "aimeat/src/routes/admin/cors.ts": "827ff3c09abd1cd7",

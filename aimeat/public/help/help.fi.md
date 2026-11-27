@@ -61,6 +61,24 @@ Kerro [chatissa](/v1/chat) tai [Kodissa](/v1/home) yhdellä lauseella, mitä hal
 
 Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/profile?tab=scheduler), josta näet, milloin kukin agentti tekee työtä seuraavaksi. Valmiit työt näet Kodissa kohdassa Mitä on tapahtunut. Halutessasi agentti lähettää ne myös sähköpostiisi. Voit pysäyttää agentin milloin tahansa.
 
+## Agentti, jossa on merkintä ”Ylläpitäjän asettama” {#operator-agent}
+
+Tämän palvelimen ylläpitäjä voi ottaa ulkoisen palvelun käyttöön tilillesi. Palvelu voi esimerkiksi kirjoittaa jokaisen kokouksen yhteenvedon muistiinpanoihisi. Silloin palvelu saa agentin tilillesi, vaikka et hyväksynyt sitä itse. Näet agentin [Agentit-sivulla](/v1/profile?tab=agents), ja siinä on merkintä ”Ylläpitäjän asettama”.
+
+Sait agentista yhden ilmoituksen. Ilmoitus, merkintä ja agentin kortti kertovat ylläpitäjän omin sanoin, mikä palvelu on ja mitä se saa tehdä. Jos palvelu kirjoittaa muistiisi sinun nimissäsi, se kirjoittaa vain niihin avaimiin, jotka ilmoitus nimeää.
+
+Jos palvelu lukee myös yksityiset tietueesi, ilmoitus ja kortti kertovat sen omalla lauseellaan ja kertovat ylläpitäjän syyn. Ylläpitäjä antaa tämän oikeuden vain syyn kanssa, jonka jokainen lukee. Syy voi olla esimerkiksi sääntö, jota organisaation on noudatettava tallennetuissa tiedoissa.
+
+Jos kortti kertoo, miten voit auttaa palvelua, tee niin: kortti kertoo, mitä voit antaa palvelulle, jotta se toimii sinulle paremmin. Voit myös antaa agentille ohjeita ja aineistoa sen kortilla.
+
+Voit poistaa palvelun käytöstä itseltäsi: poista sen agentti Agentit-sivulla. Sen jälkeen palvelu ei saa sinulle agenttia, ennen kuin painat samalla sivulla kohdassa ”Palvelut, jotka eivät ole käytössäsi” painiketta Ota taas käyttöön. Se, mitä palvelu kirjoitti muistiisi, jää sinulle.
+
+Agenttia, jossa on merkintä ”Ylläpitäjän edellyttämä”, et voi poistaa käytöstä. Sellaisia palveluja on työhön, jonka ylläpitäjän on nähtävä tehdyksi jokaisella tilillä, jolla palvelu on käytössä, esimerkiksi että jokainen uusi henkilö saa käyttöönoton tehtyä. Et voi poistaa, pysäyttää tai rajata agenttia, mutta näet sen, voit lukea, mitä se teki, antaa sille ohjeita ja lisätä sille omia oikeuksia. Vain ylläpitäjä voi poistaa sen käytöstä.
+
+Jos palvelun kohdalla lukee ”Ylläpitäjä poisti tämän palvelun käytöstä tililtäsi”, ylläpitäjä poisti sen käytöstä vain sinulta, ja vain ylläpitäjä voi ottaa sen taas käyttöön.
+
+Kysy lisää ylläpitäjältä viestillä osoitteeseen support@operators.
+
 <!--store-->
 ## Ulkopuoliset tekoälyt ja agentit {#outside}
 

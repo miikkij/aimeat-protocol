@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-26 — PATCH runtime-source passes the caller's principal too (operator services review, S10).
+ *   2026-11-26 — OPERATOR_SERVICE_REQUIRED answers 403; PATCH run-mode passes the caller's principal, so
+ *     the fence for a required operator service's agent spares the agent itself.
+ *   2026-11-26 — GET /v1/agents carries set_by_operator: { service, display_name } for an agent an operator
+ *     service set up (services/operator-services/marks.ts), null otherwise.
  *   2026-11-19 — PATCH /v1/agents/:name/task-start takes task_start_app_waits (setAgentTaskStartSettings).
  *   2026-11-14 — GET /v1/agents/:gaii reads the agent, its trust score (computed and stored) and its
  *     avatar through agentProfileNow (services/agent/profile-read.ts), which aimeat_agent_profile asks too (unit 2b, B4).
@@ -115,11 +120,12 @@ import { agentInstalls } from '../../services/connector/registry.js';
 import { stoppedView } from '../../services/agent/stop-rules.js';
 import { invitesPeople } from '../../services/agent/invites.js';
 import { avatarView, readAvatarsOrEmpty } from '../../services/agent/avatar.js';
+import { operatorServiceMarks } from '../../services/operator-services/marks.js';
 
 /** HTTP status for a refusal from services/agent/profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
   if (code === 'AGENT_NOT_FOUND') return 404;
-  if (code === 'ACCESS_DENIED') return 403;
+  if (code === 'ACCESS_DENIED' || code === 'OPERATOR_SERVICE_REQUIRED') return 403;
   if (code === 'INVALID_INPUT') return 400;
   return 500;
 }
@@ -301,6 +307,8 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // Every agent's picture in one read; the list carries the emoji or the picture's address, never
     // the SVG itself (services/agent/avatar.ts).
     const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/agents');
+    // The agents an operator service set up for this person (services/operator-services/marks.ts).
+    const setByOperator = await operatorServiceMarks(storage, config, req.auth!.owner, agents);
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
         gaii: a.gaii,
@@ -348,6 +356,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // every agent that predates the field. The owner's own answer to "where did these come
         // from", and the fence on which agents a sibling may delete.
         registered_by: a.registeredBy ?? null,
+        // The operator service that set this agent up for the person, from the service's ledger; null
+        // for every other agent. The person can turn it off on DELETE /v1/operator-services/{id}/me.
+        set_by_operator: setByOperator.get(a.gaii) ?? null,
         // How the agent is meant to be RUN, and which credential mechanics it uses. Both are
         // recorded here and honoured by the runtime; the node never enforces either. `run_mode` is
         // null on an agent nobody has said anything about, which is not the same as 'spawn'.
@@ -595,7 +606,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
   router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentRunMode({ storage, config }, req.auth!.owner as string,
-      (req.params.name as string), req.body?.run_mode);
+      (req.params.name as string), req.body?.run_mode, resolveIdentity(req.auth!, config.nodeId));
     if (!outcome.ok) {
       res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
         .json(error(config.nodeId, outcome.code, outcome.message));
@@ -631,7 +642,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
   router.patch('/v1/agents/:name/runtime-source', requireAuth(), refuseAnonymousPrincipal(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const outcome = await setAgentRuntimeSource({ storage, config }, req.auth!.owner as string,
-      (req.params.name as string), req.body?.runtime_source);
+      (req.params.name as string), req.body?.runtime_source, resolveIdentity(req.auth!, config.nodeId));
     if (!outcome.ok) {
       res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
         .json(error(config.nodeId, outcome.code, outcome.message));

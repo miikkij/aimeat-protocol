@@ -28,6 +28,8 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   v2.5.0 — 2026-11-26 — The writes refuse an operator service's agent unless its entry's prefixes cover
+ *     `calibrator.` (services/operator-services/write-fence.ts).
  *   v2.4.0 — 2026-11-19 — The handlers' work moved unchanged to services/calibrator/projects.ts and
  *     the templates to services/calibrator/templates.ts, which the MCP tool aimeat_calibrator runs.
  *     Each route admits the owner in person as before, and now also the owner's agent holding
@@ -65,6 +67,7 @@ import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { readerFor } from '../services/classification/reader.js';
 import { READ_AS_OWNER_SCOPE, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { operatorServiceAreaRefusal } from '../services/operator-services/write-fence.js';
 import {
   calibratorTemplates, listProjects, createProject, getProject, projectDetail, updateProject, deleteProject,
   createVersion, listVersions, getVersion, createBatch, listBatches, getBatch, updateBatch, deleteBatch,
@@ -78,7 +81,15 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
   // The owner in person; or the owner's agent with the word that reads the owner's private records,
   // and for a change the word that writes them.
   const read: RequestHandler[] = [requireAuth(), requireRoleOrScope('owner', READ_AS_OWNER_SCOPE)];
-  const write: RequestHandler[] = [...read, requireRoleOrScope('owner', WRITE_AS_OWNER_SCOPE)];
+  // An operator service's agent writes the person's `calibrator.` records only when its entry's
+  // prefixes cover that whole area (services/operator-services/write-fence.ts).
+  const fence: RequestHandler = (req, res, next) => {
+    void operatorServiceAreaRefusal(storage, config, req.auth!.sub, 'calibrator.').then((fenced) => {
+      if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message)); return; }
+      next();
+    }, next);
+  };
+  const write: RequestHandler[] = [...read, requireRoleOrScope('owner', WRITE_AS_OWNER_SCOPE), fence];
 
   /** The owner GHII whose calibrations the caller works on; null (and a 403 sent) for another node's session. */
   const ownerOf = (req: Request, res: Response): string | null => {
