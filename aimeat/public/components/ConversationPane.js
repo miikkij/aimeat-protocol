@@ -15,7 +15,7 @@
  *   top edge to the window's bottom as --conversation-desk-avail (views/profile/inbox-tab/
  *   use-thread-ux.js), and on a phone the open pane is pinned to the visible area, --vv-top and
  *   --vv-height (js/visual-viewport.js).
- * @structure Panes({ open, backLabel, onBack, side, head, label, framed, children }) · Pane({ empty, page, children }) ·
+ * @structure Panes({ open, backLabel, onBack, side, head, label, framed, folded, unfold, children }) · Pane({ empty, page, children }) ·
  *   PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) ·
  *   PaneDoor({ mark, label, title, pressed, onClick }) · PaneFields({ children }) ·
  *   ReplyBar({ label, text, onJump, cancelLabel, onCancel }) · PaneNote({ children }) ·
@@ -30,6 +30,8 @@
  *   thing opened from it; `label` names the list): html`<${Panes} framed label=${x('find')}
  *     head=${searchAndFilters} side=${rows}>${editor}<//>`
  * @version-history
+ *   v1.2.0 — 2026-11-27 — Panes `folded` + `unfold`: on a wide screen the list folds to a narrow
+ *     strip with the control that opens it again, so the open conversation gets the width.
  *   v1.1.0 — 2026-09-27 — `Panes framed` + `head` + `label`: the admin System Prompts page's list beside
  *     the open prompt (components/Panes.js, admin page group G3, folded in: one component for a list
  *     beside the thing opened from it). Its look moved from panes.css into conversation-pane.css; the
@@ -44,7 +46,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { Avatar } from '/components/Avatar.js';
 import { PresenceDot } from '/components/PresenceDot.js';
-import { Action, Icon } from '/components/Action.js';
+import { Action, Icon, Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -56,7 +58,7 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
  *  over the list and does not scroll, the rows (`side`) scroll inside their pane, the opened thing
  *  (children) scrolls on its own; `label` names the list pane for a screen reader. Under a wide
  *  desktop (1400px) the list stands over the opened thing and is kept short; both stay in sight. */
-export function Panes({ open, backLabel, onBack, side, head, label, framed, children }) {
+export function Panes({ open, backLabel, onBack, side, head, label, framed, folded, unfold, children }) {
   if (framed) {
     return html`
       <div class="conversation-panes-framed">
@@ -67,9 +69,12 @@ export function Panes({ open, backLabel, onBack, side, head, label, framed, chil
         <div class="conversation-panes-framed-open">${children}</div>
       </div>`;
   }
+  // folded (a wide screen only; a phone shows one pane at a time anyway): the list is a narrow strip
+  // with the control that opens it again (`unfold`: { label, onClick }).
   return html`
-    <div class=${cx('conversation-panes', 'poster-row--thing', open && 'conversation-panes--open')}>
+    <div class=${cx('conversation-panes', 'poster-row--thing', open && 'conversation-panes--open', folded && 'conversation-panes--folded')}>
       <button type="button" class="conversation-panes-back" onClick=${onBack}>← ${backLabel}</button>
+      ${folded && unfold ? html`<div class="conversation-panes-strip"><${Icon} small label=${unfold.label} onClick=${unfold.onClick}><${Chevron} /><//></div>` : null}
       <div class="conversation-panes-side">${side}</div>
       ${children}
     </div>`;

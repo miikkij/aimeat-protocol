@@ -35079,5 +35079,12 @@
   "organisms.ev.agentAdded": "{n} agentes más",
   "organisms.ev.agentRemoved": "{n} agentes menos",
   "organisms.ev.change": "Un cambio",
-  "organisms.ev.totals": "{ws} espacios de trabajo · {docs} documentos · {recs} registros · {members} miembros"
+  "organisms.ev.totals": "{ws} espacios de trabajo · {docs} documentos · {recs} registros · {members} miembros",
+  "settings.menuHide": "Ocultar el menú",
+  "settings.menuShow": "Mostrar el menú",
+  "inbox.listHide": "Ocultar la lista de conversaciones",
+  "inbox.listShow": "Mostrar la lista de conversaciones",
+  "contacts.cover.colNote": "Nota",
+  "contacts.cover.colInvite": "Invitación",
+  "contacts.cover.colWhose": "De quién"
 }

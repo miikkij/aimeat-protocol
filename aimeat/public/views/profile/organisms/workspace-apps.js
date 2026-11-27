@@ -11,6 +11,7 @@
  * @structure WorkspaceApps
  * @usage import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
  * @version-history
+ *   v2.0.2 — 2026-11-27 — Manage is its word alone; it carried a gear glyph.
  *   v2.0.1 — 2026-11-14 — The app picker's search is a TextField `search`: a find field the
  *     browser's autofill cannot fill with the sign-in name (js/find-field-guard.js).
  *   v2.0.0 — 2026-09-26 — Every part is a library component that takes data: the strip is the Object box
@@ -127,7 +128,7 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
         <${Note} inline>${t('organisms.apps.hint') || 'Pinned to this workspace: they open with it as context.'}<//>
         ${canEdit ? html`
           <${Action} small expanded=${showPicker} onClick=${() => setShowPicker(s => !s)}>
-            ${showPicker ? (t('organisms.apps.done') || 'Done') : ('⚙ ' + (t('organisms.apps.manage') || 'Manage'))}
+            ${showPicker ? (t('organisms.apps.done') || 'Done') : (t('organisms.apps.manage') || 'Manage')}
           <//>` : null}
       <//>
       ${bound.length > 0

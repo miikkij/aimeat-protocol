@@ -141,6 +141,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         variants: [
             { name: 'overview', class: 'settings-frame-content--overview', prop: 'overview', when: 'the overview, where no tab is open' },
             { name: 'drawer open', class: 'settings-frame--open', prop: 'open', when: 'on a phone, while the menu is shown' },
+            { name: 'folded', class: 'settings-frame--folded', prop: 'the person\'s choice (the fold control at the menu\'s top)', when: 'on a wide screen, when the person folds the menu to a 56px strip; kept in this browser' },
         ],
         example: { menuLabel: 'Menu', menu: '…', children: '…' },
     },

@@ -30,6 +30,8 @@
  *   box with the arrow out of it. `pick` on a group: the "select all" word while selecting.
  *   `openLabel` on a row: its tooltip, the whole name where the row cuts it short (an agent's threads).
  * @version-history
+ *   v1.5.0 — 2026-11-27 — ConversationTools `lead`: a control at the row's start (the messenger's
+ *     fold for the list), before the selection count.
  *   v1.4.0 — 2026-11-08 — A request opens: `body` (the whole first message), `more` and `less` (the
  *     page's words for the toggle under it). The name and the address wrap instead of cutting. On a
  *     phone a request showed two lines of its message and a cut name, and nothing opened them.
@@ -90,8 +92,9 @@ export function ConversationRows({ children }) {
 }
 
 /** The line of the list's own actions (select, archive the selected…), and how many are picked. */
-export function ConversationTools({ count, children }) {
+export function ConversationTools({ count, lead, children }) {
   return html`<div class="conversation-tools">
+    ${lead ? html`<span class="conversation-tools-lead">${lead}</span>` : null}
     ${count ? html`<span class="conversation-tools-count">${count}</span>` : null}
     ${children}
   </div>`;

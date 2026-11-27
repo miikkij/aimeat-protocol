@@ -13,6 +13,8 @@
  *   v1.13.0 -- 2026-11-27 -- A person's or an agent's row whose first message waits for the owner's answer (state
  *     'pending') says so in the coral line under the name (state.pending), so the row that needs the person reads as one.
  *   v1.12.0 -- 2026-10-26 -- A row of origin 'colleague' (a person of a company server, members see each other on) says "colleague" where a saved row says "saved".
+ *   v1.12.0 -- 2026-11-27 -- The no-account and agents lists have their column heads too; only the
+ *     people list had them.
  *   v1.11.0 -- 2026-10-19 -- An agent's row shows the agent's own avatar when it has one (leadProps); the initials stay its mark otherwise.
  *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (List with its Lead, Name, Cell, Desc, Who, When and Doors; Mark; Action; SettingsPage with the crumb and the rail as data): the page passes data and writes no class. The people table's heading row is the List's head, as main drew it over the rows (page group G8).
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -115,7 +117,8 @@ export function peopleRows(ctx, rows) {
 
 /** The people without an account: who, tags, the note, the invitation, the doors. */
 export function noAccountRows(ctx, rows) {
-  return html`<${List} cols="mark-name-tags-note-state-doors" keepCols>
+  return html`<${List} cols="mark-name-tags-note-state-doors" keepCols
+    head=${['', c('colName'), c('colRelation'), c('colNote'), c('colInvite'), '']}>
     ${rows.map(r => html`
       <${Row} key=${r.contact_id}>
         <${Lead} text=${initials(r)} />
@@ -133,7 +136,8 @@ export function noAccountRows(ctx, rows) {
 
 /** The agents and apps: who, whose, last message, the doors. Their mark is the agent's, dashed. */
 export function agentRows(ctx, rows) {
-  return html`<${List} cols="mark-name-who-last-doors" keepCols>
+  return html`<${List} cols="mark-name-who-last-doors" keepCols
+    head=${['', c('colName'), c('colWhose'), c('colLast'), '']}>
     ${rows.map(r => {
       const owner = ctx.personOf(r.owner);
       const whose = r.owner === ctx.me ? c('yours')

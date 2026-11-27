@@ -9,6 +9,7 @@
  * @structure PAGE_KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
  * @version-history
+ *   v1.5.2 — 2026-11-27 — The fold row's icon controls draw the Glyph marks instead of emoji.
  *   v1.5.1 — 2026-11-15 — Demo names and sample words say actions, not doors.
  *   v1.5.0 — 2026-11-01 — PageSection's `step`: three numbered steps in a raised box (WP9b).
  *   v1.4.0 — 2026-10-11 — PageSection's `ends`, shown as two small bands in a row.
@@ -40,7 +41,7 @@ import { Rail } from '/components/Rail.js';
 import { Crumb } from '/components/Crumb.js';
 import { PageHead } from '/components/PageHead.js';
 import { SubHeading, HeadDesc } from '/components/SubHeading.js';
-import { Action, Actions, Loud, Icon } from '/components/Action.js';
+import { Action, Actions, Loud, Icon, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -154,7 +155,7 @@ export const PAGE_KIT_DEMOS = {
         <${FoldRow} name="studio/clients" defaultOpen body=${html`<${Note} kind="lead">Twelve records under this key.<//>`}><${Mark} kind="count" tone="tally">12<//><//><//><//>` },
     { name: 'doors', render: () => html`<${SettingsRoot}><${Folds}>
         <${FoldRow} name="studio/prices" isKey open=${false} onClick=${noop}
-          doors=${html`<${Icon} small label="Search in this group" onClick=${noop}>🔍<//><${Icon} small label="Delete group" onClick=${noop}>🗑️<//>`} /><//><//>` },
+          doors=${html`<${Icon} small label="Search in this group" onClick=${noop}><${Glyph} name="search" /><//><${Icon} small label="Delete group" onClick=${noop}><${Glyph} name="trash" /><//>`} /><//><//>` },
     { name: 'long', render: () => html`<${SettingsRoot}><${Folds}><${FoldRow} num="09:12" who="invoice-drafter" verb="wrote" name=${LONG} onClick=${noop} /><//><//>` },
   ] },
   'tab-row': { variants: [

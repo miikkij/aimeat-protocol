@@ -37296,5 +37296,12 @@
   "organisms.ev.agentAdded": "agentteja {n} lisää",
   "organisms.ev.agentRemoved": "agentteja {n} vähemmän",
   "organisms.ev.change": "Muutos",
-  "organisms.ev.totals": "työtiloja {ws} · dokumentteja {docs} · tietueita {recs} · jäseniä {members}"
+  "organisms.ev.totals": "työtiloja {ws} · dokumentteja {docs} · tietueita {recs} · jäseniä {members}",
+  "settings.menuHide": "Piilota valikko",
+  "settings.menuShow": "Näytä valikko",
+  "inbox.listHide": "Piilota keskustelulista",
+  "inbox.listShow": "Näytä keskustelulista",
+  "contacts.cover.colNote": "Muistiinpano",
+  "contacts.cover.colInvite": "Kutsu",
+  "contacts.cover.colWhose": "Kenen"
 }

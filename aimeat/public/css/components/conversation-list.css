@@ -11,6 +11,7 @@
  *   from outside.
  * @usage Linked from public/spa.html in the component block, after thread-list.css.
  * @version-history
+ *   v1.2.0 — 2026-11-27 — .conversation-tools-lead: a control at the selection line's start.
  *   v1.1.0 — 2026-11-08 — A contact request's name and address wrap instead of cutting with an
  *     ellipsis; .conversation-request--open shows the whole first message with its line breaks, and
  *     .conversation-request-more holds the toggle under it.
@@ -74,6 +75,9 @@
   justify-content: flex-start; position: sticky; top: 0; z-index: 2; background: var(--card-bg);
 }
 .conversation-tools-count { margin-right: auto; font-size: 12px; font-weight: 700; }
+/* A control at the row's start (ConversationTools lead): the list's fold. */
+.conversation-tools-lead { margin-right: auto; display: inline-flex; }
+.conversation-tools-lead:has(+ .conversation-tools-count) { margin-right: 0; }
 
 /* ── Sections: every heading closes what is under it, and a closed heading still shows how many are
    unread. The heading is the group heading (.poster-day-title); this keeps its place. ── */

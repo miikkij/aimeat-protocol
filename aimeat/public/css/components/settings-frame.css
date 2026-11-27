@@ -11,6 +11,9 @@
  *   in the order they were read, under the component's names (UI consolidation phase 5, a move).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The menu folds to a 56px strip on a wide screen (.settings-frame--folded,
+ *     .settings-frame-fold, .settings-frame-menu-body), and a desk page (the messenger) ends 12px
+ *     above the window's edge instead of 48px.
  *   v1.1.0 — 2026-09-26 — The phone's Menu button is the loud action (.poster-slab); its own copy of the look goes, its place stays (Jouni's decision "Phone menu button").
  *   v1.0.0 — 2026-09-25 — Moved from the profile sheets (.pf-shell, .pf-sidebar, .pf-content,
  *     .pf-content-head, .pf-content-body, .pf-mnav-toggle, .pf-scrim, .pf-overview), a move.
@@ -42,11 +45,21 @@
 /* Content fills the space next to the side column and caps at ~1360px, so lines stay readable
    on a wide screen; the wide gutter and the air under the header give the rules room. */
 .settings-frame-content { flex: 1 1 auto; min-width: 0; max-width: 1360px; padding: 1.5rem 2.75rem 3rem 3rem; }
+/* A page whose work area takes the screen (SettingsPage desk, the messenger) ends at the window's
+   edge: the 48px under it was an empty band under the conversation. */
+.settings-frame-content:has(.settings-page-head--desk) { padding-bottom: .75rem; }
 .settings-frame-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
 .settings-frame-body { min-width: 0; }
 
 .settings-frame-toggle { display: none; }
 .settings-frame-scrim { display: none; }
+
+/* The fold control at the top of the menu (wide screens only): folded, the column is a 56px strip
+   with only the control that opens it again, and the content column takes the rest. */
+.settings-frame-fold { display: flex; justify-content: flex-end; margin: -0.75rem -0.5rem 0.25rem 0; }
+.settings-frame--folded .settings-frame-menu { width: 56px; flex-basis: 56px; padding: 1.5rem 0.5rem; overflow: visible; }
+.settings-frame--folded .settings-frame-fold { justify-content: center; margin: 0; }
+.settings-frame--folded .settings-frame-menu-body { display: none; }
 
 @media (max-width: 900px) {
   .settings-frame { display: block; }
@@ -63,6 +76,10 @@
   }
   /* Screen space is valuable on a phone: minimal side margins. */
   .settings-frame-content { padding: 0.5rem 0.35rem 1.5rem; }
+  /* The drawer is the phone's way to hide the menu: the wide screen's fold does not apply. */
+  .settings-frame-fold { display: none; }
+  .settings-frame--folded .settings-frame-menu { width: 264px; flex-basis: auto; padding: 1.5rem 1.25rem 2rem 2rem; overflow-y: auto; }
+  .settings-frame--folded .settings-frame-menu-body { display: block; }
 }
 
 /* The poster face: the content column reads in the poster body face, the head has no rule. */

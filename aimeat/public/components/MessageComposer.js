@@ -28,7 +28,8 @@
  *   Remount it (a `key` per conversation) so a draft never leaks between threads.
  * @version-history
  *   2026-11-27 — The thin field grows to 40 % of the window (at most 320px) before it scrolls; it
- *     stopped at 132px.
+ *     stopped at 132px. Its height no longer counts the padding twice (an empty field was one line
+ *     plus 16px).
  *   2026-10-31 — The rich editor sanitizes HTML with js/editor-html-sanitizer.js, as the document
  *     editor does (secaudit2026oct31w2 round 10).
  *   v1.0.1 — 2026-10-21 — clearDraft cancels a save still waiting: a message sent within 400 ms of the
@@ -261,7 +262,11 @@ export function MessageComposer({
     // was 132px, five lines, and a longer message was written behind a scrollbar.
     const tall = typeof window !== 'undefined' ? window.innerHeight : 800;
     const cap = expanded ? Math.round(tall * 0.6) : Math.min(Math.round(tall * 0.4), 320);
-    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, cap) + 'px';
+    // scrollHeight holds the padding and the field is content-box, so the padding comes off once:
+    // set as it is, an empty field stood one padding taller than its one line.
+    const cs = getComputedStyle(ta);
+    const pad = cs.boxSizing === 'border-box' ? 0 : (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight - pad, cap) + 'px';
   };
   // Size the thin field to any seeded draft on mount (and keep it 1 row when empty); re-fit when the
   // expand cap changes.

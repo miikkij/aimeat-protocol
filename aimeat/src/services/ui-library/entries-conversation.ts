@@ -395,6 +395,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
             { name: 'page', class: 'conversation-pane--page', prop: 'Pane page', when: 'the broadcast form, tracked responses, results: a page\'s column' },
             { name: 'grey strip', class: 'conversation-strip--grey', prop: 'PaneStrip grey', when: 'a command to fill in, an agent\'s schedule' },
             { name: 'framed', class: 'conversation-panes-framed', prop: 'Panes framed head label', when: 'a list beside the thing opened from it on a page, in one frame (the operator\'s System prompts)' },
+            { name: 'folded', class: 'conversation-panes--folded', prop: 'Panes folded unfold', when: 'on a wide screen, the list folded to a 48px strip with the control that opens it again' },
         ],
         example: { open: true, head: { name: 'mika', subject: 'Brand colours' } },
         note: 'Built on 2026-09-26 with the values of css/views/inbox.css and inbox-poster.css (.inbox-body, -back, -side, -panel, -thread-head, -replybar*, -announce-note, -compose-fields, -tracked-list, -results, -cmdbar, -cmdfill, -sched). The heights are measured by the page (--conversation-desk-avail, --conversation-avail). On 2026-09-27 it folded in the admin System prompts page\'s Panes (components/Panes.js and panes.css, both gone): Panes framed, its look under this sheet\'s names (.conversation-panes-framed*).',

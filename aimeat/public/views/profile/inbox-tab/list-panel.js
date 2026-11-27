@@ -13,6 +13,8 @@
  * @structure ListPanel · rowIds · isUnread
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.15.0 — 2026-11-27 — `foldControl`: the control that folds the list stands at the start of its
+ *     selection line.
  *   v1.14.0 — 2026-11-14 — A thread a question of Ask someone who knows opened carries the Question
  *     chip (openedKind help-question).
  *   v1.13.0 — 2026-11-10 — "Unread" is the top section: a row with a message the owner has not opened
@@ -73,7 +75,7 @@ export function rowIds(c) {
   return [c.conversationId, ...(c.folded || []).map(f => f.conversationId)];
 }
 
-export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org, groupInvitations }) {
+export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org, groupInvitations, foldControl }) {
   /** An agent peer's own avatar or null (inbox-tab.js peerAvatar); ConversationList draws it in the identicon's place. */
   const avatarFor = (id) => (peerAvatar ? peerAvatar(id) : null);
   /** How many entries each section shows, by section key, once "Show more" was pressed. */
@@ -283,7 +285,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
         <//>` : null}
 
       ${conversations.length ? html`
-        <${ConversationTools} count=${selecting ? t('inbox.org.selectedCount', { count: String(selected.size) }) : null}>
+        <${ConversationTools} lead=${foldControl} count=${selecting ? t('inbox.org.selectedCount', { count: String(selected.size) }) : null}>
           ${selecting ? html`
             <${Action} disabled=${!toArchive.length} onClick=${() => org.archive(toArchive, false, true)}>${t('inbox.org.archiveSelected', { count: String(toArchive.length) })}<//>
             ${toRestore.length ? html`<${Action} onClick=${() => org.archive(toRestore, true, true)}>${t('inbox.org.restoreSelected', { count: String(toRestore.length) })}<//>` : null}

@@ -36529,5 +36529,12 @@
   "organisms.ev.agentAdded": "{n} more agents",
   "organisms.ev.agentRemoved": "{n} fewer agents",
   "organisms.ev.change": "A change",
-  "organisms.ev.totals": "{ws} workspaces · {docs} documents · {recs} records · {members} members"
+  "organisms.ev.totals": "{ws} workspaces · {docs} documents · {recs} records · {members} members",
+  "settings.menuHide": "Hide the menu",
+  "settings.menuShow": "Show the menu",
+  "inbox.listHide": "Hide the conversation list",
+  "inbox.listShow": "Show the conversation list",
+  "contacts.cover.colNote": "Note",
+  "contacts.cover.colInvite": "Invitation",
+  "contacts.cover.colWhose": "Whose"
 }

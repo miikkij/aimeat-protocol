@@ -24,6 +24,8 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.3.2 — 2026-11-27 — A list row's name stands 14px from its mark (it touched it), and the column
+ *     heads end in an ink line so the list visibly starts under them.
  *   v1.3.1 — 2026-11-27 — The start closed in a head's row (PageStart inline) has no box: the
  *     messenger's head showed an empty framed box with a sun offset around one word.
  *   v1.3.0 — 2026-11-27 — A soft action is a third weight: a hairline frame and lighter words. It was
@@ -186,6 +188,12 @@ function themeCss(): string {
 :root .listing--cols { column-gap: 0; }
 :root .listing--cols > .listing-row > * { padding-right: 14px; }
 :root .listing--cols > .listing-row > :last-child { padding-right: 0; }
+/* A row's mark (initials, a picture) fills its column, so the space after it is the name's own: the
+   name stood against the mark. */
+:root .listing--cols[class*="listing--mark-"] > .listing-row > :first-child { padding-right: 0; }
+:root .listing--cols[class*="listing--mark-"] > .listing-row > :nth-child(2) { padding-left: 14px; }
+/* The column heads end in a line, so the list visibly starts under them. */
+:root .listing-row--head > * { padding-bottom: .5rem; border-bottom: 1.5px solid var(--text); }
 /* A tab is an outlined button; the chosen one stands on the sun. */
 :root .poster-tab { padding: 7px 12px; border: 1.5px solid var(--text); border-radius: var(--shape-corner-control); background: var(--card-bg); color: var(--text); font-weight: 700; text-transform: none; letter-spacing: 0; box-shadow: none; }
 :root .poster-tab:hover, :root .poster-tab.is-on { background: var(--sun); color: var(--on-sun); }

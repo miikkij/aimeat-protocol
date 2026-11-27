@@ -30,6 +30,7 @@
  * @structure DocTree(props)
  * @usage html`<${DocTree} sections=${tree} unsorted=${loose} words=${words} onOpen=${open} …>${theOpenDocument}<//>`
  * @version-history
+ *   v1.1.0 — 2026-11-27 — Archive, restore and delete draw the Glyph marks; they were emoji.
  *   v1.0.0 — 2026-09-26 — Initial: the document tree of views/profile/organisms/workspace/doc-space.js as
  *     a component with its own class names (.doc-tree*); the look it had inside a workspace page (the
  *     only place it is drawn). A section's name is the Sub-heading (Jouni's decision "Sub-heading");
@@ -39,7 +40,7 @@ import { h } from 'preact';
 import { useRef } from 'preact/hooks';
 import htm from 'htm';
 import { ColorPicker, colourClass } from '/components/ColorPicker.js';
-import { Icon } from '/components/Action.js';
+import { Icon, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
@@ -78,9 +79,9 @@ export function DocTree(props) {
         ${d.draft ? html`${draft} ` : null}${d.title}
       </button>
       ${archived
-        ? html`<${Icon} small label=${words.unarchive} disabled=${busy} onClick=${() => onArchive?.(d.id)}>♻️<//>`
-        : html`<${Icon} small label=${words.archive} disabled=${busy} onClick=${() => onArchive?.(d.id)}>🗄️<//>`}
-      <${Icon} small label=${words.delete} disabled=${busy} onClick=${() => onDelete?.(d.id)}>🗑<//>
+        ? html`<${Icon} small label=${words.unarchive} disabled=${busy} onClick=${() => onArchive?.(d.id)}><${Glyph} name="restore" /><//>`
+        : html`<${Icon} small label=${words.archive} disabled=${busy} onClick=${() => onArchive?.(d.id)}><${Glyph} name="archive" /><//>`}
+      <${Icon} small label=${words.delete} disabled=${busy} onClick=${() => onDelete?.(d.id)}><${Glyph} name="trash" /><//>
     </div>`;
 
   const renderItems = (items) => (items || []).map((it) => {

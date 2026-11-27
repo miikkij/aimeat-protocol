@@ -33,6 +33,9 @@
  *        html`<${Action} small copy=${ref} copiedLabel=${t('x.copied')}>${t('x.copyRef')}<//>`
  *        html`<${Actions}>…<//>`
  * @version-history
+ *   v1.16.0 — 2026-11-27 — Chevron: the drawn mark of a fold control (the Settings menu, the
+ *     messenger's list). Glyph: the drawn archive, delete and search marks that replace emoji in
+ *     icon controls. Additive.
  *   v1.15.0 — 2026-10-21 — Action `control`: the action link in a box as tall as the control cut
  *     (44px, poster.css .poster-action--control), a touch target on a phone. Additive.
  *   v1.14.0 — 2026-09-27 —Action tone 'file' (.og-crumb-link--file): a link to a file in the
@@ -168,6 +171,34 @@ export function Icon({ small, pressed, label, title, copy, copiedLabel, onCopied
  * appcat sections-b, parity) puts its parts 8px apart: a picker's row of a door, a choice and a door
  * (the old detail's skill picker).
  */
+/**
+ * The mark of a fold control (added 2026-11-27 for the Settings menu and the messenger's list): a
+ * chevron that points the way the folded part moves, drawn so a theme's colour reaches it.
+ * @param {{ left?: boolean }} props
+ */
+export function Chevron({ left }) {
+    return html`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"
+      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      ${left ? html`<path d="M10 3 5 8l5 5" />` : html`<path d="M6 3l5 5-5 5" />`}</svg>`;
+}
+
+/** The drawn marks of an Icon (added 2026-11-27): an emoji in a control is not drawn by the theme and
+ *  reads as noise; these take the text colour. */
+const MARKS = {
+    archive: html`<path d="M2.5 3.5h11v3h-11z" /><path d="M3.5 6.5v6h9v-6" /><path d="M6.5 9h3" />`,
+    trash: html`<path d="M2.5 4.5h11" /><path d="M6 4.5V3h4v1.5" /><path d="M4 4.5l.7 9h6.6l.7-9" /><path d="M6.8 7v4.5M9.2 7v4.5" />`,
+    search: html`<circle cx="7" cy="7" r="4.2" /><path d="M10.2 10.2 13.5 13.5" />`,
+    restore: html`<path d="M3 8a5 5 0 1 0 1.5-3.5" /><path d="M3 2.5v3h3" />`,
+    shield: html`<path d="M8 1.8 13 3.6v4.2c0 3-2.2 5.3-5 6.4-2.8-1.1-5-3.4-5-6.4V3.6Z" />`,
+    cart: html`<path d="M1.8 2.5h2l1.6 7.5h7l1.4-5.3H4.6" /><circle cx="6.5" cy="13" r="1" /><circle cx="11.5" cy="13" r="1" />`,
+    file: html`<path d="M4 1.8h5l3 3v9.4H4Z" /><path d="M9 1.8v3h3" />`,
+};
+/** @param {{ name: 'archive'|'trash'|'search'|'restore'|'shield'|'cart'|'file' }} props */
+export function Glyph({ name }) {
+    return html`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"
+      fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${MARKS[name] || null}</svg>`;
+}
+
 export function Actions({ under, end, chapter, apart, tight, children }) {
     return html`<div class=${cx('og-doors', under && 'listing-open-doors', end && 'og-doors--end', chapter && 'og-doors--chapter', apart && 'og-doors--apart', tight && 'og-doors--tight')}>${children}</div>`;
 }

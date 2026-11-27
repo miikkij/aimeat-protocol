@@ -11,6 +11,7 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.6.1 -- 2026-11-27 -- The agent menu says its actions in words; each carried an emoji.
  *   v1.6.0 -- 2026-11-27 -- The document spaces' group comes before the records' group, so the tree and
  *     a space page's rail list documents first, as the cover does.
  *   v1.5.1 -- 2026-11-14 -- The crumb names a team in the reader's language (orgName, team setup T24).
@@ -177,10 +178,10 @@ export function buildWorkspaceModel(ctx) {
   // Menu items are VERBS (a click copies to the clipboard; the toast confirms). The contract-agent
   // builder is a different category from the two copy actions, so a divider separates it.
   const agentMenuItems = [
-    { label: t('organisms.copyChatPrompt') || 'Copy chat prompt', icon: '💬', onClick: () => copyAccessPrompt('human') },
-    { label: t('organisms.copyCodingPrompt') || 'Copy coding agent prompt', icon: '⌨', onClick: () => copyAccessPrompt('agent') },
+    { label: t('organisms.copyChatPrompt') || 'Copy chat prompt', onClick: () => copyAccessPrompt('human') },
+    { label: t('organisms.copyCodingPrompt') || 'Copy coding agent prompt', onClick: () => copyAccessPrompt('agent') },
     { divider: true },
-    { label: t('organisms.contractPrompt') || 'Create contract agent', icon: '⚙️', onClick: copyContractPrompt },
+    { label: t('organisms.contractPrompt') || 'Create contract agent', onClick: copyContractPrompt },
   ];
 
   return {

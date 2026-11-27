@@ -18,6 +18,8 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.18.0 -- 2026-11-27 -- The head is one row (SettingsPage desk) with New message, New group and
+ *     More; the conversation list folds to a strip on a wide screen (kept in this browser).
  *   v2.17.0 -- 2026-11-27 -- The head says how many conversations wait for the person's answer (the
  *     threads the home's waiting list counts as "reply"), and the broadcast is a soft action: the head
  *     had one main action and two more of the same weight beside it.
@@ -200,7 +202,7 @@ import { useGroupChat, GroupComposePane, GroupInvitations } from './inbox-tab/gr
 import { isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { Composer } from '/components/Composer.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Icon, Chevron } from '/components/Action.js';
 import { CardMenu } from '/components/CardMenu.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
@@ -220,7 +222,12 @@ import { useConfirm } from '/components/Modal.js';
 import { messageActions } from './inbox-tab/message-actions.js';
 import { swallowed } from '/js/swallowed.js';
 
+const LIST_FOLD_KEY = 'aimeat.messages.listFolded';
+// No storage (a private window): the list stays open.
+const readListFold = () => { try { return localStorage.getItem(LIST_FOLD_KEY) === '1'; } catch (err) { swallowed('inbox: read list fold', err); return false; } };
+
 export default function InboxTab({ showToast }) {
+  const [listFolded, setListFolded] = useState(readListFold);
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
   // The lists were read once (the saved overview, the server's or the four lists): until then the start stays folded.
@@ -706,6 +713,8 @@ export default function InboxTab({ showToast }) {
   const isPage = mode === 'tracked' || mode === 'results' || mode === 'broadcast' || mode === 'organize';
   const pageTitle = mode === 'broadcast' ? t('inbox.broadcastTitle') : mode === 'results' ? t('inbox.resultsTitle') : mode === 'organize' ? t('inbox.org.pageTitle') : t('inbox.trackedTitle');
   const goIdle = () => { setMode('idle'); setActiveConv(null); setReplyQuote(null); };
+  // The list folds to a strip on a wide screen, kept in this browser (a per-viewer convenience).
+  const foldList = (on) => { setListFolded(on); try { localStorage.setItem(LIST_FOLD_KEY, on ? '1' : '0'); } catch (err) { swallowed('inbox: keep list fold', err); } };
   const broadcastForm = mode !== 'broadcast' ? null : renderBroadcastForm({
     bcType, setBcType, bcMode, setBcMode, bcQuestions, setBcQuestions, bcRecipients, removeBcRecipient, bcInput, setBcInput,
     addBcRecipient, myGroups, bcGroupId, setBcGroupId, isOperator, bcAudience, setBcAudience, sending, doBroadcast,
@@ -775,7 +784,9 @@ export default function InboxTab({ showToast }) {
           openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
         ${mode === 'organize' ? html`<${OrganizePage} org=${org} showToast=${showToast} />` : null}` : html`
       <${Panes} open=${mode !== 'idle'} backLabel=${t('inbox.back')} onBack=${goIdle}
+        folded=${listFolded} unfold=${{ label: t('inbox.listShow'), onClick: () => foldList(false) }}
         side=${html`<${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
+          foldControl=${html`<${Icon} small label=${t('inbox.listHide')} onClick=${() => foldList(true)}><${Chevron} left /><//>`}
           peerDisplay=${peerDisplay} peerAvatar=${peerAvatar} accept=${accept} block=${block} openConversation=${openConversation}
           openFolds=${openFolds} toggleFold=${toggleFold} org=${org}
           groupInvitations=${html`<${GroupInvitations} invitations=${group.invitations} answer=${group.answer} peerDisplay=${peerDisplay} />`} />`}>

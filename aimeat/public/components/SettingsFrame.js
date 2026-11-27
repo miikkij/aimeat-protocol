@@ -12,6 +12,9 @@
  * @usage html`<${SettingsFrame} open=${o} onToggle=${…} onClose=${…} menuLabel=${t('…')} menu=${html`<${SideMenu}>…<//>`}>
  *   <${SettingsFrameHead}><span class="poster-crumb">Apps</span><//><${SettingsFrameBody}>…<//><//>`
  * @version-history
+ *   v1.3.0 — 2026-11-27 — On a wide screen the menu folds to a narrow strip and opens again
+ *     (.settings-frame--folded, the fold control at its top), kept per browser: a page whose work
+ *     area is the job (the messenger) gets the menu's 250px.
  *   v1.2.0 — 2026-09-26 — SettingsRoot: the .pf root every Settings sheet keys on (was written by
  *     views/profile.js), and SettingsFrameHead's `crumb` (the open tab's name as the crumb, was a
  *     span the overview wrote). Additive, by page group G8.
@@ -20,22 +23,45 @@
  *     from the class names (UI consolidation phase 5, a move).
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
+import { t } from '/js/i18n.js';
+import { Icon, Chevron } from '/components/Action.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
+const FOLD_KEY = 'aimeat.settings.menuFolded';
+
+/** The person's own choice in this browser: the menu folded to a narrow strip on a wide screen. */
+function readFold() {
+  // No storage (a private window): the menu stays open.
+  try { return localStorage.getItem(FOLD_KEY) === '1'; } catch (err) { swallowed('settings-frame: read fold', err); return false; }
+}
+function writeFold(on) {
+  // No storage: the fold holds for this visit only.
+  try { localStorage.setItem(FOLD_KEY, on ? '1' : '0'); } catch (err) { swallowed('settings-frame: keep fold', err); }
+}
 
 /**
  * `dialogs` are drawn first inside the frame, before the menu button (the page's open dialogs).
+ * On a wide screen the menu folds to a narrow strip with the control that opens it again (the
+ * person's choice is kept in this browser); on a phone it is the drawer as before.
  * @param {{ open?: boolean, onToggle: () => void, onClose: () => void, menuLabel: any, menu: any,
  *   overview?: boolean, dialogs?: any, children?: any }} props
  */
 export function SettingsFrame({ open, onToggle, onClose, menuLabel, menu, overview, dialogs, children }) {
+  const [folded, setFolded] = useState(readFold);
+  const fold = () => { setFolded(!folded); writeFold(!folded); };
+  const foldWords = folded ? t('settings.menuShow') : t('settings.menuHide');
   return html`
-    <div class="settings-frame${open ? ' settings-frame--open' : ''}">
+    <div class="settings-frame${open ? ' settings-frame--open' : ''}${folded ? ' settings-frame--folded' : ''}">
       ${dialogs}
       <button class="settings-frame-toggle poster-slab" onClick=${onToggle}>☰ ${menuLabel}</button>
       <div class="settings-frame-scrim" onClick=${onClose}></div>
-      <aside class="settings-frame-menu">${menu}</aside>
+      <aside class="settings-frame-menu">
+        <div class="settings-frame-fold"><${Icon} small label=${foldWords} pressed=${folded} onClick=${fold}><${Chevron} left=${!folded} /><//></div>
+        <div class="settings-frame-menu-body">${menu}</div>
+      </aside>
       <main class=${`settings-frame-content ${overview ? 'settings-frame-content--overview' : ''}`}>
         ${children}
       </main>

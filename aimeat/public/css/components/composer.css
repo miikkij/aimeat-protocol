@@ -11,8 +11,8 @@
  *   the field over the whole width, the tools and the loud action on the line under it, the files
  *   waiting as chips above, the Markdown fallback and the Toast UI editor behind ⤢.
  * @version-history
- *   v1.6.0 — 2026-11-27 — The message field starts at three lines and grows to 40 % of the window
- *     (at most 320px); it stopped at 132px.
+ *   v1.6.0 — 2026-11-27 — The message field is one line until the person is in it, then three lines,
+ *     and grows to 40 % of the window (at most 320px); it stopped at 132px.
  *   v1.5.0 — 2026-09-26 — The list over the field (`suggest`, .composer-suggest*): an agent's slash
  *     commands, with main's values (css/views/agents-detail.css .pf-agd-autocomplete*,
  *     .pf-agd-command-name/-desc); its frame and corner read the theme's shape tokens.
@@ -133,9 +133,12 @@
   gap: 8px;
   background: var(--card-bg);
 }
-/* The field grows with what is written up to 40 % of the window (at most 320px), so a long message is
-   written in sight; it stopped at 132px, five lines. */
-.poster-composer--message .poster-composer-input { flex: none; display: block; width: 100%; height: auto; min-height: 64px; max-height: min(40vh, 320px); overflow-y: auto; }
+/* The field is one line while nobody writes in it, three lines from the moment the person is in it or
+   has written something, and grows with what is written up to 40 % of the window (at most 320px), so
+   a long message is written in sight. Three empty lines took the conversation's space. */
+.poster-composer--message .poster-composer-input { flex: none; display: block; width: 100%; height: auto; min-height: 1.5em; max-height: min(40vh, 320px); overflow-y: auto; }
+.poster-composer--message .poster-composer-input:focus,
+.poster-composer--message .poster-composer-input:not(:placeholder-shown) { min-height: 4.5em; }
 /* flex:none so the tool line can never absorb the composer's slack and grow into the reading area. */
 .poster-composer-bar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
 .poster-composer-tools { display: flex; align-items: center; gap: 8px; }

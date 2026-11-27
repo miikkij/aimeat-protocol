@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.42.1 -- 2026-11-27 -- A shared place's menu says its actions in words; each carried an emoji.
  *   v2.42.0 -- 2026-11-26 -- The list page leads with where things stand: a figure strip (the shared
  *     places the person is in, what waits for them there, the archived ones, the ones to discover),
  *     then its sections numbered as they are drawn (an invitation and the team map are there only for
@@ -540,11 +541,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     const activate = () => (isMine || isMember) ? openHome(false) : toggleExpand(org.id);
 
     const menuItems = isMine ? [
-      canEdit && { label: t('organisms.settings') || 'Settings', icon: '⚙', onClick: () => openHome(true) },
-      { label: t('organisms.exportOrg') || 'Export organism', icon: '⬇', onClick: () => exportOrganismZip(org, showToast) },
+      canEdit && { label: t('organisms.settings') || 'Settings', onClick: () => openHome(true) },
+      { label: t('organisms.exportOrg') || 'Export organism', onClick: () => exportOrganismZip(org, showToast) },
       canEdit && (org.archived
-        ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => handleArchive(org.id, org.name, false) }
-        : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => handleArchive(org.id, org.name, true) }),
+        ? { label: t('organisms.unarchive') || 'Unarchive', onClick: () => handleArchive(org.id, org.name, false) }
+        : { label: t('organisms.archive') || 'Archive', onClick: () => handleArchive(org.id, org.name, true) }),
       !isCreator && { label: t('organisms.leave') || 'Leave', danger: true, onClick: () => handleLeave(org.id, org.name) },
       isCreator && { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => handleDelete(org.id, org.name) },
     ] : [];

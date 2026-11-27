@@ -9,6 +9,8 @@
  *   never styles it from outside.
  * @usage Linked from public/spa.html in the component block.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — .conversation-panes--folded and .conversation-panes-strip: the list folds
+ *     to a 48px strip on a wide screen.
  *   v1.2.0 — 2026-10-19 — The open phone pane is pinned to the visible area (--vv-top, --vv-height),
  *     so its composer stays on the keyboard on iOS too; its scroll part does not chain to the page.
  *   v1.1.0 — 2026-09-27 — The framed panes (Panes framed): panes.css folded in under this sheet's names,
@@ -33,6 +35,15 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  border-right: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+}
+/* Folded (Panes folded, a wide screen): the list gives its width to the open conversation and a
+   48px strip holds the control that opens it again. */
+.conversation-panes-strip { display: none; }
+.conversation-panes--folded { grid-template-columns: 48px 1fr; }
+.conversation-panes--folded > .conversation-panes-side { display: none; }
+.conversation-panes--folded > .conversation-panes-strip {
+  display: flex; justify-content: center; padding-top: .45rem;
   border-right: var(--shape-frame-heavy) solid var(--shape-rule-colour);
 }
 /* The way back: on a phone only. */
@@ -126,6 +137,10 @@
 @media (max-width: 760px) {
   .conversation-panes { grid-template-columns: 1fr; height: var(--conversation-desk-avail, calc(100dvh - 168px)); min-height: 240px; }
   .conversation-panes-side { border-right: none; }
+  /* A phone shows one pane at a time: the wide screen's fold does not apply. */
+  .conversation-panes--folded { grid-template-columns: 1fr; }
+  .conversation-panes--folded > .conversation-panes-strip { display: none; }
+  .conversation-panes--folded:not(.conversation-panes--open) > .conversation-panes-side { display: block; }
   .conversation-panes:not(.conversation-panes--open) > .conversation-pane { display: none; }
   .conversation-panes:not(.conversation-panes--open) > .conversation-panes-side { height: 100%; }
   /* Pinned to the area the person can see (--vv-top, --vv-height: js/visual-viewport.js), not to the
