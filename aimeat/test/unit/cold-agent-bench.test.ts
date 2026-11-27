@@ -108,6 +108,9 @@ describe('the briefs', () => {
         const proves = (id: string, html: string, app: { openTo: string | null; signedOutDraws: boolean | null } = unread) => BRIEFS.find(b => b.id === id)!.proves.map(p => p.test(html, app));
         expect(proves('list', '<script src="/v1/libs/aimeat-data.js"></script><script>A.data.set("k", 1)</script>')).toEqual([true]);
         expect(proves('list', '<script>localStorage.setItem("k", 1)</script>')).toEqual([false]);
+        // A page calls the data library by a name of its own, as the fourth round's map app did.
+        expect(proves('list', '<script src="/v1/libs/aimeat-data.js"></script><script>var D = window.AIMEAT.data; D.set("k", 1)</script>')).toEqual([true]);
+        expect(proves('list', '<script src="/v1/libs/aimeat-data.js"></script><script>var D = window.AIMEAT.data; cache.set("k", 1)</script>')).toEqual([false]);
         // The team's list is shared in a workspace or in an extension's namespace, and never in each person's own memory.
         expect(proves('team', '<script>AIMEAT.atelier.workspacePicker({ target })</script>', { openTo: 'organism:abc', signedOutDraws: false })).toEqual([true, true]);
         expect(proves('team', '<script>AIMEAT.data.action("toolshed", "borrow", { id })</script>', { openTo: 'organism:abc', signedOutDraws: false })).toEqual([true, true]);

@@ -26,6 +26,8 @@
  * @usage
  *   import { BRIEFS, briefPrompt } from './bench-briefs.js';
  * @version-history
+ *   v1.1.1 — 2026-11-28 — keepsOnNode follows a page's own name for the data library
+ *     (`var D = window.AIMEAT.data`): the fourth round failed a map app that kept its places there.
  *   v1.1.0 — 2026-11-27 — A proof also reads the node's facts about the app. The first baseline
  *     round failed two builds that did what was ordered: a team list kept by an extension, and a
  *     public page forked from a genre, which has no `requireLogin: false` in its text.
@@ -67,8 +69,18 @@ export interface Brief {
     proves: Array<{ what: string; test: (html: string, app: AppFacts) => boolean }>;
 }
 
-const keepsOnNode = (html: string): boolean =>
-    /\/v1\/libs\/aimeat-living\.js/.test(html) || (/\/v1\/libs\/aimeat-data\.js/.test(html) && /\b\w+\.data\.(set|get)\s*\(/.test(html));
+/**
+ * The page loads the data library and calls it. A page may call it by a name of its own
+ * (`var D = window.AIMEAT.data; D.set(…)`): the fourth round's map app did, and the proof that
+ * looked for `.data.set(` alone failed an app that kept every place on the node.
+ */
+export const keepsOnNode = (html: string): boolean => {
+    if (/\/v1\/libs\/aimeat-living\.js/.test(html)) return true;
+    if (!/\/v1\/libs\/aimeat-data\.js/.test(html)) return false;
+    if (/\b\w+\.data\.(set|get)\s*\(/.test(html)) return true;
+    const names = [...html.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*(?:window\.)?AIMEAT\.data\b(?!\.)/g)].map(m => m[1]);
+    return names.some(n => new RegExp(String.raw`(?<![\w$.])${n.replace(/\$/g, String.raw`\$`)}\.(set|get)\s*\(`).test(html));
+};
 
 export const BRIEFS: Brief[] = [
     {
