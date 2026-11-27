@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-11-27 -- A line whose sellable says `platformFee: false` (an app's own membership) books no platform fee; fulfil gets the collect's tracking code (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-11-25 -- The spend question is checkoutSpendRefusal (app-checkout-reach.ts): an app without contract:spend completes its own subscription on the card page.
  *   2026-11-15 -- completeSession asks the team approval gate after the agent's own limit (services/team/action-gate.ts, T7).
  *   2026-11-04 -- completeSession writes the completed session and the seller's order copy in one transaction with the sale's fee and beneficiary bookings (commerce/settle-purchase.ts; the line step moved to checkout-shares.ts); bookSessionlessSale books through settlePurchase, and settleSessionlessSale books with the caller's last write (codebase analysis 2026-11-03, item B2).
@@ -548,7 +549,7 @@ async function completeSessionInner(
   const changed = session.items.findIndex((item, i) =>
     sellables[i].unitPrice !== item.unitPrice || sellables[i].tollMorsels !== (item.tollMorsels ?? sellables[i].tollMorsels)
     // A subscription's line title names its period: a period changed since the quote is a changed price (secaudit2026oct26).
-    || (item.kind === 'subscription' && sellables[i].title !== item.title));
+    || ((item.kind === 'subscription' || item.kind === 'membership') && sellables[i].title !== item.title));
   if (changed >= 0 || quotedTotal !== session.total) {
     throw new CommerceError('PRICE_CHANGED', 409, changed >= 0
       ? `The price of "${session.items[changed].title}" changed after this checkout was opened. Update the items to get a new quote, then complete again.`
@@ -564,9 +565,10 @@ async function completeSessionInner(
 
   // Per-item money math on the QUOTED prices the session carries, which equal the live prices above.
   const feePct = commerceFeePercent(config);
-  const lines = session.items.map((item) => {
+  const lines = session.items.map((item, i) => {
     const gross = item.unitPrice * item.quantity;
-    const fee = percentFee(gross, feePct);
+    // A line the operator takes no fee on (an app's own membership, commerce/membership-sale.ts).
+    const fee = sellables[i]!.platformFee === false ? 0 : percentFee(gross, feePct);
     return { item, gross, fee, net: gross - fee };
   });
   const totalFee = lines.reduce((n, l) => n + l.fee, 0);
@@ -628,7 +630,7 @@ async function completeSessionInner(
       const item = session.items[i]!;
       const sellable = sellables[i]!;
       if (sellable.fulfill) {
-        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt, payment: { handler: handler?.id ?? 'none', ...(collected.saved ? { saved: collected.saved } : {}) } });
+        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt, payment: { handler: handler?.id ?? 'none', trackingCode: collected.trackingCode, ...(collected.saved ? { saved: collected.saved } : {}) } });
         if (outcome.taskId) taskIds.push(outcome.taskId);
         if (outcome.result !== undefined) {
           // The capability may name who shares this sale, the same way it does on a contracted

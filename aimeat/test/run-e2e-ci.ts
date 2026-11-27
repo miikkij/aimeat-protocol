@@ -57,6 +57,7 @@
  *   2026-11-19 -- test/e2e-live-page-events.ts joins ALL_SUITES (feature audit 2026-11-19, 4.6).
  *   2026-11-19 -- test/e2e-oidc-link-domains.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 3).
  *   2026-11-19 -- test/e2e-connector-command-approval.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 4).
+ *   2026-11-27 -- test/e2e-app-membership-sale.ts joins ALL_SUITES (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-11-19 -- test/e2e-subscription-renewal.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 5).
  *   2026-11-19 -- test/e2e-trust-score.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 6).
  *   2026-11-19 -- test/e2e-mcp-workspace-server.ts joins ALL_SUITES (feature audit 2026-11-19, 4.5 item 2).
@@ -1889,6 +1890,7 @@ const ALL_SUITES = [
     // A subscription renews on its kept card once per period, a raised price waits for the buyer's
     // yes, a declined card tells the buyer once (in-process node, feature audit 2026-11-19, 4.5).
     'test/e2e-subscription-renewal.ts',
+    'test/e2e-app-membership-sale.ts',
     // The real connector daemon on a folder that brings its own runner: held until the owner allows
     // it on the node, run after, stopped again (feature audit 2026-11-19, 4.5).
     'test/e2e-connector-command-approval.ts',

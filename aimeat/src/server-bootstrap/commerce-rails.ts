@@ -7,6 +7,8 @@
  * @structure registerCommerceRails(config, peers)
  * @usage await registerCommerceRails(config, peers);   // before the commerce routers mount
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The `membership` kind, its subscription source and the paid invitation's
+ *     renewal start (commerce/membership-sale.ts).
  *   v1.1.0 — 2026-10-31 — The `package-account` kind: a package its author sells to accounts of this
  *     node (services/packages/sale/package-account-checkout.ts).
  *   v1.0.0 — 2026-10-18 — Moved from routes-loader.ts (pure extraction), with the two registrations of
@@ -17,7 +19,9 @@ import type { PeerInfo } from '../services/federation.js';
 import { registerPaymentHandler, resetPaymentHandlers } from '../commerce/payment-handlers.js';
 import { stripePaymentHandler } from '../commerce/stripe-handler.js';
 import { stripeCheckoutHandler } from '../commerce/stripe-checkout.js';
-import { subscriptionSellableResolver } from '../commerce/subscriptions.js';
+import { subscriptionSellableResolver, registerSubscriptionSource } from '../commerce/subscriptions.js';
+import { membershipSellableResolver, membershipSource, startPaidMembership } from '../commerce/membership-sale.js';
+import { setPaidMembershipStarter } from '../services/app/member-invites.js';
 import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver, pacingPackSellableResolver } from '../commerce/sellable-resolvers.js';
@@ -41,6 +45,11 @@ export async function registerCommerceRails(config: AimeatConfig, peers: Map<str
   registerSellableResolver(packageAccountSellableResolver());   // a package its author sells to accounts of this node
   registerSellableResolver(pacingPackSellableResolver());   // pacing capacity the operator sells for money
   registerSellableResolver(subscriptionSellableResolver());   // one period of an extension's plan (commerce/subscriptions.ts)
+  // One period of a role an app's owner sells, renewed by the same subscription machinery (commerce/membership-sale.ts).
+  registerSellableResolver(membershipSellableResolver());
+  registerSubscriptionSource('membership', membershipSource);
+  // A paid invitation that became a membership gets its renewal (services/app/member-invites.ts).
+  setPaidMembershipStarter((storage, _nodeId, args) => startPaidMembership(storage, config, args));
   // A fake EUR/USD rail with no real PSP, on any node while the flag is on; a public node warns (utils/test-money-guard.ts).
   if (testMoneyHandlerActive(config)) registerPaymentHandler((await import('../commerce/test-money-handler.js')).testMoneyPaymentHandler());
   // x402 stablecoin settlement (TARGET-042): the NON-CUSTODIAL USDC handler for money (USD) sessions.

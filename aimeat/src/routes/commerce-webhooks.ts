@@ -32,6 +32,10 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-11-27 — An app membership the seller sells on their own Stripe: invoice.paid, a paid one-time
+ *     checkout.session.completed, customer.subscription.deleted and .updated act on it
+ *     (commerce/membership-stripe.ts); a full charge.refunded ends the membership it paid for, bought
+ *     here or there (commerce/membership-end.ts) (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-10-31 — charge.refunded with `refunded: true` ends the package purchase that charge paid for
  *     (refundByTrackingCode; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   2026-10-25 — An agent order is taken only when Stripe reads the session as paid, and
@@ -59,6 +63,8 @@ import { markPaid } from '../services/finance/invoice-service.js';
 import { intakeAgentOrder } from '../commerce/agent-order-intake.js';
 import { completeFromStripeCheckout } from '../commerce/stripe-checkout-complete.js';
 import { refundByTrackingCode } from '../services/packages/sale/package-account-sale.js';
+import { handleMembershipStripeEvent } from '../commerce/membership-stripe.js';
+import { endMembershipsByCharge } from '../commerce/membership-end.js';
 
 const TOLERANCE_SECONDS = 300;
 
@@ -146,9 +152,16 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
     const date = isoDateOf(event.created);
 
     try {
-      let booked: { action: string; voucherId?: string; invoiceId?: string; orderId?: string } = { action: 'ignored' };
+      let booked: { action: string; voucherId?: string; invoiceId?: string; orderId?: string; detail?: string } = { action: 'ignored' };
+      // A membership the seller sells on their own Stripe (commerce/membership-stripe.ts). A checkout the
+      // node opened itself (aimeat_session) is never one of these.
+      const membership = typeof (object.metadata as Record<string, unknown> | undefined)?.aimeat_session === 'string'
+        ? null
+        : await handleMembershipStripeEvent(storage, config, ownerGhii, { id: event.id, type: event.type, data: { object } });
 
-      if (event.type === 'payment_intent.succeeded') {
+      if (membership) {
+        booked = { action: membership.action, ...(membership.detail ? { detail: membership.detail } : {}) };
+      } else if (event.type === 'payment_intent.succeeded') {
         const amount = Number(object.amount_received ?? object.amount ?? 0);
         const intentId = typeof object.id === 'string' ? object.id : null;
         const metadata = (object.metadata ?? {}) as Record<string, unknown>;
@@ -203,6 +216,14 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
         // A FULL refund of a charge that paid for a package this seller sells to accounts ends that
         // purchase (services/packages/sale/package-account-sale.ts). A partial refund leaves it.
         if (intentId && object.refunded === true) await refundByTrackingCode(storage, config, ownerGhii, intentId);
+        // A FULL refund ends the membership the payment bought, on this node's checkout or the seller's
+        // own Stripe (commerce/membership-end.ts), among this seller's sales only.
+        if (object.refunded === true) {
+          const refs = [intentId, typeof object.id === 'string' ? object.id : null, typeof object.invoice === 'string' ? object.invoice : null]
+            .filter((r): r is string => !!r);
+          const ended = await endMembershipsByCharge(storage, config, ownerGhii, refs);
+          if (ended) booked = { ...booked, action: booked.action === 'ignored' ? 'membership_refunded' : booked.action, detail: `memberships ended: ${ended}` };
+        }
       } else if (event.type === 'payout.paid') {
         const amount = Number(object.amount ?? 0);
         if (amount > 0) {

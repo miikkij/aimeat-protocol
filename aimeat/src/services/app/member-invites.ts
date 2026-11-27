@@ -27,6 +27,10 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.5.0 — 2026-11-27 — An invitation carries the term the inviter gave (`term`: days or an end date)
+ *     to the membership it becomes; it was lost. A paid invitation (`paid`, from a membership bought
+ *     without an account or sold on the owner's own Stripe) becomes a membership to the paid end and
+ *     starts its renewal through setPaidMembershipStarter (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   v1.4.0 — 2026-11-05 — sendAppInvite takes `turn`: the emailed-invitation turn the caller took for
  *     an agent or an app, which the mail carries as its count (codebase analysis 2026-11-03,
  *     decision 14a of 2026-11-05).
@@ -44,7 +48,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import { listAppRecords, readAppRecord } from './record-keys.js';
-import { slugOf, sameApp, accountOf, updateAppRecord } from './members.js';
+import { slugOf, sameApp, accountOf, updateAppRecord, type MemberPaid } from './members.js';
 import { approveMember, appStem } from './member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './member-notices.js';
 import { inviteEmailHash } from '../invitations.js';
@@ -81,7 +85,39 @@ export interface AppMemberInvite {
   invitedBy: string;
   at: string;
   expiresAt: string;
+  /** The membership's term, as the inviter gave it: days from the acceptance, or an end date (null: no end). */
+  term?: { days?: number; expiresAt?: string | null };
+  /**
+   * The invitation was paid for (commerce/membership-guest.ts, commerce/membership-stripe.ts): the
+   * membership it becomes runs to the paid end, and a kept card renews it. Never set by a roster request.
+   */
+  paid?: PaidInvite;
 }
+
+/** A paid term an invitation carries to the account that accepts it. */
+export interface PaidInvite {
+  via: 'checkout' | 'stripe';
+  until: string;
+  renews: boolean;
+  amount?: number;
+  currency?: string;
+  periodDays?: number;
+  /** The card kept on the seller's payment provider for the renewals, and the handler that charges it. */
+  keptPayment?: { handler: string; customer?: string; payment_method?: string };
+  stripeSubscription?: string;
+  charges: string[];
+  /** The purchase it came from, for the audit row. */
+  purchase?: string;
+}
+
+/**
+ * What runs when a paid invitation became a membership: the subscription that renews it is written
+ * for the new account (commerce/membership-sale.ts registers it at boot, so this file imports no
+ * commerce code).
+ */
+type PaidStarter = (storage: Storage, nodeId: string, args: { appId: string; role: string; account: string; paid: PaidInvite }) => Promise<void>;
+let paidStarter: PaidStarter | null = null;
+export function setPaidMembershipStarter(fn: PaidStarter | null): void { paidStarter = fn; }
 
 const isOpen = (inv: AppMemberInvite, now = Date.now()) => Date.parse(inv.expiresAt) > now;
 
@@ -107,7 +143,8 @@ export async function findInvite(storage: Storage, appId: string, id: string): P
  */
 export async function putInvite(
   storage: Storage,
-  input: { appId: string; emailHash: string; emailShown: string; role: string; note?: string; invitedBy: string },
+  input: { appId: string; emailHash: string; emailShown: string; role: string; note?: string; invitedBy: string;
+    term?: AppMemberInvite['term']; paid?: PaidInvite; validDays?: number },
 ): Promise<AppMemberInvite> {
   const key = inviteKey(input.appId, input.emailHash);
   // On the record's version: two invitations of one address at the same moment answer one id, the
@@ -123,7 +160,10 @@ export async function putInvite(
       note: (input.note ?? '').slice(0, 400),
       invitedBy: input.invitedBy,
       at: now.toISOString(),
-      expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000).toISOString(),
+      expiresAt: new Date(now.getTime() + (input.validDays ?? INVITE_DAYS) * 86_400_000).toISOString(),
+      ...(input.term && Object.keys(input.term).length ? { term: input.term } : {}),
+      // A paid term is not lost when the owner sends the same address an ordinary invitation to the same role.
+      ...(input.paid ? { paid: input.paid } : prev?.paid && prev.role === input.role ? { paid: prev.paid } : {}),
     };
   }, { tags: ['app-member'] });
   return stored!;
@@ -155,11 +195,16 @@ export async function sendAppInvite(
   input: {
     appId: string; filename: string; email: string; role: string; note?: string; invitedBy: string;
     inviterName: string; appUrl: string; lang: NoticeLang; turn?: AccountTurnTaken;
+    term?: AppMemberInvite['term']; paid?: PaidInvite;
+    /** Why a mail no person in their own session sent is not counted (a paid invitation: the payment is the ask). */
+    uncounted?: string;
   },
 ): Promise<{ invite: AppMemberInvite; emailSent: boolean; acceptUrl: string | null }> {
   const invite = await putInvite(storage, {
     appId: input.appId, emailHash: inviteEmailHash(input.email), emailShown: input.email,
-    role: input.role, note: input.note, invitedBy: input.invitedBy,
+    role: input.role, note: input.note, invitedBy: input.invitedBy, term: input.term, paid: input.paid,
+    // A paid invitation stays open as long as the period it paid for, at least the usual week.
+    ...(input.paid ? { validDays: Math.max(INVITE_DAYS, Math.ceil((Date.parse(input.paid.until) - Date.now()) / 86_400_000)) } : {}),
   });
   // The sign-up link (services/app/invite-link.ts). Without it the email still links to the app and
   // the invitation still applies on a confirmed address, as before the link existed.
@@ -187,7 +232,7 @@ export async function sendAppInvite(
         // person in their own session was counted by the contacts lookup (takeEmailLookup) instead.
         count: input.turn
           ? { turn: input.turn }
-          : { uncounted: 'A person in their own session: counted as an address lookup (takeEmailLookup) by app-roster-write.ts, and at most MAX_OPEN_INVITES_PER_APP open per app.' },
+          : { uncounted: input.uncounted ?? 'A person in their own session: counted as an address lookup (takeEmailLookup) by app-roster-write.ts, and at most MAX_OPEN_INVITES_PER_APP open per app.' },
       }, { form: 'html', subject, html, text }) === 'sent';
     } catch (err) {
       logger.warn('app-member-invites: the invitation email failed, the invitation stands', { error: String(err) });
@@ -196,11 +241,21 @@ export async function sendAppInvite(
   return { invite, emailSent, acceptUrl };
 }
 
-/** The invitation as the owner's and the managers' list shows it: without the address hash. */
-export function inviteView(inv: AppMemberInvite): Omit<AppMemberInvite, 'emailHash'> {
+/** The invitation as the owner's and the managers' list shows it: without the address hash or a kept card. */
+export function inviteView(inv: AppMemberInvite): Omit<AppMemberInvite, 'emailHash' | 'paid'> & { paidUntil?: string } {
   return {
     id: inv.id, appId: inv.appId, emailShown: inv.emailShown, role: inv.role, note: inv.note,
     invitedBy: inv.invitedBy, at: inv.at, expiresAt: inv.expiresAt,
+    ...(inv.term ? { term: inv.term } : {}),
+    ...(inv.paid ? { paidUntil: inv.paid.until } : {}),
+  };
+}
+
+/** The member row's paid term, from the paid term an invitation carried. */
+export function memberPaidOf(p: PaidInvite): MemberPaid {
+  return {
+    via: p.via, until: p.until, renews: p.renews, at: new Date().toISOString(), charges: p.charges.slice(-24),
+    ...(p.stripeSubscription ? { stripeSubscription: p.stripeSubscription } : {}),
   };
 }
 
@@ -235,10 +290,15 @@ export async function applyAppInvitesForVerifiedEmail(
     if (!isOpen(inv) || !owner || accountOf(owner) === account) { await drop(); continue; }
     const ownerGhii = await resolveGhii(storage, owner, { nodeId });
     if (!(await storage.getApp(ownerGhii, filename))) { await drop(); continue; }
+    // The term the invitation carries: a paid end, else the inviter's date or days, else the role's own.
+    const paidLive = inv.paid && Date.parse(inv.paid.until) > Date.now() ? inv.paid : undefined;
     const result = await approveMember(storage, nodeId, {
       appId: inv.appId, owner, filename, account, role: inv.role, note: inv.note || undefined,
       approvedBy: localAccountName(inv.invitedBy).toLowerCase(), by: inv.invitedBy, ownerGhii,
-      auditDetail: { via: 'invite', invite: inv.id },
+      ...(paidLive
+        ? { expiresAt: paidLive.until, paid: memberPaidOf(paidLive) }
+        : { ...(inv.term?.expiresAt !== undefined ? { expiresAt: inv.term.expiresAt } : {}), ...(inv.term?.days ? { days: inv.term.days } : {}) }),
+      auditDetail: { via: inv.paid ? 'purchase' : 'invite', invite: inv.id, ...(inv.paid?.purchase ? { purchase: inv.paid.purchase } : {}) },
     });
     if (!result.ok) {
       logger.warn('app-member-invites: an invitation could not be applied yet, it stays open', { appId: inv.appId, code: result.code });
@@ -246,6 +306,11 @@ export async function applyAppInvitesForVerifiedEmail(
     }
     await drop();
     made++;
+    // A paid membership that renews gets its subscription now that it has an account to charge for.
+    if (paidLive && paidStarter) {
+      await paidStarter(storage, nodeId, { appId: inv.appId, role: inv.role, account, paid: paidLive })
+        .catch(err => logger.error('app-member-invites: a paid membership started without its renewal', { appId: inv.appId, error: String(err) }));
+    }
   }
   if (made) logger.info('app-member-invites: invitations became memberships', { ghii, made });
   return made;

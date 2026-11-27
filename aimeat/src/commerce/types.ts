@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · RefundOutcome · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   2026-11-27 — Sellable.platformFee (false: no fee on the line) and the collect's trackingCode on
+ *     FulfillArgs.payment (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-10-27 — CheckoutSessionRecord.cardPages, the card pages the node opened (secaudit2026oct26).
  *   2026-10-25 — CheckoutSessionRecord: refundedTrackingCodes and collectAttempt; collect takes
  *     `attempt` (secaudit2026oct22).
@@ -99,6 +101,11 @@ export interface Sellable {
    * payees its result names (services/ext-pay-token.ts; Comicland v3 A-6).
    */
   sharesAtUse?: boolean;
+  /**
+   * False when the operator takes no platform fee on this line: an app's own membership, which is a
+   * person selling to a person (commerce/membership-sale.ts). The checkout then books no fee for it.
+   */
+  platformFee?: false;
 }
 
 /**
@@ -113,8 +120,11 @@ export interface FulfillArgs {
   item: CheckoutLineItem;
   /** The buyer's bearer token, threaded from the completing request (capability invokes need it). */
   callerJwt?: string;
-  /** The handler that collected, and the payment it saved for later charges when one was asked for. */
-  payment?: { handler: string; saved?: SavedPayment };
+  /**
+   * The handler that collected, the payment it saved for later charges when one was asked for, and the
+   * collect's tracking code (a refund of the payment names it).
+   */
+  payment?: { handler: string; saved?: SavedPayment; trackingCode?: string };
 }
 
 /** A custom fulfillment yields a TASK id and/or an inline result (surfaced on the session). */

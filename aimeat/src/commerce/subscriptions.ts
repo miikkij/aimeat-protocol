@@ -30,9 +30,15 @@
  *
  *   READING: an extension sees the caller's running subscriptions to it on `ctx.caller.subscriptions`
  *   (services/extension/invoke.ts); the buyer lists and cancels theirs on /v1/commerce/subscriptions.
- * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
+ * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · SubscriptionSource · registerSubscriptionSource ·
+ *   readSubscription · writeSubscription · updateSubscription · withCharge · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   2026-11-27 — The plan comes from a SubscriptionSource: an extension's plan (as before) or, for a
+ *     record of kind `membership`, a sold role of an app's member plan (commerce/membership-sale.ts).
+ *     A renewal runs the source's `extended` in its transaction (the membership's end date moves with
+ *     the period), takes no platform fee from a fee-free source, and keeps the payment references a
+ *     refund names (`charges`) (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-11-10 — The three renewal notices open the wallet; they had no link (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-08 — The claim on a period reads the stored auto_renew and kept card, so a cancel stored
  *     after the daily run read its list is not charged; a renewal charged whose period write failed is
@@ -99,6 +105,19 @@ export interface SubscriptionPlan {
 }
 
 export interface SubscriptionRecord {
+  /**
+   * Which plan source this renews (SubscriptionSource). Absent: an extension's plan. `membership`: a
+   * role of an app's member plan (commerce/membership-sale.ts), with `ext` = `app~<app key segment>`
+   * and `plan` = the role.
+   */
+  kind?: 'membership';
+  /** membership: the app (`owner/file.html`) and the role bought. */
+  app?: string;
+  role?: string;
+  /** The payment references of the purchase and its renewals (newest last), which a refund names. */
+  charges?: string[];
+  /** When a refund ended it (commerce/membership-sale.ts endMembershipsByCharge). */
+  refunded_at?: string;
   ext: string;
   plan: string;
   title: string;
@@ -130,6 +149,60 @@ export interface SubscriptionRecord {
 }
 
 const subKey = (ext: string, plan: string): string => `${SUBSCRIPTION_PREFIX}${ext}.${plan}`;
+/** The buyer's record key of one (ext, plan); exported for the membership source. */
+export const subscriptionKey = subKey;
+
+/**
+ * Where a subscription's plan comes from, and what follows from a renewal or a cancel. The renewal,
+ * the raised-price question, the failed charge and the charged-not-recorded refund are this file's
+ * and the same for every source; a source answers what the plan is now and who sells it.
+ */
+export interface SubscriptionSource {
+  /** The plan as its seller offers it now, and the seller's account; null when it is no longer offered. */
+  offer(storage: Storage, config: AimeatConfig, sub: SubscriptionRecord): Promise<{ plan: SubscriptionPlan; sellerOwner: string } | null>;
+  /** Storage calls only: runs in the renewal's transaction, after the period was extended. */
+  extended?(storage: Storage, sub: SubscriptionRecord): Promise<void>;
+  /** After the buyer's cancel was stored. */
+  cancelled?(storage: Storage, sub: SubscriptionRecord): Promise<void>;
+  /** No platform fee is taken out of the seller's net (an app's own membership). */
+  feeFree?: boolean;
+}
+
+/** An extension's plan, sold by the extension's installer (the source this file began with). */
+const extensionSource: SubscriptionSource = {
+  async offer(storage, _config, sub) {
+    const plan = await readPlan(storage, sub.ext, sub.plan);
+    const ext = await storage.getExtension(sub.ext);
+    return plan && ext && ext.status === 'active' ? { plan, sellerOwner: ext.installedBy } : null;
+  },
+};
+
+const sources = new Map<string, SubscriptionSource>();
+/** Register the source of one record kind (commerce/membership-sale.ts registers `membership`). */
+export function registerSubscriptionSource(kind: NonNullable<SubscriptionRecord['kind']>, source: SubscriptionSource): void {
+  sources.set(kind, source);
+}
+const sourceOf = (sub: SubscriptionRecord): SubscriptionSource => (sub.kind ? sources.get(sub.kind) : undefined) ?? (sub.kind ? noSource : extensionSource);
+/** A record whose source is not registered on this node renews nothing. */
+const noSource: SubscriptionSource = { async offer() { return null; } };
+
+/** The buyer's record of one (ext, plan), or null. */
+export async function readSubscription(storage: Storage, ownerGhii: string, ext: string, plan: string): Promise<SubscriptionRecord | null> {
+  return readRecord(storage, ownerGhii, ext, plan);
+}
+/** Write a buyer's record whole (the purchase that makes it). */
+export async function writeSubscription(storage: Storage, rec: SubscriptionRecord): Promise<void> {
+  await putRecord(storage, rec);
+}
+/** Change a buyer's record on its version; storage calls only. */
+export async function updateSubscription(
+  storage: Storage, ownerGhii: string, ext: string, plan: string,
+  mutate: (cur: SubscriptionRecord | null) => SubscriptionRecord | typeof UNCHANGED,
+): Promise<SubscriptionRecord | null> {
+  return updateRecord(storage, ownerGhii, subKey(ext, plan), parseRecord, mutate, { tag: SUBSCRIPTION_ACTION });
+}
+/** Keep the newest payment references on a record, a bounded list. */
+export const withCharge = (charges: string[] | undefined, ref: string): string[] => [...(charges ?? []).filter(c => c !== ref), ref].slice(-24);
 
 /** A plan an extension published, checked for shape; null when it is not there or not usable. */
 export async function readPlan(storage: Storage, ext: string, planId: string): Promise<SubscriptionPlan | null> {
@@ -242,6 +315,10 @@ export async function activeSubscriptions(storage: Storage, ownerGhii: string, e
 export async function listSubscriptions(storage: Storage, ownerGhii: string, now = Date.now()) {
   const rows = await storage.listMemory(ownerGhii, { prefix: SUBSCRIPTION_PREFIX });
   return rows.map(r => r.value as SubscriptionRecord).filter(v => v && typeof v.active_until === 'string').map(v => ({
+    // A membership names the app and the role it was bought for (commerce/membership-sale.ts).
+    ...(v.kind === 'membership' ? { kind: v.kind, app: v.app, role: v.role } : {}),
+    ...(v.refunded_at ? { refunded_at: v.refunded_at } : {}),
+    seller: v.seller_ghii,
     ext: v.ext, plan: v.plan, title: v.title, amount: v.amount, currency: v.currency, period_days: v.period_days,
     started_at: v.started_at, active_until: v.active_until, active: Date.parse(v.active_until) > now,
     auto_renew: v.auto_renew, ...(v.last_failure ? { last_failure: v.last_failure } : {}),
@@ -255,6 +332,8 @@ export async function cancelSubscription(storage: Storage, ownerGhii: string, ex
   const rec = await updateRecord(storage, ownerGhii, subKey(ext, plan), parseRecord,
     cur => cur ? { ...cur, auto_renew: false, updated_at: new Date().toISOString() } : UNCHANGED, { tag: SUBSCRIPTION_ACTION });
   if (!rec) return null;
+  const after = sourceOf(rec).cancelled;
+  if (after) await after(storage, rec).catch(err => logger.warn('subscriptions: the cancel was stored, its follow-up failed', { ext, plan, error: String(err) }));
   emitChange('commerce', ownerGhii);
   return { ext, plan, active_until: rec.active_until, auto_renew: false };
 }
@@ -338,7 +417,7 @@ export async function allowRaisedPrice(
   const sub = await readRecord(storage, buyerGhii, asked.ext, asked.plan);
   if (!sub || !sub.auto_renew) return { ok: false, reason: 'the subscription no longer renews' };
   if (sub.active_until !== asked.period) return { ok: false, reason: 'the subscription is in another period now' };
-  const plan = await readPlan(storage, asked.ext, asked.plan);
+  const plan = (await sourceOf(sub).offer(storage, config, sub))?.plan ?? null;
   if (!plan || plan.amount !== asked.amount || plan.currency !== asked.currency
     || (asked.period_days !== undefined && plan.period_days !== asked.period_days)) return { ok: false, reason: 'the plan\'s price changed again since you were asked' };
   // A question that named the period makes that period the agreed one too (secaudit2026oct26).
@@ -354,12 +433,13 @@ export async function allowRaisedPrice(
 async function renewOne(storage: Storage, config: AimeatConfig, sub: SubscriptionRecord, reference: string): Promise<Pick<SubscriptionRenewalOutcome, 'result' | 'detail'>> {
   // The plan as the extension offers it now: a price it lowered applies from the next period, a price
   // it raised waits for the buyer's yes (subscription-price-ask.ts), and a plan it removed is not renewed.
-  const plan = await readPlan(storage, sub.ext, sub.plan);
-  const ext = await storage.getExtension(sub.ext);
-  if (!plan || !ext || ext.status !== 'active') return { result: 'skipped', detail: 'the plan is no longer offered' };
+  const source = sourceOf(sub);
+  const offered = await source.offer(storage, config, sub);
+  if (!offered) return { result: 'skipped', detail: 'the plan is no longer offered' };
+  const { plan, sellerOwner } = offered;
   const handler = getPaymentHandler(sub.kept_payment!.handler);
   if (!handler?.chargeSaved) return { result: 'skipped', detail: `handler ${sub.kept_payment!.handler} cannot charge a kept card` };
-  const sellerGhii = `${ext.installedBy}@${config.nodeId}`;
+  const sellerGhii = `${sellerOwner}@${config.nodeId}`;
   if (priceRose(sub, plan)) {
     return askBuyerForPrice({ storage, config }, sub, plan, sellerGhii, async (q) => {
       await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord,
@@ -378,7 +458,7 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   if (claim !== 'claimed') {
     return { result: 'skipped', detail: 'already renewed, or being renewed, for this period' };
   }
-  const seller = { ghii: sellerGhii, owner: ext.installedBy, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
+  const seller = { ghii: sellerGhii, owner: sellerOwner, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
   // A plan an agent bought renews as that agent's purchase, held to the daily limit its owner set,
   // checked and counted in one step right before the charge and given back when the charge fails, as
   // the package renewal does (secaudit2026oct22).
@@ -419,16 +499,23 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   }
   // The seller's net of the renewal, shared with the plan's payees by the seller's split, as at checkout.
   // Booked in one transaction with the renewal write (commerce/settle-purchase.ts).
-  const net = plan.amount - percentFee(plan.amount, commerceFeePercent(config));
+  // A source that takes no platform fee (an app's own membership) leaves the seller the whole amount.
+  const net = source.feeFree ? plan.amount : plan.amount - percentFee(plan.amount, commerceFeePercent(config));
   let renewed: SubscriptionRecord | null | undefined;
   try {
     ({ delivered: renewed } = await settlePurchase(storage, config, {
       from: 'paid',
-      deliver: () => updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
-        ...withoutClaim(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
-        active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
-        last_order: reference, updated_at: new Date().toISOString(),
-      }), { tag: SUBSCRIPTION_ACTION }),
+      deliver: async () => {
+        const next = await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
+          ...withoutClaim(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
+          active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
+          charges: withCharge((cur ?? sub).charges, trackingCode),
+          last_order: reference, updated_at: new Date().toISOString(),
+        }), { tag: SUBSCRIPTION_ACTION });
+        // The same transaction carries what follows from the new period (a membership's end date).
+        if (next && source.extended) await source.extended(storage, next);
+        return next;
+      },
       steps: [{
         books: [{
           kind: 'shares', sellerGhii, ext: sub.ext, action: SUBSCRIPTION_ACTION, net, currency: plan.currency,

@@ -25,6 +25,8 @@
  *   const { url } = await openStripeCheckout(config, session, psp, returnUrl);
  *   registerPaymentHandler(stripeCheckoutHandler(config));
  * @version-history
+ *   v1.0.3 — 2026-11-27 — openStripeCheckout takes `customerEmail`, which the card page fills in (a
+ *     membership bought without an account, commerce/membership-guest.ts).
  *   v1.0.2 — 2026-10-30 — A credit card on a seller's own Stripe account waits for the buyer's
  *     confirmation before the adult check is recorded (secaudit2026oct26 round 8c, commerce-07,
  *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
@@ -64,6 +66,8 @@ export async function openStripeCheckout(
   session: CheckoutSessionRecord,
   psp: unknown,
   returnUrl: string,
+  /** The address the card page fills in (a membership bought without an account). */
+  opts: { customerEmail?: string } = {},
 ): Promise<{ url: string; stripeSession: string }> {
   if (session.status !== 'open') throw new PaymentError('SESSION_NOT_OPEN', 409, `This checkout is ${session.status}.`);
   if (session.total <= 0) throw new PaymentError('NOTHING_TO_PAY', 409, 'This checkout has nothing to pay by card.');
@@ -88,6 +92,7 @@ export async function openStripeCheckout(
     // Stripe's own session expiry is at least 30 minutes; the AIMEAT session's is what counts.
     expires_at: String(Math.max(Math.floor(Date.now() / 1000) + 1800, Math.floor(new Date(session.expiresAt).getTime() / 1000))),
     ...(renews(session) ? { customer_creation: 'always', 'payment_intent_data[setup_future_usage]': 'off_session' } : {}),
+    ...(opts.customerEmail ? { customer_email: opts.customerEmail } : {}),
   };
   const cs = await stripeApi(key, 'POST', 'checkout/sessions', params, undefined, stripeIdempotencyKey('hosted', `${session.id}-${session.updatedAt}`));
   if (typeof cs.url !== 'string' || typeof cs.id !== 'string') {
@@ -128,7 +133,10 @@ export function stripeCheckoutHandler(config: EncryptionConfig): PaymentHandler 
       const intent = (typeof cs.payment_intent === 'object' && cs.payment_intent ? cs.payment_intent : null) as Record<string, unknown> | null;
       const intentId = intent ? String(intent.id) : String(cs.payment_intent ?? '');
       if (!intentId) throw new PaymentError('PSP_ERROR', 502, 'The card payment provider did not say which payment this was.');
-      await recordCreditCardAdult(ctx, buyerGhii, cardFundingOf(intent), isStripeTestMode(cs, intent), { seller, checkout: reference, payment: intentId });
+      // A buyer with no account yet (`guest:…`, commerce/membership-guest.ts) has nobody to record the check on.
+      if (!buyerGhii.startsWith('guest:')) {
+        await recordCreditCardAdult(ctx, buyerGhii, cardFundingOf(intent), isStripeTestMode(cs, intent), { seller, checkout: reference, payment: intentId });
+      }
       const customer = typeof cs.customer === 'string' ? cs.customer : null;
       const method = intent && typeof intent.payment_method === 'string' ? intent.payment_method : null;
       return { trackingCode: intentId, ...(customer && method ? { saved: { customer, payment_method: method } } : {}) };

@@ -37857,7 +37857,7 @@ paths:
                     type: object
                     description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, app-tool, ext-call, package, package-account, pacing-pack, subscription], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }. package-account: only app, the group id of a package its author sells to accounts of this node; the money goes to the author, and once paid the buyer''s account may read and install it. pacing-pack: only quantity; the pack is the one GET /v1/wallet names as pacing_pack, sold by the operator in its own currency.' }
+                      kind: { type: string, enum: [offer, app-tool, ext-call, package, package-account, pacing-pack, subscription, membership], default: offer, description: 'membership: app "<owner>/<app file>", tool the role, input { auto_renew }; one period of a role the app owner sells, approved to the end of the paid period, no platform fee. package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }. package-account: only app, the group id of a package its author sells to accounts of this node; the money goes to the author, and once paid the buyer''s account may read and install it. pacing-pack: only quantity; the pack is the one GET /v1/wallet names as pacing_pack, sold by the operator in its own currency.' }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
                       tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
@@ -45293,8 +45293,18 @@ paths:
                       renewal:
                         type: string
                         enum: [manual, self-serve, none]
-                        description: "What is MEANT to happen when the term ends. Descriptive only: nothing here charges anybody and no membership renews itself, so a monthly subscription is this plus whatever the app already uses to take money."
-                  description: "Role key to how long it lasts and how it is meant to continue."
+                        description: "What is meant to happen when the term ends. A role with a price in `sale` is bought for one term at a time and renews by itself when `sale.<role>.renews` is true; for any other role nothing charges anybody."
+                  description: "Role key to how long it lasts and how it is meant to continue. A role for sale needs `days`: it is the paid period (400 SALE_NEEDS_TERM otherwise)."
+                sale:
+                  type: object
+                  description: "Role key to its price. Absent keeps what the plan sells. The owner sets it (the app's own token may not change it, 403). A role is bought with a checkout line `{ kind: membership, app: '<owner>/<file>', tool: '<role>' }`, without an account at POST .../membership/guest, or on the owner's own Stripe through `stripePrices` and the seller's webhook. No platform fee is taken on these sales."
+                  additionalProperties:
+                    type: object
+                    properties:
+                      amount: { type: integer, minimum: 1, description: "Price of one period in 6-decimal micro-units (4.90 EUR is 4900000). With currency, the role is sold on this node's checkout." }
+                      currency: { type: string, pattern: '^[A-Za-z]{3}$' }
+                      renews: { type: boolean, default: true, description: "True: the card is kept and the next period is charged three days before the end. False: a one-time payment." }
+                      stripePrices: { type: array, maxItems: 10, items: { type: string, pattern: '^price_' }, description: "Stripe Price ids of the owner's own Stripe account that sell this role. One price sells one role of one app of the owner (400 STRIPE_PRICE_TAKEN)." }
       responses:
         '200':
           description: OK
@@ -45395,6 +45405,103 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/membership:
+    get:
+      operationId: appMembershipGet
+      summary: What a membership of this app costs, and the caller's own standing
+      description: >
+        Public. The roles the owner sells (`for_sale`: role, amount in micro-units, currency, days,
+        renews, `buy_here` when it is sold on this node's checkout, `seats_left`), the seller, and
+        whether a buyer without an account may buy (`guest.open`; false in registration mode
+        closed). For a signed-in caller `me` holds their membership (`role`, `expires_at`,
+        `paid_until`, `renews`) and their subscriptions to it. The owner's Stripe Price ids are
+        never in the answer.
+      tags: [Apps]
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/membership/guest:
+    post:
+      operationId: appMembershipGuestOpen
+      summary: Buy a membership without an account
+      description: >
+        No session. Opens Stripe's card page on the app owner's Stripe account for one period of
+        `role`, with `email` filled in, and answers its `url` and the purchase id (`gm_...`). The
+        person comes back to `return_url` with `stripe_session`. A purchase is an invitation, so it
+        is refused in registration mode closed (403 REGISTRATION_CLOSED). On a node that runs the
+        test money rail the answer is `test_money: true` and no card page. Limited per address.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role, email, return_url]
+              properties:
+                role: { type: string }
+                email: { type: string, format: email }
+                return_url: { type: string, pattern: '^https?://' }
+                auto_renew: { type: boolean }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/membership/guest/complete:
+    post:
+      operationId: appMembershipGuestComplete
+      summary: Finish a membership bought without an account
+      description: >
+        No session. Reads the payment back from Stripe (paid, for this purchase, in its amount) and
+        gives the membership to the address: a verified account is a member at once, any other
+        address gets an invitation carrying the paid term, whose link makes an account that is a
+        member. The answer is the same in both cases. A second completion answers as done and
+        charges nothing. The seller's webhook completes it when the person never comes back.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [purchase]
+              properties:
+                purchase: { type: string }
+                stripe_session: { type: string }
+                handler: { type: string, description: "Only test.money, on a node that runs the test money rail." }
+                instrument: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/apps/{owner}/{filename}/members/requests:
     post:
       operationId: appMembersRequest

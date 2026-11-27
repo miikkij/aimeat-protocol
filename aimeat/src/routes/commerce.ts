@@ -132,7 +132,7 @@ function checkoutGate(config: AimeatConfig, storage: Storage, gate: RequestHandl
 }
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription', 'membership']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */

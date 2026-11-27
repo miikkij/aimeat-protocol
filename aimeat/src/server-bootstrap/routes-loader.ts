@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-27 — appMembershipRouter (routes/app-membership.ts): an app membership's price and its purchase without an account.
  *   2026-11-26 — operatorServicesRouter (routes/agents/operator-services.ts): the operator services setting's routes.
  *   2026-11-26 — evalsRouter (routes/evals/evals.ts): stored eval sets for crews, skills and library packs.
  *   2026-11-21 — The eight routers behind a feature flag (calibrator, portfolio, extensions, cortex,
@@ -215,6 +216,7 @@ import { dependenciesRouter } from '../routes/dependencies.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
 import { appMembersRouter } from '../routes/app-members.js';
+import { appMembershipRouter } from '../routes/app-membership.js';
 import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
 import { appealsRouter } from '../routes/appeals.js';
@@ -752,6 +754,8 @@ export async function mountRoutes(
   // Member roster BEFORE appsRouter for the same reason as backup: these are more specific paths
   // under /v1/apps/:owner/:filename/ and must not be swallowed by the parameterized app routes.
   app.use(appMembersRouter(config, storage));
+  // What a membership costs and how to buy it, with or without an account (routes/app-membership.ts).
+  app.use(appMembershipRouter(config, storage));
   app.use(appsRouter(config, storage, peers));
   app.use(appStoreRouter(config, storage));
   // Node Extensions (Sandboxed)

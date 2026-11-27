@@ -27,6 +27,8 @@
  *   const reach = await appCheckoutReach(storage, req.auth!.app_grant, items); // { kind: 'own' } | ...
  *   const refused = await checkoutSpendRefusal(storage, caller, session, handlerId); if (refused) throw refused;
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A `membership` line of the app's own member plan, and the cancel of its
+ *     renewal, are the app's own product too (commerce/membership-sale.ts).
  *   v1.0.0 — 2026-11-25 — Initial (wish-sovellus-saa-avata-oman-tilauksensa-maksun-commerce-buy-ei-o).
  */
 import type { Storage } from '../storage/interface.js';
@@ -36,9 +38,14 @@ import { getPaymentHandler } from './payment-handlers.js';
 import { STRIPE_CHECKOUT_HANDLER_ID } from './stripe-checkout.js';
 import { appSpendRefusal } from '../services/metered/access.js';
 import { resolveGatedAppRef } from '../services/members-only.js';
+import { resolveOwnerAppRef } from '../services/app/app-ref.js';
+import { appIdOfMembershipExt } from './membership-sale.js';
 
 /** A checkout line as a request sends it and as a session stores it: only the two fields read here. */
 export interface CartLine { kind?: string; app?: string }
+
+/** The line kinds an app sells itself: its extension's plan, and a role of its own member plan. */
+const SELLS_ITSELF = new Set(['subscription', 'membership']);
 
 /**
  * own: every line is a subscription plan of the extension that serves this app.
@@ -64,7 +71,7 @@ export function sameApp(a: string | null | undefined, b: string | null | undefin
 /** Pure: the reach of a cart for the app `grantApp`, given the app each subscription line's extension serves. */
 export function cartReach(grantApp: string | null, lines: CartLine[], servedAppOf: (ext: string) => string | null): CartReach {
   if (!grantApp || lines.length === 0) return { kind: 'other' };
-  if (lines.some(l => l.kind !== 'subscription' || typeof l.app !== 'string' || !l.app)) return { kind: 'other' };
+  if (lines.some(l => !SELLS_ITSELF.has(l.kind ?? '') || typeof l.app !== 'string' || !l.app)) return { kind: 'other' };
   for (const line of lines) {
     const served = servedAppOf(line.app!);
     if (!sameApp(served, grantApp)) return { kind: 'foreign', ext: line.app!, servesApp: served };
@@ -85,11 +92,17 @@ export async function appCheckoutReach(
   grantId: string | null | undefined,
   lines: CartLine[],
 ): Promise<CartReach> {
-  if (!grantId || lines.length === 0 || lines.some(l => l.kind !== 'subscription')) return { kind: 'other' };
+  if (!grantId || lines.length === 0 || lines.some(l => !SELLS_ITSELF.has(l.kind ?? ''))) return { kind: 'other' };
   const grant = await storage.getAppGrant(grantId);
   if (!grant || grant.revoked) return { kind: 'other' };
   const served = new Map<string, string | null>();
   for (const name of new Set(lines.map(l => l.app).filter((a): a is string => typeof a === 'string' && !!a))) {
+    // A membership line names the app it sells a role of; a membership's subscription is named by
+    // its `app~…` ext (commerce/membership-sale.ts). Both serve that app.
+    const membershipApp = lines.some(l => l.kind === 'membership' && l.app === name)
+      ? await resolveOwnerAppRef(storage, name)
+      : appIdOfMembershipExt(name);
+    if (membershipApp) { served.set(name, membershipApp); continue; }
     const ext = await storage.getExtension(name);
     served.set(name, ext && ext.status === 'active' ? await resolveGatedAppRef(storage, ext) : null);
   }

@@ -16,6 +16,8 @@
  * @structure sweepLapsedMemberships(storage, config) → { swept, revoked, failed }
  * @usage started from server-bootstrap/service-init.ts on a low-frequency timer
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A self-serve term's expiry notice leads to the app's join page, where a new
+ *     term is bought; the sweep also clears old membership purchases made without an account.
  *   v1.0.2 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead
  *     of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
@@ -29,6 +31,7 @@ import { appDisplayName } from './app-ref.js';
 import { syncGrantsForMember } from '../grant-sync.js';
 import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
+import { sweepGuestPurchases } from '../../commerce/membership-guest.js';
 
 export interface SweepResult {
   swept: number;
@@ -98,7 +101,10 @@ export async function sweepLapsedMemberships(
           body: rec.renewal === 'self-serve'
             ? 'The term ran out. You can take another one whenever you like.'
             : 'The term ran out. Ask the owner if you need it back.',
-          link: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rec.appId.split('/')[1] ?? '')}?mode=inline`,
+          // A term meant to be bought again leads to the app's join page, where it is bought.
+          link: rec.renewal === 'self-serve'
+            ? `/v1/app-join?app=${encodeURIComponent(rec.appId)}`
+            : `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rec.appId.split('/')[1] ?? '')}?mode=inline`,
           i18n: {
             key: rec.renewal === 'self-serve' ? 'app_member_expired_self_serve' : 'app_member_expired',
             vars: { app: appName },
@@ -118,6 +124,11 @@ export async function sweepLapsedMemberships(
 
   if (out.swept) {
     logger.info('app-member sweep: lapsed memberships closed', out as unknown as Record<string, unknown>);
+  }
+  // The same hour clears purchases made without an account that were never paid, and paid ones a
+  // month after they became memberships (commerce/membership-guest.ts).
+  if (!appId) {
+    await sweepGuestPurchases(storage).catch(err => logger.warn('app-member sweep: old membership purchases were not cleared', { error: String(err) }));
   }
   return out;
 }

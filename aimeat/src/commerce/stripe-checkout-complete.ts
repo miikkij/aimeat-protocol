@@ -17,6 +17,8 @@
  *   services/exchange/party-buy.ts completePartyPurchaseFromStripe.
  * @structure completeFromStripeCheckout
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A card page opened for a membership bought without an account (`gm_…`)
+ *     completes that purchase (commerce/membership-guest.ts).
  *   v1.2.0 — 2026-11-03 — A party purchase's card page completes that purchase (secaudit2026nov02d
  *     round 13b, party-buy: the webhook did not complete a party purchase whose buyer never came back).
  *   v1.1.0 — 2026-10-27 — Completes only from a card page the node opened for the checkout
@@ -29,6 +31,7 @@ import type { Storage } from '../storage/interface.js';
 import { getSession, completeSession } from './session-service.js';
 import { STRIPE_CHECKOUT_HANDLER_ID } from './stripe-checkout.js';
 import { isPartyPurchaseId, completePartyPurchaseFromStripe } from '../services/exchange/party-buy.js';
+import { isGuestMembershipId, completeGuestPurchase } from './membership-guest.js';
 import { logger } from '../utils/logger.js';
 
 export async function completeFromStripeCheckout(
@@ -40,6 +43,18 @@ export async function completeFromStripeCheckout(
   const cs = typeof object.id === 'string' ? object.id : '';
   // An outside buyer's purchase of a data package: the same completion as the buyer's own return.
   if (isPartyPurchaseId(id)) return completePartyPurchaseFromStripe({ storage, config }, sellerGhii, id, cs);
+  // A membership bought without an account (commerce/membership-guest.ts), by the same rule.
+  if (isGuestMembershipId(id)) {
+    try {
+      const r = await completeGuestPurchase(storage, config, id, cs, { sellerGhii });
+      return r.already ? 'checkout_already_closed' : 'checkout_completed';
+    } catch (err) {
+      const code = String((err as { code?: unknown }).code ?? '');
+      if (code === 'NOT_FOUND' || code === 'PAYMENT_MISMATCH') return 'checkout_not_found';
+      logger.error('[stripe-checkout] a paid membership purchase did not complete', { purchase: id, seller: sellerGhii, code, error: String(err) });
+      return 'checkout_not_completed';
+    }
+  }
   const session = id && buyer ? await getSession(storage, buyer, id, config) : null;
   if (!session || session.sellerGhii !== sellerGhii || !cs) return 'checkout_not_found';
   if (session.status !== 'open') return 'checkout_already_closed';

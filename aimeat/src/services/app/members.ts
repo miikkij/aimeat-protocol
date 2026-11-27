@@ -109,6 +109,40 @@ export interface AppMemberRecord {
   devSince?: string;
   /** Who gave it. The app's audit log carries the act; this carries the current state. */
   devBy?: string;
+  /**
+   * The membership was bought (commerce/membership-sale.ts, commerce/membership-stripe.ts): how far it
+   * is paid and whether it renews. Absent for a membership the owner gave. `until` equals `expiresAt`:
+   * the purchase, the renewal and the outside sale write both in one step.
+   */
+  paid?: MemberPaid;
+}
+
+/** How a bought membership stands. Written by the sale code only, never by a roster request. */
+export interface MemberPaid {
+  /** `checkout`: bought through this node's checkout. `stripe`: sold on the owner's own Stripe and reported by its webhook. */
+  via: 'checkout' | 'stripe';
+  /** The end of the paid period. */
+  until: string;
+  /** Whether the next period is charged by itself. */
+  renews: boolean;
+  /** The Stripe subscription that renews an outside sale. */
+  stripeSubscription?: string;
+  /** The payment references a refund names (PaymentIntent, Charge or Invoice ids), newest last. */
+  charges?: string[];
+  at: string;
+}
+
+/**
+ * A role the owner sells. `amount` (6-decimal micro-units) and `currency` price it on this node's own
+ * checkout; a role sold only through the owner's own Stripe links has `stripePrices` and no amount.
+ * The period is the role's `terms[role].days`. `renews: false` is a one-time payment.
+ */
+export interface RoleSale {
+  amount?: number;
+  currency?: string;
+  renews: boolean;
+  /** Stripe Price ids (`price_…`) of the owner's own Stripe account that sell this role. */
+  stripePrices: string[];
 }
 
 /** A row is live if it has no term, or its term has not run out yet. */
@@ -296,7 +330,8 @@ export async function getMemberRow(storage: Storage, appId: string, principal: s
 export async function putMember(
   storage: Storage,
   input: { appId: string; account: string; role: string; level?: number | null; note?: string;
-    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'] },
+    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'];
+    paid?: MemberPaid | null },
 ): Promise<AppMemberRecord> {
   const account = accountOf(input.account);
   // The RAW row, so re-approving somebody whose term lapsed renews them rather than treating them
@@ -308,9 +343,13 @@ export async function putMember(
 
 function memberRow(
   input: { appId: string; role: string; level?: number | null; note?: string;
-    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'] },
+    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'];
+    paid?: MemberPaid | null },
   account: string, prev: AppMemberRecord | null,
 ): AppMemberRecord {
+  // A bought term is carried while the owner changes the role or the note; a new purchase replaces
+  // it, and null (an approval the owner made with a date of their own) takes it off.
+  const paid = input.paid === null ? undefined : (input.paid ?? prev?.paid);
   const now = new Date().toISOString();
   const rec: AppMemberRecord = {
     appId: input.appId,
@@ -331,8 +370,20 @@ function memberRow(
     ...(prev?.dev === undefined || prev.dev === null ? {} : { dev: prev.dev }),
     ...(prev?.devSince ? { devSince: prev.devSince } : {}),
     ...(prev?.devBy ? { devBy: prev.devBy } : {}),
+    ...(paid ? { paid } : {}),
   };
   return rec;
+}
+
+/**
+ * Change one member's row on its version, by its key alone. Storage calls only, so a renewal can run
+ * it inside its transaction (commerce/settle-purchase.ts). `mutate` gets the stored row or null.
+ */
+export async function updateMemberRow(
+  storage: Storage, appId: string, principal: string,
+  mutate: (cur: AppMemberRecord | null) => AppMemberRecord | typeof UNCHANGED,
+): Promise<AppMemberRecord | null> {
+  return updateAppRecord<AppMemberRecord>(storage, NS_MEMBER, memberKey(appId, principal), null, mutate);
 }
 
 /**
@@ -388,11 +439,15 @@ export interface AppCarryPlan {
    * membership does not lapse. `renewal` is descriptive: `manual` means the owner re-approves,
    * `self-serve` means the member is expected to buy another term, `none` means it simply ends.
    *
-   * NOTHING here charges anybody. A monthly subscription is expressed as `{ days: 30, renewal:
-   * 'self-serve' }` plus whatever the app already uses to take money; the node enforces the TERM,
-   * not the payment, and saying otherwise would be a promise it cannot keep.
+   * The term charges nobody by itself. A role with a price in `sale` is bought for one term at a
+   * time (commerce/membership-sale.ts), and its `days` is the paid period.
    */
   terms: Record<string, { days?: number; renewal?: 'manual' | 'self-serve' | 'none' }>;
+  /**
+   * The roles the owner sells, and at what price (RoleSale). A sold role has `terms[role].days`. The
+   * prices are public (GET /v1/apps/:owner/:filename/membership); the rest of the plan is not.
+   */
+  sale: Record<string, RoleSale>;
   /**
    * Roles whose holders manage the roster: approve, decline, remove, change a role, invite. Never the
    * plan or the sweep, and never a member who holds one of these roles, so only the owner appoints
@@ -425,7 +480,48 @@ export async function getCarryPlan(storage: Storage, appId: string): Promise<App
   const rec = await readAppRecord(storage, NS_PLAN, planKey(appId), appId);
   const v = rec?.value as AppCarryPlan | undefined;
   if (!v || !sameApp(v.appId, appId)) return null;
-  return { ...v, manageRoles: Array.isArray(v.manageRoles) ? v.manageRoles.filter(r => typeof r === 'string') : [] };
+  return {
+    ...v,
+    manageRoles: Array.isArray(v.manageRoles) ? v.manageRoles.filter(r => typeof r === 'string') : [],
+    // A plan stored before roles could be sold sells nothing.
+    sale: normalizeSale(v.sale),
+  };
+}
+
+/**
+ * Every carry plan of one owner's apps that sells a role, read across the plan namespace. The outside
+ * Stripe sale looks a Price id up here, so a webhook of one seller reads that seller's apps only.
+ */
+export async function listOwnerSalePlans(storage: Storage, owner: string): Promise<AppCarryPlan[]> {
+  const { items } = await listAppRecords(storage, NS_PLAN, 'appmemplan.');
+  const who = owner.toLowerCase();
+  return items
+    .map(r => r.value as AppCarryPlan)
+    .filter(v => v && typeof v.appId === 'string' && v.appId.split('/')[0]?.toLowerCase() === who)
+    .map(v => ({ ...v, manageRoles: Array.isArray(v.manageRoles) ? v.manageRoles : [], sale: normalizeSale(v.sale) }))
+    .filter(v => Object.keys(v.sale).length > 0);
+}
+
+/** Pure: a stored or requested `sale` map in its one shape; entries that are not usable are left out. */
+export function normalizeSale(raw: unknown): Record<string, RoleSale> {
+  const out: Record<string, RoleSale> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [role, v] of Object.entries(raw as Record<string, unknown>)) {
+    const s = v as { amount?: unknown; currency?: unknown; renews?: unknown; stripePrices?: unknown } | null;
+    if (!s || typeof s !== 'object') continue;
+    const priced = typeof s.amount === 'number' && Number.isInteger(s.amount) && s.amount > 0
+      && typeof s.currency === 'string' && /^[A-Za-z]{3}$/.test(s.currency);
+    const stripePrices = Array.isArray(s.stripePrices)
+      ? [...new Set(s.stripePrices.filter((p): p is string => typeof p === 'string' && /^price_[A-Za-z0-9]{1,250}$/.test(p)))].slice(0, 10)
+      : [];
+    if (!priced && !stripePrices.length) continue;
+    out[String(role)] = {
+      ...(priced ? { amount: s.amount as number, currency: (s.currency as string).toUpperCase() } : {}),
+      renews: s.renews !== false,
+      stripePrices,
+    };
+  }
+  return out;
 }
 
 /** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
@@ -433,7 +529,7 @@ export async function putCarryPlan(
   storage: Storage,
   input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members';
     access?: AppCarryPlan['access'] | 'open'; seats?: Record<string, number>; terms?: AppCarryPlan['terms'];
-    manageRoles?: string[]; setBy: string },
+    manageRoles?: string[]; sale?: Record<string, RoleSale>; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
@@ -458,6 +554,7 @@ export async function putCarryPlan(
     access: normalizeAccess(input.access),
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     manageRoles: [...new Set((input.manageRoles ?? []).filter(r => typeof r === 'string' && r))],
+    sale: normalizeSale(input.sale),
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };
   await writePrivateRecord(storage, NS_PLAN, planKey(input.appId), rec);

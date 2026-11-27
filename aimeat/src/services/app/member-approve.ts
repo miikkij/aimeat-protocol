@@ -13,6 +13,9 @@
  * @structure memberAddress · appDeepLink · appStem · ApproveMemberInput · approveMember
  * @usage const r = await approveMember(storage, config.nodeId, { appId, owner, filename, account, role, approvedBy, by, ownerGhii });
  * @version-history
+ *   v1.1.0 — 2026-11-27 — Re-approving a member into the role they hold continues from the end of the
+ *     running term, not from now; a purchase passes its paid term (`paid`) to the row
+ *     (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   v1.0.2 — 2026-11-20 — The app name comes from services/app/app-ref.ts (appDisplayName) instead of a regex of this file's own; no change in behaviour.
  *   v1.0.1 — 2026-10-01 — A seat limit of 0 is refused as "the plan allows no seats", not "all 0 seats are taken".
  *   v1.0.0 — 2026-10-01 — Extracted from routes/app-members.ts POST .../members. Adds the role-change
@@ -20,7 +23,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import {
-  getMember, putMember, removeRequest, forgetVisit, getCarryPlan, seatsTaken, type AppMemberRecord,
+  getMember, putMember, removeRequest, forgetVisit, getCarryPlan, seatsTaken, type AppMemberRecord, type MemberPaid,
 } from './members.js';
 import { syncGrantsForMember } from '../grant-sync.js';
 import { recordAppAudit } from './audit.js';
@@ -65,6 +68,10 @@ export interface ApproveMemberInput {
   days?: number;
   /** Undefined when not given; null for a membership that does not lapse; else an ISO time. */
   expiresAt?: string | null;
+  /** A bought term (commerce/membership-sale.ts). Undefined keeps the row's; an owner's own date clears it. */
+  paid?: MemberPaid;
+  /** A purchase tells the member it is paid and until when, also on a renewal they bought themselves. */
+  notice?: 'purchased';
   /** Extra detail for the audit row, such as how the membership began. */
   auditDetail?: Record<string, string | number | boolean | null>;
 }
@@ -103,17 +110,20 @@ export async function approveMember(storage: Storage, nodeId: string, input: App
     }
   }
 
-  // How long the term runs. An explicit date wins; otherwise the role's declared length applies,
-  // counted from NOW, so re-approving somebody is a renewal rather than an extension of a date
-  // that may already be in the past.
+  // How long the term runs. An explicit date wins; otherwise the role's declared length applies.
+  // Re-approving somebody into the role they hold continues from the end of their running term, so
+  // a renewal made before the end adds a whole term; a lapsed member (getMember answers null for one)
+  // and a role change start from now.
   const term = plan?.terms?.[role];
+  const runningEnd = before && before.role === role && before.expiresAt ? Date.parse(before.expiresAt) : NaN;
+  const from = Number.isFinite(runningEnd) && runningEnd > Date.now() ? runningEnd : Date.now();
   let expiresAt: string | null | undefined;
   if (input.expiresAt !== undefined) {
     expiresAt = input.expiresAt;
   } else if (typeof input.days === 'number' && input.days > 0) {
-    expiresAt = new Date(Date.now() + Math.floor(input.days) * 86400_000).toISOString();
+    expiresAt = new Date(from + Math.floor(input.days) * 86400_000).toISOString();
   } else if (term?.days) {
-    expiresAt = new Date(Date.now() + term.days * 86400_000).toISOString();
+    expiresAt = new Date(from + term.days * 86400_000).toISOString();
   } else if (!before) {
     expiresAt = null;
   }
@@ -130,6 +140,8 @@ export async function approveMember(storage: Storage, nodeId: string, input: App
     offerings: carried,
     ...(expiresAt !== undefined ? { expiresAt } : {}),
     ...(term?.renewal ? { renewal: term.renewal } : {}),
+    // A purchase names its paid term. An owner's own end date is no longer the paid one.
+    ...(input.paid ? { paid: input.paid } : input.expiresAt !== undefined && before?.paid ? { paid: null } : {}),
   });
   await removeRequest(storage, appId, account);
   // They are decided now, so they leave the guest list rather than appearing in two places.
@@ -151,7 +163,9 @@ export async function approveMember(storage: Storage, nodeId: string, input: App
   const joined = !before || !before.role;
   const changed = !joined && before!.role !== role;
   const vars = { app: appStem(input.filename), by: input.approvedBy, role, from: before?.role ?? '' };
-  if (joined) await sendMemberNotice(storage, memberAddress(account, nodeId), 'approved', vars, { link: appDeepLink(appId) });
+  if (input.notice === 'purchased' && rec.expiresAt) {
+    await sendMemberNotice(storage, memberAddress(account, nodeId), 'purchased', { ...vars, date: rec.expiresAt }, { link: appDeepLink(appId), dates: ['date'] });
+  } else if (joined) await sendMemberNotice(storage, memberAddress(account, nodeId), 'approved', vars, { link: appDeepLink(appId) });
   else if (changed) await sendMemberNotice(storage, memberAddress(account, nodeId), 'role_changed', vars, { link: appDeepLink(appId) });
 
   await recordAppAudit(storage, {

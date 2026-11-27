@@ -10,6 +10,10 @@
  * @structure setCarryPlan · setMember · removeRosterMember
  * @usage const out = await setMember(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The carry plan takes `sale`, the roles the owner sells (member-sale-rules.ts
+ *     checks it; the app's own token may not change it), and keeps the stored one when the request
+ *     leaves it out. An invitation by email carries the term (`days`, `expiresAt`) to the membership it
+ *     becomes; it was lost (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   v1.2.0 — 2026-11-05 — An invitation an agent or an app sends by email counts against the account's
  *     emailed-invitation allowance (account-limits.ts takeInviteEmailOnNode) before anything is written,
  *     as the organism invitation does; 429 RATE_LIMITED past it (codebase analysis 2026-11-03,
@@ -22,7 +26,10 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
-import { getMember, getMemberRow, removeMember, accountOf, putCarryPlan, normalizeAccess, type AppCarryPlan } from './members.js';
+import { getMember, getMemberRow, removeMember, accountOf, putCarryPlan, normalizeAccess, normalizeSale, type AppCarryPlan } from './members.js';
+import { saleRequestError, saleConflict } from './member-sale-rules.js';
+import { cancelSubscription } from '../../commerce/subscriptions.js';
+import { membershipExt } from '../../commerce/membership-sale.js';
 import { tokenOfThisApp } from './record-keys.js';
 import { syncGrantsForMember } from '../grant-sync.js';
 import { approveMember, memberAddress, appDeepLink, appStem } from './member-approve.js';
@@ -62,7 +69,7 @@ export async function setCarryPlan(
   if (!c.isOwner) return forbidden('Only the app owner sets its carry plan');
   const b = (body ?? {}) as {
     roles?: Record<string, unknown>; rosterVisibility?: string; access?: string;
-    seats?: Record<string, unknown>; terms?: Record<string, unknown>; manageRoles?: unknown;
+    seats?: Record<string, unknown>; terms?: Record<string, unknown>; manageRoles?: unknown; sale?: unknown;
   };
   const ACCESS = ['members-free', 'free', 'members-only', 'open'];
   if (b.access !== undefined && !ACCESS.includes(String(b.access))) {
@@ -94,6 +101,8 @@ export async function setCarryPlan(
       b.access !== undefined && normalizeAccess(String(b.access)) !== (c.plan?.access ?? 'members-free') ? 'access' : null,
       b.manageRoles !== undefined && !sameSet(b.manageRoles as unknown[], c.plan?.manageRoles ?? []) ? 'manageRoles' : null,
       b.rosterVisibility !== undefined && b.rosterVisibility !== (c.plan?.rosterVisibility ?? 'owner') ? 'rosterVisibility' : null,
+      // What a role costs is the owner's to set, like who pays (commerce/membership-sale.ts).
+      b.sale !== undefined && JSON.stringify(normalizeSale(b.sale)) !== JSON.stringify(c.plan?.sale ?? {}) ? 'sale' : null,
     ].filter((x): x is string => !!x);
     if (changed.length) {
       return forbidden(`The app's own token may not change ${changed.join(', ')}: who pays and who manages the roster are the owner's to decide. `
@@ -127,8 +136,13 @@ export async function setCarryPlan(
     return bad('manageRoles must be a list of role names. Each starts with a letter and holds only letters, digits, ".", "_" or "-", '
       + 'at most 40 characters; "owner" is not a role.');
   }
+  // The roles for sale. Absent keeps what the plan sells, so a save from an older panel does not take
+  // the prices away.
+  const sale = b.sale === undefined ? (c.plan?.sale ?? {}) : normalizeSale(b.sale);
+  const saleError = saleRequestError(b.sale) ?? await saleConflict(storage, c.appId, sale, terms);
+  if (saleError) return bad(saleError.message, saleError.code);
   const plan = await putCarryPlan(storage, {
-    appId: c.appId, roles, seats, terms, setBy: c.callerAccount,
+    appId: c.appId, roles, seats, terms, setBy: c.callerAccount, sale,
     access: b.access as AppCarryPlan['access'] | 'open' | undefined,
     rosterVisibility: b.rosterVisibility === 'members' ? 'members' : 'owner',
     manageRoles: (b.manageRoles as string[] | undefined) ?? c.plan?.manageRoles ?? [],
@@ -152,7 +166,8 @@ export async function setCarryPlan(
  */
 async function invite(
   storage: Storage, config: AimeatConfig, c: MembersCtx,
-  args: { email: string; role: string; note?: string; lang: string | undefined; inPerson: boolean },
+  args: { email: string; role: string; note?: string; lang: string | undefined; inPerson: boolean;
+    days?: number; expiresAt?: string | null },
 ): Promise<AppOpOutcome> {
   const open = await listInvites(storage, c.appId);
   const hash = inviteEmailHash(args.email);
@@ -173,6 +188,7 @@ async function invite(
     appId: c.appId, filename: c.filename, email: args.email, role: args.role, note: args.note, invitedBy: c.callerGaii,
     inviterName: (await displayNamesOf(storage, [c.callerAccount])).get(c.callerAccount) || c.callerAccount,
     appUrl: Object.values(urls)[0] ?? `${config.baseUrl}${appDeepLink(c.appId)}`, lang: noticeLang(args.lang), turn,
+    term: { ...(args.days !== undefined ? { days: args.days } : {}), ...(args.expiresAt !== undefined ? { expiresAt: args.expiresAt } : {}) },
   });
   // The address, as the owner's and the managers' invitation list shows it: the history is read
   // by the same people, and an invitation has no account to name.
@@ -211,6 +227,17 @@ export async function setMember(
   // Only the owner makes managers: a manager may not approve anybody INTO a managing role.
   if (!c.isOwner && isManagerRole(c.plan, role)) return forbidden(MANAGER_ROLE_MSG);
   const note = typeof b.note === 'string' ? b.note.slice(0, 400) : undefined;
+  // The term, read before the email branch: an invitation carries it to the membership it becomes,
+  // which lost it when the address had no account yet.
+  let expiresAt: string | null | undefined;
+  if (b.expiresAt !== undefined) {
+    const t = b.expiresAt === null ? null : Date.parse(String(b.expiresAt));
+    if (t !== null && !Number.isFinite(t)) {
+      return bad('expiresAt must be a date such as 2026-12-31T00:00:00Z, or null for a membership that does not lapse.');
+    }
+    expiresAt = t === null ? null : new Date(t).toISOString();
+  }
+  const days = typeof b.days === 'number' && b.days > 0 ? Math.floor(b.days) : undefined;
 
   // By email: an exact match through the contacts lookup and its per-account limit. An address of
   // a VERIFIED account approves that account; any other address becomes an invitation.
@@ -230,7 +257,7 @@ export async function setMember(
     // (POST /v1/contacts/resolve). Anybody else asking here (the app's own token, an agent, a
     // manager) gets an invitation whatever the address is, so the answer tells them nothing about
     // who has an account; the account holder accepts it from their mail (secaudit 2026-10, APP-3).
-    if (!isOwnerInPerson(caller)) return invite(storage, config, c, { email, role, note, lang, inPerson: false });
+    if (!isOwnerInPerson(caller)) return invite(storage, config, c, { email, role, note, lang, inPerson: false, days, expiresAt });
     let hit: Awaited<ReturnType<typeof resolveContactEmail>>;
     try {
       hit = await resolveContactEmail(storage, c.callerGaii, email);
@@ -239,7 +266,7 @@ export async function setMember(
       throw e;
     }
     const verified = hit.found ? (await storage.getGHII(hit.ghii))?.emailVerifiedAt : null;
-    if (!hit.found || !verified) return invite(storage, config, c, { email, role, note, lang, inPerson: true });
+    if (!hit.found || !verified) return invite(storage, config, c, { email, role, note, lang, inPerson: true, days, expiresAt });
     account = accountOf(hit.owner);
     found = { account, displayName: hit.display_name };
   }
@@ -258,14 +285,6 @@ export async function setMember(
   if (!found && !account.includes('@') && !(await storage.getGHIIByOwner(account))) {
     return refuse(404, 'NOT_FOUND', `No account named "${account}" on this node.`);
   }
-  let expiresAt: string | null | undefined;
-  if (b.expiresAt !== undefined) {
-    const t = b.expiresAt === null ? null : Date.parse(String(b.expiresAt));
-    if (t !== null && !Number.isFinite(t)) {
-      return bad('expiresAt must be a date such as 2026-12-31T00:00:00Z, or null for a membership that does not lapse.');
-    }
-    expiresAt = t === null ? null : new Date(t).toISOString();
-  }
   // Naming offerings gives away free access to what the owner sells, which is the exchange:grant
   // act itself. The app's own token and a manager approve by the declared plan only.
   const namesOfferings = Array.isArray(b.offerings) && c.isOwner && !tokenOfThisApp(caller, c.appId);
@@ -274,7 +293,7 @@ export async function setMember(
     level: typeof b.level === 'number' ? b.level : undefined, note,
     approvedBy: c.callerAccount, by: c.callerGaii, ownerGhii: await rosterBucketOf(storage, config, c.owner),
     offerings: namesOfferings ? (b.offerings as unknown[]).filter((x): x is string => typeof x === 'string') : undefined,
-    days: typeof b.days === 'number' ? b.days : undefined, expiresAt,
+    days, expiresAt,
     ...(found ? { auditDetail: { via: 'email' } } : {}),
   });
   if (!r.ok) return refuse(r.status, r.code, r.message);
@@ -307,6 +326,11 @@ export async function removeRosterMember(
     });
   }
   if (!gone) return refuse(404, 'NOT_FOUND', 'No such member');
+  // A membership the person bought stops renewing when the owner removes them: nothing charges a
+  // card for a role its holder no longer has (commerce/membership-sale.ts).
+  if (gone.paid?.via === 'checkout' && gone.paid.renews) {
+    await cancelSubscription(storage, memberAddress(account, config.nodeId), membershipExt(c.appId), gone.role);
+  }
   // An outside party has no account to notify (services/app-parties/).
   if (!account.startsWith('party:')) await sendMemberNotice(storage, memberAddress(account, config.nodeId), 'revoked', { app: appStem(c.filename), by: c.callerAccount }, { link: appDeepLink(c.appId) });
   await rosterAudit(storage, config, c, 'member.removed', { account, from: gone.role || null, to: null });

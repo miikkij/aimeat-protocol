@@ -18,6 +18,7 @@
  *   sendMemberNotice · appMemberInviteEmail
  * @usage await sendMemberNotice(storage, 'bob@node', 'approved', { app: 'club', by: 'alice', role: 'member' }, { link });
  * @version-history
+ *   v1.2.0 — 2026-11-27 — Two kinds: `purchased` (a bought membership, paid until {date}) and `refunded` (a refund ended it).
  *   v1.1.0 — 2026-10-01 — The invitation email's button accepts the invitation through its sign-up
  *     link, and the text says what happens there (en, fi, es).
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, B4): the roster's notifications in en, fi and es,
@@ -37,7 +38,7 @@ export function noticeLang(locale: string | null | undefined): NoticeLang {
   return tag === 'fi' || tag === 'es' ? tag : 'en';
 }
 
-export type MemberNoticeKind = 'approved' | 'revoked' | 'request' | 'role_changed' | 'declined';
+export type MemberNoticeKind = 'approved' | 'revoked' | 'request' | 'role_changed' | 'declined' | 'purchased' | 'refunded';
 
 /** The notification type each kind is stored under. */
 const TYPE: Record<MemberNoticeKind, string> = {
@@ -46,6 +47,8 @@ const TYPE: Record<MemberNoticeKind, string> = {
   request: 'app_member_request',
   role_changed: 'app_member_role_changed',
   declined: 'app_member_declined',
+  purchased: 'app_member_purchased',
+  refunded: 'app_member_refunded',
 };
 
 type Text = { title: string; body: string };
@@ -56,6 +59,8 @@ const NOTICES: Record<NoticeLang, Record<MemberNoticeKind, Text> & { noNote: str
     request: { title: '{who} asked for access to {app}', body: '{note}' },
     role_changed: { title: 'Your role in {app} is now {role}', body: '{by} changed your role. It was {from}.' },
     declined: { title: 'Your request to join {app} was declined', body: 'You can ask again from {date}.' },
+    purchased: { title: 'You are a member of {app}', body: 'Your membership as {role} is paid until {date}.' },
+    refunded: { title: 'Your membership of {app} ended', body: 'The payment was refunded, so the membership as {role} ended.' },
     noNote: 'No message was left.',
     approveAs: 'Approve as {role}',
     decline: 'Decline',
@@ -66,6 +71,8 @@ const NOTICES: Record<NoticeLang, Record<MemberNoticeKind, Text> & { noNote: str
     request: { title: '{who} pyytää pääsyä sovellukseen {app}', body: '{note}' },
     role_changed: { title: 'Roolisi sovelluksessa {app} on nyt {role}', body: '{by} vaihtoi roolisi. Aiempi rooli oli {from}.' },
     declined: { title: 'Pyyntösi liittyä sovellukseen {app} hylättiin', body: 'Voit pyytää uudelleen {date} alkaen.' },
+    purchased: { title: 'Olet sovelluksen {app} jäsen', body: 'Jäsenyytesi rooliin {role} on maksettu {date} asti.' },
+    refunded: { title: 'Jäsenyytesi sovelluksessa {app} päättyi', body: 'Maksu palautettiin, joten jäsenyys rooliin {role} päättyi.' },
     noNote: 'Viestiä ei jätetty.',
     approveAs: 'Hyväksy rooliin {role}',
     decline: 'Hylkää',
@@ -76,6 +83,8 @@ const NOTICES: Record<NoticeLang, Record<MemberNoticeKind, Text> & { noNote: str
     request: { title: '{who} pidió acceso a {app}', body: '{note}' },
     role_changed: { title: 'Tu rol en {app} ahora es {role}', body: '{by} cambió tu rol. Antes era {from}.' },
     declined: { title: 'Tu solicitud para unirte a {app} fue rechazada', body: 'Puedes volver a pedirlo a partir del {date}.' },
+    purchased: { title: 'Eres miembro de {app}', body: 'Tu membresía con el rol {role} está pagada hasta el {date}.' },
+    refunded: { title: 'Tu membresía de {app} terminó', body: 'Se devolvió el pago, así que terminó la membresía con el rol {role}.' },
     noNote: 'No dejó ningún mensaje.',
     approveAs: 'Aprobar como {role}',
     decline: 'Rechazar',
