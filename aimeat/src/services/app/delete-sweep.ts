@@ -57,6 +57,8 @@
  * @usage
  *   await removeAppLeftovers(storage, config, { ownerName, ownerGhii, filename, buckets: [app.ownerGaii] });
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A step for the pictures a scenario run keeps in the owner's files
+ *     (services/app/scenario-pictures.ts).
  *   v1.1.4 — 2026-11-22 — Comment only: the checkpoint slug's source is appcat's workcopy.js; the old
  *     catalogue's copy is removed. The record key app-catalog.wc.<slug> is unchanged.
  *   v1.1.3 — 2026-11-20 — The data-map id comes from services/app/app-ref.ts (appDataMapId) instead
@@ -108,6 +110,7 @@ import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import { reconcileOwnerOfferings } from '../exchange/projection.js';
 import { listSkillsByBinding, deleteSkill } from '../skills.js';
 import { appDataMapId } from './app-ref.js';
+import { removeScenarioPictures } from './scenario-pictures.js';
 
 /** The app a whole-app delete removed. */
 export interface AppSweepTarget {
@@ -190,6 +193,12 @@ export const APP_SWEEP_STEPS: ReadonlyArray<{ name: string; run: (c: SweepCtx) =
     name: 'icon', run: async c => {
       // An app with no icon has none to delete; a storage error fails the step and is logged there.
       for (const b of new Set([c.t.ownerGhii, ...(c.t.buckets ?? [])])) await c.storage.deleteStorageFile(b, appIconKey(c.t.filename));
+    },
+  },
+  {
+    // The pictures its scenario runs kept in the owner's files, under playtest/<filename>/.
+    name: 'scenario pictures', run: async c => {
+      for (const b of new Set([c.t.ownerGhii, ...(c.t.buckets ?? [])])) await removeScenarioPictures(c.storage, b, c.t.filename);
     },
   },
   {

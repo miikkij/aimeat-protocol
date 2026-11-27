@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-27 — The scenarios line: the node's browser is the first one to use, and a run at the
+ *     phone and the desktop size answers a picture address (services/app/scenario-pictures.ts).
  *   2026-11-27 — The scenarios line says what a run gets: an account of its own per size and theme,
  *     an answer in the same call when it is short, and otherwise `running` and the same call again.
  *   2026-11-27 — The template tools' line names the `recipe` a template can carry
@@ -442,11 +444,16 @@ where it stands (\`status\`: open, evidenced with \`evidence\` that says what pr
 empty, error and loading states, the phone width and both themes are where builds fall short. Write
 the whole list with \`aimeat_app_manage\` \`criteria_set\`; the spec must exist first. At the finest
 level an update is refused while a line is open (\`APP_OWES_ITEMS\`, item \`criteria\`); every
-publish answer counts them in \`next_steps\`. Only the owner waives a line. When you have no browser
-of your own, write playtest scenarios with \`scenarios_set\` (steps: click, fill, press, wait,
+publish answer counts them in \`next_steps\`. Only the owner waives a line. The node has a browser of
+its own, and it is the first one to use, whether or not you have another: write playtest scenarios
+with \`scenarios_set\` (steps: click, fill, press, wait,
 expect_text, expect_visible, expect_absent; each scenario names the criteria it proves) and run them
 with \`audit\` \`{ playtest: true }\`: the node opens the published app signed in as a throwaway member
-at four sizes and both themes, and answers pass or fail per size and theme. A scenario that passes
+at four sizes and both themes, and answers pass or fail per size and theme. Each run at the phone and
+the desktop size also answers a \`picture\` address: the screen after the last step, or at the step
+that failed. Fetch it (no sign-in is sent, it is valid for an hour) and look at it; the files are in
+the owner's own files under \`playtest/\`. Never install a browser or stand in the sign-in or data
+libraries to see the app: that page is not the published app. A scenario that passes
 at all of them marks the criteria it names as evidenced by itself (\`criteria_evidenced\`): no
 \`criteria_set\` is owed for those. Write the criteria first: a scenario names them. Every run
 of a size and theme is on an account of its own that holds nothing. A scenario runs at the phone and

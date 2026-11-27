@@ -35,6 +35,8 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.5.0 — 2026-11-27 — The audit hands the scenario run the app's owner identity, so the run
+ *     keeps its pictures in the owner's files and the answer names their addresses.
  *   v1.4.1 — 2026-11-27 — `boots` counts the Atelier shell's status card as something on screen: an
  *     app that needs a sign-in draws its sign-in card there and hides the empty main region.
  *   v1.4.0 — 2026-11-27 — The audit asks scenario-run.ts for the scenarios: a run is started once,
@@ -708,7 +710,7 @@ export async function auditAppWithPlaytest(
   const playtest = kept ?? await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
   const run = await scenarioRunFor(
     storage, config,
-    { ...target, html, appName: record.manifest?.name ?? app.filename },
+    { ...target, html, appName: record.manifest?.name ?? app.filename, ownerGaii: record.ownerGaii },
     scenarios, () => takePlaytestSlot(app.ownerName), { playtest },
   );
   return { artifact, playtest, scenarios: run };

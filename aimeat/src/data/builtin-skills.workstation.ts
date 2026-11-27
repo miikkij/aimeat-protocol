@@ -29,6 +29,8 @@
  * @usage
  *   import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
  * @version-history
+ *   v1.0.4 — 2026-11-27 — "When you have finished a change" names the node's own browser first: the
+ *     scenarios and the audit with the playtest, which answers a picture per run.
  *   v1.0.3 — 2026-11-25 — "When you have finished a change" names the one size matrix of the Atelier
  *     specification (services/app/publish-finish.ts); it named three of its four sizes.
  *   v1.0.2 — 2026-11-19 — "What does NOT change" names the Atelier spec and guide only, and section
@@ -158,7 +160,7 @@ much, something was inlined.
 
 ## When you have finished a change
 
-Drive a real browser at ${ATELIER_SIZE_MATRIX} in both themes. A build that compiles is not
+Look at the published app at ${ATELIER_SIZE_MATRIX} in both themes, in the node's own browser first: the app's scenarios and \`aimeat_app_manage { action: "audit", playtest: true }\`, which answers a picture of the screen for each run at the phone and the desktop size. A browser of your own is for what those do not show. A build that compiles is not
 a screen that works, and at this size the thing you broke is usually somewhere you did not look.
 `,
 };

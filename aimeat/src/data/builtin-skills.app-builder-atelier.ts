@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-27 — Step 7: the node's browser first (scenarios, the audit with the playtest, and the
+ *     picture each run answers), and no browser installed or library replaced to see the app. Five
+ *     measured builds each installed a browser and wrote a test driver; three replaced the sign-in.
  *   2026-11-27 — Step 1: an order that carries its answers and says to decide gets no questions and
  *     no drawn layouts. Five measured builds each drew two or three layouts for a person who had
  *     said to decide.
@@ -537,11 +540,11 @@ changed after you fetched it says so.
    several seconds while the app works, and run an app that computes every frame once with the
    JavaScript compiler off (\`--js-flags=--jitless\`): the specification's "Finishing" says how
    and what passes. The checklist to go through is the platform section \`verify\`
-   (\`aimeat_handbook_get { tier: "build-app-atelier/verify" }\`). LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
-   you were given and search them for \`playwright\`, \`browser\` and \`chrome\`. A Playwright MCP
-   server driving the machine's own Chrome is the usual one, and a session that has it and does
-   not look is the common failure. If there is none, say so once and suggest it by name
-   (Playwright MCP with Chrome), because it is what lets you see what you built.
+   (\`aimeat_handbook_get { tier: "build-app-atelier/verify" }\`). THE NODE HAS A BROWSER, AND IT IS THE FIRST ONE YOU USE: write the app's paths as scenarios (\`aimeat_app_manage { action: "scenarios_set" }\`) and ask \`{ action: "audit", filename, playtest: true }\`. It opens the PUBLISHED app at every size in both themes, signed in as a member of its own, and each run at the phone and the desktop size answers a \`picture\` address: fetch it and LOOK at it.
+   NEVER install a browser or write a test driver of your own to see the app, and never replace the sign-in or data libraries with stand-ins to get past a sign-in: that page is not the app the owner gets.
+   A browser among your own tools (search them for \`playwright\`, \`browser\` and \`chrome\`; a Playwright MCP
+   server driving the machine's own Chrome is the usual one) is for what the node's does not show: a hover, a drag, the
+   browser's own warnings. If there is none, say in one line what was not checked.
    A MISSING BROWSER NEVER HOLDS A PUBLISH BACK: the published page
    is what gets verified, by you if you have a browser and by the owner if you do not. Publish,
    give the address, and say in one line what you could not check yourself (a microphone, a

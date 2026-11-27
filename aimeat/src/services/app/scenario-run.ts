@@ -25,6 +25,9 @@
  * @usage
  *   const scenarios = await scenarioRunFor(storage, config, app, list, () => takePlaytestSlot(owner));
  * @version-history
+ *   v1.1.0 — 2026-11-27 — With the app's `ownerGaii`, the run keeps a picture per run at the phone
+ *     and the desktop size in the owner's files, removes the pictures it did not write, and every
+ *     answer names an address per picture (scenario-pictures.ts).
  *   v1.0.0 — 2026-11-27 — Initial (wish-rakentajan-skenaarioajo-vastaa-mcp-kutsun-aikana-ja-jokainen).
  */
 import { createHash } from 'node:crypto';
@@ -33,6 +36,7 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { readAppDesignSpec, writeAppScenarioRun, type AppScenarioRunNote } from './design-spec.js';
 import { runAppScenarios, type ScenarioRunResult } from './playtest-scenarios.js';
+import { keepScenarioPicture, sweepScenarioPictures, withPictureAddresses } from './scenario-pictures.js';
 import type { AppScenario } from './scenarios.js';
 import type { HeadlessBrowser } from '../screenshot-capture.js';
 
@@ -52,6 +56,8 @@ const RUNNING_NOTE_MAX_MS = BACKGROUND_DEADLINE_MS + 60_000;
 
 /** What a caller reads: the run's answer, and where the run stands. */
 export interface ScenarioRunAnswer extends ScenarioRunResult {
+  /** How the pictures are read, when a run has any (scenario-pictures.ts). */
+  pictures?: string;
   /** True while the run goes on in the background: `scenarios` is empty and the same call reads it later. */
   running?: boolean;
   /** The criteria the node marked evidenced from this run: no criteria_set is owed for them. */
@@ -92,7 +98,7 @@ const runningAnswer = (note: AppScenarioRunNote): ScenarioRunAnswer => ({
  */
 export async function scenarioRunFor(
   storage: Storage, config: AimeatConfig,
-  app: { ownerName: string; filename: string; html: string; appName: string; appVersion: number },
+  app: { ownerName: string; filename: string; html: string; appName: string; appVersion: number; ownerGaii?: string },
   scenarios: readonly AppScenario[],
   takeSlot: () => { release(): void } | { reason: string },
   opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; inlineWaitMs?: number; readWaitMs?: number; playtest?: unknown } = {},
@@ -100,8 +106,12 @@ export async function scenarioRunFor(
   const appId = `${app.ownerName}/${app.filename}`;
   const now = opts.now ?? Date.now;
   const key = scenarioRunKey(app.appVersion, scenarios);
-  const done = (n: AppScenarioRunNote): ScenarioRunAnswer =>
-    ({ ...(n.result as ScenarioRunResult), app_version: n.appVersion, started_at: n.startedAt, ...(n.finishedAt ? { finished_at: n.finishedAt } : {}) });
+  const ownerGaii = app.ownerGaii;
+  // The note keeps each picture's key; the address is made when the answer is, so it is valid from then.
+  const addressed = (a: ScenarioRunAnswer): Promise<ScenarioRunAnswer> | ScenarioRunAnswer =>
+    (ownerGaii && a.scenarios.length ? withPictureAddresses(storage, config, ownerGaii, a) : a);
+  const done = (n: AppScenarioRunNote): Promise<ScenarioRunAnswer> | ScenarioRunAnswer =>
+    addressed({ ...(n.result as ScenarioRunResult), app_version: n.appVersion, started_at: n.startedAt, ...(n.finishedAt ? { finished_at: n.finishedAt } : {}) });
   let note = (await readAppDesignSpec(storage, appId))?.scenarioRun;
   if (note?.key === key) {
     if (note.state === 'done' && note.result) return done(note);
@@ -131,10 +141,19 @@ export async function scenarioRunFor(
 
   // The run goes on whether or not this call is still waiting for it. Its answer is written to the
   // note it started under, and only there: a newer run's note is never overwritten by an older one.
-  const work = runAppScenarios(storage, config, app, scenarios, { deadlineMs: BACKGROUND_DEADLINE_MS, ...(opts.launch ? { launch: opts.launch } : {}) })
+  const work = runAppScenarios(storage, config, app, scenarios, {
+    deadlineMs: BACKGROUND_DEADLINE_MS, ...(opts.launch ? { launch: opts.launch } : {}),
+    ...(ownerGaii ? { keepPicture: (p) => keepScenarioPicture(storage, ownerGaii, app.filename, p) } : {}),
+  })
     .catch((err: unknown): ScenarioRunResult => ({ ran: false, reason: `The scenarios did not finish: ${(err as Error)?.message ?? 'unknown error'}.`, member: 'Not known.', scenarios: [], criteria_evidence: [] }))
     .then(async (ran) => {
       const finishedAt = new Date(now()).toISOString();
+      // The pictures of this run are the app's pictures now: one of a scenario that is gone, or of
+      // a size this run did not reach, would be read as this run's.
+      if (ownerGaii && ran.ran) {
+        const kept = new Set(ran.scenarios.flatMap(s => s.runs.flatMap(r => (r.picture_key ? [r.picture_key] : []))));
+        await sweepScenarioPictures(storage, ownerGaii, app.filename, kept);
+      }
       // What a scenario proved at every size and theme is written as evidence in the same write as
       // the result: the node saw it, so the builder does not send the whole criteria list back.
       const result: ScenarioRunResult & { criteria_evidenced?: string[] } = { ...ran };
@@ -143,7 +162,7 @@ export async function scenarioRunFor(
         (marked) => { if (marked.length) result.criteria_evidenced = marked; return { ...started, state: 'done', finishedAt, result }; },
         { onlyIfKey: key, evidence: ran.criteria_evidence, appVersion: app.appVersion },
       ).catch((err: unknown) => { logger.warn('scenario run: the result was not kept', { app: appId, error: String(err) }); });
-      return { ...result, app_version: app.appVersion, started_at: started.startedAt, finished_at: finishedAt } satisfies ScenarioRunAnswer;
+      return addressed({ ...result, app_version: app.appVersion, started_at: started.startedAt, finished_at: finishedAt });
     })
     .finally(() => slot.release());
 

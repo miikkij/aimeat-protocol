@@ -1016,6 +1016,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership, plan, request and roadmap system records."
     },
+    "src/services/app/scenario-pictures.ts": {
+      "reads": {
+        "listStorageFiles": 1,
+        "getStorageFileMeta": 1,
+        "generateDownloadToken": 1
+      },
+      "why": "Reviewed 2026-11-27, the node's own read: the pictures a scenario run of one app wrote under playtest/<app file>/ in the app owner's files. The list is read to remove the pictures a run did not write, and the metadata to give each picture of that app an address in the audit answer. A picture shows the published app as the run's own throwaway member sees it; the audit route admits the owner, an agent of the owner, or a holder of a development right on the app. No other key is listed to anyone or handed out."
+    },
     "src/services/app/scope-allowance-store.ts": {
       "reads": {
         "getMemory": 1

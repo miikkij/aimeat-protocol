@@ -14,6 +14,7 @@
  * @structure readDesignSpecFor · writeDesignSpecFor · writeCriteriaFor · writeScenariosFor · clearDesignSpecFor
  * @usage const out = await writeDesignSpecFor(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.3.1 — 2026-11-27 — The scenarios answer names the pictures a run gives.
  *   v1.3.0 — 2026-11-27 — writeDesignSpecFor takes `confirm: true` in place of the text: the spec
  *     there is marked current for the app's version without the document being sent back.
  *   v1.2.0 — 2026-11-26 — writeScenariosFor: the playtest scenarios inside the spec (scenarios.ts).
@@ -232,7 +233,7 @@ export async function writeScenariosFor(
     app_version: found.app.versionNumber,
     scenarios: out.spec.scenarios,
     revision: out.spec.revision,
-    meaning: `${checked.scenarios.length} scenario(s) stored. aimeat_app_manage { action: "audit", playtest: true } runs each on the published app at four sizes and both themes, and answers with evidence lines for the criteria of every scenario that passes.`,
+    meaning: `${checked.scenarios.length} scenario(s) stored. aimeat_app_manage { action: "audit", playtest: true } runs each on the published app at four sizes and both themes, and answers with evidence lines for the criteria of every scenario that passes and, for each run at the phone and the desktop size, the address of a picture of the screen: look at those in place of a browser of your own.`,
   });
 }
 

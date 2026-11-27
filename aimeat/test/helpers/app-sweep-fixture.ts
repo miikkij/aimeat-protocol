@@ -27,6 +27,8 @@
  *   await attachApp(kit, owner, other, a, 'a');
  *   const hits = await sweepDatabase(storage, provider, [a.stripped, a.seg]);
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The store "the scenario pictures" and its fixture file
+ *     (services/app/scenario-pictures.ts).
  *   v1.0.0 — 2026-11-19 — Initial: moved out of test/e2e-app-delete-sweep.ts unchanged, so the owner
  *     erasure suite reads the same list (feature audit 2026-11-19, part 1 of agent F). The internet
  *     opening's key reads the app's own owner instead of the suite's one owner.
@@ -51,6 +53,7 @@ import { NS_INVITE, inviteKey } from '../../src/services/app/member-invites.js';
 import { openingKey, openingOwner } from '../../src/services/internet-opening/opening-types.js';
 import { ROLES_KEY } from '../../src/services/ai/roles.js';
 import { appPlanKey } from '../../src/services/app/plan.js';
+import { keepScenarioPicture, scenarioPicturePrefix } from '../../src/services/app/scenario-pictures.js';
 
 // ── The names ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -90,6 +93,8 @@ const under = (k: (a: AppNames) => string) => (a: AppNames) => new RegExp(`^${es
 export const STORES: Store[] = [
     { name: 'the app rows', table: 'app', fate: 'removed', fixture: true },
     { name: 'the draft slot', table: 'appdraft', fate: 'removed', fixture: true },
+    // Before the icon, which takes every other stored file that names the app.
+    { name: 'the scenario pictures', table: 'storagefile', key: a => new RegExp(`^${esc(scenarioPicturePrefix(a.file))}`), fate: 'removed', fixture: true },
     { name: 'the stored icon', table: 'storagefile', fate: 'removed', fixture: true },
     { name: 'the settings values', table: 'memory', key: exact(a => appConfigKey(a.file)), fate: 'removed', fixture: true },
     { name: 'the tool manifest', table: 'memory', key: exact(a => appToolsKey(a.file)), fate: 'removed', fixture: true },
@@ -283,6 +288,9 @@ export async function attachApp(kit: SweepKit, owner: SweepOwner, other: SweepOw
     await put(NS_SEEN, seenKey(a.id, 'carol'), { appId: a.id, account: 'carol' });
     await put(NS_PLAN, planKey(a.id), { appId: a.id });
     await put('app-plan', appPlanKey(a.id), { appId: a.id, name: `Sweep ${letter}` });
+    // A picture a scenario run kept in the owner's files (the run itself needs a browser).
+    const kept = await keepScenarioPicture(storage, O.ghii, a.file, { scenario: 'opens', size: '390x844', theme: 'light', jpeg: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
+    assert(kept !== null, `scenario picture for ${a.file}`);
     await put(NS_INVITE, inviteKey(a.id, `hash${letter}`), { appId: a.id, emailHash: `hash${letter}` });
     const now = new Date().toISOString();
     await put(openingOwner(nodeId), openingKey(O.name, a.file), {

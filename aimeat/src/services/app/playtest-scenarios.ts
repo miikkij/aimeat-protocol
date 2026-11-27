@@ -28,6 +28,12 @@
  *   waits 60 seconds for a tool got no answer at all from a run that was allowed 170.
  * @structure runAppScenarios(storage, config, app, scenarios, opts) · ScenarioRunResult
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A run at the phone or the desktop size ends with a picture of the screen,
+ *     passed or failed, handed to opts.keepPicture; the run carries its key as `picture_key`
+ *     (scenario-pictures.ts, wish-noden-selain-antaa-kuvat-skenaarioajosta-rakentaja-ei-asenna).
+ *     Each run has a browser context of its own: the first pictures showed a signed-out run signed
+ *     in as another run's member, from shared storage. A dark run now makes the person's own theme
+ *     choice (`aimeat-theme`): asking the device for dark alone left every dark run in the light theme.
  *   v1.2.0 — 2026-11-27 — Two stages: the phone and the desktop in the light theme first, and the
  *     other six runs only for a scenario that passed them. The answer says which runs were left
  *     for that reason, apart from the ones the deadline left. `deadlineMs` is the caller's.
@@ -44,8 +50,9 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { parseAppScopes } from '../protected-resource.js';
 import { MAX_RESOURCE_BYTES, serveDocumentOnce, type HeadlessRoute } from '../headless/network.js';
-import { HeadlessDeadlineError, NO_HEADLESS_BROWSER, withHeadlessContext, type HeadlessBrowser } from '../screenshot-capture.js';
+import { HeadlessDeadlineError, NO_HEADLESS_BROWSER, withHeadlessContext, type HeadlessBrowser, type HeadlessContext } from '../screenshot-capture.js';
 import { makePlaytestMember, type PlaytestMember } from './playtest-member.js';
+import { isPictureSize, PICTURE_QUALITY, type ScenarioPicture } from './scenario-pictures.js';
 import { SCENARIO_SIZES, SCENARIO_THEMES, type AppScenario, type ScenarioStep } from './scenarios.js';
 
 /**
@@ -66,6 +73,7 @@ const RUNS_AT_ONCE = 4;
 const FIRST_SIZES = 2;
 const STEP_DEFAULT_MS = 3000;
 const BOOT_SETTLE_MS = 800;
+const PICTURE_SETTLE_MS = 400;
 const MAX_QUOTED = 5;
 
 export interface ScenarioRun {
@@ -77,6 +85,11 @@ export interface ScenarioRun {
   console_errors: string[];
   /** The node's own answers of 400 or more, `status path`. */
   bad_responses: string[];
+  /**
+   * The key, in the app owner's files, of the picture of the screen after the last step or at the
+   * step that failed (scenario-pictures.ts). Only at the picture sizes, and only when the caller keeps pictures.
+   */
+  picture_key?: string;
 }
 
 export interface ScenarioResult {
@@ -127,8 +140,12 @@ interface ScenarioPage {
   locator(sel: string): ScenarioLocator;
   getByText(t: string): ScenarioLocator;
   on(ev: string, fn: (arg: never) => void): void;
+  screenshot(o: { type: 'jpeg'; quality: number; timeout: number }): Promise<Buffer>;
   close(): Promise<void>;
 }
+
+/** Keeps one picture and answers its key, or null when it was not kept. */
+export type KeepScenarioPicture = (picture: ScenarioPicture) => Promise<string | null>;
 
 
 /**
@@ -199,13 +216,34 @@ async function runStep(page: ScenarioPage, step: ScenarioStep): Promise<void> {
   }
 }
 
-/** One scenario at one size and theme, in a fresh page of the run's context. */
+/**
+ * One scenario at one size and theme, in a browser context of its own. Pages of one context share
+ * cookies, localStorage and the stored session: with one context for the whole run, a signed-out
+ * scenario opened signed in as the member of the run before it, and a dark run drew the light theme
+ * the first run had stored. Seen in the first pictures a run took, on 2026-11-27.
+ */
 async function runOnce(
-  ctx: { newPage(): Promise<unknown> }, config: AimeatConfig, html: string, url: string, origin: string,
+  another: () => Promise<HeadlessContext>, config: AimeatConfig, html: string, url: string, origin: string,
   scenario: AppScenario, size: { width: number; height: number }, theme: 'light' | 'dark', member: PlaytestMember | null,
+  keepPicture?: KeepScenarioPicture,
 ): Promise<ScenarioRun> {
   const run: ScenarioRun = { size: `${size.width}x${size.height}`, theme, ok: false, console_errors: [], bad_responses: [] };
-  const page = await ctx.newPage() as ScenarioPage;
+  const own = await another();
+  const page = await own.newPage() as ScenarioPage;
+  // The screen as the run left it, passed or failed: what a builder looks at in place of a browser
+  // of their own. A picture that cannot be taken or kept changes nothing about the run's verdict.
+  const takePicture = async (): Promise<void> => {
+    if (!keepPicture || !isPictureSize(size)) return;
+    try {
+      // A step ends when its element appears, which can be mid-transition: let the screen settle.
+      await page.waitForTimeout(PICTURE_SETTLE_MS);
+      const jpeg = await page.screenshot({ type: 'jpeg', quality: PICTURE_QUALITY, timeout: 5000 });
+      const key = await keepPicture({ scenario: scenario.id, size: run.size, theme, jpeg });
+      if (key) run.picture_key = key;
+    } catch (err) {
+      logger.debug('playtest scenario: no picture', { scenario: scenario.id, size: run.size, theme, error: String(err) });
+    }
+  };
   try {
     page.on('console', ((m: { type(): string; text(): string }) => {
       if (m.type() === 'error' && run.console_errors.length < MAX_QUOTED) run.console_errors.push(m.text().slice(0, 240));
@@ -218,6 +256,11 @@ async function runOnce(
     }) as (arg: never) => void);
     await page.setViewportSize(size);
     await page.emulateMedia({ colorScheme: theme });
+    // An AIMEAT app is light unless the person chose otherwise: the choice is the `aimeat-theme`
+    // key the libraries read (static/sdk-libs/auth/theme.js), and the device's own scheme counts
+    // only when that choice is "auto". So the run makes the choice a person makes; without it
+    // every "dark" run drew the light theme, which the first pictures showed.
+    await page.addInitScript({ content: `try { localStorage.setItem('aimeat-theme', '${theme}'); } catch (e) { /* storage blocked */ }` });
     // A signed-in run signs in the way an app does, through the silent bridge the member route answers.
     if (member && scenario.signed_in) await page.route('**/*', memberRoute(config, member));
     // Registered last, so it answers first: the document is the stored bytes.
@@ -229,13 +272,16 @@ async function runOnce(
         await runStep(page, step);
       } catch (err) {
         run.failed_step = { index, do: step.do, ...(step.target ? { target: step.target } : {}), error: String((err as Error)?.message ?? err).split('\n')[0].slice(0, 300) };
+        await takePicture();
         return run;
       }
     }
     run.ok = true;
+    await takePicture();
     return run;
   } finally {
-    await page.close().catch((e: unknown) => logger.debug('playtest scenario: page close failed', { error: String(e) }));
+    // The context goes with its page, and its storage with it.
+    await own.close().catch((e: unknown) => logger.debug('playtest scenario: context close failed', { error: String(e) }));
   }
 }
 
@@ -247,7 +293,7 @@ export async function runAppScenarios(
   storage: Storage, config: AimeatConfig,
   app: { ownerName: string; filename: string; html: string; appName: string },
   scenarios: readonly AppScenario[],
-  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; deadlineMs?: number } = {},
+  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; deadlineMs?: number; keepPicture?: KeepScenarioPicture } = {},
 ): Promise<ScenarioRunResult> {
   const origin = `http://127.0.0.1:${config.port}`;
   const url = `${origin}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
@@ -289,7 +335,7 @@ export async function runAppScenarios(
   try {
     // New runs stop early enough for the ones in the browser to end before the deadline closes it.
     const endsAt = now() + deadlineMs - 8_000;
-    const out = await withHeadlessContext(config, SCENARIO_SIZES[0], async (ctx) => {
+    const out = await withHeadlessContext(config, SCENARIO_SIZES[0], async (_first, another) => {
       const runAll = async (list: typeof jobs): Promise<void> => {
         let next = 0;
         const worker = async (): Promise<void> => {
@@ -298,7 +344,7 @@ export async function runAppScenarios(
             if (!job || now() > endsAt) return;
             const member = job.scenario.signed_in && canSignIn ? await freshMember() : null;
             try {
-              job.run = await runOnce(ctx, config, app.html, url, origin, job.scenario, job.size, job.theme, member);
+              job.run = await runOnce(another, config, app.html, url, origin, job.scenario, job.size, job.theme, member, opts.keepPicture);
             } finally {
               await member?.erase();
             }

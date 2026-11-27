@@ -15,6 +15,12 @@
  *   A node with no headless browser (CI) answers ran:false with the reason, and the run cases skip.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-scenarios
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The pictures: one per run at the phone and the desktop size, passed or
+ *     failed, read from the answer's address with no sign-in; private files of the owner; a new run
+ *     removes the pictures of scenarios that are gone, and the app's delete removes them all.
+ *     The scenario `isolated` and its case: seen red on the runner that opened every run in one
+ *     browser context (the second run read the first one's localStorage), green with a context per run;
+ *     its second step seen red on the runner that only asked the device for the dark scheme.
  *   v1.2.0 — 2026-11-27 — The run is started once and read with the same request: a run under way
  *     answers `running`, asking again reads the kept run, the node's note leaves the spec's revision
  *     alone, and changed scenarios start a new run (services/app/scenario-run.ts).
@@ -37,11 +43,18 @@ const page = (filename: string) => [
     '<meta name="aimeat-scopes" content="memory:read memory:write">',
     '<meta name="aimeat-locales" content="en fi">',
     '<link rel="stylesheet" href="/lib/aimeat-theme.css">',
-    '</head><body style="overflow-x:clip"><div id="login"></div><p id="who">Signed out</p>',
+    '</head><body style="overflow-x:clip"><div id="login"></div><p id="who">Signed out</p><p id="mark"></p><p id="theme"></p>',
     '<input id="new" aria-label="Item"><button id="add">Add</button><p id="out"></p><p id="stored"></p>',
     '<script src="/v1/libs/aimeat-auth.js"></' + 'script>',
     '<script src="/v1/libs/aimeat-data.js"></' + 'script>',
     '<script>',
+    // What the browser kept from an earlier visit: a run that shares storage with another reads "set".
+    'document.getElementById("mark").textContent = "Mark " + (localStorage.getItem("scen.mark") || "none");',
+    'localStorage.setItem("scen.mark", "set");',
+    // The theme choice the libraries read, beside the scheme the device asks for: a run of a theme has
+    // to have made that choice, or an AIMEAT app draws the light theme whatever the device asks.
+    'var os = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";',
+    'document.getElementById("theme").textContent = localStorage.getItem("aimeat-theme") === os ? "Theme chosen" : "Theme not chosen";',
     'AIMEAT.auth.mountLoginButton("#login", { onSession: async function () {',
     '  document.getElementById("who").textContent = "Signed in";',
     '  var kept = null; try { kept = await AIMEAT.data.get("scen.item"); } catch (e) { kept = null; }',
@@ -73,6 +86,11 @@ const SCENARIOS = [
         { do: 'click', target: 'text=Add' },
         { do: 'expect_text', value: 'Saved Tea' },
     ] },
+    // Passes at every size and theme only when no run reads what another run left in the browser.
+    { id: 'isolated', name: 'No run inherits the browser storage of another run, and each has its theme chosen.', signed_in: false, steps: [
+        { do: 'expect_text', value: 'Mark none' },
+        { do: 'expect_text', value: 'Theme chosen' },
+    ] },
 ];
 
 (async () => {
@@ -101,9 +119,9 @@ const SCENARIOS = [
         assert(r.status === 403, `another owner is refused: ${r.status} ${JSON.stringify(r.body?.error)}`);
     });
 
-    await test('the four scenarios are stored', async () => {
+    await test('the five scenarios are stored', async () => {
         const r = await json(`${app}/design-spec/scenarios`, { method: 'PUT', headers: auth, body: JSON.stringify({ scenarios: SCENARIOS }) });
-        assert(r.status === 200 && r.body.data.scenarios.length === 4, `stored: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.scenarios?.length)}`);
+        assert(r.status === 200 && r.body.data.scenarios.length === 5, `stored: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.scenarios?.length)}`);
         assert(r.body.data.scenarios[0].signed_in === true && r.body.data.scenarios[2].signed_in === false, 'signed_in defaults to true and keeps false');
     });
 
@@ -149,6 +167,43 @@ const SCENARIOS = [
         assert(fresh.ok === true && fresh.runs.length === 8, `fresh: ${JSON.stringify({ ok: fresh.ok, first: fresh.runs.find((x: any) => !x.ok) ?? null, not_run: fresh.not_run })}`);
     });
 
+    await test('every run has browser storage of its own, and the theme choice of the theme it runs in', async () => {
+        if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
+        const isolated = (run.scenarios as any[]).find(s => s.id === 'isolated');
+        assert(isolated.ok === true && isolated.runs.length === 8, `isolated: ${JSON.stringify({ ok: isolated.ok, first: isolated.runs.find((x: any) => !x.ok) ?? null, not_run: isolated.not_run })}`);
+    });
+
+    /** The keys of the app's pictures in the owner's files. */
+    const pictureKeys = async (): Promise<string[]> => {
+        const list = await json('/v1/storage', { headers: auth });
+        assert(list.status === 200, `the owner's files: ${list.status}`);
+        return (list.body.data.files as Array<{ key: string; visibility: string }>).filter(x => x.key.startsWith(`playtest/${f}/`)).map(x => `${x.key} ${x.visibility}`).sort();
+    };
+
+    await test('a run at the phone or the desktop size has a picture, passed or failed, read with no sign-in', async () => {
+        if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
+        const byId = new Map((run.scenarios as any[]).map(s => [s.id, s]));
+        const saves = byId.get('saves');
+        const withPicture = (saves.runs as any[]).filter(x => typeof x.picture === 'string').map(x => `${x.size} ${x.theme}`).sort();
+        assert(JSON.stringify(withPicture) === JSON.stringify(['1280x900 dark', '1280x900 light', '390x844 dark', '390x844 light']), `a picture at the two sizes an app is accepted at, in both themes, and at no other: ${JSON.stringify(withPicture)}`);
+        // The failed step is the one a builder most needs to see.
+        const broken = byId.get('broken');
+        assert((broken.runs as any[]).every(x => typeof x.picture === 'string'), `a failed run has its picture: ${JSON.stringify(broken.runs[0])}`);
+        assert(/LOOK at it/.test(String(run.pictures)), `the answer says how the pictures are read: ${run.pictures}`);
+        const phone = (saves.runs as any[]).find(x => x.size === '390x844' && x.theme === 'light');
+        const res = await fetch(phone.picture);
+        const bytes = Buffer.from(await res.arrayBuffer());
+        assert(res.status === 200 && String(res.headers.get('content-type')).startsWith('image/jpeg'), `the address answers a JPEG with no credential: ${res.status} ${res.headers.get('content-type')}`);
+        assert(bytes.length > 2000 && bytes[0] === 0xff && bytes[1] === 0xd8, `and the bytes are a picture: ${bytes.length} bytes`);
+        // In the owner's own files, private, one per scenario, size and theme that has one.
+        const keys = await pictureKeys();
+        assert(keys.includes(`playtest/${f}/saves-390x844-light.jpg private`) && keys.includes(`playtest/${f}/broken-1280x900-light.jpg private`), `the pictures are the owner's private files: ${JSON.stringify(keys)}`);
+        assert(keys.length === 4 * 4 + 2, `four per passing scenario and two for the one that stopped: ${keys.length}`);
+        // A private file of another owner is not read through the public address.
+        const pub = await fetch(`${BASE}/v1/pub/${encodeURIComponent(alice.name)}/playtest/${encodeURIComponent(f)}/saves-390x844-light.jpg`);
+        assert(pub.status === 403 || pub.status === 404, `the file is not public: ${pub.status}`);
+    });
+
     await test('asking again reads the run the node kept and starts no new one; changed scenarios start one', async () => {
         if (!run?.ran) skip('no browser on this node');
         const again = await json(`/v1/apps/me/${encodeURIComponent(f)}/audit?limit=5&playtest=true`, { headers: auth });
@@ -166,6 +221,9 @@ const SCENARIOS = [
             if (!next?.running) break;
         }
         assert(next?.ran === true && next.started_at !== run.started_at && next.scenarios.length === 1 && next.scenarios[0].id === 'stranger', `a new run for the new list: ${JSON.stringify(next).slice(0, 300)}`);
+        // The new run's pictures are the app's pictures: those of the scenarios that are gone went with them.
+        const keys = await pictureKeys();
+        assert(keys.length > 0 && keys.every(k => k.startsWith(`playtest/${f}/stranger-`)), `only the new run's pictures are left: ${JSON.stringify(keys)}`);
     });
 
     await test('the passing scenario gives an evidence line for its criterion, and the throwaway account is gone', async () => {
@@ -180,6 +238,15 @@ const SCENARIOS = [
         assert(owners.status === 200, `owners: ${owners.status}`);
         const names = JSON.stringify(owners.body?.data ?? {});
         assert(!/"playtest[0-9a-f]{12}"/.test(names), 'no throwaway account is left');
+    });
+
+    await test('deleting the app removes its pictures from the owner\'s files', async () => {
+        if (!run?.ran) skip('no browser on this node');
+        assert((await pictureKeys()).length > 0, 'there are pictures before the delete');
+        const del = await json(`/v1/apps/${encodeURIComponent(f)}`, { method: 'DELETE', headers: auth });
+        assert(del.status === 200, `delete: ${del.status} ${JSON.stringify(del.body?.error)}`);
+        const left = await pictureKeys();
+        assert(left.length === 0, `no picture is left: ${JSON.stringify(left)}`);
     });
 
     finish();

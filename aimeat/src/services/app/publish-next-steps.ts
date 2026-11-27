@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.11.1 — 2026-11-27 — `acceptance` says the node takes the screenshots: scenarios, the audit
+ *     with the playtest, and the picture address of each run (scenario-pictures.ts).
  *   v1.11.0 — 2026-11-27 — `declared_needs`, `needs_proof` and `needs_proof_ready`: a page that
  *     declares `session` with AIMEAT.atelier.requires is offered the criterion and scenario pair
  *     that proves it (declared-needs.ts; wish-atelier-contextual-templates-pyynt-lohko-ask).
@@ -221,7 +223,10 @@ export async function buildPublishNextSteps(
       ...(track === 'atelier' && !level ? {
         acceptance: `Accept this app from screenshots at ${ATELIER_SCREENSHOT_SIZES}, in both themes, placed `
           + `beside the genre it forked (${genreAddress}), and ask while looking: would this pass `
-          + `beside the genre? Measure alongside it, at ${ATELIER_SIZE_MATRIX} (the one size matrix `
+          + 'beside the genre? THE NODE TAKES THOSE SCREENSHOTS: write the app\'s paths as scenarios (aimeat_app_manage { action: "scenarios_set" }), '
+          + 'ask { action: "audit", playtest: true }, and fetch the `picture` address of each run; it is the published app, signed in as a member of the node\'s own, '
+          + 'so install no browser and replace no library to see it. '
+          + `Measure alongside it, at ${ATELIER_SIZE_MATRIX} (the one size matrix `
           + 'of the skill and the spec): page width equal to the viewport, nothing '
           + 'past the viewport edge (including inside a box that clips), no text under 11 px, no '
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '

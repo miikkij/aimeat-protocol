@@ -45777,8 +45777,9 @@ paths:
         `playtest=true` runs every scenario on the published app at 390x844, 1280x900, 1280x460 and
         1920x1080 in both themes, signed in as a throwaway member account the run makes and erases
         (unless `signed_in` is false), and answers `live.scenarios` with pass or fail per size and theme,
-        the failed step, console errors, the node's own failed answers, and `criteria_evidence` lines
-        for criteria_set. Returns `{ app, app_version, scenarios, revision, meaning }`. Needs
+        the failed step, console errors, the node's own failed answers, `criteria_evidence` lines
+        for criteria_set, and for each run at 390x844 and 1280x900 the address of a picture of the
+        screen. Returns `{ app, app_version, scenarios, revision, meaning }`. Needs
         `app:write` and the owner, one of the owner's agents, or a development right.
       tags: [Apps]
       security:
@@ -84831,9 +84832,15 @@ paths:
                                 description: >
                                   Present when the design spec has playtest scenarios (PUT .../design-spec/scenarios).
                                   { ran, reason?, member, scenarios: [{ id, name, criteria, signed_in, ok, runs:
-                                  [{ size, theme, ok, failed_step?, console_errors, bad_responses }], not_run }],
-                                  criteria_evidence: [{ id, evidence }], running?, app_version?, started_at?,
-                                  finished_at? }. The request that starts a run waits about 25 seconds for it. A
+                                  [{ size, theme, ok, failed_step?, console_errors, bad_responses, picture_key?,
+                                  picture? }], not_run }], criteria_evidence: [{ id, evidence }], pictures?,
+                                  running?, app_version?, started_at?, finished_at? }. A run at 390x844 or
+                                  1280x900 keeps a JPEG of the screen after its last step, or at the step that
+                                  failed, as a private file of the app's owner under `playtest/<filename>/`
+                                  (`picture_key`); `picture` is a presigned address for it (GET /v1/download/{token},
+                                  no credential, valid for an hour and for that version of the file). The next
+                                  run writes over the files and removes those it did not write; deleting the app
+                                  removes them. The request that starts a run waits about 25 seconds for it. A
                                   longer run goes on on the node for up to eight minutes and this answers
                                   `running: true` with `ran: false` and no scenarios: the same request again waits
                                   up to 45 seconds for the run, reads it when it has ended, runs no playtest of

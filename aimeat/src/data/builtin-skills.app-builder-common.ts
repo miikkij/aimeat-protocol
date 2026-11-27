@@ -22,6 +22,8 @@
  * @structure APP_BUILDER_COMMON · PUBLISH_CHECKS_SECTION · AFTER_PUBLISH_SECTION · VERIFY_SECTION · DATES_NUMBERS_SECTION
  * @usage import { APP_BUILDER_COMMON } from './builtin-skills.app-builder-common.js';  // inside a skillMd
  * @version-history
+ *   v1.2.0 — 2026-11-27 — VERIFY_SECTION starts with the node's own browser: scenarios, the audit
+ *     with the playtest, and the picture each run answers (services/app/scenario-pictures.ts).
  *   v1.1.0 — 2026-11-21 — AFTER_PUBLISH_SECTION's "report what bit you" is four questions in order
  *     (flow-constants.ts PITFALL_FOUR_QUESTIONS). VERIFY_SECTION: one checklist for checking an app
  *     in a browser, the Atelier platform section `verify`, folded from six learned pitfalls.
@@ -130,6 +132,16 @@ export const VERIFY_SECTION = `## Verify: one checklist before you say it works
 
 Go through all seven. A line you could not check is named in your report as not checked; it is
 never counted as passed.
+
+**Start with the node's own browser.** Write the app's paths as scenarios
+(\`aimeat_app_manage { action: "scenarios_set" }\`) and ask
+\`{ action: "audit", filename, playtest: true }\`: the node opens the PUBLISHED app at every size
+of the matrix in both themes, signed in as a member of its own, runs your steps, and for each run at
+the phone and the desktop size answers a \`picture\` address, the screen after the last step or at
+the step that failed. Fetch the picture and look at it. Do not install a browser or write a test
+driver to see the app, and never replace the sign-in or data libraries with stand-ins to get past a
+sign-in: five measured builds did, and three of them checked a page that was not the published app.
+A browser of your own is for what those pictures do not show, and the lines below are for it.
 
 1. **Name the browser.** "Verified in the browser" is not a claim. "Verified in Playwright's
    Chromium" is one, and a weaker one: it runs a clean profile with no extensions, no download

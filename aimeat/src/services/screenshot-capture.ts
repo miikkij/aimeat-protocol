@@ -21,6 +21,9 @@
  *   log line; runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its
  *   own per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.10.0 — 2026-11-27 — withHeadlessContext hands its callback a second argument that makes one
+ *     more guarded context of the same browser. Pages of one context share cookies, localStorage
+ *     and the stored session, and the scenario runner needs a run that shares none of them.
  *   v1.9.0 — 2026-10-27 — secaudit2026oct26: an on-demand capture holds one of the node-wide headless
  *     slots (headless-slots.ts; past them 503 HEADLESS_BUSY, before the owner's allowance is taken)
  *     and renders in withHeadlessContext, so its deadline closes a render that does not finish.
@@ -127,6 +130,9 @@ export function browserLaunchEnv(env: NodeJS.ProcessEnv): Record<string, string>
 }
 
 export interface HeadlessBrowser { close(): Promise<void>; newContext(o: unknown): Promise<unknown> }
+
+/** One more context of a lent browser (withHeadlessContext's second argument): its pages, and its close. */
+export interface HeadlessContext { newPage(): Promise<unknown>; close(): Promise<void> }
 
 /** What one pass over the launch ladder gave: a browser, or the last error. No error and no browser: no playwright-core. */
 export interface LaunchOutcome { browser: HeadlessBrowser | null; error?: unknown }
@@ -313,7 +319,7 @@ export const NO_HEADLESS_BROWSER =
 export async function withHeadlessContext<T>(
   config: AimeatConfig,
   viewport: { width: number; height: number },
-  fn: (ctx: { newPage(): Promise<unknown> }) => Promise<T>,
+  fn: (ctx: { newPage(): Promise<unknown> }, another: () => Promise<HeadlessContext>) => Promise<T>,
   opts: { deadlineMs?: number; launch?: () => Promise<HeadlessBrowser | null> } = {},
 ): Promise<T | null> {
   // The deadline starts before the launch: a launch or its page probe can stall under machine load,
@@ -344,7 +350,11 @@ export async function withHeadlessContext<T>(
   }
   if (!browser) { clearTimeout(timer); return null; }
   try {
-    const work = guardedContext<{ newPage(): Promise<unknown> }>(browser, config, viewport).then(fn);
+    const lent = browser;
+    // `another` is one more guarded context of the same browser, with storage of its own (cookies,
+    // localStorage, the stored session): pages of one context share all of it.
+    const work = guardedContext<{ newPage(): Promise<unknown> }>(lent, config, viewport)
+      .then(ctx => fn(ctx, () => guardedContext<HeadlessContext>(lent, config, viewport)));
     // The work's own rejection, which follows the deadline's close; the race below has already answered.
     work.catch((err: unknown) => { logger.debug('headless: work ended after its browser closed', { error: String(err) }); });
     return await Promise.race([work, deadline]);
