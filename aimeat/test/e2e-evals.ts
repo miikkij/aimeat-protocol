@@ -204,7 +204,7 @@ function resultsFor(start: StartData) {
 
     await test('an agent with read access only may not start a run', async () => {
       const reader = await connectAgentByDevice(BASE, { owner: alice.name, ownerToken: alice.token, name: 'evalreader', scopes: ['memory:read'] });
-      const r = await post(`/v1/evals/skill/${ref}/run`, { dry_run: true }, { Authorization: `Bearer ${reader.token}` });
+      const r = await json(`/v1/evals/skill/${ref}/run`, { method: 'POST', headers: { Authorization: `Bearer ${reader.token}` }, body: JSON.stringify({ dry_run: true }) });
       assert(r.status === 403, `refused without memory:write: ${r.status} ${JSON.stringify(r.body?.error)}`);
     });
 
@@ -221,12 +221,15 @@ function resultsFor(start: StartData) {
       const minted = await json('/v1/auth/anonymous', { method: 'POST' });
       if (minted.status !== 200) { console.log(`    (anonymous mode is off on this node: ${minted.status}; nothing to mint)`); return; }
       const h = { Authorization: `Bearer ${minted.body.data.token}` };
-      const path = '/v1/evals/pack/aimeat-data';
       const body = JSON.stringify({ cases: [{ id: 'x', prompt: 'p', expect: [{ kind: 'contains', value: 'v' }] }] });
-      expectRefusal(await json(path, { method: 'PUT', headers: h, body }), 403, 'FORBIDDEN');
-      expectRefusal(await json(path, { headers: h }), 403, 'FORBIDDEN');
-      expectRefusal(await json(`${path}/run`, { method: 'POST', headers: h, body: '{}' }), 403, 'FORBIDDEN');
-      expectRefusal(await json(path, { method: 'DELETE', headers: h }), 403, 'FORBIDDEN');
+      const w = await json('/v1/evals/pack/aimeat-data', { method: 'PUT', headers: h, body });
+      assert(w.status === 403 && w.body?.error?.code === 'FORBIDDEN', `write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+      const r = await json('/v1/evals/pack/aimeat-data', { method: 'GET', headers: h });
+      assert(r.status === 403 && r.body?.error?.code === 'FORBIDDEN', `read: ${r.status} ${JSON.stringify(r.body?.error)}`);
+      const run = await json('/v1/evals/pack/aimeat-data/run', { method: 'POST', headers: h, body: '{}' });
+      assert(run.status === 403 && run.body?.error?.code === 'FORBIDDEN', `run: ${run.status} ${JSON.stringify(run.body?.error)}`);
+      const d = await json('/v1/evals/pack/aimeat-data', { method: 'DELETE', headers: h });
+      assert(d.status === 403 && d.body?.error?.code === 'FORBIDDEN', `remove: ${d.status} ${JSON.stringify(d.body?.error)}`);
     });
 
     await test('over MCP an agent with memory:write starts a run, answers it and is scored', async () => {
