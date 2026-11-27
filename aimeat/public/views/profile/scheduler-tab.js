@@ -13,6 +13,10 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.6.0 -- 2026-11-27 -- A refused load, switch, run or cancel is said in the page's language by its code
+ *     (js/refusal-words.js, scheduler.refusal.*), each with its own sentence when the code has none; a failed
+ *     run says to read its run log instead of the scheduler's English reason. Cancel asks in the page's own
+ *     dialog (useConfirm) instead of the browser's window.confirm.
  *   v2.5.0 -- 2026-11-27 -- contOpen and rareOpen with their setters in the ctx bag: the continuous and the rarer
  *     schedules are rows that open in place on the cover (scheduler/cover.js).
  *   v2.4.1 -- 2026-10-19 -- The fallback agent list reads listAgents' array; it read `.data.agents` and was always empty.
@@ -40,6 +44,8 @@ import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, getSchedulerTab, listScheduleOccurrences, getScheduleDetail, setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
 import { useOpenItem } from '/js/open-item.js';
+import { refusalText, runOutcomeWords } from '/js/refusal-words.js';
+import { useConfirm } from '/components/Modal.js';
 import { Note } from '/components/Note.js';
 import { buildModel, startOfDay } from './scheduler/model.js';
 import { renderSchedulerView } from './scheduler/cover.js';
@@ -49,6 +55,7 @@ const html = htm.bind(h);
 const WINDOW_DAYS = 7;
 
 export default function SchedulerTab({ showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [data, setData] = useState({ managed: [], extensions: [], agentInternal: [] });
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +96,7 @@ export default function SchedulerTab({ showToast }) {
       setError(null);
       setReloadTick((n) => n + 1);
     } catch (e) {
-      setError(e.message || 'Failed to load schedules');
+      setError(refusalText(e, 'scheduler.refusal.', 'scheduler.refusal.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -136,25 +143,26 @@ export default function SchedulerTab({ showToast }) {
   useOpenItem('scheduler', (id) => pickView({ kind: 'detail', id }), !loading);
   const toggleMore = (id) => setMoreOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-  const run = async (fn) => {
+  // An action, then a reload. A refusal is said in the page's words by its code (js/refusal-words.js),
+  // with the action's own sentence when the code has none; the server's sentence is English for an AI.
+  const run = async (fn, fallbackKey) => {
     setBusy(true);
-    try { await fn(); await loadData(); } catch (e) { showToast?.(e.message, true); } finally { setBusy(false); }
+    try { await fn(); await loadData(); }
+    catch (e) { showToast?.(refusalText(e, 'scheduler.refusal.', fallbackKey), true); }
+    finally { setBusy(false); }
   };
-  const onToggle = (s) => run(() => setScheduleEnabled(s.id, s.enabled === false));
+  const onToggle = (s) => run(() => setScheduleEnabled(s.id, s.enabled === false), 'scheduler.refusal.toggleFailed');
   // "Run now" reports what actually happened: an agent task can decline to create a task (a previous
-  // run is still active, or a run limit is reached), which used to look like success.
+  // run is still active, or a run limit is reached), which used to look like success. A failed run's
+  // reason is the scheduler's English sentence; the run log on the schedule's page has it.
   const onTrigger = (s) => run(async () => {
-    const d = await triggerSchedule(s.id);
-    if (d.outcome === 'created') showToast?.(t('profile.scheduler.runCreated'));
-    else if (d.outcome === 'busy') showToast?.(t('profile.scheduler.runBusy'), true);
-    else if (d.outcome === 'stopped') showToast?.(t('profile.scheduler.runStopped'), true);
-    else if (d.outcome === 'limited') showToast?.(t('profile.scheduler.runLimited'), true);
-    else if (d.outcome === 'error') showToast?.(d.reason || t('profile.scheduler.runError'), true);
-    else showToast?.(t('profile.scheduler.triggered'));
-  });
+    const said = runOutcomeWords((await triggerSchedule(s.id)).outcome);
+    showToast?.(said.text, said.error);
+  }, 'scheduler.refusal.runFailed');
   const onCancel = (s) => {
-    if (!window.confirm(t('profile.scheduler.confirmCancel'))) return;
-    run(async () => { await deleteSchedule(s.id); showToast?.(t('profile.scheduler.cancelled')); setView({ kind: 'cover' }); });
+    confirm(t('profile.scheduler.confirmCancel'),
+      () => run(async () => { await deleteSchedule(s.id); showToast?.(t('profile.scheduler.cancelled')); setView({ kind: 'cover' }); }, 'scheduler.refusal.cancelFailed'),
+      { danger: true, confirmLabel: t('scheduler.cancelYes'), cancelLabel: t('scheduler.cancelKeep') });
   };
 
   if (loading) return html`<${Note} kind="loading">${t('profile.scheduler.loading')}<//>`;
@@ -165,5 +173,5 @@ export default function SchedulerTab({ showToast }) {
     showSearch, setShowSearch, agentsOpen, setAgentsOpen, contOpen, setContOpen, rareOpen, setRareOpen, moreOpen, toggleMore, editOpen, setEditOpen,
     busy, detail, onToggle, onTrigger, onCancel,
   };
-  return renderSchedulerView(ctx);
+  return html`${renderSchedulerView(ctx)}<${ConfirmUI} />`;
 }

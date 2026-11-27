@@ -15,6 +15,9 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.10.0 — 2026-11-27 — A connect round is waited on with js/connection-wait.js, shared with the Email page:
+ *     the node's `connections` live domain instead of a poll every 1.2 s, and a renewed sign-in (the same row
+ *     made active again) counts as finished; the row count did not move for it.
  *   v1.9.0 — 2026-11-02 — SharePoint and OneDrive (microsoft-files, microsoft-files-write) carry a note
  *     each: an administrator may have to approve the app, and writing is a permission of its own.
  *   v1.8.0 — 2026-10-09 — "Accounts your agents connected": the owner sees each account an agent
@@ -61,6 +64,7 @@ import { TextField } from '/components/TextField.js';
 import { Row as Line, Stack, Split, Space } from '/components/Layout.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { waitForConnection, snapshot } from '/js/connection-wait.js';
 
 /** Things a user must be told BEFORE they try, because the failure they prevent is unreadable. */
 const NOTES = {
@@ -141,47 +145,14 @@ export function ConnectionsSection({ showToast, inRow }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
-/**
- * Wait for the round to finish, WITHOUT touching the pop-up window.
- *
- * This node sets a Cross-Origin-Opener-Policy, which severs the opener relationship as soon as the
- * pop-up navigates to the provider. `win.closed` is then unreadable — the first version of this
- * polled it and logged ten "COOP would block the window.closed call" errors per connection while
- * appearing to work, because the flow completed for other reasons.
- *
- * Two signals instead, and neither goes near the window:
- *   - the done page announces on a same-origin BroadcastChannel, which COOP does not affect
- *   - the connection list is polled, which is what ACTUALLY decides success and also covers the
- *     user who closes the pop-up before it ever reaches the done page
- *
- * Resolves either way; gives up after the timeout rather than waiting forever on a cancelled round.
- */
-  const waitForConnection = useCallback(async (countBefore) => {
-    const DEADLINE = Date.now() + 180_000;
-    let channel = null;
-    let announced = false;
-    try {
-      channel = new BroadcastChannel('aimeat-connect');
-      channel.onmessage = () => { announced = true; };
-    } catch (err) {
-      // Not fatal: the poll below is the one that decides. Logged so the two paths stay
-      // distinguishable when someone is looking at why a connection took four seconds.
-      swallowed('connections-broadcast', err);
-    }
-    try {
-      while (Date.now() < DEADLINE) {
-        await new Promise(r => setTimeout(r, 1200));
-        if (announced) return true;
-        const now = (await apiGet('/v1/connections'))?.data?.connections?.length ?? 0;
-        // A re-authorisation repairs a row rather than adding one, so a count that did not grow is
-        // not proof of failure -- but it is the cheap signal, and the announce covers the rest.
-        if (now > countBefore) return true;
-      }
-      return false;
-    } finally {
-      if (channel) channel.close();
-    }
-  }, []);
+  /**
+   * The round finishes WITHOUT anything touching the pop-up window: this node sets a
+   * Cross-Origin-Opener-Policy, which makes `win.closed` unreadable once the pop-up reaches the
+   * provider. js/connection-wait.js waits on the done page's BroadcastChannel and on the node's
+   * `connections` live domain, and notices a renewed sign-in (the same row made active again) as
+   * well as a new row; it polls nothing.
+   */
+  const listConnections = useCallback(async () => (await apiGet('/v1/connections'))?.data?.connections ?? [], []);
 
   /**
    * Consent happens at the provider, in a pop-up. Completion is detected by that window closing and
@@ -201,17 +172,17 @@ export function ConnectionsSection({ showToast, inRow }) {
       });
       const url = res?.data?.authorize_url;
       if (!url) throw new Error('no authorize url');
-      const before = (await apiGet('/v1/connections'))?.data?.connections?.length ?? 0;
+      const before = snapshot(await listConnections());
       const win = window.open(url, 'aimeat-connect', 'width=620,height=760');
       if (!win) throw new Error('popup blocked');
-      await waitForConnection(before);
+      await waitForConnection(before, listConnections);
       await load();
     } catch (err) {
       swallowed('connections-start', err);
       showToast(t('profile.access.cxConnectFailed') || 'Could not start connecting that account');
     }
     setBusy('');
-  }, [instances, load, showToast, waitForConnection]);
+  }, [instances, load, showToast, listConnections]);
 
   /**
    * The other way to connect: the user supplies a credential and there is no round trip to the

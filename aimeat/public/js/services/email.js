@@ -8,6 +8,8 @@
  *   (/v1/outbound/log), what the node mailed them (/v1/notifications/mail), and the chat prompt.
  * @usage import * as email from '/js/services/email.js';
  * @version-history
+ *   v1.1.0 — 2026-11-27 — waitForConnection moved to js/connection-wait.js, shared with the Access page: it
+ *     waits on the `connections` live domain instead of polling, and notices a renewed sign-in too.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Sähköpostin sivu", direction A).
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
@@ -58,19 +60,3 @@ export async function outboundLog(limit = 50) {
 export async function mailLog() { const r = await apiGet('/v1/notifications/mail'); return r?.data ?? { entries: [], total: 0 }; }
 
 export async function getPrompt() { const r = await apiGet('/v1/templates/email-mcp'); return r?.data?.prompt ?? ''; }
-
-/** Wait for a connection round to finish: the pop-up announces, or the list grows. */
-export async function waitForConnection(countBefore, listFn) {
-  const DEADLINE = Date.now() + 180_000;
-  let channel = null, announced = false;
-  try { channel = new BroadcastChannel('aimeat-connect'); channel.onmessage = () => { announced = true; }; }
-  catch (err) { swallowed('email: broadcast', err); }
-  try {
-    while (Date.now() < DEADLINE) {
-      await new Promise(r => setTimeout(r, 1200));
-      if (announced) return true;
-      if ((await listFn()).length > countBefore) return true;
-    }
-    return false;
-  } finally { if (channel) channel.close(); }
-}

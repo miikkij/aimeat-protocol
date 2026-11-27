@@ -7,6 +7,8 @@
  * @structure c · rel · day · providerWord · kindWord · channelWord · Switch · crumb · pageLinks
  * @usage import { c, rel, Switch, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.6.0 — 2026-11-27 — stateWord reads the server's 'needs_reauth' (it tested 'expired' and 'needs-reauth',
+ *     which the server never sends, so a mailbox needing a new sign-in read "not in use").
  *   v1.5.0 — 2026-10-31 — The mail log kind `notification`: a report your agent sent you by email (v31 K46).
  *   v1.4.0 — 2026-10-18 — The mail log kind `agent_narrowed`.
  *   v1.3.0 — 2026-10-17 — The mail log kind `agent_ask`.
@@ -17,6 +19,7 @@
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
+import { needsSignIn } from '/js/connection-wait.js';
 
 export const c = (key, vars) => t('emailpage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -28,7 +31,9 @@ export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); retu
 /** A provider as a person reads it: Gmail, Gmail (sending), Outlook. */
 export const providerWord = (p) => { if (!p) return ''; const k = 'emailpage.provider.' + p.id; const s = t(k); return s && s !== k ? s : (p.label || p.id); };
 export const isSender = (p) => (p?.capabilities || []).includes('send-mail');
-export const stateWord = (conn) => (conn ? c('state.' + (conn.status === 'active' ? 'active' : conn.status === 'expired' || conn.status === 'needs-reauth' ? 'expired' : 'other')) : c('state.none'));
+// The server's states are active, needs_reauth and revoked (src/models/connection-schemas.ts); the word
+// for a connection that needs a new sign-in is the locale's state.expired.
+export const stateWord = (conn) => (conn ? c('state.' + (conn.status === 'active' ? 'active' : needsSignIn(conn) ? 'expired' : 'other')) : c('state.none'));
 const MAIL_KINDS = ['verification', 'password_reset', 'username', 'magic_link', 'workflow_end', 'digest', 'nudge', 'invitation', 'agent_ask', 'agent_narrowed', 'notification'];
 export const kindWord = (kind) => (MAIL_KINDS.includes(kind) ? c('kind.' + kind) : kind);
 /** Where it went: to an email address, or into a person's AIMEAT inbox. */

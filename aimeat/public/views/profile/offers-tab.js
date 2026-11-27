@@ -10,6 +10,10 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.8.0 -- 2026-11-27 -- Ask, build, the need search, the price and visibility, and a rating say a refusal in
+ *     the page's language by its code (js/refusal-words.js, offers.refusal.*), each with its own sentence when the
+ *     code has none, and as an error; the server's English sentence for an AI is no longer shown. A schedule-born
+ *     offer's run that did not happen (busy, stopped, limited, error) is said as one, not as "triggered".
  *   v2.7.0 -- 2026-11-27 -- autoOpen and setAutoOpen in the ctx bag: "what runs on its own" is a row that opens in
  *     place on the cover (offers/cover.js). An effect the confirm names without a word for it shows its own
  *     name, not the locale key.
@@ -45,9 +49,14 @@ import { useConfirm } from '/components/Modal.js';
 import { Note } from '/components/Note.js';
 import * as offersService from '/js/services/offers.js';
 import { swallowed } from '/js/swallowed.js';
+import { refusalText, runOutcomeWords } from '/js/refusal-words.js';
 import { openTabAt } from './landing-page.helpers.js';
 import { buildModel } from './offers/model.js';
 import { renderOffersView } from './offers/cover.js';
+
+/** The page's words for a refusal by its code; a rating's own words come first (js/refusal-words.js). */
+const OFFER_WORDS = 'offers.refusal.';
+const RATE_WORDS = ['offers.refusal.rate.', 'offers.refusal.'];
 
 export default function OffersTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -139,17 +148,27 @@ export default function OffersTab({ session, showToast }) {
   const contentOf = (d) => contents[d.task_id];
 
   // Ask: schedule-born → fired now; a task-runner → a queued task; else a prompt copied for the chat.
+  // A refusal in the page's words by its code (js/refusal-words.js), with the action's own sentence
+  // when the code has none; the server's sentence is English for an AI.
+  /** @type {(e: any, fallbackKey: string, vars?: Record<string, string|number>, prefix?: string|string[]) => void} */
+  const refused = (e, fallbackKey, vars, prefix = OFFER_WORDS) => showToast(refusalText(e, prefix, fallbackKey, vars), true);
   const doAsk = async (it) => {
     setBusy(true);
     try {
       const r = await offersService.ask(it.entry, it.offer, askInput[it.key] || '');
-      if (r.ok === false) { showToast(r.error?.message || t('profile.offers.askFailed')); return; }
+      if (r.ok === false) { refused(r, 'offers.refusal.askFailed', { agent: it.agent }); return; }
+      // A schedule-born offer's run that did not happen (busy, stopped, limited, error) is said as one.
+      if (r.kind === 'triggered' && r.outcome && !['created', 'ran'].includes(r.outcome)) {
+        const said = runOutcomeWords(r.outcome);
+        showToast(said.text, said.error);
+        return;
+      }
       setAskResultAll(prev => ({ ...prev, [it.key]: { ...r, at: new Date().toISOString() } }));
       setAskInput(it.key, '');
       if (r.kind === 'prompt') showToast(t('profile.offers.promptCopied'));
       else if (r.kind === 'triggered') showToast(t('profile.offers.triggered'));
       else if (r.kind === 'task') { showToast(t('profile.offers.requested').replace('{agent}', it.agent)); load(); }
-    } catch (e) { showToast((e && e.message) || t('profile.offers.askFailed')); }
+    } catch (e) { refused(e, 'offers.refusal.askFailed', { agent: it.agent }); }
     finally { setBusy(false); }
   };
   const ask = (it) => {
@@ -165,9 +184,12 @@ export default function OffersTab({ session, showToast }) {
     setBusy(true);
     try {
       const r = await offersService.ask(builder.entry, builder.offer, brief || q || '');
-      if (r?.ok === false) showToast(r.error?.message || t('profile.offers.askFailed'));
-      else showToast(t('profile.offers.buildRequested').replace('{agent}', builder.agent));
-    } catch (e) { showToast((e && e.message) || t('profile.offers.askFailed')); }
+      if (r?.ok === false) refused(r, 'offers.refusal.buildFailed', { agent: builder.agent });
+      else if (r.kind === 'triggered' && r.outcome && !['created', 'ran'].includes(r.outcome)) {
+        const said = runOutcomeWords(r.outcome);
+        showToast(said.text, said.error);
+      } else showToast(t('profile.offers.buildRequested').replace('{agent}', builder.agent));
+    } catch (e) { refused(e, 'offers.refusal.buildFailed', { agent: builder.agent }); }
     finally { setBusy(false); }
   };
   // The AI need-router: ranks the catalogue against the typed need, on explicit submit only.
@@ -178,23 +200,25 @@ export default function OffersTab({ session, showToast }) {
     catch (e) {
       setAiResult(null);
       const code = e?.code;
-      showToast(code === 'NO_API_KEY' ? t('profile.offers.aiNoKey') : (code === 'QUOTA_EXHAUSTED' || code === 'APP_QUOTA_EXHAUSTED') ? t('profile.offers.aiQuota') : (e?.message || t('profile.offers.aiFailed')));
+      if (code === 'NO_API_KEY') showToast(t('profile.offers.aiNoKey'), true);
+      else if (code === 'QUOTA_EXHAUSTED' || code === 'APP_QUOTA_EXHAUSTED' || code === 'AGENT_QUOTA_EXHAUSTED') showToast(t('profile.offers.aiQuota'), true);
+      else refused(e, 'offers.refusal.searchFailed', undefined, 'offers.refusal.ai.');
     }
   };
   const clearAi = () => setAiResult(null);
   const saveBilling = async (it, { tollMorsels, priceMoney, visibility }) => {
     try {
       const r = await offersService.setOfferBilling(it.agent, it.offer.id, { tollMorsels, priceMoney, visibility });
-      if (r?.ok === false) showToast(r?.error?.message || t('profile.offers.billSaveFailed'));
+      if (r?.ok === false) refused(r, 'offers.refusal.billFailed');
       else { showToast(t('profile.offers.billSaved')); load(); }
-    } catch (e) { showToast((e && e.message) || t('profile.offers.billSaveFailed')); }
+    } catch (e) { refused(e, 'offers.refusal.billFailed'); }
   };
   const rate = async (d, stars, comment) => {
     try {
       const r = await offersService.rateDeliverable(d.agent, d.task_id, { stars, comment: comment || undefined });
-      if (r?.ok === false) showToast(r?.error?.message || t('profile.offers.rateFailed'));
+      if (r?.ok === false) refused(r, 'offers.refusal.rateFailed', undefined, RATE_WORDS);
       else { showToast(t('profile.offers.rated')); load(); }
-    } catch (e) { showToast((e && e.message) || t('profile.offers.rateFailed')); }
+    } catch (e) { refused(e, 'offers.refusal.rateFailed', undefined, RATE_WORDS); }
   };
 
   if (feed === null) return html`<${Note} kind="loading">…<//>`;

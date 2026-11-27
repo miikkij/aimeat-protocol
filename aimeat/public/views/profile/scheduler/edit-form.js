@@ -9,6 +9,8 @@
  * @structure ScheduleEditForm
  * @usage <${ScheduleEditForm} schedule=${s} showToast=${showToast} onSaved=${reload} onClose=${close} />
  * @version-history
+ *   v1.9.0 — 2026-11-27 — A refused save is said in the page's language by its code (js/refusal-words.js,
+ *     scheduler.refusal.*), not with the server's English sentence for an AI.
  *   v1.8.0 — 2026-10-02 — The question marks that explain the schedule: schedule.cron, schedule.timezone on their TextFields (components/HelpTip.js).
  *   v1.7.0 —2026-09-26 — The form is the Field family (Fields, TextField and TextArea with their labels, FormActions at the right) and the Action family; it writes no class (page group G5).
  *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -29,6 +31,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { updateSchedule } from '/js/services/schedules.js';
+import { refusalText } from '/js/refusal-words.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Action, Loud } from '/components/Action.js';
@@ -65,7 +68,7 @@ export function ScheduleEditForm({ schedule: s, showToast, onSaved, onClose }) {
     }
     setBusy(true);
     try { await updateSchedule(s.id, patch); showToast?.(t('profile.scheduler.saved')); onSaved?.(); }
-    catch (e) { showToast?.(e.message, true); }
+    catch (e) { showToast?.(refusalText(e, 'scheduler.refusal.', 'scheduler.refusal.saveFailed'), true); }
     finally { setBusy(false); }
   };
 

@@ -18,6 +18,8 @@
  * @structure ensureFreshCredential · revokeConnection
  * @usage import { ensureFreshCredential } from './refresh.js';
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A connection that now needs a new sign-in, and a removed one, are announced on
+ *     the owner's `connections` live domain (live.ts), so the pages that list them update without asking.
  *   v1.1.0 — 2026-10-15 — A provider may renew further ahead than five minutes (refreshSkewMs), and
  *     Instagram renews by its own GET on the current token. Revocation sends the client in a Basic
  *     header for a provider whose token endpoint wants it there (Reddit, X).
@@ -32,6 +34,7 @@ import type { OutboundProvider } from './providers.js';
 import { mintSession } from './attach.js';
 import { renewInstagram } from './social-finish.js';
 import type { ConnectContext } from './oauth.js';
+import { markNeedsReauth, announceConnectionChange } from './live.js';
 import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
 
 /** Refresh this far ahead of expiry, so a long upload does not start on a token about to die. */
@@ -78,7 +81,7 @@ export async function ensureFreshCredential(
     if (!credential) {
       // Unreadable ciphertext is a rotated key or a restored backup. The honest thing to tell the
       // owner is "reconnect", so the connection is parked rather than the request 500ing.
-      await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'stored credential cannot be read');
+      await markNeedsReauth(ctx.storage, conn,'stored credential cannot be read');
       return { ok: false, code: 'UNREADABLE', reason: 'stored credential cannot be read; reconnect this account' };
     }
     return { ok: true, credential, connection: conn };
@@ -167,7 +170,7 @@ async function clientThatIssued(
 async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Promise<FreshResult> {
   const current = openCredential(conn.credential, ctx.key);
   if (!current) {
-    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'stored credential cannot be read');
+    await markNeedsReauth(ctx.storage, conn,'stored credential cannot be read');
     return { ok: false, code: 'UNREADABLE', reason: 'stored credential cannot be read; reconnect this account' };
   }
   const provider = findProvider(ctx.providers, conn.provider);
@@ -188,7 +191,7 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
   if (!current.refreshToken) {
     // An expiring token with no way to renew it. Google does this when access_type=offline was
     // missing, and the connection is genuinely finished — say so instead of retrying forever.
-    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'no refresh token; reconnect this account');
+    await markNeedsReauth(ctx.storage, conn,'no refresh token; reconnect this account');
     return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be reconnected' };
   }
 
@@ -228,7 +231,7 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     // 4xx from a token endpoint means the grant is gone: revoked at the provider, expired past its
     // limit, or a testing-mode token past its seven days. That IS a reconnect.
     if (res.status >= 400 && res.status < 500) {
-      await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'the provider no longer accepts this authorization');
+      await markNeedsReauth(ctx.storage, conn,'the provider no longer accepts this authorization');
       return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be reconnected' };
     }
     return { ok: false, code: 'REFRESH_FAILED', reason: `the provider failed the refresh (HTTP ${res.status})` };
@@ -312,7 +315,7 @@ async function refreshSession(
   const secret = current.extra?.appPassword;
   const identifier = current.extra?.identifier;
   if (!secret || !identifier) {
-    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'the session expired and no stored secret can renew it');
+    await markNeedsReauth(ctx.storage, conn,'the session expired and no stored secret can renew it');
     return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be connected again' };
   }
 
@@ -320,7 +323,7 @@ async function refreshSession(
   if ('error' in minted) {
     // The secret itself no longer works — revoked at the provider, or the account changed. That IS
     // a reconnect, and the reason is the one the owner can act on.
-    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', minted.error);
+    await markNeedsReauth(ctx.storage, conn,minted.error);
     return { ok: false, code: 'NEEDS_REAUTH', reason: minted.error };
   }
   await ctx.storage.updateConnectionCredential(
@@ -349,7 +352,7 @@ async function refreshInstagram(
     // refusal while it is valid is reported without parking the connection.
     const expired = conn.expiresAt ? new Date(conn.expiresAt).getTime() <= Date.now() : false;
     if (out.status >= 400 && out.status < 500 && expired) {
-      await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', out.reason);
+      await markNeedsReauth(ctx.storage, conn,out.reason);
       return { ok: false, code: 'NEEDS_REAUTH', reason: 'this Instagram account needs to be connected again' };
     }
     if (!expired) {
@@ -427,5 +430,6 @@ export async function revokeConnection(
   }
 
   await ctx.storage.deleteConnection(conn.id);
+  announceConnectionChange(conn.principal);
   return { ok: true, toldProvider };
 }

@@ -17,8 +17,8 @@
     call" errors per connection while appearing to work.
 
     BroadcastChannel is same-origin and unaffected by COOP, so this reaches the opener directly. The
-    opener also polls the server as a fallback, because a user who closes the pop-up early never
-    reaches this page at all.
+    opener also listens for the node's `connections` live domain (public/js/connection-wait.js),
+    because a user who closes the pop-up early never reaches this page at all.
   -->
   <style>
     html { color-scheme: light dark; }
@@ -37,8 +37,8 @@
       ch.postMessage({ type: 'connected' });
       ch.close();
     } catch (err) {
-      // Reported rather than swallowed: without this message the opener falls back to polling, which
-      // is slower but still correct, and an operator should be able to tell the two paths apart.
+      // Reported rather than swallowed: without this message the opener waits for the node's live
+      // `connections` event instead, and an operator should be able to tell the two paths apart.
       console.warn('[aimeat-connect] could not announce over BroadcastChannel', err);
     }
     // Attempted, not assumed. A window the script did not open cannot close itself in most

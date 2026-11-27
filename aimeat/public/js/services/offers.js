@@ -9,6 +9,8 @@
  * @structure listOffers / getAgentOffers / publishOffers · ask(agentEntry, offer, inputs) · buildAskPrompt
  * @usage import * as offers from '/js/services/offers.js';
  * @version-history
+ *   v1.2.3 -- 2026-11-27 -- ask() on a schedule-born offer answers the run's `outcome`, so the page says a
+ *     run that did not happen (busy, stopped, limited, error) instead of "triggered".
  *   v1.2.2 -- 2026-10-13 -- Legacy route first, provider path on 410 (js/services/ai-connection.js legacyOr):
  *     on 3.x aiAvailable() reads the owner's own key from GET /v1/openrouter/settings again, as before
  *     v1.2.1; GET /v1/ai/available answers on node 4.0.0.
@@ -218,7 +220,8 @@ function scheduleIdOf(offer) {
 /**
  * Mode-aware Ask. Branch order: schedule-born first (independent of mode), then by agent mode.
  * Returns one of:
- *   { kind: 'triggered' }                              — schedule-born → ran the schedule now
+ *   { kind: 'triggered', outcome }                     — schedule-born → ran the schedule now; outcome
+ *                                                        is what the clock did (POST /v1/schedules/:id/trigger)
  *   { kind: 'task', taskId, agent }                    — task-runner/autonomous → created a queued task
  *   { kind: 'prompt', copied: true, prompt }           — interactive/workstation → copied a paste-ready prompt
  */
@@ -247,7 +250,8 @@ export async function ask(agentEntry, offer, inputs) {
   const scheduleId = scheduleIdOf(offer);
   if (scheduleId) {
     const r = await apiPost(`/v1/schedules/${encodeURIComponent(scheduleId)}/trigger`, {});
-    return { kind: 'triggered', ok: r?.ok !== false, error: r?.error };
+    // What the clock did: 'created' or 'ran', or why nothing ran ('busy', 'stopped', 'limited', 'error').
+    return { kind: 'triggered', ok: r?.ok !== false, error: r?.error, outcome: r?.data?.outcome || null };
   }
 
   if (dispatchMode(agentEntry) === 'task') {

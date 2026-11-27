@@ -18,6 +18,8 @@
  * @structure attachCredential · mintSession
  * @usage import { attachCredential } from './attach.js';
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A new or a renewed connection is announced on the owner's `connections` live
+ *     domain (live.ts).
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 6.
  */
 
@@ -26,6 +28,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { sealCredential } from './credential.js';
 import { findProvider } from './providers.js';
 import type { ConnectContext } from './oauth.js';
+import { announceConnectionChange } from './live.js';
 import type {
   ConnectionCredential, ConnectionMode, ConnectionRecord,
 } from '../../models/connection-schemas.js';
@@ -166,6 +169,7 @@ export async function attachCredential(
   const existing = await ctx.storage.findConnection(input.principal, provider.id, minted.externalId, null);
   if (existing) {
     await ctx.storage.updateConnectionCredential(existing.id, credential, minted.expiresAt);
+    announceConnectionChange(existing.principal);
     const refreshed = await ctx.storage.getConnection(existing.id);
     return { ok: true, connection: refreshed ?? existing, created: false };
   }
@@ -191,5 +195,6 @@ export async function attachCredential(
     updatedAt: now,
   };
   await ctx.storage.createConnection(connection);
+  announceConnectionChange(connection.principal);
   return { ok: true, connection, created: true };
 }

@@ -10,6 +10,10 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.6.0 — 2026-11-27 — A refusal is said in the page's language by its code (js/refusal-words.js:
+ *     contacts.refusal.*, the invitation's own words, the organism invitation's own words) with one
+ *     sentence per action when the code has none; the server's English sentence for an AI is no
+ *     longer shown. A first card without an email says so before any call.
  *   v2.5.0 — 2026-10-27 — A refused save keeps each field's message (formErrors) for the person form
  *     to show under its field; the toast says what no field shows (wish
  *     wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -37,6 +41,7 @@ import * as messagesService from '/js/services/messages.js';
 import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
+import { refusalText } from '/js/refusal-words.js';
 
 /** The fields the person form draws, by the name the server's refusal gives them (contacts/add.js). */
 const PERSON_FIELDS = ['name', 'email', 'relation', 'tags', 'links', 'note'];
@@ -78,7 +83,12 @@ export default function ContactsTab({ showToast }) {
   const me = (() => { try { return JSON.parse(localStorage.getItem('aimeat_session') || '{}'); } catch (err) { swallowed('contacts-tab: session', err); return {}; } })();
   const myGhii = me.owner && contacts.length ? (contacts.find(r => r.owner && parts(r.owner).owner === me.owner)?.owner || `${me.owner}@${parts(contacts[0].contact_id).node}`) : (me.owner || '');
 
-  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('contacts.addFailed'), true);
+  // A refusal in the page's words by its code (js/refusal-words.js); `fallbackKey` is the action's
+  // own sentence when the code has none. `prefix` puts an action's own words before the page's.
+  /** @type {(e: any, fallbackKey: string, vars?: Record<string, string|number>, prefix?: string|string[]) => void} */
+  const fail = (e, fallbackKey, vars, prefix = 'contacts.refusal.') =>
+    showToast?.(refusalText(e, prefix, fallbackKey, vars), true);
+  const INVITE_WORDS = ['contacts.refusal.invite.', 'contacts.refusal.'];
 
   const load = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
@@ -149,7 +159,7 @@ export default function ContactsTab({ showToast }) {
       showToast?.(t('contacts.added'));
       setWho('');
       await load({ showSpinner: false });
-    } catch (e) { fail(e); }
+    } catch (e) { fail(e, 'contacts.refusal.addFailed'); }
     finally { setBusy(false); }
   }
   const emailUnresolved = (email) => { setForm({ ...EMPTY_FORM, email }); setFormResolve({ found: false }); setRoad('person'); setFold('add', true); };
@@ -171,7 +181,7 @@ export default function ContactsTab({ showToast }) {
     const refused = fieldErrorsOf(e);
     setFormErrors(refused);
     const line = refusalLine(refused, PERSON_FIELDS, t);
-    if (line) { showToast?.(line, true); focusFirstInvalid(); } else fail(e);
+    if (line) { showToast?.(line, true); focusFirstInvalid(); } else fail(e, 'contacts.refusal.saveFailed');
   };
   async function savePerson() {
     setBusy(true);
@@ -181,8 +191,10 @@ export default function ContactsTab({ showToast }) {
       if (r?.ok === false) throw r;
       let note = t('contacts.added');
       if (form.invite && r?.data?.kind === 'mail') {
-        const inv = await contactsService.invite(form.email.trim(), form.inviteMessage.trim());
-        if (inv?.ok === false) { fail(inv); note = t('contacts.added'); }
+        // The person is saved either way: a refused invitation is said on its own, and the toast after it
+        // says the save. api.js throws a refusal; a service that answered it without throwing is the same.
+        const inv = await contactsService.invite(form.email.trim(), form.inviteMessage.trim()).catch((err) => ({ ok: false, refused: err }));
+        if (inv?.ok === false) { fail(inv.refused || inv, 'contacts.refusal.inviteFailed', { email: form.email.trim() }, INVITE_WORDS); note = t('contacts.added'); }
         else note = inv?.data?.email_sent ? c('invitedSent', { email: form.email.trim() }) : c('invitedNoMail');
       }
       showToast?.(note);
@@ -208,7 +220,8 @@ export default function ContactsTab({ showToast }) {
       let r;
       if (row.kind === 'ghii' && !row.email && !row.saved_name && !row.note && !(row.tags || []).length && !(row.links || []).length && !row.relation) {
         // No card behind this identity yet: the first edit creates one with the address it needs.
-        r = card.email ? await contactsService.savePerson(card) : { ok: false, error: { message: c('needEmailForCard') } };
+        if (!card.email) { showToast?.(c('needEmailForCard'), true); return; }
+        r = await contactsService.savePerson(card);
       } else {
         r = await contactsService.updatePerson(row.contact_id, patch);
       }
@@ -231,7 +244,7 @@ export default function ContactsTab({ showToast }) {
         showToast?.(r?.data?.email_sent ? c('invitedSent', { email: row.email }) : c('invitedNoMail'));
         if (!r?.data?.email_sent && r?.data?.accept_url) copyToClipboard(r.data.accept_url);
         await load({ showSpinner: false });
-      } catch (e) { fail(e); }
+      } catch (e) { fail(e, 'contacts.refusal.inviteFailed', { email: row.email }, INVITE_WORDS); }
       finally { setBusy(false); }
     });
   }
@@ -255,7 +268,7 @@ export default function ContactsTab({ showToast }) {
       if (r?.ok === false) throw r;
       showToast?.(c('invitedToOrganism', { name: nameOf(row), org: org.name }));
       setOrgChooser(false);
-    } catch (e) { fail(e); }
+    } catch (e) { fail(e, 'contacts.refusal.orgInviteFailed', { name: nameOf(row), org: org.name }, 'contacts.refusal.org.'); }
     finally { setBusy(false); }
   }
 
@@ -269,7 +282,7 @@ export default function ContactsTab({ showToast }) {
         showToast?.(t('contacts.removed'));
         pickView({ kind: 'cover' });
         await load({ showSpinner: false });
-      } catch (e) { fail(e); }
+      } catch (e) { fail(e, 'contacts.refusal.removeFailed', { name: nameOf(row) }); }
       finally { setBusy(false); }
     }, { danger: true });
   }
@@ -281,7 +294,7 @@ export default function ContactsTab({ showToast }) {
       if (!text) throw new Error(c('promptUnavailable'));
       copyToClipboard(text);
       showToast?.(c('promptCopied'));
-    } catch (e) { fail(e, c('promptUnavailable')); }
+    } catch (e) { fail(e, 'contacts.cover.promptUnavailable'); }
   }
 
   const ctx = {

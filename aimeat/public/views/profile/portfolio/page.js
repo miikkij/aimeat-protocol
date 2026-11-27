@@ -11,10 +11,15 @@
  *   taken off the web keeps its preview and the way back. The page explains itself the designed way
  *   (.claude/rules/page-guidance.md): the page's start (PageStart "portfolio") and the title's
  *   question mark (concept.portfolio). Pure render over the ctx bag.
- * @structure renderPage · mast · strip · secAddresses · secVisibility · secPage · secChange ·
- *   secFirst · secAgent
+ * @structure renderPage · accessSaid · mast · strip · secAddresses · secVisibility · accessChoices ·
+ *   secPage · secChange · secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-27 -- Who can open the page is a row of the visibility section with its value (anyone,
+ *     people signed in here, the members of one organism) and Change, which opens the three choices in place, one
+ *     row each with what choosing it does; one organism is picked from the person's own. A page that needs a
+ *     sign-in is no longer called public: the head's tag, the strip's figure and the On the web row say who may
+ *     open it, and the search row says a search engine cannot read it (its switch is drawn only for anyone).
  *   v1.20.0 -- 2026-11-27 -- With no page yet there is no figure strip (its four figures counted a reserved address,
  *     the ways to a page and other people's pages, nothing to act on); with a page the strip drops the address count,
  *     which section 01 says. "Changing the page" and "Your AI and your page" are FoldSection rows that say their state
@@ -67,11 +72,12 @@ import { Facts } from '/components/Facts.js';
 import { Tinted } from '/components/Figure.js';
 import { Box } from '/components/Box.js';
 import { Roads, Road } from '/components/Roads.js';
-import { List, Row, Thumb, Name, Doors } from '/components/List.js';
+import { List, Row, Thumb, Tick, Name, Doors } from '/components/List.js';
+import { Select } from '/components/Select.js';
 import { PagePreview } from '/components/PagePreview.js';
 import { TextArea } from '/components/TextField.js';
 import { FileDrop } from '/components/FileDrop.js';
-import { Label, Code } from '/components/Mark.js';
+import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { x, apexUrl, dateWord, timeWord, writtenBy, crumb, pageLinks } from './frame.js';
@@ -128,6 +134,20 @@ export function renderPage(ctx) {
     <//>`;
 }
 
+/**
+ * Who may open the page, in words: the setting's value (`access`: anyone, signed-in, organism:<id>)
+ * with the name of the organism, and, on a server that shows its pages to signed-in people only
+ * (js/site.js signedInOnly), "anyone" said as what it is there. `open` is the kind the page is open to.
+ */
+function accessSaid(ctx) {
+  const a = ctx.access || 'anyone';
+  if (a === 'anyone') return { open: ctx.nodeSignedInOnly ? 'signed-in' : 'anyone', org: '' };
+  if (a === 'signed-in') return { open: 'signed-in', org: '' };
+  const id = a.slice('organism:'.length);
+  const known = (ctx.organisms || []).find((o) => o.id === id);
+  return { open: 'organism', org: known ? known.name : ctx.organisms ? x('access.organismUnknown') : '…' };
+}
+
 /** A style or a kind of page in the reader's words; a value the page has no word for is shown as it is. */
 const choiceWord = (kind, v) => { if (!v) return ''; const k = `pfpage.${kind}.${v}`; const w = t(k); return w === k ? v : w; };
 
@@ -136,8 +156,11 @@ function mast(ctx, state) {
   const d = ctx.data;
   const cfg = d?.config;
   const others = Math.max(0, (ctx.members ?? 0) - (state === 'on' ? 1 : 0));
+  // A page that needs a sign-in is on the web, not public, and no search engine reads it.
+  const { open } = accessSaid(ctx);
+  const openChip = open === 'anyone' ? { label: x('chipPublic'), tone: 'sun' } : { label: open === 'signed-in' ? x('chipSignedIn') : x('chipOrganism'), tone: 'sun' };
   const marks = state === 'on'
-    ? [{ label: x('chipPublic'), tone: 'sun' }, { label: cfg?.seoIndex ? x('chipSearch') : x('chipNoSearch') }, { label: x('chipShowcase') }, { label: `${x('kb', { n: d.html.size_kb })} · ${dateWord(d.html.stored_at)}` }]
+    ? [openChip, { label: cfg?.seoIndex && open === 'anyone' ? x('chipSearch') : x('chipNoSearch') }, { label: x('chipShowcase') }, { label: `${x('kb', { n: d.html.size_kb })} · ${dateWord(d.html.stored_at)}` }]
     : state === 'off'
       ? [{ label: x('chipOff'), tone: 'coral' }, { label: x('chipStored', { n: d.html.size_kb }) }, cfg?.seoIndex ? { label: x('chipSearchAllowed') } : null]
       : state === 'none'
@@ -176,9 +199,15 @@ function strip(ctx, state) {
       { key: 'showcase', n: others ?? '…', label: x('stripShowcase'), sub: x('stripShowcaseOff') },
     ]} />`;
   }
+  const said = accessSaid(ctx);
+  const openFigure = said.open === 'anyone'
+    ? { n: x('stripPublic'), sub: cfg?.seoIndex ? x('stripSearchOn') : x('stripSearchOff') }
+    : said.open === 'signed-in'
+      ? { n: x('stripSignedIn'), sub: x('stripSignedInSub') }
+      : { n: x('stripMembers'), sub: x('stripMembersSub', { org: said.org }) };
   return html`<${FigureStrip} items=${[
     { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: [timeWord(d.html.stored_at), x('kb', { n: d.html.size_kb }), choiceWord('style', cfg?.designStyle)].filter(Boolean).join(' · ') },
-    { key: 'public', n: x('stripPublic'), tone: 'coral', label: x('stripPublicLabel'), sub: cfg?.seoIndex ? x('stripSearchOn') : x('stripSearchOff') },
+    { key: 'public', n: openFigure.n, tone: 'coral', label: x('stripPublicLabel'), sub: openFigure.sub },
     { key: 'showcase', n: m ?? '…', label: x('stripShowcase'), sub: others != null ? x('stripShowcaseSub', { n: others }) : '' },
   ]} />`;
 }
@@ -210,19 +239,74 @@ function secVisibility(ctx, state, n) {
   const webDoor = off
     ? html`<${Action} small disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
     : html`<${Action} small soft tone="danger" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(false)}>${x('unpublish')}<//>`;
+  // Who may open it decides what "on the web" means and whether a search engine can read the page.
+  const who = accessSaid(ctx);
+  const limited = who.open !== 'anyone';
+  const webOn = who.open === 'anyone' ? said('fine', x('visWebOn'), x('visWebOnSub'))
+    : who.open === 'signed-in' ? said('fine', x('visWebOnLimited'), x('visWebOnSignedInSub'))
+      : said('fine', x('visWebOnLimited'), x('visWebOnOrganismSub', { org: who.org }));
   const search = off
     ? said(undefined, x('visSearchOffWeb'), cfg.seoIndex ? x('visSearchOffWebAllowed') : x('visSearchOffWebDenied'))
-    : cfg.seoIndex ? said('fine', x('visSearchOn'), x('visSearchOnSub')) : said(undefined, x('visSearchOff'), x('visSearchOffSub'));
+    : limited ? said(undefined, x('visSearchOffWeb'), x('visSearchLimitedSub'))
+      : cfg.seoIndex ? said('fine', x('visSearchOn'), x('visSearchOnSub')) : said(undefined, x('visSearchOff'), x('visSearchOffSub'));
+  const accessValue = who.open === 'anyone' ? said('fine', x('access.valueAnyone'), x('access.anyoneSub'))
+    : who.open === 'signed-in' ? said('notice', x('access.valueSignedIn'), ctx.access === 'anyone' ? x('access.anyoneNodeSignedIn') : x('access.signedInSub'))
+      : said('notice', x('access.valueOrganism', { org: who.org }), x('access.organismNamedSub', { org: who.org }));
+  // The choices open right under the row that changes them, so the rows after it are split off.
   return html`
     <${PageSection} id="pf-visibility" num=${n} title=${x('secVisibility')} count=${x('secVisibilitySub')} first=${off}>
       <${Facts} rows=${[
-        { k: x('visWeb'), v: off ? said('notice', x('visWebOff'), x('visWebOffSub')) : said('fine', x('visWebOn'), x('visWebOnSub')),
+        { k: x('visWeb'), v: off ? said('notice', x('visWebOff'), x('visWebOffSub')) : webOn,
           sub: x('visWebHint'), actions: webDoor },
+        { k: x('visAccess'), v: accessValue, sub: x('visAccessHint'),
+          actions: html`<${Action} small soft pressed=${ctx.accessOpen} disabled=${ctx.busy === 'access'} onClick=${() => ctx.toggleAccess()}>${ctx.accessOpen ? x('access.close') : x('access.change')}<//>` },
+      ]} />
+      ${ctx.accessOpen ? accessChoices(ctx) : null}
+      <${Facts} rows=${[
         { k: x('visSearch'), v: search, sub: x('visSearchHint'),
-          actions: off ? null : html`<${Action} small soft disabled=${ctx.busy === 'seo'} onClick=${() => ctx.setSeo(!cfg.seoIndex)}>${cfg.seoIndex ? x('searchOff') : x('searchOn')}<//>` },
+          actions: off || limited ? null : html`<${Action} small soft disabled=${ctx.busy === 'seo'} onClick=${() => ctx.setSeo(!cfg.seoIndex)}>${cfg.seoIndex ? x('searchOff') : x('searchOn')}<//>` },
         { k: x('visShowcase'), v: off ? said(undefined, x('visShowcaseOff'), x('visShowcaseOffSub')) : said('fine', x('visShowcaseOn'), x('visShowcaseOnSub', { n: others })),
           sub: x('visShowcaseHint'), actions: openDoor('/v1/members', x('openShowcase')) },
       ]} />
+    <//>`;
+}
+
+/**
+ * The three choices of who may open the page, one row each: what happens when it is chosen, and the
+ * press that chooses it. "One organism" picks from the organisms the person is an active member of,
+ * the only ones the server accepts (services/page/access.ts parsePageAccessInput).
+ */
+function accessChoices(ctx) {
+  const current = ctx.access || 'anyone';
+  const orgs = ctx.organisms;
+  const onOrg = current.startsWith('organism:');
+  const busy = ctx.busy === 'access';
+  const choose = (value, words = x('access.choose')) => html`<${Action} small row disabled=${busy} onClick=${() => ctx.setAccess(value)}>${words}<//>`;
+  const chosen = html`<${Mark} kind="status" tone="fine">${x('access.chosen')}<//>`;
+  const orgDoors = orgs === null
+    ? html`<${Mark} tone="dim">${x('access.loadingOrganisms')}<//>`
+    : !orgs.length ? null
+      : html`
+        <${Select} fit ariaLabel=${x('access.pickOrganism')} value=${ctx.orgPick} disabled=${busy}
+          onChange=${(v) => ctx.setOrgPick(v)} options=${orgs.map((o) => [o.id, o.name])} />
+        ${onOrg && current === `organism:${ctx.orgPick}` ? chosen : choose(`organism:${ctx.orgPick}`)}`;
+  return html`
+    <${List} cols="mark-name-doors" keepCols>
+      <${Row} key="anyone">
+        <${Tick} bare state=${current === 'anyone' ? 'done' : 'off'} />
+        <${Name} desc=${ctx.nodeSignedInOnly ? x('access.anyoneDescNode') : x('access.anyoneDesc')}>${x('access.anyone')}<//>
+        <${Doors}>${current === 'anyone' ? chosen : choose('anyone')}<//>
+      <//>
+      <${Row} key="signed-in">
+        <${Tick} bare state=${current === 'signed-in' ? 'done' : 'off'} />
+        <${Name} desc=${x('access.signedInDesc')}>${x('access.signedIn')}<//>
+        <${Doors}>${current === 'signed-in' ? chosen : choose('signed-in')}<//>
+      <//>
+      <${Row} key="organism">
+        <${Tick} bare state=${onOrg ? 'done' : 'off'} />
+        <${Name} desc=${orgs && !orgs.length ? x('access.noOrganisms') : x('access.organismDesc')}>${x('access.organism')}<//>
+        <${Doors}>${orgDoors}<//>
+      <//>
     <//>`;
 }
 

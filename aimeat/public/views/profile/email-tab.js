@@ -11,6 +11,10 @@
  * @structure EmailTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'email'.
  * @version-history
+ *   v2.4.0 -- 2026-11-27 -- connect(p, renew): "Connect again" on a mailbox that needs a new sign-in runs the
+ *     provider's connect round; the wait (js/connection-wait.js) listens for the `connections` live domain
+ *     instead of polling and notices the row made active again, not only a new row. Every refusal is said
+ *     in the page's language by its code (js/refusal-words.js, emailpage.refusal.*).
  *   v2.3.0 -- 2026-11-27 -- The fold state covers the address, which the cover draws as a row once it is
  *     confirmed (usability pass of the Settings pages); `chat` is gone, its fold was removed on 2026-11-08.
  *   v2.2.0 — 2026-10-18 — saveLanguage: the letters' language choice sets the account language
@@ -35,6 +39,8 @@ import * as notif from '/js/services/notifications.js';
 import * as contactsService from '/js/services/contacts.js';
 import { updateProfile } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
+import { refusalText } from '/js/refusal-words.js';
+import { waitForConnection, snapshot } from '/js/connection-wait.js';
 import { c, providerWord } from './email/frame.js';
 import { renderCover } from './email/cover.js';
 
@@ -60,7 +66,10 @@ export default function EmailTab({ showToast }) {
   const [showAll, setShowAll] = useState(false);
   const [folds, setFolds] = useState({ address: false, letters: false });
 
-  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+  // A refusal in the page's words by its code (js/refusal-words.js), the action's own words first,
+  // with the action's own sentence when the code has none; the server's sentence is English for an AI.
+  /** @type {(e: any, fallbackKey: string, vars?: Record<string, string|number>, prefix?: string|string[]) => void} */
+  const fail = (e, fallbackKey, vars, prefix = 'emailpage.refusal.') => showToast?.(refusalText(e, prefix, fallbackKey, vars), true);
 
   const load = useCallback(async () => {
     try {
@@ -115,7 +124,7 @@ export default function EmailTab({ showToast }) {
         if (r?.ok === false) throw r;
         setForm(f => ({ ...f, codeSent: true, code: '', verificationId: r?.data?.verification_id || null }));
         showToast?.(c('codeSentToast'));
-      } catch (e) { fail(e, t('profile.email.sendFailed')); }
+      } catch (e) { fail(e, 'profile.email.sendFailed', undefined, ['emailpage.refusal.verify.', 'emailpage.refusal.']); }
       finally { setBusy(false); }
     };
     if (me?.email_verified_at && me?.notification_email && addr !== me.notification_email) confirm(c('changeConfirm', { old: me.notification_email, next: addr }), proceed);
@@ -130,36 +139,39 @@ export default function EmailTab({ showToast }) {
       cancelChange();
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await load();
-    } catch (e) { fail(e, t('profile.email.verifyFailed')); }
+    } catch (e) { fail(e, 'profile.email.verifyFailed', undefined, ['emailpage.refusal.confirm.', 'emailpage.refusal.']); }
     finally { setBusy(false); }
   }
 
   /* ── mailboxes ── */
-  async function connect(p) {
+  // Connect a mailbox, or sign in to one again (`renew`, the row that needs a new sign-in): the same
+  // round at the provider. A new sign-in with the same account repairs that row in place, so the wait
+  // compares the rows' states as well as their ids (email.waitForConnection).
+  async function connect(p, renew) {
     setConnecting(p.id);
     try {
       const url = await email.startConnection(p.id);
-      if (!url) throw new Error(c('connectFailed'));
-      const before = connections.length;
+      if (!url) { showToast?.(c('connectFailed'), true); return; }
+      const before = snapshot(connections);
       const win = window.open(url, 'aimeat-connect', 'width=620,height=760');
-      if (!win) throw new Error(c('popupBlocked'));
-      const ok = await email.waitForConnection(before, () => email.mailConnections(providers));
-      if (ok) showToast?.(c('connected', { name: providerWord(p) }));
+      if (!win) { showToast?.(c('popupBlocked'), true); return; }
+      const ok = await waitForConnection(before, () => email.mailConnections(providers));
+      if (ok) showToast?.(c(renew ? 'reconnected' : 'connected', { name: providerWord(p) }));
       await load();
-    } catch (e) { fail(e, c('connectFailed')); }
+    } catch (e) { fail(e, 'emailpage.connectFailed'); }
     finally { setConnecting(''); }
   }
   function remove(conn, p) {
     confirm(c('removeConfirm', { name: providerWord(p), account: conn.accountLabel || '' }), async () => {
       setBusy(true);
       try { const r = await email.removeConnection(conn.id); if (r?.ok === false) throw r; showToast?.(c('removed', { name: providerWord(p) })); await load(); }
-      catch (e) { fail(e); } finally { setBusy(false); }
+      catch (e) { fail(e, 'emailpage.refusal.removeFailed', { name: providerWord(p) }); } finally { setBusy(false); }
     }, { danger: true });
   }
   async function stopDelegation(conn, d) {
     setBusy(true);
     try { const r = await email.setDelegation(d.id, false); if (r?.ok === false) throw r; await load(); }
-    catch (e) { fail(e); } finally { setBusy(false); }
+    catch (e) { fail(e, 'emailpage.refusal.stopFailed', undefined, ['emailpage.refusal.delegation.', 'emailpage.refusal.']); } finally { setBusy(false); }
   }
 
   /* ── the letters ── */
@@ -170,10 +182,10 @@ export default function EmailTab({ showToast }) {
     setBusy(true);
     try {
       const saved = await notif.putSettings(next);
-      if (!saved) throw new Error(c('saveFailed'));
+      if (!saved) { showToast?.(c('saveFailed'), true); return; }
       setSettings(saved);
       showToast?.(c('saved'));
-    } catch (e) { fail(e, c('saveFailed')); }
+    } catch (e) { fail(e, 'emailpage.saveFailed'); }
     finally { setBusy(false); }
   }
 
@@ -182,10 +194,11 @@ export default function EmailTab({ showToast }) {
     setBusy(true);
     try {
       const r = await updateProfile({ locale });
-      if (!r?.data) throw new Error(c('saveFailed'));
+      // The session's own fetch answers a refusal as the envelope; its code is said like any other.
+      if (!r?.data) { fail(r, 'emailpage.saveFailed'); return; }
       setMe(m => ({ ...m, locale: r.data.locale }));
       showToast?.(c('saved'));
-    } catch (e) { fail(e, c('saveFailed')); }
+    } catch (e) { fail(e, 'emailpage.saveFailed'); }
     finally { setBusy(false); }
   }
 
@@ -193,10 +206,10 @@ export default function EmailTab({ showToast }) {
   async function copyPrompt() {
     try {
       const text = await email.getPrompt();
-      if (!text) throw new Error(c('promptUnavailable'));
+      if (!text) { showToast?.(c('promptUnavailable'), true); return; }
       copyToClipboard(text);
       showToast?.(c('promptCopied'));
-    } catch (e) { fail(e, c('promptUnavailable')); }
+    } catch (e) { fail(e, 'emailpage.promptUnavailable'); }
   }
 
   const ctx = {

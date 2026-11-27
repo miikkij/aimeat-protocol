@@ -15,6 +15,10 @@
  * @structure renderCover · lettersSub · secAddress · addressBody · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.25.0 -- 2026-11-27 -- A mailbox that needs a new sign-in has "Connect again" as its row's main action, the
+ *     same connect round its service's Connect starts; Remove stays beside it in the quiet tone. Such a mailbox
+ *     is read from the server's own status, 'needs_reauth' (js/connection-wait.js needsSignIn): the page tested
+ *     'expired' and 'needs-reauth', which the server never sends, so it never showed one as needing a sign-in.
  *   v1.24.0 -- 2026-11-27 -- Usability pass of the Settings pages: the mailboxes are the page (01), the
  *     one that needs a new sign-in first in its list and its figure in the notice tone. The address
  *     leads, open, only while it is missing or not confirmed; confirmed, it is one row that says the
@@ -83,11 +87,12 @@ import { Space } from '/components/Layout.js';
 import { c, rel, day, clock, providerWord, isSender, stateWord, kindWord, channelWord, statusWord, Switch, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { HelpLabel } from '/components/HelpTip.js';
+import { needsSignIn } from '/js/connection-wait.js';
 
 const PAGE = 12;
 
-/** A mailbox whose sign-in ran out: its owner signs in at the provider again. */
-const isStale = (conn) => conn.status === 'expired' || conn.status === 'needs-reauth';
+/** A mailbox whose sign-in ran out: its owner signs in at the provider again (status 'needs_reauth'). */
+const isStale = (conn) => needsSignIn(conn);
 /** The mailbox rows' order: one that needs a new sign-in, then the connected, then the rest. */
 const mailboxRank = ({ conn }) => (!conn ? 3 : isStale(conn) ? 0 : conn.status === 'active' ? 1 : 2);
 const LANGUAGES = [['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']];
@@ -242,6 +247,7 @@ function secMailboxes(ctx, num, first) {
             <${Doors}>
               ${conn ? html`
                 <${Mark} kind="status" tone=${conn.status === 'active' ? 'fine' : 'attention'}>${stateWord(conn)}<//>
+                ${isStale(conn) ? html`<${Action} small row disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p, true)}>${ctx.connecting === p.id ? c('connecting') : c('connectAgain')}<//>` : null}
                 <${Action} small row soft disabled=${ctx.busy} onClick=${() => ctx.remove(conn, p)}>${c('remove')}<//>`
                 : html`<${Action} small row disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${ctx.connecting === p.id ? c('connecting') : c('connect')}<//>`}
             <//>

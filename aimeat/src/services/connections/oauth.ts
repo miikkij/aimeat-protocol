@@ -27,6 +27,8 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   2026-11-27 — completeAuthorization announces a new or a renewed connection on the owner's
+ *     `connections` live domain (live.ts): the Email and Access pages wait on it instead of polling.
  *   2026-11-02 — The files pair (microsoft-files, microsoft-files-write) learns its account from Graph's
  *     /me, as Outlook does.
  *   v1.3.1 — 2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and the
@@ -59,6 +61,7 @@ import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, t
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import { finishSocialToken, SOCIAL_FINISH_PROVIDERS } from './social-finish.js';
+import { announceConnectionChange } from './live.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ConnectionMode, ConnectionRecord } from '../../models/connection-schemas.js';
@@ -588,6 +591,7 @@ export async function completeAuthorization(
     // Re-authorising repairs the row it already has. updateConnectionCredential also clears the
     // error state, because a successful exchange IS the evidence that whatever was wrong is not.
     await ctx.storage.updateConnectionCredential(existing.id, credential, expiresAt, scopes);
+    announceConnectionChange(existing.principal);
     const refreshed = await ctx.storage.getConnection(existing.id);
     return { ok: true, connection: refreshed ?? existing, returnUrl: nonce.redirectUri, created: false };
   }
@@ -613,5 +617,6 @@ export async function completeAuthorization(
     updatedAt: now,
   };
   await ctx.storage.createConnection(connection);
+  announceConnectionChange(connection.principal);
   return { ok: true, connection, returnUrl: nonce.redirectUri, created: true };
 }

@@ -10,6 +10,8 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.16.0 -- 2026-11-27 -- A refused create is said in the page's language by its code (js/refusal-words.js,
+ *     scheduler.refusal.*), not with the server's English sentence for an AI.
  *   v2.15.1 -- 2026-10-19 -- The agent picker shows each agent's shown name, in alphabetical order (sortAgents).
  *   v2.15.0 -- 2026-10-02 -- The daily AI spend limit shows, and goes into the request, only for the AI kind: the server checks it on no other kind (src/services/schedule-constraints.ts).
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain the schedule and its limits: schedule.cron, schedule.timezone on their TextFields, schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
@@ -42,6 +44,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { createSchedule } from '/js/services/schedules.js';
+import { refusalText } from '/js/refusal-words.js';
 import { cronWords, timeOfCron, withTime } from './cron-words.js';
 import { resolvedTimeZone } from '/js/display-prefs.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
@@ -130,7 +133,7 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
       await createSchedule(body);
       showToast?.(t('profile.scheduler.created'));
       onCreated?.();
-    } catch (e) { showToast?.(e.message, true); }
+    } catch (e) { showToast?.(refusalText(e, 'scheduler.refusal.', 'scheduler.refusal.createFailed'), true); }
     finally { setSaving(false); }
   };
 
