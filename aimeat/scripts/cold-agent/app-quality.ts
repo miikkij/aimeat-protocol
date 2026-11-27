@@ -15,6 +15,8 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.3.0 — 2026-11-27 — publishedHtml is exported: the Atelier build bench reads the same bytes for
+ *     its own measures (bench-measure.ts).
  *   v1.2.3 — 2026-11-08 — appQuality takes the owner's token, so an app opened only to members is read.
  *   v1.2.2 — 2026-11-08 — The page is read through a redirect to `<label>.apps.localhost` by asking the
  *     node's address with that Host; Node could not resolve the name and the run stopped.
@@ -109,7 +111,7 @@ function kitAliases(html: string): string[] {
  * ("fetch failed", which stopped a whole run on 2026-11-08). Such a redirect is followed by asking
  * the node's own address with the subdomain as the Host, which is what a browser's lookup reaches.
  */
-async function publishedHtml(url: string, token?: string): Promise<string> {
+export async function publishedHtml(url: string, token?: string): Promise<string> {
     // The owner's token reads an app opened only to members: anonymously it answers 401, and the
     // family list of 2026-11-08 measured as an empty, Classic, level-less page three times out of three.
     const res = await fetch(url, { redirect: 'manual', headers: token ? { Authorization: `Bearer ${token}` } : {} });
