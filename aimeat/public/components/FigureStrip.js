@@ -27,11 +27,13 @@
  *     above, air under it before what follows.
  *   - free: the figures stand free inside a section, without the rules: each number over its word in
  *     the row label's coral capitals, wrapping as they fit (the old app catalogue's visitor numbers).
- * @structure FigureStrip({ items, loading, wrap, flush, lead, free })
+ * @structure FigureStrip({ items, loading, wrap, flush, lead, free, stacked, hideZeros })
  * @usage html`<${FigureStrip} items=${[{ n: apps.length, label: x('stripApps'), sub: x('stripAppsSub') },
  *          { n: drafts.length, tone: drafts.length ? 'coral' : undefined, label: x('stripDrafts'), sub: '' }]} />`
  *        html`<${FigureStrip} loading=${4} />`
  * @version-history
+ *   v1.4.0 — 2026-11-27 — `hideZeros`: the strip draws nothing while every figure is zero or the "no
+ *     value" mark, so a page that holds nothing yet does not open with a band of zeros; additive.
  *   v1.3.0 — 2026-10-18 — `stacked`: the number, its word and its line on three rows the figures
  *     share, so they line up whatever the width (og-strip--stacked); additive.
  *   v1.2.0 — 2026-09-27 — `free`: figures without the rules, the word under the number in coral
@@ -63,7 +65,14 @@ function Figure({ item }) {
   return html`<div title=${item.title}>${inner}</div>`;
 }
 
-export function FigureStrip({ items = [], loading, wrap, flush, lead, free, stacked }) {
+/** A figure that says nothing yet: zero, or the placeholder a page shows for "no value". */
+const isNothing = (n) => n === 0 || n === '0' || n === '·' || n === '' || n === null || n === undefined;
+
+export function FigureStrip({ items = [], loading, wrap, flush, lead, free, stacked, hideZeros }) {
+  // hideZeros (added 2026-11-27): a page whose figures are all zero has nothing yet, and a band of
+  // zeros is then the largest thing on a page that has nothing to say. The page's empty line says
+  // what fills it. Only for a strip whose first figure counts everything the page holds.
+  if (hideZeros && !loading && (items || []).filter(Boolean).every((item) => isNothing(item.n))) return null;
   // free (added by appcat detail builder B): the figures stand free in a section, no rules, each
   // number over its word in coral capitals (the old app catalogue's visitor numbers, .vis-stats).
   // stacked (added 2026-10-18, What others can see): the number, its word and its line on three rows

@@ -24,6 +24,9 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A soft action is a third weight: a hairline frame and lighter words. It was
+ *     drawn as the outlined action with a greyer frame, so a page head with one main action and four
+ *     others showed five buttons of the same weight.
  *   v1.2.0 — 2026-11-26 — The Settings overview: its totals are the dark state band of a Settings
  *     page (the poster's tilted coral band was the largest thing on the page), and a list group's
  *     title the contents rail lists carries the number tile.
@@ -158,7 +161,8 @@ function themeCss(): string {
 :root .poster-action { padding: 9px 16px; border: 1.5px solid var(--text); border-radius: var(--shape-corner-control); background: var(--card-bg); color: var(--text); font-weight: 700; font-size: .95rem; line-height: 1.2; text-decoration: none; text-transform: none; letter-spacing: 0; box-shadow: none; }
 :root .poster-action:hover { background: var(--sun); color: var(--on-sun); }
 :root .poster-action--small { padding: 6px 12px; font-size: .875rem; }
-:root .poster-action--lower, :root .poster-action--soft { border-color: var(--text-dim); }
+/* Three weights, so a row of actions is not five equal buttons: the filled main action, the outlined action, and the soft one (Action's \`soft\`, class --lower) in a hairline frame with lighter words. */
+:root .poster-action--lower, :root .poster-action--soft { border-color: var(--border); color: var(--text-dim); font-weight: 500; }
 :root .poster-slab, :root .btn-primary, :root .poster-prompt-actions > .poster-action, :root .field-row > .poster-action { padding: 12px 18px; line-height: 1.2; border: 0; border-radius: var(--shape-corner-control); background: var(--text); color: var(--card-bg); font-weight: 700; text-decoration: none; text-transform: none; letter-spacing: 0; box-shadow: none; }
 :root .poster-slab:hover, :root .btn-primary:hover, :root .poster-prompt-actions > .poster-action:hover, :root .field-row > .poster-action:hover { background: var(--accent); color: var(--card-bg); }
 :root .og-mast .poster-slab { background: var(--accent); }

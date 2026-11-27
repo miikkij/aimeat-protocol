@@ -371,8 +371,9 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
         summary: 'A few figures between two heavy ink rules: the number in the poster face, its word, a small typewriter line under it; two to a row on a phone. With free, the figures stand in a section without the rules, each number over its word in coral capitals. A page passes the figures as data to FigureStrip.',
         module: '/components/FigureStrip.js', sheet: '/css/components/figure-strip.css',
         data: {
-            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key, onClick, title }], loading, wrap, flush, lead, free, stacked })',
+            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key, onClick, title }], loading, wrap, flush, lead, free, stacked, hideZeros })',
             fields: {
+                hideZeros: 'the strip draws nothing while every figure is zero or "·": a page that holds nothing yet does not open with a band of zeros (use it when the first figure counts everything the page holds)',
                 onClick: 'the figure is a button (a filter, a link to its page) whose word underlines under the pointer', title: 'the figure\'s tooltip',
                 n: 'the figure: a number, a word or a time; "…" while it loads, "·" when there is none', of: 'the "of how many" after it ("/4"), smaller and grey',
                 label: 'the word beside the figure (always drawn, empty or not)', sub: 'the typewriter line under it; "" still draws the empty line, undefined draws none',
