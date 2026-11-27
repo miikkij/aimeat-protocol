@@ -37334,5 +37334,8 @@
   "profile.agents.detail.activity.type.declined": "kieltäytyi",
   "profile.agents.detail.activity.type.onboarding_passed": "läpäisi yhteyden vaiheen",
   "profile.agents.detail.activity.type.onboarding_failed": "ei läpäissyt yhteyden vaihetta",
-  "profile.agents.detail.activity.type.onboarding_step": "yhteyden vaihe"
+  "profile.agents.detail.activity.type.onboarding_step": "yhteyden vaihe",
+  "profile.memory.cover.lastByAgent": "{who} kirjoitti: {title}",
+  "profile.memory.cover.lastByYou": "Sinä kirjoitit: {title}",
+  "profile.memory.cover.wroteYou": "kirjoitit"
 }

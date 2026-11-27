@@ -17,6 +17,8 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.36.1 -- 2026-11-27 -- The last change and the change list bend the verb to the writer: Finnish
+ *     read "sinä kirjoitti", built from separate words.
  *   v1.36.0 -- 2026-11-27 -- A key space row names its newest record by its title (recordName, read by
  *     memory-tab/space-titles.js for the rows drawn), and so do the strip's last change and "What has
  *     happened"; a key is the name only until the title is read, or when the record has none. A shared
@@ -461,7 +463,10 @@ function renderCover(ctx) {
       { key: 'stale', n: stale.count, tone: stale.count ? 'notice' : undefined, label: c('figStale', 'stale'), sub: c('figStaleSub', 'not changed in 90 days'),
         onClick: stale.count && draws.rest ? () => scrollToSection('mp-stale') : undefined },
       { key: 'last', n: last ? formatRelativeTime(last.updated_at || last.created_at) : '·', tone: last ? 'coral' : undefined, label: c('figLast', 'last change'),
-        sub: last ? `${agentOf(last.owner_gaii) || c('you', 'you')} ${c('wrote', 'wrote')} ${recordName(ctx, last, null)}` : undefined },
+        // One sentence per writer, so each language can bend the verb ("sinä kirjoitti" was wrong in Finnish).
+        sub: last ? (agentOf(last.owner_gaii)
+          ? c('lastByAgent', '{who} wrote {title}').replace('{who}', agentOf(last.owner_gaii)).replace('{title}', recordName(ctx, last, null))
+          : c('lastByYou', 'You wrote {title}').replace('{title}', recordName(ctx, last, null))) : undefined },
     ]} />`}
     ${searchRow}
     ${showMemForm ? html`<${SettingBox} label=${c('newEntry', '+ New entry')} irreversible><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /><//>` : null}
@@ -509,7 +514,7 @@ function renderCover(ctx) {
           // The record by its title when the page has read one; its key is the name only until then.
           const title = ctx.titleFor?.(m);
           return html`
-          <${FoldRow} key=${m.key} num=${formatRelativeTime(m.updated_at || m.created_at)} who=${agentOf(m.owner_gaii) || c('you', 'you')} verb=${c('wrote', 'wrote')}
+          <${FoldRow} key=${m.key} num=${formatRelativeTime(m.updated_at || m.created_at)} who=${agentOf(m.owner_gaii) || c('you', 'you')} verb=${agentOf(m.owner_gaii) ? c('wrote', 'wrote') : c('wroteYou', 'wrote')}
             name=${title || m.key} isKey=${!title} onClick=${() => pickView({ kind: 'record', key: m.key })} />`;
         })}<//>` : none()}
       <//>` : null}

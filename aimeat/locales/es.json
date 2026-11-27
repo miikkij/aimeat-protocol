@@ -35117,5 +35117,8 @@
   "profile.agents.detail.activity.type.declined": "rechazó la tarea",
   "profile.agents.detail.activity.type.onboarding_passed": "superó un paso de conexión",
   "profile.agents.detail.activity.type.onboarding_failed": "no superó un paso de conexión",
-  "profile.agents.detail.activity.type.onboarding_step": "paso de conexión"
+  "profile.agents.detail.activity.type.onboarding_step": "paso de conexión",
+  "profile.memory.cover.lastByAgent": "{who} escribió {title}",
+  "profile.memory.cover.lastByYou": "Escribiste {title}",
+  "profile.memory.cover.wroteYou": "escribiste"
 }

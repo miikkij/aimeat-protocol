@@ -36567,5 +36567,8 @@
   "profile.agents.detail.activity.type.declined": "declined",
   "profile.agents.detail.activity.type.onboarding_passed": "passed a connection step",
   "profile.agents.detail.activity.type.onboarding_failed": "failed a connection step",
-  "profile.agents.detail.activity.type.onboarding_step": "connection step"
+  "profile.agents.detail.activity.type.onboarding_step": "connection step",
+  "profile.memory.cover.lastByAgent": "{who} wrote {title}",
+  "profile.memory.cover.lastByYou": "You wrote {title}",
+  "profile.memory.cover.wroteYou": "wrote"
 }

@@ -11,6 +11,7 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.14.1 -- 2026-11-27 -- The front-page app is named by its manifest name; the row showed its file name.
  *   v1.14.0 -- 2026-11-27 -- A company row says what is inside before it is opened: its description
  *     under the name, the app its address serves by title (or the redirect's host), and who works in
  *     its name (the linked shared place by its name and member count, or only you) with the invoices
@@ -135,7 +136,8 @@ function frontOf(ctx, co, host) {
   const target = co.frontPage?.target || '';
   if (kind === 'app' && target) {
     const app = (ctx.apps || []).find((a) => `${a.owner}/${a.filename}` === target);
-    return app ? (app.name || app.filename) : '';
+    // The app's own name is in its manifest; the file name is only the fallback.
+    return app ? (app.manifest?.name || app.manifest?.title || app.name || app.filename) : '';
   }
   if (kind === 'redirect' && target) return host(target);
   return '';
