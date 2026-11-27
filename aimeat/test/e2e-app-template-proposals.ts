@@ -11,7 +11,7 @@
  * @version-history
  *   v1.3.0 — 2026-11-27 — The recipe a template carries: proposed, read back on both lists and both
  *     gets, kept by an upsert without one, replaced and removed on PATCH /v1/appdev/templates/:id, and
- *     the PATCH refused to an agent, another owner and a caller without a session
+ *     the PATCH taken from the owner's agent and refused to another owner and a caller without a session
  *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   v1.2.1 — 2026-11-15 — Audit M208: after a public agent face and a bound skill, a republish's
  *     next_steps reports agent_face_present true and bound_skills_count 1.
@@ -398,7 +398,7 @@ await test('GET /v1/appdev/pitfalls/index → 400 for an unknown scope, 401 with
 //
 // A template names what the next build starts from: the look, the genre, the frame, the needs, the
 // moments, where the data is kept and the criteria. It is written by the propose MCP tool and the POST
-// route, read back by both lists and both gets, and edited by the owner in person on PATCH.
+// route, read back by both lists and both gets, and replaced or removed on PATCH.
 
 const RECIPE = {
     look: 'kit-mappi', genre: 'genre-workbench', frame: 'tool',
@@ -486,12 +486,14 @@ await test('PATCH /v1/appdev/templates/:id replaces the recipe, and null removes
     assert(missing.status === 404 && missing.body.error?.code === 'NOT_FOUND', `unknown id answered ${missing.status}`);
 });
 
-await test('PATCH /v1/appdev/templates/:id → 403 for an agent, 403 or 404 for another owner, 401 without a session', async () => {
-    await patchRecipe(ownerAToken, RECIPE_ID, { frame: 'tool' });
-    const agent = await patchRecipe(A.restToken, RECIPE_ID, { frame: 'game' });
-    assert(agent.status === 403, `agent token answered ${agent.status}: ${JSON.stringify(agent.body).slice(0, 200)}`);
-    // Another owner in person passes the in-person check and reaches only their own templates, where
-    // this id does not exist: 404, and A's recipe is unchanged (read back below).
+await test('PATCH /v1/appdev/templates/:id: the owner\'s agent may, another owner → 404, no session → 401', async () => {
+    await patchRecipe(ownerAToken, RECIPE_ID, { frame: 'stage' });
+    // The owner's own agent holds memory:write and can already replace the recipe by proposing the
+    // template again, so the PATCH takes it under the guards POST and DELETE have.
+    const agent = await patchRecipe(A.restToken, RECIPE_ID, { frame: 'tool' });
+    assert(agent.status === 200 && agent.body.data?.recipe?.frame === 'tool', `the owner's agent answered ${agent.status}: ${JSON.stringify(agent.body).slice(0, 200)}`);
+    // Another owner reaches only their own templates, where this id does not exist: 404, and A's
+    // recipe is unchanged (read back below).
     const other = await patchRecipe(ownerBToken, RECIPE_ID, { frame: 'game' });
     assert(other.status === 404, `another owner answered ${other.status}`);
     const anon = await patchRecipe(null, RECIPE_ID, { frame: 'game' });

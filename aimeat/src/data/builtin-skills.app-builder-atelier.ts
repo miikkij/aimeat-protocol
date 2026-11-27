@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-27 — Step 4: describe() also answers `use`, and find("<use>") names the components for
+ *     a job (static/sdk-libs/atelier/index.js, aimeat-atelier 0.73.0). No line added.
  *   2026-11-25 — Steps 7 to 9 read the size matrix and the owed items by level from
  *     services/app/publish-finish.ts, the texts the specification, FINISH and the publish answer read;
  *     step 9 now says the data map is owed when the app keeps data, as the refusal reads it.
@@ -499,8 +501,8 @@ changed after you fetched it says so.
    \`<html>\` or \`<body>\`.
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
-   \`{ parts, slots, variants, tokens, fork }\` for the components that have the model, and
-   \`describe()\` lists them; the answer is generated from each component's source and held to
+   \`{ parts, slots, variants, tokens, use, fork }\` for the components that have the model,
+   \`describe()\` lists them and \`find("<use>")\` names the ones for a job; the answer is generated from each component's source and held to
    it by \`pnpm check:atelier-parts\`. The order, stopping at the first that works: a token
    (\`--ak-list-aside-size\` on your own element); a variant (\`variant: "dense"\`); a slot
    (\`extra\`, \`aside\`, \`before\`, \`after\` — the four the kit renders empty); a part selector

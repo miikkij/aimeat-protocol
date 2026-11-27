@@ -90,14 +90,14 @@
       "digest": "sha256:e0fed4d4d196dabda52701b4"
     },
     "node:aimeat-find-my-app": {
-      "reviewedOn": "2026-11-24",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/mcp/apps.ts",
         "aimeat/src/tool-catalog/definitions/apps-publish.ts",
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:d0191a6efa8833d6af810e10"
+      "digest": "sha256:7f2be2ffacd486dbcd2a4ca8"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-15",
@@ -193,12 +193,12 @@
       "digest": "sha256:b9f96b5526e764d31255d42e"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:711694c98c1152fd77a42ff8"
+      "digest": "sha256:2e8882cc5213f17a9198c632"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-22",
@@ -211,14 +211,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-25",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/builder/atelier-prompt.ts",
         "aimeat/src/services/builder/atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:5f1e250bbf04c64da2336564"
+      "digest": "sha256:7e95319589f004d518a5f49e"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -542,7 +542,7 @@
       "digest": "sha256:b5d81d0a5efaeb4ea4bbf922"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:c4cdc65aff27894dc9fad1bb",
+      "digest": "sha256:9d7b396bb88da32f5cea41c4",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -721,7 +721,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "905fba7ed8d0e386",
-      "aimeat/src/services/app/publish-next-steps.ts": "fd3e86be40e263ff"
+      "aimeat/src/services/app/publish-next-steps.ts": "33d61dc97db52021"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
@@ -729,9 +729,9 @@
       "aimeat/src/services/app/spec-gate.ts": "95bb1883f65b8ebb"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "29fc491ce623c41d",
-      "aimeat/src/services/builder/atelier-layers.ts": "f092e049fdd0e7e0",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "ff1edefcea10eb67",
+      "aimeat/src/services/builder/atelier-prompt.ts": "3d1725f03d431fea",
+      "aimeat/src/services/builder/atelier-layers.ts": "de2eb1a20631506d",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "68c0e5a7e6d5edc9",
       "aimeat/src/services/design-book/component.ts": "12d4355f129e437f"
     },
     "node:aimeat-phaser": {
@@ -842,7 +842,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
-      "aimeat/src/services/builder/atelier-prompt.ts": "29fc491ce623c41d",
+      "aimeat/src/services/builder/atelier-prompt.ts": "3d1725f03d431fea",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
       "aimeat/src/services/app/publish.ts": "d60e8864bf0adbe6",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
@@ -1048,7 +1048,7 @@
       "aimeat/src/mcp/apps.ts": "649c0744d606db11",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "b5f0f65b06e21760",
       "aimeat/src/services/usage/usage-read.ts": "84149fb8bd919615",
-      "aimeat/public/views/appcat.js": "07854e20e3e0385c"
+      "aimeat/public/views/appcat.js": "e6f1676f8eef7d07"
     },
     "node:aimeat-ask-someone-who-knows": {
       "aimeat/src/services/help/questions.ts": "48bd731a5654dfa6",

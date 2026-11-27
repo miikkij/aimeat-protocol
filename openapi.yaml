@@ -20465,10 +20465,9 @@ paths:
       operationId: setAppdevTemplateRecipe
       summary: Replace or remove the recipe of one of the owner's templates
       description: >-
-        For the page where the owner edits their own template: `recipe` replaces the stored recipe and
-        null removes it; nothing else in the template changes. The account holder signed in in person
-        only; an agent changes a template by proposing it again (POST /v1/appdev/templates). Written
-        on the record's version and under the owner's memory ceilings.
+        `recipe` replaces the stored recipe and null removes it; nothing else in the template changes.
+        The owner, or an agent of theirs that holds memory:write, as on POST and DELETE. Written on
+        the record's version and under the owner's memory ceilings.
       tags: [Discovery]
       security:
         - BearerAuth: []
@@ -20495,7 +20494,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: ACCESS_DENIED — the caller is not the account holder in person (an agent, an app or a visitor).
+          description: The caller lacks memory:write.
         '404':
           description: NOT_FOUND — the owner has no template with this id.
         '413':

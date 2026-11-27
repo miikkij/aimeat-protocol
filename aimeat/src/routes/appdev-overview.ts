@@ -9,8 +9,8 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
- *   2026-11-27 — PATCH /v1/appdev/templates/:id { recipe | null }: the owner in person replaces or removes
- *     a template's recipe; POST takes `recipe`; GET /v1/appdev/templates/:id answers `how_to_start`, the
+ *   2026-11-27 — PATCH /v1/appdev/templates/:id { recipe | null } replaces or removes a template's
+ *     recipe, under the guards POST and DELETE have; POST takes `recipe`; GET /v1/appdev/templates/:id answers `how_to_start`, the
  *     text aimeat_app_template_get answers (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   2026-11-21 — GET /v1/appdev/overview takes ?areas=, the areas a draft uses, which narrow both pitfall sections.
  *   2026-11-19 — GET /v1/appdev/templates and /:id name the caller as the reader of a genre grown out
@@ -39,7 +39,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev/overview.js';
@@ -60,7 +60,6 @@ import { TemplateRecipeSchema } from '../models/template-recipe.js';
 const ProposeTemplateBody = z.object(zodShapeFor('aimeat_app_template_propose'));
 /** The body PATCH /v1/appdev/templates/:id takes: the recipe the catalog entry validates, or null to remove it. */
 const SetRecipeBody = z.object({ recipe: TemplateRecipeSchema.nullable() }).strict();
-const RECIPE_IN_PERSON = 'Only you, signed in yourself, edit the recipe of your template here. An agent proposes the template again with its recipe.';
 
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -152,16 +151,12 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     }));
   });
 
-  // PATCH /v1/appdev/templates/:id { recipe | null } — the owner replaces or removes the template's
-  // recipe on the page where they edit their own template. The account holder in person only: an
-  // agent changes a template by proposing it again (POST above, aimeat_app_template_propose).
-  router.patch('/v1/appdev/templates/:id', requireAuth(), requireOwnerPrincipal(RECIPE_IN_PERSON), requireScope('memory:write'),
+  // PATCH /v1/appdev/templates/:id { recipe | null } — replace or remove the template's recipe and
+  // change nothing else. The same guards as POST and DELETE: the owner, or an agent of theirs that
+  // holds memory:write, which can already replace the recipe by proposing the template again.
+  router.patch('/v1/appdev/templates/:id', requireAuth(), requireScope('memory:write'),
     rateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
       const caller = callerOf(req, config.nodeId, storage);
-      if (!caller.inPerson) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', RECIPE_IN_PERSON));
-        return;
-      }
       const parsed = SetRecipeBody.safeParse(req.body ?? {});
       if (!parsed.success) {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')));

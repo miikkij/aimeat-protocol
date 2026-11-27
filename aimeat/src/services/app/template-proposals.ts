@@ -182,8 +182,8 @@ export async function proposeTemplate(
 }
 
 /**
- * Replace a template's recipe, or remove it with null, and change nothing else. For the page where the
- * owner edits their own template (PATCH /v1/appdev/templates/:id). Written on the version that was
+ * Replace a template's recipe, or remove it with null, and change nothing else
+ * (PATCH /v1/appdev/templates/:id). Written on the version that was
  * read, and refused by the memory ceilings before it is written, as proposeTemplate is.
  */
 export async function setTemplateRecipe(

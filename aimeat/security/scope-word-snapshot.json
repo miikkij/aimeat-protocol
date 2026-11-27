@@ -1054,6 +1054,7 @@
     "src/routes/appdev-overview.ts:GET:/v1/appdev/overview": ["memory:read"],
     "src/routes/appdev-overview.ts:GET:/v1/appdev/templates": ["memory:read"],
     "src/routes/appdev-overview.ts:GET:/v1/appdev/templates/:id": ["memory:read"],
+    "src/routes/appdev-overview.ts:PATCH:/v1/appdev/templates/:id": ["memory:write"],
     "src/routes/appdev-overview.ts:POST:/v1/appdev/templates": ["memory:write"],
     "src/routes/appdev-pitfalls.ts:DELETE:/v1/appdev/pitfalls/learned/:category/:slug": ["memory:write"],
     "src/routes/appdev-pitfalls.ts:GET:/v1/appdev/pitfalls": [],
