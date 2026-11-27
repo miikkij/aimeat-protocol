@@ -6,6 +6,8 @@
  *   simulation, and per-key effective rules (the UI's sharing-rules popover).
  * @structure permissionsRouter() — GET /v1/permissions/summary, /check, /memory/:key
  * @version-history
+ *   2026-11-27 — GET /v1/permissions/summary counts the memory keys and files over the account (the
+ *     GHII and its agents, as GET /v1/data-wallet does), where it counted the GHII's only.
  *   2026-10-15 — GET /v1/permissions/check takes `key` and `accessor` only as single strings; a
  *     repeated parameter (an array) is refused as missing (CodeQL js/type-confusion-through-parameter-tampering).
  *   2026-10-15 — GET /v1/permissions/check asks authorizeRead, the reads' own guard, as a simulation
@@ -27,6 +29,9 @@ import { success, error } from '../middleware/envelope.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
 import { resolveIdentity, isOwnerInPerson, localAccountName } from '../utils/gaii.js';
+import { accountConsentHolders } from '../services/consent/write.js';
+import { consentHolderOf } from '../services/consent/consent-read.js';
+import { callerOf } from '../middleware/caller.js';
 
 export function permissionsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -56,12 +61,20 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
 
         const byType = countConsentRecipients(consents);
 
-        const memoryKeys = await storage.listMemory(ownerGaii);
-        const storageFiles = await storage.listStorageFiles(ownerGaii);
+        // The keys and files are counted over the account, the person and every agent of it, as GET
+        // /v1/data-wallet counts them (services/db/data-wallet-db-service.ts) and the Memory page lists
+        // them: an agent's records are its owner's own. Counted over the GHII alone, the Data Wallet and
+        // Memory pages gave two numbers for the same data.
+        const holders = await accountConsentHolders(storage, consentHolderOf(callerOf(req, config.nodeId, storage)));
+        const keepers = holders.includes(ownerGaii) ? holders : [ownerGaii];
+        const [memoryKeys, storageFiles] = await Promise.all([
+            storage.countMemory(keepers, { excludeExpired: true }),
+            storage.sumStorageBytesForOwners(keepers),
+        ]);
 
         res.json(success(config.nodeId, {
-            total_memory_keys: memoryKeys.length,
-            total_storage_files: storageFiles.length,
+            total_memory_keys: memoryKeys,
+            total_storage_files: storageFiles.count,
             active_consents: consents.length,
             rules_by_recipient_type: byType,
             data_patterns: [...new Set(consents.map(c => c.dataPattern))],

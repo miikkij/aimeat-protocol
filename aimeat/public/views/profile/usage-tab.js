@@ -29,6 +29,9 @@
  *   (PageStart id "usage") gives the prompt that has one's own AI read the same reports.
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- The report is a Select (eight tab buttons stood beside the period's
+ *     three); money is js/format.js money (two decimals, four under a cent: "$0.0000" became
+ *     "0,00 $"); a day report's rows and chart show the reader's date under the head "Day".
  *   v1.12.0 -- 2026-11-27 -- The figures stand under the head (SettingsPage strip), before the report
  *     bar: where things stand comes before the controls that choose a report. With nothing recorded
  *     for the chosen report and window the strip is not drawn and the table's one empty line, now
@@ -74,6 +77,8 @@ import { List, Row, Name, Num } from '/components/List.js';
 import { Row as Line, Space } from '/components/Layout.js';
 import { PageStart } from '/components/PageStart.js';
 import { HelpLabel } from '/components/HelpTip.js';
+import { Select } from '/components/Select.js';
+import { money, date as fmtDate } from '/js/format.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -99,11 +104,14 @@ function getRange(period) {
   return { from: back(days), to: fmt(today) };
 }
 
-/** Small amounts need four decimals to be a number at all; large ones do not. */
+/** Money in the reader's own format: two decimals, four only for an amount under a cent
+ *  (js/format.js money); "$0.0000" stood for nothing spent. */
 function usd(n) {
-  const v = Number(n) || 0;
-  return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2));
+  return money(Number(n) || 0, 'USD');
 }
+
+/** A day report's key is an ISO day (2026-11-20): written as the reader writes a date. */
+const dayOf = (key) => (/^\d{4}-\d{2}-\d{2}$/.test(String(key)) ? fmtDate(`${key}T12:00:00`) : key);
 
 function compact(n) {
   const v = Number(n) || 0;
@@ -163,7 +171,7 @@ export default function UsageTab() {
     <${Space} below="large">
       <${UsageChart}
         type="bar"
-        labels=${series.map(s => s.bucket)}
+        labels=${series.map(s => dayOf(s.bucket))}
         datasets=${[{
           label: current.kind === 'spend' ? t('profile.usage.statCost') : t('profile.usage.statCalls'),
           data: series.map(s => (current.kind === 'spend' ? s.cost_usd : s.calls)),
@@ -201,7 +209,7 @@ export default function UsageTab() {
 
   // A column head: its words, and the explanation it opens when it has one.
   const headers = current.kind === 'spend'
-    ? [{ label: t('profile.usage.colName') }, { label: t('profile.usage.statCost') }, { label: t('profile.usage.statTokens') }, { label: t('profile.usage.statCalls') }]
+    ? [{ label: report === 'day' ? t('profile.usage.colDay') : t('profile.usage.colName') }, { label: t('profile.usage.statCost') }, { label: t('profile.usage.statTokens') }, { label: t('profile.usage.statCalls') }]
     : [
         { label: t('profile.usage.colName') },
         { label: t('profile.usage.statCalls') },
@@ -216,7 +224,7 @@ export default function UsageTab() {
   const troubled = (g) => ((Number(g.refusals) || 0) + (Number(g.errors) || 0) > 0 ? 0 : 1);
   const ordered = current.kind === 'spend' ? groups : [...groups].sort((a, b) => troubled(a) - troubled(b));
   const rows = ordered.map(g => (current.kind === 'spend'
-    ? [g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
+    ? [report === 'day' ? dayOf(g.key) : g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
     : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg),
         // A row with no measured answer (a web request, a call from before the measurement) stays empty.
         ...(withAnswerSize ? [g.answer_chars_max ? compact(g.answer_chars_max) : ''] : [])]));
@@ -227,12 +235,12 @@ export default function UsageTab() {
     .replace('{report}', t(current.label))
     .replace('{days}', t(`profile.usage.period${period}`));
 
-  // The report bar and the time window: each chooses one, the chosen one on the sun. The report
-  // bar wraps (eight long labels do not fit one line on a phone); the two stand apart in one row.
+  // The report and the time window: the report is one Select (eight buttons stood in a wall beside
+  // the three of the window), the window a tab row with the chosen one on the sun.
   const controls = html`
-    <${Line} wrap align="start" justify="between" gap="medium" below="large">
-      <${Tabs} tone="filter" label=${t('profile.usage.reportGroupLabel')} value=${report} onSelect=${setReport}
-        items=${REPORTS.map(r => ({ value: r.id, label: t(r.label) }))} />
+    <${Line} wrap align="center" justify="between" gap="medium" below="large">
+      <${Select} fit ariaLabel=${t('profile.usage.reportGroupLabel')} value=${report} onChange=${setReport}
+        options=${REPORTS.map(r => [r.id, t(r.label)])} />
       <${Tabs} tone="filter" label=${t('profile.usage.periodGroupLabel')} value=${period} onSelect=${setPeriod}
         items=${PERIODS.map(p => ({ value: p, label: t(`profile.usage.period${p}`) }))} />
     <//>`;

@@ -16,6 +16,8 @@
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v2.3.1 -- 2026-11-27 -- The strip's word agrees with its number (tn: "1 yhdistetty tekoäly"); the
+ *     head's grey subtitle, which repeated section 01's name, is gone.
  *   v2.3.0 -- 2026-11-27 -- Usability pass on the person's three situations: nothing connected draws only
  *     the connect section (no strip of "0 / Not yet / On", no head marks, no competing actions); connected
  *     draws the list first, the strip without the suggestions figure (its state is the suggestions row) and
@@ -56,7 +58,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -97,7 +99,7 @@ export function renderPage(ctx) {
   // No strip while nothing is connected: "0 / Not yet / –" said nothing the connect section does not.
   // The suggestions figure is gone: its state is the suggestions row's own line.
   const strip = loading ? html`<${FigureStrip} loading=${3} />` : !connected ? null : html`<${FigureStrip} items=${[
-    { key: 'ais', n: live.length, label: m('stripAis'), sub: live.length ? live.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
+    { key: 'ais', n: live.length, label: tn('mcppage.stripAis', live.length), sub: live.length ? live.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
     { key: 'proof', n: proven ? m('stripProven') : m('stripNotYet'), tone: 'coral', label: proven ? m('stripProofOk') : m('stripProofPending'), sub: proven ? m('stripProvenSub', { date: day(provenAt) }) : m('stripNotYetSub') },
     { key: 'last', n: latest ? rel(latest.when) : '–', label: m('stripLast'), sub: latest ? `${latest.tool} · ${latest.name}` : m('stripLastNone') },
     gone.length ? { key: 'gone', n: gone.length, tone: 'notice', label: m('stripGone'), sub: m('stripGoneSub') } : null,
@@ -127,7 +129,7 @@ export function renderPage(ctx) {
   const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
 
   return html`
-    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} help="concept.connect"
+    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} help="concept.connect"
       desc=${`${m('desc')} ${proven ? m('descProven') : m('descNew')}`} actions=${actions} strip=${strip}
       start=${html`<${PageStart} id="mcp" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${ctx.proof || outside ? proven : null}
         action=${{ onClick: () => openConnect(true) }} />`}

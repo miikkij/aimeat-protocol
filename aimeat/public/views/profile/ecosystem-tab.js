@@ -12,6 +12,8 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.30.0 -- 2026-11-27 -- The connected apps' list has a head row, and a row's end says "Open" or
+ *     "Close" with the chevron (List RowOpen) instead of the mark alone.
  *   v3.29.1 -- 2026-11-27 -- An app row's open mark draws the Chevron (down while open, right while closed) instead of ▼ ▶.
  *   v3.29.0 -- 2026-11-27 -- With nothing connected and nothing waiting the strip is not drawn (FigureStrip hideZeros) and the list says in one empty line how an app gets here (it replaces the two empty notes); an app that waits comes first in the list and a disconnected one last; the one-entry contents rail goes.
  *   v3.28.0 -- 2026-11-27 -- The page leads with where things stand: a figure strip (connected apps, requests that wait, when an app was last here) from the lists it already reads, then the apps as section 01 (eco-apps) with the contents rail. Approving a waiting request is the page's one loud action; the emoji before an app's name goes (no emoji in the interface). No control was removed.
@@ -173,9 +175,9 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { PageSection } from '/components/PageSection.js';
 import { PageStart } from '/components/PageStart.js';
-import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { List, Row, Name, Desc, Doors, RowOpen } from '/components/List.js';
 import { Folds } from '/components/Folds.js';
-import { Action, Loud, Icon, Actions, Chevron } from '/components/Action.js';
+import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Select } from '/components/Select.js';
@@ -379,7 +381,8 @@ export default function EcosystemTab({ onStats, showToast }) {
             the list's one empty line says how an app gets here. The page has one section, so no
             contents rail. */''}
       <${PageSection} id="eco-apps" num="01" first title=${x('secApps')} count=${apps.length}>
-      <${List} cols="name-desc-doors" empty=${x('emptyLine')}>${byAttention(apps).map(app => {
+      <${List} cols="name-desc-doors" empty=${x('emptyLine')}
+        head=${apps.length ? [x('colApp'), x('colConnected'), x('colState')] : null}>${byAttention(apps).map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
@@ -423,7 +426,7 @@ export default function EcosystemTab({ onStats, showToast }) {
               <${Doors}>
                 <${Mark} kind="status" tone=${appStatusTone(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}<//>
                 <${Mark} kind="time">${app.last_seen ? timeAgo(app.last_seen) : ''}<//>
-                <${Icon} small><${Chevron} down=${isOpen} /><//>
+                <${RowOpen} open=${isOpen} />
               <//>
             <//>`;
         })}<//>

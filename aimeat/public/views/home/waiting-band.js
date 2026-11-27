@@ -23,6 +23,8 @@
  *   moreThanShown(data) · moreWords(n) · GROUPS
  * @usage html`<${WaitingBand} data=${data} navigate=${ctx?.navigate} />` (views/surface/blocks-home.js)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The count stands in the heading (a count Mark); the state bar under it that
+ *     said the heading again ("9 things wait for you") is drawn only when nothing waits.
  *   v1.1.0 — 2026-11-26 — Two kinds more: an organism's approvals the person can decide and a request to
  *     join an organism they run. The rows moved to WaitingRows, which the Settings overview draws too,
  *     so the home and the overview show one list; the band looks as before.
@@ -40,6 +42,7 @@ import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { HelpTip } from '/components/HelpTip.js';
+import { Mark } from '/components/Mark.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const fill = (text, values) => Object.entries(values).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v ?? '')), text);
@@ -222,9 +225,11 @@ export function WaitingBand({ data, navigate }) {
   const more = moreThanShown(data);
   const title = tr('home.waiting.title', 'Waiting for you');
 
+  // The count stands in the heading; the state bar under it said the heading again ("9 things wait
+  // for you" under "Waiting for you"), so it is drawn only when nothing waits, as the empty line.
   return html`
-    <${Band} title=${html`${title} <${HelpTip} term="home.waiting" label=${title} />`}>
-      <${Note} kind="state" tone=${total ? 'attention' : 'fine'}>${leadOf(total, data.to_open ?? 0)}<//>
+    <${Band} title=${html`${title}${total ? html` <${Mark} kind="count">${total}<//>` : ''} <${HelpTip} term="home.waiting" label=${title} />`}>
+      ${total ? null : html`<${Note} kind="state" tone="fine">${leadOf(total, data.to_open ?? 0)}<//>`}
       <${WaitingRows} data=${data} navigate=${navigate} />
       ${more > 0 && html`<${BandNote}>${moreWords(more)}<//>`}
       ${(data.partial ?? []).length > 0 && html`<${Note} kind="quiet">${tr('home.waiting.partial', 'A part of the list could not be read just now.')}<//>`}

@@ -8,6 +8,7 @@
  *
  * @structure
  *   - agentLabel / byAgentLabel / sortAgents: the name a person sees, and the alphabetical order by it
+ *   - agentNeedsAttention / SIGN_IN_ATTENTION: whether an agent needs the person's look
  *   - listAgents / deleteAgent / updateAgentScopes / setMaxConcurrentTasks: agent CRUD + config
  *   - getAgentCors / setAgentCors: per-agent CORS origins
  *   - offersWorkspaceContract / contractNamesOf / adoptContractTask / getAgentEngagements: workspace-contract tags
@@ -17,6 +18,8 @@
  *   - isOwnerStartedAgent / listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
  *
  * @version-history
+ *   v1.4.0 — 2026-11-27 — agentNeedsAttention and SIGN_IN_ATTENTION: the one rule for an agent that needs
+ *     a look, which the Agents page and the fleet page both count with.
  *   v1.3.0 — 2026-10-19 — listAgents returns the agents in alphabetical order of the name a person
  *     sees (sortAgents, byAgentLabel, agentLabel), so every agent list and picker that reads it is
  *     in that order (wish-agenttilistat-aakkosj-rjestykseen).
@@ -59,6 +62,21 @@ export const byAgentLabel = (a, b) => compare(agentLabel(a), agentLabel(b));
  * the caller's array. A view whose order means something else (newest first, last seen) sorts again.
  */
 export const sortAgents = (list) => (Array.isArray(list) ? [...list].sort(byAgentLabel) : []);
+
+/** The sign-in states (GET /v1/agents?include=credentials, `credential.state`) that leave an agent unable to sign in, or soon. */
+export const SIGN_IN_ATTENTION = new Set(['dead', 'expiring', 'never', 'unreadable']);
+
+/**
+ * Whether an agent needs the person's look: its sign-in cannot work (or runs out soon), the node's
+ * verdict is a problem (`health.state`), or the node refused it a permission it still lacks
+ * (`refusals`). One rule for the Agents page and the fleet page, which counted different halves of it
+ * and gave two numbers for the same agents. The sign-in half needs `include=credentials`.
+ */
+export function agentNeedsAttention(a) {
+  return SIGN_IN_ATTENTION.has(a?.credential?.state)
+    || a?.health?.state === 'problem'
+    || (Array.isArray(a?.refusals) && a.refusals.length > 0);
+}
 
 /** Workspace-contract advertising via agent tags (this convention is dot-based so 'contract.<name>'
  *  parses by prefix; the server tag pattern is [a-z0-9._:-], colons allowed, no '@'): the tag

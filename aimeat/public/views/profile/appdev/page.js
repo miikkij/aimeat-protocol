@@ -15,6 +15,7 @@
  * @structure renderPage · secStart · secLearned · secProposals · secCurated
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- The filter rows are drawn only over more than ten pitfalls (Filters total).
  *   v2.2.0 -- 2026-11-27 -- Usability pass: the pitfalls the agents filed are the main thing, first and
  *     open (most severe first, appdev-tab.js); the template proposals are drawn only when there are
  *     some; the two prompts ("The start") and the platform's own registry are rows that open in place
@@ -197,14 +198,14 @@ function secLearned(ctx, nr, none) {
     <${Section} id="ad-learned" num=${nr} title=${a('secLearned')} count=${L ? filed : null} first>
       ${none ? html`<${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${a('learnedEmptyHead')}</b> ${a('learnedEmptyBody')}<//>`} />`
         : !L ? html`<${List} loading=${t('common.loading')} />` : html`
-        <${Filters}>
+        <${Filters} total=${filed + (L.community || 0)}>
           ${facet(!F.severity && F.status === 'active' && F.shared === undefined, a('facetAll'), scope.status?.active || 0, () => ctx.setFilters({ severity: '', status: 'active', shared: undefined }), 'all')}
           ${['critical', 'warn', 'info'].map((s) => facet(F.severity === s, a('facet.' + s), scope.severity?.[s] || 0, () => ctx.setFilters({ severity: F.severity === s ? '' : s }), s))}
           ${facet(F.shared === false, a('facetPrivate'), scope.shared?.private || 0, () => ctx.setFilters({ shared: F.shared === false ? undefined : false }), 'private')}
           ${facet(F.status === 'outdated', a('facetOutdated'), scope.status?.outdated || 0, () => ctx.setFilters({ status: F.status === 'outdated' ? 'active' : 'outdated' }), 'outdated')}
           ${L.community || F.includeShared ? facet(!!F.includeShared, a('communityMark'), L.community, () => ctx.setFilters({ includeShared: !F.includeShared }), 'community') : null}
         <//>
-        <${Filters}>
+        <${Filters} total=${filed + (L.community || 0)}>
           ${shownAreas.map(([k, n]) => facet(F.category === k, areaLabel(k), n, () => ctx.setFilters({ category: F.category === k ? '' : k }), 'c' + k))}
           ${areas.length > 7 && !ctx.allAreas ? html`<${Action} tone="more" onClick=${() => ctx.setAllAreas(true)}>${a('moreAreas', { n: areas.length - 7 })}<//>` : null}
           ${models.map(([k, n]) => facet(F.model === k, k, n, () => ctx.setFilters({ model: F.model === k ? '' : k }), 'm' + k))}
@@ -247,7 +248,7 @@ function secCurated(ctx, nr, none, open) {
     <${Section} fold id="ad-curated" num=${nr} title=${a('secCurated')} sub=${S ? a('curatedSub', { n: S.total }) : ''} open=${open} onToggle=${() => ctx.setFold('curated', !open)}>
       ${S && !C ? html`<${Actions}><${Action} small soft disabled=${ctx.busy === 'curated'} onClick=${ctx.loadCurated}>${a('showRows', { n: S.total })}<//><//>` : null}
       ${!S ? html`<${List} loading=${t('common.loading')} />` : html`
-        <${Filters}>
+        <${Filters} total=${S.total}>
           ${facet(!F.severity, a('facetAll'), S.total, () => ctx.setCuratedFilter({ severity: '' }), 'all')}
           ${['critical', 'warn', 'info'].map((s) => facet(F.severity === s, a('facet.' + s), S.facets?.severity?.[s] || 0, () => ctx.setCuratedFilter({ severity: F.severity === s ? '' : s }), s))}
           ${areas.map(([k, n]) => facet(F.area === k, areaLabel(k), n, () => ctx.setCuratedFilter({ area: F.area === k ? '' : k }), 'c' + k))}

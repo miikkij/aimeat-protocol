@@ -26,6 +26,7 @@
  * @structure useContentClasses() → content · contentCount(content) · secContentClasses(ctx, num)
  * @usage const content = useContentClasses({ federated, confirm, toast }); … secContentClasses({ ...ctx, content }, '06')
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The section is one of the page's closed rows (foldOf), its state words the row's.
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  */
 import { h } from 'preact';
@@ -47,7 +48,7 @@ import { Check } from '/components/Check.js';
 import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { openTab } from '/components/Rail.js';
-import { n } from './frame.js';
+import { n, foldOf } from './frame.js';
 import {
   cc, classLabel, itemRow, readOverview, readLatest, readClasses, readProposals, decideProposal, startScan, readScan,
   saveSettings, readRules, downloadOntology,
@@ -277,7 +278,7 @@ export function secContentClasses(ctx, num) {
   const content = ctx.content;
   const o = content.ov;
   return html`
-    <${Section} id="dw-content" num=${num} title=${cc('title')} count=${contentCount(content)}>
+    <${Section} ...${foldOf(ctx, 'dw-content')} id="dw-content" num=${num} title=${cc('title')} sub=${contentCount(content)}>
       <${Note} kind="lead">${cc('lead')}<//>
       ${!o ? (content.failed ? html`<${Note} kind="quiet">${cc('loadFailed')}<//>` : html`<${Note} kind="loading">${t('dwpage.loading')}<//>`)
       : o.off ? html`<${Note} kind="quiet">${cc('off')}<//>`

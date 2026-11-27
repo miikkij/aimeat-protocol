@@ -86,7 +86,7 @@
         ] },
         { "id": "workflows", "labelKey": "profile.tabs.workflows", "sections": [
           { "id": "wp-waiting", "num": "01", "labelKey": "profile.workflows.cover.secWaiting" },
-          { "id": "wp-list", "num": "02", "labelKey": "profile.workflows.title" },
+          { "id": "wp-list", "num": "02", "labelKey": "profile.workflows.cover.secList" },
           { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" }
         ] },
         { "id": "receivers", "labelKey": "profile.tabs.receivers", "sections": [
@@ -308,7 +308,7 @@
           { "id": "fd-peers", "num": "01", "labelKey": "profile.federation.peers" }
         ] },
         { "id": "nodes", "labelKey": "profile.tabs.nodes", "sections": [
-          { "id": "pn-servers", "num": "", "labelKey": "profile.nodes.title" }
+          { "id": "pn-servers", "num": "", "labelKey": "profile.nodes.secRegistered" }
         ] },
         { "id": "security", "labelKey": "profile.tabs.security", "sections": [
           { "id": "sec-own", "num": "01", "labelKey": "profile.security.ghiiTitle" },

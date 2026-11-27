@@ -17,6 +17,11 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.37.0 -- 2026-11-27 -- Usability round 3: Mine stays open; the shared places, files, what has
+ *     happened, stale and who else sees are closed rows whose words say their state (ctx.memFolds), and
+ *     the rail and the stale figure open a row before they scroll; a section's doors stand inside its
+ *     body. The choice of whose memory is read is a labelled field in Mine (agentPick) instead of a bare
+ *     drop-down among the head's tags.
  *   v1.36.2 -- 2026-11-27 -- The files list and the who-else-sees list carry a head row (file, size; key,
  *     visibility), as every list of columns on a Settings page does.
  *   v1.36.1 -- 2026-11-27 -- The last change and the change list bend the verb to the writer: Finnish
@@ -417,13 +422,17 @@ function renderCover(ctx) {
   const filesCount = ctx.filesTotal ?? (files || []).length;
   const hasAny = store.total > 0 || filesCount > 0;
   const draws = { org: memReady && cls.org.length > 0, sys: memReady && cls.sys.length > 0, rest: memReady && hasAny };
+  // Mine stays open; every other section is one closed row whose words say its state (usability
+  // round 3), opened by the person (ctx.memFolds, memory-tab.js) or by the rail and a door that point in.
+  const fold = (id) => ({ fold: true, open: !!ctx.memFolds?.[id], onToggle: () => ctx.toggleMemFold(id) });
+  const opens = (id) => () => ctx.openMemFold(id);
   const nOwn = sec('mp-own', c('own', 'Mine'), ownCount);
-  const nOrg = draws.org ? sec('mp-org', c('orgs', 'Shared places’'), orgCount, undefined, true) : null;
+  const nOrg = draws.org ? sec('mp-org', c('orgs', 'Shared places’'), orgCount, opens('mp-org'), true) : null;
   const nSys = draws.sys ? sec('mp-sys', c('sys', 'System records'), sysCount, () => setSysOpen(true), true) : null;
-  const nFiles = draws.rest ? sec('mp-files', c('files', 'Files'), filesCount) : null;
-  const nHist = draws.rest ? sec('mp-history', c('happened', 'What has happened'), '→') : null;
-  const nStale = draws.rest ? sec('mp-stale', c('stale', 'Stale'), stale.count, undefined, true) : null;
-  const nSeen = draws.rest ? sec('mp-seen', c('seen', 'Who else sees'), seenRows.length) : null;
+  const nFiles = draws.rest ? sec('mp-files', c('files', 'Files'), filesCount, opens('mp-files')) : null;
+  const nHist = draws.rest ? sec('mp-history', c('happened', 'What has happened'), '→', opens('mp-history')) : null;
+  const nStale = draws.rest ? sec('mp-stale', c('stale', 'Stale'), stale.count, opens('mp-stale'), true) : null;
+  const nSeen = draws.rest ? sec('mp-seen', c('seen', 'Who else sees'), seenRows.length, opens('mp-seen')) : null;
 
   const search = () => runServerSearch(searchInput, ctx.searchScopePrefix);
   const searchRow = (showSearch || searchResults !== null) ? html`
@@ -441,14 +450,16 @@ function renderCover(ctx) {
 
   // The count of keys and their size are the strip's first two figures; the head's marks no longer
   // repeat them.
+  // One agent: its name, dim (it chooses nothing). Several: the choice of whose memory is read is a
+  // labelled field in Mine, the section it narrows (agentPick), not a bare drop-down in the head.
   const marks = [
     changedToday ? { label: c('changedToday', '{n} changed today').replace('{n}', String(changedToday)), tone: 'sun' } : null,
-    // Several agents: the drop-down that chooses whose memory is read. One: its name, dim (it chooses nothing).
-    agents.length > 1
-      ? html`<${Select} key="agent" fit value=${selectedAgent} onChange=${(v) => setSelectedAgent(v)} ariaLabel=${t('profile.memory.agent') || 'Agent'}
-          placeholder=${t('profile.memory.defaultAgent') || 'Default agent'} options=${agents.map(a => [a.gaii, agentLabel(a)])} />`
-      : { label: agentName, tone: 'dim' },
+    agents.length > 1 ? null : { label: agentName, tone: 'dim' },
   ];
+  const agentPick = agents.length > 1
+    ? html`<${Select} label=${c('whoseMemory', 'Whose memory')} value=${selectedAgent} onChange=${(v) => setSelectedAgent(v)}
+        placeholder=${c('everyone', 'You and all your agents')} options=${agents.map(a => [a.gaii, agentLabel(a)])} />`
+    : null;
   const actions = html`
     <${Loud} onClick=${() => setShowSearch(true)}>${c('searchSlab', 'Search memory')}<//>
     <${Actions}>
@@ -463,7 +474,7 @@ function renderCover(ctx) {
       // Stale keys wait for the person's decision (keep or delete): the one figure in the notice tone,
       // and a press goes to them.
       { key: 'stale', n: stale.count, tone: stale.count ? 'notice' : undefined, label: c('figStale', 'stale'), sub: c('figStaleSub', 'not changed in 90 days'),
-        onClick: stale.count && draws.rest ? () => scrollToSection('mp-stale') : undefined },
+        onClick: stale.count && draws.rest ? () => { ctx.openMemFold('mp-stale'); setTimeout(() => scrollToSection('mp-stale'), 30); } : undefined },
       { key: 'last', n: last ? formatRelativeTime(last.updated_at || last.created_at) : '·', tone: last ? 'coral' : undefined, label: c('figLast', 'last change'),
         // One sentence per writer, so each language can bend the verb ("sinä kirjoitti" was wrong in Finnish).
         sub: last ? (agentOf(last.owner_gaii)
@@ -487,12 +498,13 @@ function renderCover(ctx) {
       ${resultRows}
       <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${ownCount}
         doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}<//>`}>
+        ${agentPick}
         ${!memReady ? memPending : cls.own.length ? spaceTable(ctx, cls.own, { id: 'own' }) : html`<${Note} kind="quiet">${c('emptyOwn', 'Nothing of your own is stored yet. Your AI writes here when you ask it to remember something, or you write the first entry yourself with + New entry above.')}<//>`}
         ${cls.own.length ? html`<${Note} kind="hint">${c('spaceHint', 'A key space is the first part of a key: document/pitch-2026 belongs to document. It is the unit that is shared, exported and cleaned.')}<//>` : null}
       <//>
 
-      ${draws.org ? html`<${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Shared places’')} count=${orgCount}
-        doors=${html`<${Action} small soft onClick=${() => openTab('organisms')}>${t('organisms.title') || 'Shared places'} →<//>`}>
+      ${draws.org ? html`<${Section} ...${fold('mp-org')} id="mp-org" num=${nOrg} title=${c('orgs', 'Shared places’')} sub=${keysN(orgCount)}>
+        <${Actions}><${Action} small soft onClick=${() => openTab('organisms')}>${t('organisms.title') || 'Shared places'} →<//><//>
         ${spaceTable(ctx, cls.org, { id: 'org' })}
         <${Note} kind="hint">${c('orgHint', 'What you or your agents wrote in a shared place is stored in your memory. It is managed on the shared place’s page; here it shows so you know what you own and how much it takes.')}<//>
       <//>` : null}
@@ -502,16 +514,17 @@ function renderCover(ctx) {
         ${spaceTable(ctx, cls.sys, { head: false, id: 'sys' })}
       <//>` : null}
 
-      ${draws.rest ? html`<${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${filesCount}
-        doors=${html`<${Action} small onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollToSection('mp-files'), 30); }}>${c('upload', 'Upload a file')}<//>`}>
+      ${draws.rest ? html`<${Section} ...${fold('mp-files')} id="mp-files" num=${nFiles} title=${c('files', 'Files')} sub=${tn('profile.memory.cover.filesN', filesCount)}>
+        <${Actions}><${Action} small onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollToSection('mp-files'), 30); }}>${c('upload', 'Upload a file')}<//><//>
         ${files ? fileRows(ctx, files) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
         ${files && files.length < filesCount ? html`<${More} disabled=${ctx.filesMoreLoading}
           label=${ctx.filesMoreLoading ? (t('common.loading') || 'Loading…') : c('showMoreFiles', 'show {n} more').replace('{n}', String(Math.min(FILES_MORE, filesCount - files.length)))}
           onMore=${() => ctx.loadMoreFiles()} />` : null}
       <//>` : null}
 
-      ${draws.rest ? html`<${Section} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
-        doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')} →<//>`}>
+      ${draws.rest ? html`<${Section} ...${fold('mp-history')} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
+        sub=${changedToday ? c('changedToday', '{n} changed today').replace('{n}', String(changedToday)) : last ? c('lastChange', 'last change {when}').replace('{when}', formatRelativeTime(last.updated_at || last.created_at)) : null}>
+        <${Actions}><${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')} →<//><//>
         ${recent.length ? html`<${Folds}>${recent.map(m => {
           // The record by its title when the page has read one; its key is the name only until then.
           const title = ctx.titleFor?.(m);
@@ -521,7 +534,7 @@ function renderCover(ctx) {
         })}<//>` : none()}
       <//>` : null}
 
-      ${draws.rest ? html`<${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.count}>
+      ${draws.rest ? html`<${Section} ...${fold('mp-stale')} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} sub=${keysN(stale.count)}>
         <${Note} kind="hint">${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}<//>
         <${List} cols="key-doors" keepCols empty=${memReady ? c('noStale', 'Nothing has gone stale.') : null}>${shownStale.map(m => html`
           <${ListRow} key=${m.key}>
@@ -534,8 +547,14 @@ function renderCover(ctx) {
         ${stale.count > 8 && !staleAll ? html`<${More} label=${c('showAll', 'show all {n}').replace('{n}', String(stale.count))} onMore=${() => setStaleAll(true)} />` : null}
       <//>` : null}
 
-      ${draws.rest ? html`<${Section} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
-        doors=${html`<${Action} small soft onClick=${() => openTab('access')}>${t('profile.tabs.access') || 'Access'} →<//>`}>
+      ${draws.rest ? html`<${Section} ...${fold('mp-seen')} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')}
+        sub=${seenRows.length ? [
+          store.publicCount ? tn('profile.memory.cover.publicKeys', store.publicCount) : null,
+          store.membersCount ? tn('profile.memory.cover.membersKeys', store.membersCount) : null,
+          (shares || []).length ? tn('profile.memory.cover.sharesN', shares.length) : null,
+          fedKeys.length ? tn('profile.memory.cover.fedKeys', fedKeys.length) : null,
+        ].filter(Boolean).join(' · ') : c('seenNone', 'only you and your agents')}>
+        <${Actions}><${Action} small soft onClick=${() => openTab('access')}>${t('profile.tabs.access') || 'Access'} →<//><//>
         <${List} cols="name-kind-doors" keepCols head=${seenRows.length ? [c('colKey', 'Key'), c('colVisibility', 'Visibility'), ''] : null} empty=${c('none', 'Nobody but you and your agents.')}>${seenRows}<//>
       <//>` : null}
     <//>`;

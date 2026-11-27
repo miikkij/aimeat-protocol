@@ -10,6 +10,9 @@
  * @structure renderList · listRow
  * @usage import { renderList } from './list.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- The new calibration's name field and its loud action stand in section 01
+ *     under the rows, with a label (calpage.newNameLabel); in the head the field stood beside a pale
+ *     disabled button.
  *   v2.2.0 -- 2026-11-27 -- Settings usability pass: the calibrations are section 01 (cal-list) beside
  *     the contents rail, with Show archived as the section's quiet action. A figure strip under the
  *     head says how many calibrations are in use, the mean of their latest scores, how many runs
@@ -63,8 +66,10 @@ export function renderList(ctx) {
   const archived = all.filter((p) => p.status === 'archived');
   const shown = ctx.showArchived ? all : live;
   const scored = live.filter((p) => p.latestAvgScore != null);
-  const actions = html`
-    <${TextField} value=${ctx.newName} placeholder=${x('newPlaceholder')} ariaLabel=${x('newName')} onInput=${(v) => ctx.setNewName(v)} onEnter=${() => ctx.createProject()}
+  // A new calibration's name is a field in the list's section, under the rows it joins; in the page's
+  // head it stood beside a pale disabled button before a word was typed.
+  const create = html`
+    <${TextField} label=${x('newNameLabel')} value=${ctx.newName} placeholder=${x('newPlaceholder')} onInput=${(v) => ctx.setNewName(v)} onEnter=${() => ctx.createProject()}
       actions=${html`<${Loud} control disabled=${ctx.busy === 'create' || !ctx.newName.trim()} onClick=${() => ctx.createProject()}>${x('newCalibration')}<//>`} />`;
   // The start: folded once there is a calibration. Its first step is in the person's own AI, which
   // helps write the prompt and the target output; over MCP it also has the aimeat_calibrator tool
@@ -72,7 +77,7 @@ export function renderList(ctx) {
   const start = html`<${PageStart} id="calibrator" done=${ctx.projects ? all.length > 0 : null} />`;
   return html`
     <${SettingsPage} crumb=${crumb()} title=${t('profile.calibrator.tabLabel')} sub=${x('titleSub')} help="concept.calibration" desc=${x('listDesc')}
-      actions=${actions} start=${start} strip=${listStrip(ctx.projects, live, archived, scored)}
+      start=${start} strip=${listStrip(ctx.projects, live, archived, scored)}
       railTitle=${x('railTitle')} pagesLabel=${x('pages')} pages=${pageLinks()}>
       <${Section} id="cal-list" num="01" title=${x('secList')} count=${ctx.projects ? shown.length : undefined} first
         doors=${archived.length ? html`<${Action} tone="more" onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}<//>` : null}>
@@ -81,6 +86,7 @@ export function renderList(ctx) {
           empty=${html`<${Note} kind="quiet"><b>${x('emptyLead')}</b> ${x('emptyBody')}<//>`}>
           ${firstNeeded(shown).map((p) => listRow(ctx, p))}
         <//>
+        ${create}
         <${Note}>${x('listHint')}<//>
       <//>
     <//>`;

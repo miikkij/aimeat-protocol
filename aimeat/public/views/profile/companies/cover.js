@@ -11,6 +11,7 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.14.2 -- 2026-11-27 -- The strip's words agree with their number (tn: "2 yritystä", "0 laskua").
  *   v1.14.1 -- 2026-11-27 -- The front-page app is named by its manifest name; the row showed its file name.
  *   v1.14.0 -- 2026-11-27 -- A company row says what is inside before it is opened: its description
  *     under the name, the app its address serves by title (or the redirect's host), and who works in
@@ -83,13 +84,14 @@ export function renderCover(ctx) {
 
   // hideZeros: with no company the strip is not drawn, and the list's one line says what fills it.
   const strip = !ctx.loaded ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} hideZeros items=${[
-    { key: 'companies', n: rows.length, label: c('stripCompanies'), sub: rows.length ? rows.map((r) => r.co.name).join(' · ') : c('stripNone') },
+    { key: 'companies', n: rows.length, label: tn('companypage.stripCompanies', rows.length), sub: rows.length ? rows.map((r) => r.co.name).join(' · ') : c('stripNone') },
     worst
       ? { key: 'facts', n: `${worst.facts.done}/${worst.facts.total}`, tone: worst.facts.done < worst.facts.total ? 'notice' : undefined, label: c('stripFacts'),
         sub: worst.facts.missing.length ? c('stripFactsMissing', { list: worst.facts.missing.slice(0, 2).map(([w]) => t('profile.companies.field.' + w)).join(', ') }) : c('stripFactsDone') }
       : { key: 'facts', n: '·', label: c('stripFacts'), sub: c('stripNone') },
-    { key: 'inv', n: inv, label: c('stripInvoices'), sub: c('stripInvoicesSub') },
-    { key: 'sent', n: sent, label: c('stripSent'), sub: c('stripSentSub') },
+    // The words agree with their number (tn): "2 yritystä", "0 laskua", "1 lähetetty sähköposti".
+    { key: 'inv', n: inv, label: tn('companypage.stripInvoices', inv), sub: c('stripInvoicesSub') },
+    { key: 'sent', n: sent, label: tn('companypage.stripSent', sent), sub: c('stripSentSub') },
   ]} />`;
 
   // The register form opens in place: it is open while there is no company, a row after that.

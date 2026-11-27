@@ -26,6 +26,9 @@
  * @usage Registered in views/profile.js TABS as { id: 'storage', key: 'profile.tabs.storage' }; menu
  *   entry in landing-page.cards.js (the Account group, after Data Wallet).
  * @version-history
+ *   v1.6.0 — 2026-11-27 — The connect form is a closed row until the loud action, the start's button
+ *     or its own row opens it (open of itself, it repeated the loud action); the strip's stores word
+ *     agrees with its number (tn); the section and fold headings no longer repeat "storage".
  *   v1.5.0 — 2026-11-27 — Usability pass. The person's stores come first (a store whose last test
  *     failed first among them), then where the files are, then the connect form and the rule here as
  *     folds whose rows say their state; the rule stands first and open when own storage is off here or
@@ -56,7 +59,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { date, num } from '/js/format.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { getMyFileStore, moveMyFiles, removeMyFileStore, makeMyStoreDefault, testMyStore, fileSize } from '/js/services/file-store.js';
@@ -222,7 +225,7 @@ export default function StorageTab({ showToast }) {
   // (only then), and the files in the person's stores and on this service. Before the person has a
   // store there is no strip: the list's one line says how many files are on this service and how to begin.
   const strip = v && stores.length ? html`<${FigureStrip} items=${[
-    { key: 'stores', n: num(stores.length), label: S('strip.stores'), sub: defaultStore ? S('strip.storesDefault', { name: defaultStore.name }) : S('strip.storesNoDefault') },
+    { key: 'stores', n: num(stores.length), label: tn('profile.storage.strip.stores', stores.length), sub: defaultStore ? S('strip.storesDefault', { name: defaultStore.name }) : S('strip.storesNoDefault') },
     needs ? { key: 'needs', n: num(needs), tone: 'notice', label: S('strip.attention'), sub: newFilesStuck ? S('strip.newFilesStuck') : S('strip.attentionSub') } : null,
     { key: 'own', n: num(v.files.in_own_store.count), label: S('strip.own'), sub: fileSize(v.files.in_own_store.bytes) },
     { key: 'away', n: num(v.files.elsewhere.count), label: S('strip.elsewhere'), sub: fileSize(v.files.elsewhere.bytes) },
@@ -242,8 +245,9 @@ export default function StorageTab({ showToast }) {
   ].filter(Boolean);
   const numOf = (id) => String(order.indexOf(id) + 1).padStart(2, '0');
   const first = order[0];
-  // The connect form is open of itself while the person has no store, since it is how one begins.
-  const connectShown = connectOpen ?? stores.length === 0;
+  // The connect form is a closed row until the head's loud action, the start's button or the row
+  // itself opens it: open of itself, it said the same as the loud action beside it.
+  const connectShown = connectOpen ?? false;
   const openConnect = () => { setConnectOpen(true); scrollToSection('fs-connect'); };
   const actions = v && !off ? html`<${Loud} onClick=${openConnect}>${S('connect.loud')}<//>` : null;
   // The start: folded once a store is connected; its button goes to the connect form where there is one.

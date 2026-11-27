@@ -12,9 +12,11 @@
  *   and where it is. The DPIA draft is shown readable and saved into the organism's compliance
  *   records on a press: the compliance write replaces the whole document, so the page reads it first
  *   and puts the item in by its id.
- * @structure useAssessment · secAssessment · strip · areaFacts · dpiaPart · sentences
- * @usage const ra = useAssessment({ org, role, active }); ... secAssessment(ra, num)
+ * @structure useAssessment · secAssessment · secDpia · strip · areaFacts · dpiaPart · sentences
+ * @usage const ra = useAssessment({ org, role, active }); ... secAssessment(ra, num) · secDpia(ra, num)
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The DPIA is a closed row of its own after the risk assessment (secDpia), whose
+ *     words say whether the draft is stored, instead of a part at the end of the assessment's body.
  *   v1.2.0 — 2026-11-27 — The section is a row (Section fold) that says when the assessment was last
  *     recorded and whether it is due, and opens in place; it opens by itself while the assessment is
  *     due. "Record as updated today" and "Store the DPIA draft" are ordinary actions in the control
@@ -59,6 +61,8 @@ export function useAssessment({ org, role, active }) {
   const [dpiaMsg, setDpiaMsg] = useState(null);
   // The row's state: null until the person opens or shuts it, then their choice.
   const [shown, setShown] = useState(null);
+  // The DPIA's own row, closed until the person opens it.
+  const [dpiaOpen, setDpiaOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!org || !may) { setRa(null); setDpia(null); return; }
@@ -96,7 +100,8 @@ export function useAssessment({ org, role, active }) {
     setBusy('');
   };
 
-  return { org, may, ra, dpia, err, load, open, toggle, ref, setRef, record, saveDpia, busy, msg, dpiaMsg };
+  return { org, may, ra, dpia, err, load, open, toggle, ref, setRef, record, saveDpia, busy, msg, dpiaMsg,
+    dpiaOpen, toggleDpia: () => setDpiaOpen((v) => !v) };
 }
 
 /** The four figures that matter most, from the facts. */
@@ -162,7 +167,6 @@ function dpiaPart(r) {
   const it = d.item;
   const rows = (text) => lines(text).map((s, i) => html`<${FactLine} key=${i}>${s}<//>`);
   return html`
-    ${part(x('dpia.title'))}
     <${Note} kind="lead">${x('dpia.lead')}<//>
     ${d.stored ? html`<${Note} kind="state" tone="fine">${x('dpia.stored')}<//>` : null}
     <${Facts} wide rows=${[
@@ -211,7 +215,22 @@ export function secAssessment(r, num) {
           <${Action} small disabled=${!!r.busy} onClick=${r.record}>${r.busy === 'record' ? x('saving') : x('ra.record')}<//>
         <//>
         <${Note} kind="hint">${x('ra.inPerson')}<//>
-        ${r.msg ? html`<${Note} kind="message" error=${!!r.msg.error}>${r.msg.text}<//>` : null}
-        ${dpiaPart(r)}`}
+        ${r.msg ? html`<${Note} kind="message" error=${!!r.msg.error}>${r.msg.text}<//>` : null}`}
+    <//>`;
+}
+
+/**
+ * The DPIA of the due diligence as its own closed row after the risk assessment: its words say whether
+ * the draft is stored in the organism's records. Null while there is no draft, or for a caller who is
+ * not an officer or an admin.
+ * @param {ReturnType<typeof useAssessment>} r
+ * @param {string} num
+ */
+export function secDpia(r, num) {
+  if (!r.may || !r.dpia?.item) return null;
+  return html`
+    <${Section} fold wrap id="kyc-dpia" num=${num} title=${x('dpia.title')} sub=${r.dpia.stored ? x('dpia.foldStored') : x('dpia.foldNotStored')}
+      open=${r.dpiaOpen} onToggle=${r.toggleDpia}>
+      ${dpiaPart(r)}
     <//>`;
 }

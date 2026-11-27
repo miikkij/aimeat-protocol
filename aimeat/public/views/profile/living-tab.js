@@ -12,6 +12,9 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.28.0 -- 2026-11-27 -- Why a document stopped is a sentence in the person's language
+ *     (stopSentence); the server's English reason stays in the mark's title and one line under the
+ *     opened document's facts. The documents and the templates lists have a head row.
  *   v1.27.1 -- 2026-11-27 -- A template section's remove draws the close Glyph instead of the ✕ letter;
  *     Pulse now draws the refresh Glyph instead of ↻.
  *   v1.27.0 -- 2026-11-27 -- The list view leads with where things stand: a figure strip (living documents, documents that stopped updating in the notice tone, templates) from the overview it already reads, not drawn while all three are zero (FigureStrip hideZeros). The deployed documents are section 01 (lv-docs) once one exists, a stopped document first in it with its reason on the row; the templates are 01 or 02 (lv-templates), their list before the Author with AI field, and the contents rail is drawn when both sections are. One loud action at a time: Open on a document; Deploy on a template while no document exists; Author with AI while the page holds nothing (Loud quiet otherwise). The empty templates line says what fills the page and the one way to fill it. The emoji before Author with AI and before a pending proposal's title are gone (no emoji in the interface). No control was removed.
@@ -116,6 +119,21 @@ const phaseTone = (phase) => {
   if (/fail|error|cancel|reject/.test(p)) return 'danger';
   return 'attention';
 };
+
+/** Why the pulse stopped a document, in the person's language. The server writes its reason in
+ *  English (services/living/pulse.ts evaluateStop: max pulses, end date, a met condition); a reason
+ *  it wrote some other way gets the general sentence, and the server's own text stays in the
+ *  details (the mark's title, and the line under the opened document's facts). */
+function stopSentence(reason) {
+  const r = String(reason || '');
+  let m = /^reached max pulses \((\d+)\)/i.exec(r);
+  if (m) return t('profile.living.stopMax', { n: m[1] });
+  m = /^reached end date \((.+)\)/i.exec(r);
+  if (m) { const d = new Date(m[1]); return t('profile.living.stopUntil', { date: Number.isNaN(d.getTime()) ? m[1] : fmtDateTime(m[1]) }); }
+  m = /^condition met: ([\s\S]*)/i.exec(r);
+  if (m) return t('profile.living.stopCondition', { text: m[1].trim() });
+  return t('profile.living.stopOther');
+}
 
 /** A document that stopped updating (the pulse retired it) waits for its owner, so it comes first. */
 const stopped = (inst) => inst.config?.status?.health === 'retired';
@@ -444,11 +462,12 @@ export default function LivingTab({ session, showToast }) {
             · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
           <//>
           ${st.paused && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
-          ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger">${t('profile.living.retired')}: ${st.retired_reason || ''}<//>`}
+          ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger" title=${st.retired_reason || undefined}>${t('profile.living.retired')}: ${stopSentence(st.retired_reason)}<//>`}
           <${Note} kind="meta" inline>· <${HelpLabel} term="living.cadence" label=${t('profile.living.cadence')}>${t('profile.living.cadence')}<//>:<//>
           <${Select} fit ariaLabel=${t('profile.living.cadence')} value=${opened.config.charter?.cadence || 'daily'} onChange=${v => changeCadence(v)}
             options=${[['hourly', t('profile.living.cadenceHourly')], ['daily', t('profile.living.cadenceDaily')], ['weekly', t('profile.living.cadenceWeekly')]]} />
         <//>
+        ${st.health === 'retired' && st.retired_reason && html`<${Note} kind="meta">${t('profile.living.stopDetail', { reason: st.retired_reason })}<//>`}
 
         <${Box} tone="copy" scroll document><${Markdown} text=${md} /><//>
 
@@ -557,7 +576,8 @@ export default function LivingTab({ session, showToast }) {
   const docsSection = () => html`
     <${Section} band id="lv-docs" num=${numOf['lv-docs']} first title=${t('profile.living.instancesTitle')} count=${docs.length}>
       <${Note} kind="lead">${t('profile.living.instancesDesc')}<//>
-      <${List} cols="name-desc-who-doors" apart empty=${t('profile.living.noInstances')}>
+      <${List} cols="name-desc-who-doors" apart empty=${t('profile.living.noInstances')}
+        head=${docs.length ? [t('profile.living.colDoc'), t('profile.living.colState'), t('profile.living.colWhere'), ''] : null}>
         ${docs.map(inst => html`
           <${Row} key=${inst.loc.docId}>
             <${Name}>${inst.config.title}<//>
@@ -566,7 +586,7 @@ export default function LivingTab({ session, showToast }) {
               ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
               ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
               ${inst.config.status?.paused && html` · <${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
-              ${stopped(inst) && html` · <${Mark} kind="status" tone="danger">${t('profile.living.retired')}${inst.config.status?.retired_reason ? `: ${inst.config.status.retired_reason}` : ''}<//>`}
+              ${stopped(inst) && html` · <${Mark} kind="status" tone="danger" title=${inst.config.status?.retired_reason || undefined}>${t('profile.living.retired')}: ${stopSentence(inst.config.status?.retired_reason)}<//>`}
             <//>
             <${Who}><${Mark}>${orgName(inst.loc.orgId)}<//><//>
             <${Doors}>
@@ -584,7 +604,8 @@ export default function LivingTab({ session, showToast }) {
       count=${templates === null ? undefined : tpls.length}>
       ${tpls.length > 0 && html`<${Note} kind="lead">${t('profile.living.templatesDesc')}<//>`}
       <${List} cols="name-desc-doors" apart loading=${templates === null ? t('profile.living.loading') : false}
-        empty=${t('profile.living.noTemplates')}>
+        empty=${t('profile.living.noTemplates')}
+        head=${tpls.length ? [t('profile.living.colTemplate'), t('profile.living.colHolds'), ''] : null}>
         ${tpls.map(tpl => html`
           <${Row} key=${tpl.id}>
             <${Name}>${tpl.title || t('profile.living.untitled')}<//>

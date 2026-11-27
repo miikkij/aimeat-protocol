@@ -8,6 +8,7 @@
  *   AI read where this server stands, with a link to the admin Federation page where peers are
  *   approved and changed.
  * @version-history
+ *   v1.14.0 -- 2026-11-27 -- The peer list has a head row (the server, its address, its state).
  *   v1.13.0 -- 2026-11-27 -- Settings usability pass: the peer list is section 01 (fd-peers), always
  *     drawn, with its loading and empty lines inside it (List loading/empty); a figure strip under the
  *     head counts the peers (members in its sub line), the online ones and the offline ones (attention
@@ -109,7 +110,8 @@ export default function FederationTab() {
       strip=${strip}>
       <${PageSection} id="fd-peers" num="01" title=${t('profile.federation.peers')} count=${count} first>
         ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />` : html`
-          <${List} cols="name-desc-doors" empty=${t('profile.federation.empty')}>
+          <${List} cols="name-desc-doors" empty=${t('profile.federation.empty')}
+            head=${peers.length ? [t('profile.federation.colNode'), t('profile.federation.colAddress'), t('profile.federation.colState')] : null}>
           ${ordered.map(p => {
             const alive = isAlive(p);
             const tier = p.tier || 'member';

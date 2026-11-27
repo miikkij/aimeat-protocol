@@ -14,6 +14,8 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.6.0 -- 2026-11-27 -- Ask is loud in the head also with no offer yet (quiet only while a search
+ *     is typed); Inbox and Grouped view are soft words. The head showed three equal quiet buttons.
  *   v2.5.0 -- 2026-11-27 -- The strip says where things stand and draws nothing with no offer and no delivery
  *     (hideZeros): the offers with the agents online, what is under way, failed or stalled deliveries and finished
  *     ones that wait for a rating, the last two in the notice tone and each a way to its inbox filter; the seven head
@@ -131,12 +133,13 @@ function renderCover(ctx) {
   // The counts the strip says are not repeated as tags; only what is for sale stays, once something is.
   const marks = [m.selling.length ? chip(m.selling.length, 'chipSelling') : null];
   const actions = html`
-    ${/* With no offer to ask for, the head's Ask has nothing to lead to and is drawn quiet; while a
-          search is typed, the section's own "Build for this need" may be the loud one. */''}
-    <${Loud} quiet=${!m.askable.length || !!ctx.q.trim()} onClick=${() => scrollToSection('op-ask')}>${c('ask')}<//>
+    ${/* Ask is the page's one loud action: with no offer yet it leads to the section that says how one
+          comes (three equal quiet buttons stood in the head). While a search is typed, the section's
+          own "Build for this need" may be the loud one. The other two are quiet words. */''}
+    <${Loud} quiet=${!!ctx.q.trim()} onClick=${() => scrollToSection('op-ask')}>${c('ask')}<//>
     <${Actions}>
-      <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
-      <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>
+      <${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
+      <${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>
     <//>`;
   // The start: folded once something has come back from an agent; its button goes to the catalogue.
   const start = html`<${PageStart} id="offers" done=${ctx.loadingDeliveries ? null : m.latest.length > 0}

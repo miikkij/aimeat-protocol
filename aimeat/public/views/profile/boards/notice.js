@@ -10,6 +10,7 @@
  * @structure renderNotice · replyBlock · toolsFold
  * @usage import { renderNotice } from './notice.js';
  * @version-history
+ *   v1.13.1 -- 2026-11-27 -- The board's name in the crumb, title and label is frame.js boardName.
  *   v1.13.0 -- 2026-10-08 -- The notice's text carries its AI label above it when one is owed
  *     (BoardNoticeText provenance, aiprov D10).
  *   v1.12.0 -- 2026-09-26 -- On the component kit (page group G7): the crumb, the tags, the way back and the rail are data (the poster's standing is the rail's note line), the doors the Loud and Action, the reply row the Beside under the heavy rule with the TextArea and its send slab, the tools the Actions, the fold the Section fold. The notice's text and its replies stay the conversation family's. The file writes no class.
@@ -40,7 +41,7 @@ import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
-import { c, rel, day, who, bid, leftWords, standingWords, renderPage } from './frame.js';
+import { c, rel, day, who, bid, leftWords, standingWords, renderPage, boardName } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -55,9 +56,9 @@ export function renderNotice(ctx, b, postId) {
   const post = n?.post?.id === postId ? n.post : null;
   const toBoard = () => ctx.pickView({ kind: 'board', id: boardId });
   const back = { back: true, label: c('backToBoard'), onClick: toBoard };
-  const boardStep = { label: b.name, onClick: toBoard };
+  const boardStep = { label: boardName(b), onClick: toBoard };
   if (!post) {
-    return renderPage(ctx, { crumbs: [boardStep, '…'], title: b.name, back, children: html`<${Note} kind="loading">${t('common.loading')}<//>` });
+    return renderPage(ctx, { crumbs: [boardStep, '…'], title: boardName(b), back, children: html`<${Note} kind="loading">${t('common.loading')}<//>` });
   }
   const w = who(post.author_gaii);
   const me = ctx.session?.owner || '';
@@ -95,7 +96,7 @@ export function renderNotice(ctx, b, postId) {
 
   return renderPage(ctx, {
     crumbs: [boardStep, post.title],
-    label: `${post.category || (w.agent ? c('byAgent') : c('noticeWord'))} · ${b.name}`,
+    label: `${post.category || (w.agent ? c('byAgent') : c('noticeWord'))} · ${boardName(b)}`,
     title: post.title, marks, doors, rail, back,
     after: html`<${ctx.ConfirmUI} />`,
     children: html`

@@ -6,6 +6,9 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.20.0 -- 2026-11-27 -- The head row names the columns in every view (by tag, by kind, own groups),
+ *     not only the plain one; a tag the node puts on an agent (agent.proposed, unlisted) reads as words
+ *     in the group heading and the filter (tagWords).
  *   v2.19.0 -- 2026-10-19 -- The table has the Kind column (the mode and platform tags); each closed row gets what its agent works on now (`doing`, from the active tasks); every group heading stands apart from the group above it (Group `apart`). The rows come in alphabetical order (listAgents) (Jouni, 2026-10-19).
  *   v2.18.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the search
  *     is the List's SearchLine, the tag filters are Filters with Filter, the group-by is the Select,
@@ -100,6 +103,16 @@ function doingOf(activeTasksMap, name) {
   return task ? (task.title || t('profile.agents.active.untitled')) : null;
 }
 
+/**
+ * The tags the node itself puts on an agent, with the words a person reads for them: an agent made
+ * from a proposal carries `agent.proposed` (routes/agents-v2/agent-proposals.ts), one kept out of the
+ * directory `unlisted` (services/content-defaults.ts). A tag the person wrote stays as written.
+ */
+const NODE_TAGS = { 'agent.proposed': 'proposed', unlisted: 'unlisted' };
+export const tagWords = (tag) => (NODE_TAGS[tag] ? t('profile.agents.tagWords.' + NODE_TAGS[tag]) : tag);
+/** A group heading's title for a tag: a node tag in words, the person's own tag as the identifier it is. */
+const tagTitle = (tag) => (NODE_TAGS[tag] ? tagWords(tag) : html`<${Mark}>${tag}<//>`);
+
 function collectTags(agents) {
   const set = new Set();
   for (const a of agents) {
@@ -135,7 +148,7 @@ export function FilterBar({ agents, tagFilter, setTagFilter, groupBy, setGroupBy
         <${Filters} label=${t('profile.agents.filter.byTag')}>
           <${Label}>${t('profile.agents.filter.byTag')}<//>
           ${shown.map(tag => html`
-            <${Filter} key=${tag} on=${tagFilter.has(tag)} onClick=${() => toggleTag(tag)}>${tag}<//>
+            <${Filter} key=${tag} on=${tagFilter.has(tag)} onClick=${() => toggleTag(tag)}>${tagWords(tag)}<//>
           `)}
           ${tags.length > TAGS_SHOWN && html`
             <${Action} small soft onClick=${() => setTagsOpen(v => !v)}>
@@ -332,6 +345,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
         <${Action} small onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}<//>
         <${Note} inline>${t('profile.agents.groups.hint')}<//>
       <//>
+      ${tableHead()}
       ${groupSections}
       <div key="cg-ungrouped">
         <${Group} apart title=${t('profile.agents.groups.ungrouped')} count=${ungrouped.length}
@@ -351,13 +365,13 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       byMode.get(m).push(a);
     }
     const order = AGENT_MODES.filter(m => byMode.has(m));
-    return order.map(mode => html`
+    return [tableHead(), ...order.map(mode => html`
       <div key=${'mode-' + mode}>
         <${Group} apart title=${t('profile.agents.mode.' + mode) || mode} count=${byMode.get(mode).length}>
           ${byMode.get(mode).map(a => renderCard(a))}
         <//>
       </div>
-    `);
+    `)];
   }
 
   // groupBy === 'tag' -- an agent appears under every tag it carries; untagged agents grouped at end
@@ -377,11 +391,13 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
   const sortedTags = [...byTag.keys()].sort();
   const sections = sortedTags.map(tag => html`
     <div key=${'tag-' + tag}>
-      <${Group} apart title=${html`<${Mark}>${tag}<//>`} count=${byTag.get(tag).length}>
+      <${Group} apart title=${tagTitle(tag)} count=${byTag.get(tag).length}>
         ${byTag.get(tag).map(a => renderCard(a))}
       <//>
     </div>
   `);
+  // The head row names the columns once, over the first group (each group's rows share its cut).
+  sections.unshift(tableHead());
   if (untagged.length > 0) {
     sections.push(html`
       <div key="tag-untagged">

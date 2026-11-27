@@ -44,6 +44,11 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.9.0 — 2026-11-27 — Usability round 3. The open things are grouped by kind, each kind one closed
+ *     row that says how many and at which levels. A record, a file or a knowledge item the report names
+ *     by its key is named by the key's last part in words, the key under it (nameOf); an address is
+ *     shown decoded (readableAddress: sandbox%40node read as an escape). The title is the menu's and
+ *     the crumb's name for the page; the close action's words say what it does (exposure.closeIt).
  *   v1.8.0 — 2026-11-27 — Usability pass. With nothing open at any level the strip is not drawn
  *     (hideZeros, except while a place could not be read). Conflicts are drawn only when there is a
  *     conflict or an exception to say. The Data row is drawn once something is shared as data or the
@@ -90,6 +95,7 @@ import { ClassificationBadge } from '/components/ClassificationBadge.js';
 import { Marks } from '/components/Mark.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Name, Cell, Doors } from '/components/List.js';
 import { Action } from '/components/Action.js';
@@ -264,6 +270,34 @@ function Edges({ report }) {
     ${report.hidden_by_classification ? html`<${Note} kind="aside" size="small">${x('hidden', { n: report.hidden_by_classification })}<//>` : null}`;
 }
 
+/** An address as a person reads it: the escapes decoded (sandbox%40node reads sandbox@node). */
+function readableAddress(url) {
+  try { return decodeURIComponent(String(url)); } catch (err) { swallowed('exposure-tab: address', err); return String(url); }
+}
+
+/** The kinds whose title the report gives as the stored key itself (a record, a file, a knowledge item). */
+const KEYED = new Set(['memory', 'file', 'knowledge']);
+
+/**
+ * What a person calls the item. A record, a file or a knowledge item the report names by its key
+ * (seed.exposure.price-list) is named by the key's last part in words ("Price list"); the key itself
+ * stays under it, with the address. Every other title is the report's, in the page's language.
+ */
+function nameOf(item) {
+  const title = titleOf(item);
+  if (!KEYED.has(item.kind) || title !== item.id) return { name: title, key: null };
+  const last = String(item.id).split(/[/.]/).filter(Boolean).pop() || String(item.id);
+  const words = last.replace(/\.[a-z0-9]{1,5}$/i, '').replace(/[-_]+/g, ' ').trim() || last;
+  return { name: words.charAt(0).toUpperCase() + words.slice(1), key: String(item.id) };
+}
+
+/** The line under the name: the key when the name was made from it, and the address in readable form. */
+function whereOf(item) {
+  const { key } = nameOf(item);
+  const address = item.url ? readableAddress(item.url) : x('noAddress');
+  return key ? `${key} · ${address}` : address;
+}
+
 function ItemRow({ item, busy, onClose, onCopied }) {
   const close = closeOf(item);
   const place = close ? null : PLACE[item.kind];
@@ -271,7 +305,7 @@ function ItemRow({ item, busy, onClose, onCopied }) {
   const forAi = x('aiPrompt', { title: titleOf(item), how: closeText(item) });
   return html`
     <${Row}>
-      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')}>${titleOf(item)}<//>
+      <${Name} href=${item.url || undefined} newTab meta=${whereOf(item)}>${nameOf(item).name}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
       <${WhoCell} item=${item} />
       <${Doors}>
@@ -295,7 +329,7 @@ function ConflictRow({ item, busy, onLower, onCopied }) {
   const forAi = x('cls.aiPrompt', { title: titleOf(item), label: labelName(c), cap: levelWords(c.max_audience), how: closeText(item) });
   return html`
     <${Row} rail="notice">
-      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')} desc=${capSentence(item, 'cls.capSentence')}>${titleOf(item)}<//>
+      <${Name} href=${item.url || undefined} newTab meta=${whereOf(item)} desc=${capSentence(item, 'cls.capSentence')}>${nameOf(item).name}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
       <${WhoCell} item=${item} />
       <${Doors}>
@@ -316,6 +350,8 @@ export default function ExposureTab({ showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
 
   const [shared, setShared] = useState(null);
+  // Which kinds' rows the person opened (each kind of open thing is one closed row).
+  const [kindOpen, setKindOpen] = useState({});
 
   const load = useCallback(async () => {
     try {
@@ -423,14 +459,25 @@ export default function ExposureTab({ showToast }) {
         ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
       <//>`,
     'ex-data': () => secData({ shared, num: num('ex-data'), first: first === 'ex-data' }),
+    // The open things grouped by kind, each kind one closed row that says how many and at which
+    // levels (usability round 3: 21 rows in one list); the kinds in the report's KINDS order.
     'ex-items': () => html`
       <${Section} id="ex-items" num=${num('ex-items')} title=${x('itemsTitle')} count=${total} first=${first === 'ex-items'}>
-        <${List} cols="item-kind-state-doors" keepCols
-          head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
-          empty=${report.failed.length ? x('emptyPartial') : showData ? x('emptyButData') : x('empty')}
-          rows=${items}
-          render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
-            busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
+        ${items.length === 0 ? html`<${List} cols="item-kind-state-doors" keepCols
+          empty=${report.failed.length ? x('emptyPartial') : showData ? x('emptyButData') : x('empty')} rows=${[]} render=${() => null} />` : null}
+        ${KINDS.filter((kind) => items.some((i) => i.kind === kind)).map((kind) => {
+          const group = items.filter((i) => i.kind === kind);
+          const byLevel = CAP_LEVELS.map((lv) => [lv, group.filter((i) => i.level === lv).length]).filter(([, n]) => n > 0);
+          return html`
+            <${FoldSection} key=${'k-' + kind} inner id=${'ex-kind-' + kind} title=${x(`kindGroup.${kind}`)}
+              sub=${[String(group.length), ...byLevel.map(([lv, n]) => `${levelWords(lv)} ${n}`)].join(' · ')}
+              open=${!!kindOpen[kind]} onToggle=${() => setKindOpen((o) => ({ ...o, [kind]: !o[kind] }))}>
+              <${List} cols="item-kind-state-doors" keepCols head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
+                rows=${group}
+                render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
+                  busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
+            <//>`;
+        })}
         ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
       <//>`,
     'ex-notes': () => html`
@@ -441,7 +488,8 @@ export default function ExposureTab({ showToast }) {
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
-      title=${x('title')}
+      title=${/* One name for the page: the menu's and the crumb's (exposure.title said it another way). */
+        t('profile.tabs.exposure')}
       help="concept.audience"
       desc=${x('intro')}
       start=${html`<${PageStart} id="exposure" />`}

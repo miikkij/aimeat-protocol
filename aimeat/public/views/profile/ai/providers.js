@@ -13,6 +13,8 @@
  *   classifierRow · regionRows · secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.12.0 — 2026-11-27 — secRouting takes a `fold` ({ open, onToggle }): the full page draws Models as a
+ *     closed row whose words say how many uses have a model chosen.
  *   v1.11.0 — 2026-11-24 — secProviders and secPolicy take `plain`: the section without its headline and
  *     id, for the page's "Fine-tuning" rows, whose fold row carries both (ai/page.js v1.44.0).
  *   v1.10.0 — 2026-11-20 — A capability's model is chosen from a list (modelControl, the Model picker):
@@ -60,6 +62,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
 import { Facts, FactLine } from '/components/Facts.js';
 import { List, Row, Name, Who, Desc, Doors, Panel } from '/components/List.js';
 import { Box } from '/components/Box.js';
@@ -449,7 +452,7 @@ function regionRows(reg, r, e, pv) {
   return [modeRow, region, fallback];
 }
 
-export function secRouting(ctx, num) {
+export function secRouting(ctx, num, fold = null) {
   const pv = ctx.pv;
   if (!pv.view) return null;
   const routing = pv.view.routing || { defaults: {}, rules: {} };
@@ -494,7 +497,8 @@ export function secRouting(ctx, num) {
     ...regionRows(pv.view.openrouter_region, r, e, pv),
   ];
   return html`
-    <${PageSection} id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle} sub=${x('rt.count', { n: set, total: CAPS.length })}
+      id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>
       <${Note} kind="lead">${x('rt.lead')}<//>
       <${Facts} rows=${[...CAPS.map(capRow), classifierRow(pv.classifier, pv, e, servers('text'))]} />
       <${Space} above="section">

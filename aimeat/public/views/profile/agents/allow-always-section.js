@@ -12,9 +12,13 @@
  *   when; the money and the delete permissions only when the node lets them stand, otherwise as a
  *   line that says the node's operator decides. Every act an AI does on one of these is written to the
  *   person's feed, and the section says so before Save.
- * @structure AllowAlwaysSection({ showToast })
- * @usage html`<${AllowAlwaysSection} showToast=${showToast} />`
+ * @structure AllowAlwaysFold({ showToast, num, open, setOpen }) · AllowAlwaysSection({ showToast })
+ * @usage html`<${AllowAlwaysFold} showToast=${showToast} num="03" open=${o} setOpen=${setO} />`
  * @version-history
+ *   v1.1.0 -- 2026-11-27 -- AllowAlwaysFold: the section is one closed row (FoldSection) that says how
+ *     many permissions are on, or that the node has the setting off; it reads the permissions while
+ *     closed, so the row can say so, and a notice (section=allow-always) opens it. AllowAlwaysSection
+ *     is the open body, unchanged.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-toimii-itsen-isesti-omistajan-asetuksella-salli-aina-ja-k).
  */
 import { h } from 'preact';
@@ -34,6 +38,7 @@ import { Fields, FormActions } from '/components/Field.js';
 import { Loud } from '/components/Action.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { scrollToSection } from '/components/Rail.js';
+import { Section } from '/components/Section.js';
 
 const at = (iso) => date(iso);
 
@@ -44,6 +49,32 @@ function fromUrl() {
     words: (q.get('word') || '').split(',').map((w) => w.trim()).filter(Boolean),
     section: q.get('section') === 'allow-always',
   };
+}
+
+/**
+ * The section as one closed row that states its state: how many permissions every AI holds, or that
+ * the node has the setting off. The body is AllowAlwaysSection, drawn only while the row is open; a
+ * notice that links here with section=allow-always opens it.
+ */
+export function AllowAlwaysFold({ showToast, num, open, setOpen }) {
+  const [state, setState] = useState(null);   // { enabled, on } from GET /v1/ai-standing
+  const query = useMemo(fromUrl, []);
+  const read = useCallback(async () => {
+    try {
+      const resp = await apiGet(`/v1/ai-standing?lang=${encodeURIComponent(getLocale())}`);
+      const v = resp?.data ?? null;
+      setState(v ? { enabled: !!v.enabled, on: (v.words ?? []).filter((w) => w.on).length } : null);
+    } catch (err) { swallowed('allow-always: state', err); }
+  }, []);
+  useEffect(() => { read(); }, [read]);
+  useEffect(() => onLiveUpdate(['agents'], () => { read(); }), [read]);
+  useEffect(() => { if (query.section) setOpen(true); }, []);   // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
+  const sub = !state ? null : !state.enabled ? t('profile.agents.always.subOff') : tn('profile.agents.always.subOn', state.on);
+  return html`
+    <${Section} fold id="agp-always" num=${num} title=${t('profile.agents.always.title')} sub=${sub}
+      open=${open} onToggle=${() => setOpen(!open)}>
+      <${AllowAlwaysSection} showToast=${(m, e) => { showToast(m, e); read(); }} />
+    <//>`;
 }
 
 export function AllowAlwaysSection({ showToast }) {

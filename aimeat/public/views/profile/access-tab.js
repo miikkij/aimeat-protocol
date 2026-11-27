@@ -23,6 +23,8 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.7.0 — 2026-11-27 — `folds`, `openFold`, `toggleFold`: every section but how you sign in is a closed
+ *     row (access/page.js); opening the token form opens section 02 first.
  *   v2.6.0 — 2026-11-07 — `receivers`: how many receivers the account has (GET /v1/receivers), for the
  *     line in "Who acts in your name" that leads to the Receivers page; a receiver key is a credential.
  *   v2.5.0 — 2026-11-01 — `moreOpen`: on a node the store sold, the "Lisätiedot" fold under the sign-in
@@ -107,6 +109,9 @@ export default function AccessTab({ session, showToast }) {
   const [mcpCount, setMcpCount] = useState(null);
   // On a node the store sold, everything after the sign-in is one fold, "Lisätiedot", shut until opened.
   const [moreOpen, setMoreOpen] = useState(false);
+  // The closed rows of the page (every section but how you sign in), by section id; closed by default.
+  const [folds, setFolds] = useState({});
+  const openFold = (id) => setFolds((f) => ({ ...f, [id]: true }));
   const [secretForm, setSecretFormState] = useState(EMPTY_SECRET);
   const [secretMsg, setSecretMsg] = useState(null);
   const [replaceName, setReplaceName] = useState(null);
@@ -363,7 +368,9 @@ export default function AccessTab({ session, showToast }) {
     const next = typeof open === 'boolean' ? open : !form.open;
     setForm({ open: next });
     setFormMsg(null);
-    if (next) window.setTimeout(() => document.getElementById('ac-token')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    // The form stands in section 02, a closed row until opened: open it too, then scroll.
+    if (next) openFold('ac-keys');
+    if (next) window.setTimeout(() => document.getElementById('ac-token')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   };
   const toggleScope = (s) => setFormState((f) => ({ ...f, scopes: { ...f.scopes, [s]: !f.scopes[s] } }));
   const clearCreated = () => { setCreated(null); setFormState({ ...EMPTY_FORM, open: false }); };
@@ -483,6 +490,7 @@ export default function AccessTab({ session, showToast }) {
     secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount, receivers,
     setSecretForm, toggleSecretForm, openReplace, setReplaceValue, setHostDraft, writeSecret, deleteSecret, saveSecretHost, withdrawApproval,
     hostAsk, setHostAsk, moreOpen, setMoreOpen,
+    folds, openFold, toggleFold: (id) => setFolds((f) => ({ ...f, [id]: !f[id] })),
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
     toggleFedAll, addFedNode, removeFedNode, setFedInput, setKeyShown, setForm, toggleForm, toggleScope, clearCreated, createToken,

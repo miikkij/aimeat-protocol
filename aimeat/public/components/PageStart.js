@@ -41,6 +41,9 @@
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
+ *   v1.4.0 — 2026-11-27 — Closed, the start is one light row on every page (a chevron and its words,
+ *     .page-start-open, about 32 px); it was a framed block of 76 px with a label and a button. Props
+ *     unchanged.
  *   v1.3.0 — 2026-11-27 — `inline`: closed, the start is one word in the head's row of a page whose
  *     work area takes the screen; the messenger's closed start took a row of 76 px.
  *   v1.2.0 — 2026-11-26 — The block is closed on every page until the person opens it (it was open
@@ -56,7 +59,7 @@ import { h, createContext } from 'preact';
 import { useState, useEffect, useContext } from 'preact/hooks';
 import htm from 'htm';
 import { t, getLocale } from '/js/i18n.js';
-import { Action, Actions } from '/components/Action.js';
+import { Action, Actions, Chevron } from '/components/Action.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { PromptCard } from '/components/PromptCard.js';
@@ -154,21 +157,23 @@ export function PageStart({ id, vars, purpose, prompt, next, action, link, title
   const actionLabel = action ? (action.label ?? part('action')) : '';
   const linkLabel = link ? (link.label ?? part('link')) : '';
 
-  // `inline`: a page whose work area takes the screen (the messenger) keeps the start in its head's
-  // row. Closed, it is only the word that opens it; open, the same block takes the head's full width.
-  if (inline && folded) {
+  // Closed, on every page, the start is one light row: a drawn chevron and the words that open it.
+  // It was a framed block of about 76 px with its label and a button. `inline` (the messenger) keeps
+  // the same row in its head's row; open, the block takes the head's full width.
+  if (folded) {
     return html`
-      <section class="page-start page-start--inline page-start--folded" aria-label=${t('pageStart.label')}>
-        <${Action} small soft expanded=${false} onClick=${toggle}>${t('pageStart.show')}<//>
+      <section class=${cx('page-start', 'page-start--folded', inline && 'page-start--inline')} aria-label=${t('pageStart.label')}>
+        <button type="button" class="page-start-open" aria-expanded="false" onClick=${toggle}>
+          <${Chevron} small /><span>${t('pageStart.show')}</span>
+        </button>
       </section>`;
   }
   return html`
-    <section class=${cx('page-start', folded && 'page-start--folded', inline && 'page-start--inline')} aria-label=${t('pageStart.label')}>
+    <section class=${cx('page-start', inline && 'page-start--inline')} aria-label=${t('pageStart.label')}>
       <div class="page-start-head">
         <${Label}>${t('pageStart.label')}<//>
-        <${Action} small soft expanded=${!folded} onClick=${toggle}>${folded ? t('pageStart.show') : t('pageStart.hide')}<//>
+        <${Action} small soft expanded=${true} onClick=${toggle}>${t('pageStart.hide')}<//>
       </div>
-      ${folded ? null : html`
         <div class="page-start-parts">
           <div class="page-start-part">
             <${Label} block>${t('pageStart.for')}<//>
@@ -190,7 +195,7 @@ export function PageStart({ id, vars, purpose, prompt, next, action, link, title
             <${Label} block>${t('pageStart.next')}<//>
             <${Note} kind="hint">${nextWords}<//>
           </div>
-        </div>`}
+        </div>
     </section>`;
 }
 

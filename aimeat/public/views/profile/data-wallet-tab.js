@@ -16,6 +16,8 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.8.0 — 2026-11-27 — `folds`, `openFold`, `toggleFold` for the page's closed rows; goToExport opens
+ *     the export's row before it scrolls.
  *   v2.7.0 — 2026-11-26 — The export is a background job of the parts the person chooses (routes/owners/
  *     exports.ts): the parts and their sizes are read once at mount, the export's state again on each
  *     `owner-export` change, and the page starts, cancels and downloads it. The one-file JSON download
@@ -106,6 +108,9 @@ export default function DataWalletTab({ session, showToast }) {
   const [exportJob, setExportJob] = useState(null);
   const [exportParts, setExportParts] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The closed rows of the page (what happened, classification and its parts, the export), by id.
+  const [folds, setFolds] = useState({});
+  const openFold = (id) => setFolds((f) => ({ ...f, [id]: true }));
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
   const federated = !!session?.federated;
@@ -372,9 +377,14 @@ export default function DataWalletTab({ session, showToast }) {
       setBusy(false);
     }, { danger: true });
   };
-  const goToExport = () => document.getElementById('dw-export')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // The export is a closed row (data-wallet/page.js): open it, then scroll.
+  const goToExport = () => {
+    openFold('dw-export');
+    window.setTimeout(() => document.getElementById('dw-export')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
+  };
 
   const ctx = {
+    folds, openFold, toggleFold: (id) => setFolds((f) => ({ ...f, [id]: !f[id] })),
     session, federated, ov, failed, names, consents, active, revokedList, targets, people, folded, kinds, events, trail, shownTrail,
     days, reloading, deniedCount, deniedGroups, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
     swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exportPlan, exportJob, exportParts, busy, ConfirmUI, cls, content, risk, parties,

@@ -32,6 +32,9 @@
  *   const r = await requestAccess({ storage, config }, req.auth, { access, ownerName, via }, message);
  *   const d = await reviewJoinRequest({ storage, config }, organism, requestId, 'approved', { owner, principal });
  * @version-history
+ *   v1.2.1 — 2026-11-27 — A join request's notice carries i18n (join_request, join_request_message)
+ *     like the access request's, so the bell says it in the reader's language; the English title and
+ *     body are unchanged.
  *   v1.2.0 — 2026-11-19 — The access-request state knows an e-mail invitation: a pending one into the
  *     organism, addressed to the caller's verified address, answers `invited` with `invite_url`, the
  *     in-app address that opens it. An invitation of either kind is told even where the organism
@@ -218,12 +221,11 @@ export async function fileJoinRequest(
       // places made the approver look for it.
       link: organismLink(organism.id),
       ref: noticeRef(joinRequest.id),
-      ...(via ? {
-        i18n: {
-          key: message ? 'access_request_message' : 'access_request',
-          vars: { who, label: via.label, organism: organism.name, message },
-        },
-      } : {}),
+      // The reader's own language: the page reads notiftext.<key>.title and .body with these vars; the
+      // English title and body above stay for an AI and for a client without the words.
+      i18n: via
+        ? { key: message ? 'access_request_message' : 'access_request', vars: { who, label: via.label, organism: organism.name, message } }
+        : { key: message ? 'join_request_message' : 'join_request', vars: { who, organism: organism.name, message } },
       actions: [
         { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'approved' }, style: 'primary' },
         { id: 'reject', label: 'Reject', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'rejected' }, style: 'danger', confirm: true },

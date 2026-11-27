@@ -11,6 +11,8 @@
  * @structure AppsTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'apps'.
  * @version-history
+ *   v2.5.0 — 2026-11-27 — `folds`, `toggleFold`, `openFold` in the ctx: the closed rows of the page
+ *     (agents and skills, build, builders, style kit), closed until the person opens one.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v2.4.0 — 2026-10-30 — `gallery`: the Design Book gallery's address, for the style kits section (apps/kits.js).
  *   v2.3.0 — 2026-10-16 — A failed load of the owner's apps is drawn as one (appsFailed: the could-not-load
@@ -72,6 +74,8 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [diff, setDiff] = useState(null);          // { ref, state, result } for the one open draft
   const [openScopes, setOpenScopes] = useState(null);
   const [agentEditorOpen, setAgentEditorOpen] = useState(false);
+  // Which of the closed rows (agents and skills, build, builders, style kit) the person opened.
+  const [folds, setFolds] = useState({});
   const [agentPick, setAgentPick] = useState('');
   const [agentJson, setAgentJson] = useState('[]');
 
@@ -307,6 +311,8 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
     publishDraft, discardDraft, toggleDiff, revokeGrant, toggleScopes: (g) => setOpenScopes(openScopes === g.grant_id ? null : g.grant_id),
     upload, recordOpen, managePrompt,
     agentEditorOpen, setAgentEditorOpen, agentPick, pickAgentApp, agentJson, setAgentJson, agentPromptFor, saveAgents,
+    folds, toggleFold: (key) => setFolds((cur) => ({ ...cur, [key]: !cur[key] })),
+    openFold: (key) => setFolds((cur) => ({ ...cur, [key]: true })),
   };
   return renderPage(ctx);
 }

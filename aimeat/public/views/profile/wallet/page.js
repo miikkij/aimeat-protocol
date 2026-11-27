@@ -13,6 +13,9 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.25.1 — 2026-11-28 — The words say what each number is: the daily accrual stops at the cap,
+ *     and the balance may be above it ("1000 morsels" against "up to 500"); stripAtCap names the
+ *     cap. The head's words lead with what morsels do for the person, then the money.
  *   v1.25.0 — 2026-11-27 — The subscriptions (wallet/subscriptions.js) after the money, when the person
  *     has one: an app membership or a plan that renews on their card, and the press that stops it.
  *   v1.24.0 — 2026-11-27 — Usability pass on the person's three situations. The ways to get paid and
@@ -180,7 +183,7 @@ function strip(ctx) {
   // A figure that would only say "nothing yet" is left out: the flow before the first transaction,
   // the shares before the first one. The balance and the ways to get paid always say something.
   return html`<${FigureStrip} items=${[
-    { n: w.balance, tone: low ? 'notice' : undefined, label: x('stripBalance'), sub: low ? x('stripLow') : `${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap')}` : ''}` },
+    { n: w.balance, tone: low ? 'notice' : undefined, label: x('stripBalance'), sub: low ? x('stripLow') : `${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap', { cap })}` : ''}` },
     ctx.rowsTotal > 0 ? { n: html`<${Tinted} tone="fine">${signed(l.earned)}<//> / <${Tinted} tone="notice">${signed(-l.spent)}<//>`, label: x('stripFlow'),
       sub: `${x('stripFlowSub', { n: l.total_rows ?? ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}${l.unrecorded > 0 ? ` · ${x('stripUnrecorded', { n: l.unrecorded })}` : ''}` } : null,
     sh

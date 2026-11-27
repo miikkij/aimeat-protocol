@@ -9,6 +9,9 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.15.0 -- 2026-11-27 -- boardName, boardDesc: an organism's own board is said in the reader's
+ *     language while its stored name and description are still the node's English words ("<name> —
+ *     Discussion", "Discussion board for <name>"); the stored text is unchanged.
  *   v1.14.0 -- 2026-11-27 -- A board's row says what is inside before it is opened: its notice count
  *     from the board list (posts) with who posts under it (postersOf: the first two posters and how
  *     many more), and the newest notice by its title with who and when. A board whose notices are not
@@ -51,6 +54,25 @@ export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); retu
 
 export const visWord = (v) => c('vis.' + (v || 'private')) || v;
 export const bid = (b) => b?.board_id || b?.id;
+
+/**
+ * A board's name and description as the page says them. An organism's own board (id `org-<id>`) is
+ * stored with the English words the node wrote when the organism was made ("<name> — Discussion",
+ * "Discussion board for <name>", services/organism/lifecycle.ts); while they are still those words,
+ * the page says them in the reader's language. Words a person changed, and every other board, stand
+ * as stored; the stored text is never rewritten.
+ */
+const ORG_NAME = /^(.+) — Discussion$/;
+const ORG_DESC = /^Discussion board for (.+)$/;
+const isOrgBoard = (b) => String(bid(b) || '').startsWith('org-');
+export function boardName(b) {
+  const m = isOrgBoard(b) ? ORG_NAME.exec(String(b?.name || '')) : null;
+  return m ? t('profile.boards.orgBoardName', { org: m[1] }) : (b?.name || '');
+}
+export function boardDesc(b) {
+  const m = isOrgBoard(b) ? ORG_DESC.exec(String(b?.description || '')) : null;
+  return m ? t('profile.boards.orgBoardDesc', { org: m[1] }) : (b?.description || '');
+}
 
 /** "alice" out of "alice@node"; "scout · alice" out of "scout#alice@node". */
 export function who(gaii) {
@@ -104,7 +126,7 @@ export function boardSub(ctx, b) {
   else if (ctx.isMine(b)) parts.push(c('ownBoard'));
   else if (b.owner_gaii) parts.push(c('keptBy', { name: ownerOf(b.owner_gaii) }));
   if (b.rules?.categories?.length) parts.push(b.rules.categories.join(', '));
-  else if (b.description) parts.push(b.description);
+  else if (b.description) parts.push(boardDesc(b));
   return parts.join(' · ');
 }
 
@@ -138,7 +160,7 @@ export function boardRows(ctx, list, door, { head = false } = {}) {
     const open = () => ctx.pickView({ kind: 'board', id });
     return html`
       <${Row} key=${id}>
-        <${Name} onOpen=${open} meta=${boardSub(ctx, b)} clip>${b.name}<//>
+        <${Name} onOpen=${open} meta=${boardSub(ctx, b)} clip>${boardName(b)}<//>
         <${Desc}><${AudienceBadge} value=${b.visibility} /><//>
         <${Desc} faint=${!n} sub=${n && posters ? posters : undefined}>${n === null ? html`<${Note} kind="loading" inline>${t('common.loading')}<//>` : n ? html`<b>${n}</b> ${c('noticesWord', { n })}` : c('noNotices')}<//>
         <${Desc} faint=${!lastAt} clip sub=${latest ? `${who(latest.author_gaii).label} · ${rel(latest.created_at)}` : undefined}>${latest ? html`<b>${latest.title || c('untitled')}</b>` : lastAt ? rel(lastAt) : '·'}<//>
@@ -159,7 +181,7 @@ export function noticeRow(ctx, boardId, p, authors, withBoard) {
     title=${p.title} onOpen=${() => ctx.pickView({ kind: 'notice', boardId, postId: p.id })}
     words=${`${String(p.body || '').slice(0, 220)}${String(p.body || '').length > 220 ? '…' : ''}`}
     who=${w.label} whoNote=${authors?.[p.author_gaii] ? standingWords(authors[p.author_gaii]) : ''}
-    board=${board ? { name: board.name, onOpen: () => ctx.pickView({ kind: 'board', id: boardId }) } : null}
+    board=${board ? { name: boardName(board), onOpen: () => ctx.pickView({ kind: 'board', id: boardId }) } : null}
     time=${rel(p.created_at)} left=${leftWords(p.ttl_expires_at)}
     counts=${`${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}`}
     provenance=${p.ai_provenance} />`;

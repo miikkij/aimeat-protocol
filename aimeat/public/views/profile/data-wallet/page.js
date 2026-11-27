@@ -19,6 +19,11 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.33.0 — 2026-11-27 — Usability round 3: who reaches the data (01 and its parts) stays open; what
+ *     happened (02), the classification with its parts (03, 03.1, 03.2) and the export (04) are closed
+ *     rows whose words say their state (foldOf, `ctx.folds`); the rail and the export door open a row
+ *     before they scroll. The head keeps only the tag the strip does not say (whether a grant ends by
+ *     itself), and the line under the grant button that named the form's section went.
  *   v1.32.0 — 2026-11-26 — 04 is the data export as a background job: the parts as check lines with
  *     their size on this account (the account itself always in), the start, and the export's state
  *     with its ZIP files to download and a way to cancel or remove it. The card grid of what one JSON
@@ -111,7 +116,7 @@ import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { HelpTip } from '/components/HelpTip.js';
-import { x, n, crumb, pageLinks, whoOf, canWriteFor } from './frame.js';
+import { x, n, crumb, pageLinks, whoOf, canWriteFor, foldOf } from './frame.js';
 import { targetRow, personRow, foldedRow, revokedRow, bucketRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
 import { secContentClasses, contentCount } from './content-classes.js';
@@ -135,7 +140,7 @@ export function renderPage(ctx) {
     { id: 'dw-content', num: '03.1', label: x('cc.title'), count: contentCount(ctx.content) },
     { id: 'dw-risk', num: '03.2', label: x('cr.title'), count: riskCount(ctx.risk) },
     { id: 'dw-export', num: '04', label: x('secExport'), count: ctx.exportJob ? x('exportJob.state.' + ctx.exportJob.state) : '' },
-  ];
+  ].map((s) => (['dw-trail', 'dw-class', 'dw-content', 'dw-risk', 'dw-export'].includes(s.id) ? { ...s, open: () => ctx.openFold(s.id) } : s));
   // The start: the page's own list answers the same question, so there is no button and no done.
   const start = html`<${PageStart} id="dataWallet" />`;
   return html`
@@ -164,16 +169,14 @@ function federated(ctx) {
 /** The mast as SettingsPage's head props: title, its question mark, the tags, the words, the grant slab and the export. */
 function head(ctx) {
   const ov = ctx.ov;
-  const ps = ov?.permSummary;
+  // The strip says the keys and files, the grants, the refused reads and the revoked ones; the head's
+  // tags repeated each of them. What the strip does not say stays: whether any grant ends by itself.
   const marks = !ov ? [] : [
-    { label: x('chipOwn', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) }), tone: 'sun' },
-    { label: x('chipGrants', { active: ctx.active.length, revoked: ctx.revokedList.length }) },
-    ctx.deniedCount ? { label: x('chipDenied', { n: n(ctx.deniedCount), days: ctx.days }), tone: 'coral' } : { label: x('chipQuiet', { days: ctx.days }), tone: 'dim' },
     ctx.expiring ? { label: x('chipExpiring', { n: ctx.expiring }), tone: 'dim' } : { label: x('chipNoExpiry'), tone: 'dim' },
   ];
+  // The button's own words say what it does; the line under it that named the form's section went.
   const actions = html`
     <${Loud} onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}<//>
-    <${Note} kind="hint" slab inline>${x('grantSlabHint')}<//>
     <${Actions}>
       <${Action} small onClick=${() => ctx.goToExport()}>${x('exportDoor')}<//>
     <//>`;
@@ -239,7 +242,7 @@ function secTrail(ctx) {
   const shown = items.slice(0, ctx.shownTrail);
   const events = ctx.trailFilter === 'events';
   return html`
-    <${Section} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
+    <${Section} ...${foldOf(ctx, 'dw-trail')} id="dw-trail" num="02" title=${x('secTrail')} sub=${ctx.deniedCount ? x('trailState', { n: n(ctx.deniedCount) }) : x('trailStateNone', { days: ctx.days })}>
       <${Note} kind="lead">${x('trailIntro')}<//>
       <${Tabs} tone="filter" value=${ctx.days} disabled=${ctx.reloading} onSelect=${(d) => ctx.setDays(d)}
         items=${[7, 30, 90].map((d) => ({ value: d, label: x('daysN', { n: d }), count: ctx.days === d ? n(ov.audit.total) : undefined }))}>
@@ -377,7 +380,8 @@ function secExport(ctx) {
   const total = parts.filter((p) => chosen.has(p.id)).reduce((s, p) => s + p.bytes, 0);
   const count = (p) => (p.id === 'memories' || p.id === 'ai_provenance' ? x('exportPart.records', { n: n(p.count) }) : p.id === 'app_code' ? x('exportPart.versions', { n: n(p.count) }) : x('exportPart.files', { n: n(p.count) }));
   return html`
-    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${plan ? x('exportJob.sub', { size: size(total) }) : ''}>
+    <${Section} ...${foldOf(ctx, 'dw-export')} id="dw-export" num="04" title=${x('secExport')}
+      sub=${job ? x('exportJob.state.' + job.state) : plan ? x('exportJob.sub', { size: size(total) }) : ''}>
       <${Note} kind="lead">${x('exportJob.intro', { size: size((plan?.file_mb || 1024) * 1e6), days: plan?.keep_days || 7 })}<//>
       ${exportState(ctx)}
       ${!plan ? html`<${Note} kind="loading">${x('loading')}<//>` : html`

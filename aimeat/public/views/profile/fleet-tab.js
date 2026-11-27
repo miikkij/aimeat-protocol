@@ -26,6 +26,9 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.6.0 — 2026-11-27 — The list is first; the offer of a new sign-in is a closed, numbered row under
+ *     it (fleet-signin, from FleetView's `movable` figure). "Need attention" counts with
+ *     agentNeedsAttention, the Agents page's rule.
  *   v1.5.0 — 2026-11-26 — The page leads with where things stand: a figure strip (how many agents,
  *     how many cannot sign in, how many are connected now, what they finished this week) from the
  *     counts FleetView reports, then three numbered sections with the contents rail: the agents, the
@@ -72,6 +75,8 @@ export default function FleetTab({ session, showToast }) {
   // agent has no list, and the starter is then the first section. The rail reads the same list.
   const sections = [
     fig?.agents === 0 ? null : { id: 'fleet-agents', label: t('profile.tabs.agents'), count: fig?.agents },
+    // The offer of a new sign-in, one closed row under the list, only while some agent can get one.
+    fig?.agents > 0 && fig?.movable > 0 ? { id: 'fleet-signin', label: x('migrate.rail'), count: fig.movable } : null,
     { id: 'agp-basic', label: t('profile.agents.basic.title') },
     { id: 'fleet-defaults', label: t('profile.access.adTitle') },
   ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
@@ -100,7 +105,7 @@ export default function FleetTab({ session, showToast }) {
             down, made the page's two loudest controls the two that do nothing. The fix is which one
             leads, not what either says. The old Agents tab passes nothing and keeps its primary. */''}
       ${/* `embedded`: the section header above is this view's heading, so it does not bring its own. */''}
-      <${FleetView} embedded onFigures=${setFig} listId="fleet-agents" listNum=${numOf['fleet-agents']}
+      <${FleetView} embedded onFigures=${setFig} listId="fleet-agents" listNum=${numOf['fleet-agents']} signinNum=${numOf['fleet-signin']}
         starter=${html`<${BasicAgentsPanel} session=${session} showToast=${showToast} emphasis="secondary" num=${numOf['agp-basic']} />`} />
       ${/* The rules every agent carries unless its own directives say otherwise, and the token budget.
             At the foot: a person comes here for the agents first, and the defaults are the one thing

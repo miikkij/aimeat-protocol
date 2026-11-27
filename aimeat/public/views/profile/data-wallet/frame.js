@@ -8,10 +8,11 @@
  *   agent), what a grant lets them do (read, write, sign in), the permissions grouped by what they
  *   open, the trail's groups in words, the grant and revoke events read off the permissions' own
  *   timestamps, dates, the crumb and the rail links.
- * @structure x · targetOf · targetWords · whoOf · accessorWords · roleOf · canWriteFor · grantWords · targetRows ·
+ * @structure x · foldOf · targetOf · targetWords · whoOf · accessorWords · roleOf · canWriteFor · grantWords · targetRows ·
  *   groupWords · consentEvents · dateWord · timeWord · spanWord · crumb · pageLinks · openTab
  * @usage import { x, targetRows, groupWords } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-11-27 — foldOf: the props that make a section one of the page's closed rows.
  *   v1.2.0 — 2026-11-08 — roleOf reads the role the server stamped (metadata.wsRole); a purpose typed
  *     as `workspace-contributor` reads as contributor only on a grant older than the stamp. canWriteFor:
  *     the grant form offers Read and write for one person on one workspace, the shape the server takes.
@@ -24,6 +25,13 @@ import { openTab } from '/components/Rail.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
 
 export const x = (key, vars) => t('dwpage.' + key, vars);
+
+/**
+ * A closed row of the page (usability round 3): who reaches the data stays open; what happened, the
+ * classification with its parts and the export are rows whose words say their state, open while the
+ * person opened them (`ctx.folds` by section id, data-wallet-tab.js). Spread into a Section.
+ */
+export const foldOf = (ctx, id) => ({ fold: true, open: !!ctx.folds?.[id], onToggle: () => ctx.toggleFold(id) });
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const WS_KEY = new RegExp(`^organism\\.(${UUID})\\.w\\.([A-Za-z0-9_-]+)(?:\\.(.*))?$`);

@@ -18,6 +18,9 @@
  * @structure renderReceiversView · renderCover · rankOf · secList · receiverRow · secNew · secHow
  * @usage import { renderReceiversView } from './receivers/cover.js';
  * @version-history
+ *   v1.2.1 -- 2026-11-27 -- "Incoming webhook" is said once, in the title: the section, the head's
+ *     button, the fold and the strip use shorter words (receivers.secList, new, secNew, stripAll); a
+ *     row's machine name under its target only when it has a display name of its own.
  *   v1.2.0 -- 2026-11-27 -- Where things stand is a figure strip (webhooks and how many work, proposals
  *     that wait for the person, refused and delivered today) from the list the page already reads, with
  *     hideZeros; the head keeps only the "switched off" mark. A proposal comes first in the list, then
@@ -126,7 +129,7 @@ function receiverRow(ctx, r) {
     <${Row} key=${r.uid} faded=${r.state === 'paused' || r.state === 'expired'}>
       <${Name} onOpen=${open} meta=${shapeWords(r)} warn=${!r.schema} note=${refused > 0 ? x('chipRefused', { n: num(refused) }) : undefined}
         tag=${html`<${Mark} kind="status" tone=${stateTone(r.state)}>${stateWord(r.state)}<//>`}>${r.display_name || r.name}<//>
-      <${Desc} sub=${r.name}>${targetWords(r.target)}<//>
+      <${Desc} sub=${r.display_name && r.display_name !== r.name ? r.name : undefined}>${targetWords(r.target)}<//>
       <${Num} title=${x('todayLine', { n: num(today), refused: num(refused) })}>${num(today)}<//>
       <${When}>${r.last_delivery_at ? ago(r.last_delivery_at) : x('never')}<//>
       <${Doors}><${Action} small row onClick=${open}>${proposed ? x('decide') : x('open')}<//><//>

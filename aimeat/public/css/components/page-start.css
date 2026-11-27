@@ -9,6 +9,8 @@
  *   the prompt card keep their own looks. Reads the theme's tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — Closed, the start is one light row on every page (.page-start-open: a
+ *     chevron and its words, 32 px, no hairlines); it was a framed row of 76 px.
  *   v1.2.0 — 2026-11-27 — .page-start--inline: the start in the head's row (PageStart inline): closed,
  *     only its word with no hairlines; open, the block across the row's full width.
  *   v1.1.0 — 2026-11-09 — .page-start-explain: "Explain this page to me" under the purpose.
@@ -21,8 +23,24 @@
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
-.page-start--folded { padding: .55rem 0; }
-/* In the head's row (PageStart inline): closed, only the word; open, the whole block on a line of
+/* Closed, on every page: one light row, a chevron and the words that open the start. */
+.page-start.page-start--folded { margin: .6rem 0 0; padding: 0; border: 0; }
+.page-start-open {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 32px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: .9rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.page-start-open:hover, .page-start-open:focus-visible { color: var(--text); }
+.page-start-open:hover > span { text-decoration: underline; }
+/* In the head's row (PageStart inline): closed, only the row; open, the whole block on a line of
    its own under the head's words and actions. */
 .page-start--inline.page-start--folded { margin: 0; padding: 0; border: 0; flex: none; }
 .page-start--inline:not(.page-start--folded) { flex: 1 0 100%; order: 2; margin-top: .6rem; }

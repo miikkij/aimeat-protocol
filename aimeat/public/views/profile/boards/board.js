@@ -11,6 +11,8 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.16.2 — 2026-11-27 — An organism's own board is named in the reader's language (frame.js
+ *     boardName, boardDesc) while its stored words are still the node's English ones.
  *   v1.16.1 — 2026-11-27 — Who posts is shown only on a shared or public board: a private board takes
  *     posts from its keeper only, and the choice there decided nothing.
  *   v1.16.0 — 2026-11-08 — The rules fold's settings explain themselves: boards.whoSees,
@@ -51,7 +53,7 @@ import { t, tn } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
-import { c, rel, who, bid, ownerOf, standingWords, noticeRow, renderPage } from './frame.js';
+import { c, rel, who, bid, ownerOf, standingWords, noticeRow, renderPage, boardName, boardDesc } from './frame.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { ContainerLabel } from '/views/profile/classification/container-label.js';
 import { Hint } from '/components/Hint.js';
@@ -119,7 +121,7 @@ export function renderBoard(ctx, b) {
     items=${[{ value: '', label: c('all') }, ...cats.map((cat) => ({ value: cat, label: cat }))]} />` : null;
   const loadMore = () => ctx.loadMore(id);
   return renderPage(ctx, {
-    crumbs: [b.name], title: b.name, marks, desc: b.description || null, doors, strip, rail,
+    crumbs: [boardName(b)], title: boardName(b), marks, desc: boardDesc(b) || null, doors, strip, rail,
     after: html`<${ctx.ConfirmUI} />`,
     children: html`
       <${PageSection} id="bp-notices" num="01" title=${c('secNotices')} count=${`${page.posts.length}${page.cursor ? '+' : ''} · ${c('newestFirst')}`} doors=${catDoors} first>

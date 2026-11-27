@@ -2,8 +2,8 @@
  * @file public/views/home/news-band.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The band at the top of the home that says what is new on this node since the person
- *   last looked: the highlights first and marked, then a few short lines, each naming whom it
+ * @description The row at the end of the home that says what is new on this node since the person
+ *   last looked, and opens in place to show it: the highlights first and marked, then a few short lines, each naming whom it
  *   concerns, and for a fix whether it changes anything for them. "Read" records that they have
  *   seen it (home.news, views/home/news-data.js), and the band goes away until the next change.
  *
@@ -15,6 +15,10 @@
  * @structure default NewsBand({ session, navigate }) · whoWords · rowOf
  * @usage html`<${NewsBand} session=${session} navigate=${navigate} />` (views/home/index.js)
  * @version-history
+ *   v2.0.0 — 2026-11-27 — One row at the end of the home (FoldSection "System updates", its detail how
+ *     many are unread), closed until pressed; open, the lines, Read (a quiet action) and the way to
+ *     the history. The closed band had a headline and three buttons that did one job, and stood
+ *     second on the home.
  *   v1.2.0 — 2026-11-25 — The band opens closed when it holds more than one line: a headline that
  *     says how many updates are unread, "Read", "Show all N" and the way to the history. The whole
  *     list is one press away; before, it stood above everything that waits for the person, several
@@ -28,19 +32,16 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale, onLocaleChange } from '/js/i18n.js';
-import { Band, BandNote } from '/components/Band.js';
+import { BandNote } from '/components/Band.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { List, Row, Name } from '/components/List.js';
-import { Stack } from '/components/Layout.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { pick, fmtDate, KIND_LABEL } from '/views/landing-changelog.js';
 import { useNews, audienceOf, OTHERS_SHOWN, WINDOW_DAYS } from '/views/home/news-data.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-/** How many lines the closed band shows: none, its headline says how many updates wait to be read. */
-const FOLDED_SHOWN = 0;
 
 const WHO = {
   user: () => tr('news.who.user', 'You'),
@@ -91,29 +92,21 @@ export default function NewsBand({ session, navigate }) {
   };
   const history = (e) => { e?.preventDefault?.(); navigate?.('/v1/changelog'); };
 
-  // Closed, the band is its headline with the count and its actions: the page's first screen belongs
-  // to what waits for the person, and a list of every update pushed that several screens down. Open,
-  // it is the whole band as before. A band of one line has nothing to close.
-  const listed = news.highlights.length + Math.min(news.others.length, OTHERS_SHOWN);
-  const folds = listed > FOLDED_SHOWN + 1;
-  const closed = folds && !open;
-  const highlights = closed ? news.highlights.slice(0, FOLDED_SHOWN) : news.highlights;
-  const shownOthers = closed
-    ? news.others.slice(0, Math.max(0, FOLDED_SHOWN - highlights.length))
-    : news.others.slice(0, OTHERS_SHOWN);
-  const moreOthers = closed ? 0 : news.others.length - shownOthers.length + news.hidden;
-  // The home's contents rail lists this band under a short name, with every change it holds counted
+  // One row at the end of the home that says how many updates are unread, and opens in place: the
+  // home leads with what waits for the person and the work, and the updates are read when the person
+  // chooses. Open, the lines, then Read and the way to the history; closed, the row is the one action.
+  const highlights = news.highlights;
+  const shownOthers = news.others.slice(0, OTHERS_SHOWN);
+  const moreOthers = news.others.length - shownOthers.length + news.hidden;
+  // The home's contents rail lists this row under a short name, with every change it holds counted
   // (components/ContentsRail.js); the marker draws no box of its own.
   const total = news.highlights.length + news.others.length + news.hidden;
-  const title = closed
-    ? tr('news.titleClosed', 'System updates you have not read: {n}').replace('{n}', String(total))
-    : news.mode === 'window'
-      ? tr('news.titleWindow', 'The most important changes of the last {n} days').replace('{n}', String(WINDOW_DAYS))
-      : tr('news.titleSince', 'New since you last looked');
+  const sub = news.mode === 'window'
+    ? tr('news.subWindow', 'the last {n} days').replace('{n}', String(WINDOW_DAYS))
+    : tr('news.subUnread', '{n} unread').replace('{n}', String(total));
   return html`
     <div class="rail-mark" data-rail="news" data-rail-label=${tr('home.rail.news', 'System updates')} data-rail-count=${String(total)}>
-    <${Stack} below="part">
-    <${Band} title=${title}>
+    <${FoldSection} id="home-news" num="" title=${tr('home.rail.news', 'System updates')} sub=${sub} open=${open} onToggle=${() => setOpen(!open)}>
       ${highlights.length > 0 && html`
         <${NamedRow} stack label=${tr('news.highlights', 'Important')}>
           <${Note} kind="aside">
@@ -136,13 +129,9 @@ export default function NewsBand({ session, navigate }) {
       ${failed && html`<${Note} kind="message" error>${failed}<//>`}
 
       <${Actions}>
-        <${Loud} control disabled=${busy} onClick=${read}>${tr('news.read', 'Read')}<//>
-        ${folds && html`<${Action} onClick=${() => setOpen(!open)} expanded=${open}>
-          ${open ? tr('news.showFewer', 'Show fewer') : tr('news.showAll', 'Show all {n}').replace('{n}', String(total))}
-        <//>`}
+        <${Action} small disabled=${busy} onClick=${read}>${tr('news.read', 'Read')}<//>
         <${Action} tone="more" href="/v1/changelog" onClick=${history}>${tr('news.history', 'Everything that has changed →')}<//>
       <//>
-    <//>
     <//>
     </div>`;
 }

@@ -11,6 +11,7 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.17.1 -- 2026-11-27 -- The strip's invoice and e-mail words agree with their number (tn).
  *   v1.17.0 -- 2026-11-27 -- Who may act counts the linked shared place's members (member_count from
  *     the organisms the page already read) where it said "team"; the words for the link say shared
  *     place, the page title's word for the same thing, in every language.
@@ -43,7 +44,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -92,8 +93,8 @@ export function renderCompany(ctx) {
   const strip = html`<${FigureStrip} items=${[
     { key: 'facts', n: `${facts.done}/${facts.total}`, tone: facts.done < facts.total ? 'notice' : undefined, label: c('stripFacts'),
       sub: facts.missing.length ? c('stripFactsMissing', { list: facts.missing.slice(0, 2).map(([w]) => fieldLabel(w)).join(', ') }) : c('stripFactsDone') },
-    { key: 'inv', n: x.inv ?? 0, label: c('stripInvoices'), sub: c('stripInvoicesSub') },
-    { key: 'sent', n: x.sent ?? 0, label: c('stripSentOne'), sub: co.organismId ? c('stripSentOneSub') : c('stripSentNoBook') },
+    { key: 'inv', n: x.inv ?? 0, label: tn('companypage.stripInvoices', x.inv ?? 0), sub: c('stripInvoicesSub') },
+    { key: 'sent', n: x.sent ?? 0, label: tn('companypage.stripSentOne', x.sent ?? 0), sub: co.organismId ? c('stripSentOneSub') : c('stripSentNoBook') },
     { key: 'actors', n: actorsN, label: c('stripActors'), sub: co.organismId ? c('actorsOrganism', { name: ctx.organismName(co.organismId) }) : c('actorsYou') },
   ]} />`;
 

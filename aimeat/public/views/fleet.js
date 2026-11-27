@@ -26,10 +26,17 @@
  *   agent's name plus an owner and node identical on every row, so it is on the name's tooltip and
  *   the account line, not stamped in monospace sixty-eight times.
  *
- * @structure groupNote/rowDetail/metaLine · MigrateBanner · FleetView (default)
+ * @structure groupNote/rowDetail/metaLine · MigrateFold · FleetView (default)
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.6.0 -- 2026-11-27 -- Usability round 3. The list comes first, with this week's work at its top;
+ *     the offer of a new sign-in (MigrateBanner) is MigrateFold, one closed row under the list that
+ *     says whether the connector it needs runs (`signinNum` numbers it on the Settings page). "Needs
+ *     attention" is agentNeedsAttention (js/services/agents.js), the rule the Agents page counts with:
+ *     it counted only a sign-in that cannot work, the Agents page only the node's problem verdict and
+ *     a refused permission, so the two pages gave different numbers for the same agents.
+ *     `onFigures` also reports `movable`.
  *   v2.5.0 -- 2026-11-26 -- For the Settings page that holds it: `onFigures` reports the agents'
  *     counts for that page's figure strip, `listId` and `listNum` make the list one numbered section,
  *     and with agents the starter is drawn after the list (it stood over it, so the page began with
@@ -97,18 +104,18 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Tinted } from '/components/Figure.js';
-import { SubHeading } from '/components/SubHeading.js';
 import { Tab } from '/components/Tabs.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors, Group } from '/components/List.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
-import { sortAgents } from '/js/services/agents.js';
+import { sortAgents, agentNeedsAttention } from '/js/services/agents.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { WeekBlock } from './fleet-week.js';
 
-/** The states that mean a person has something to do. The heading counts these. */
-const NEEDS_ATTENTION = new Set(['dead', 'expiring', 'never', 'unreadable']);
+// Which agents need a look is one rule, agentNeedsAttention (js/services/agents.js), which the Agents
+// page counts with too: a sign-in that cannot work, the node's problem verdict, or a refused permission.
 
 /**
  * Open one agent's card, from a row.
@@ -205,20 +212,21 @@ function metaLine(a) {
  * what it needs to work, and what it costs the agent. The last one is the one that stops a person
  * hesitating, so it is not left to be inferred.
  */
-function MigrateBanner({ migration, migrating, outcome, onPress }) {
+function MigrateFold({ migration, migrating, outcome, onPress, id, num, open, onToggle }) {
   const n = (migration.would_move ?? []).length;
   const ready = (migration.daemons ?? []).length > 0;
   const plural = (one, many) => (n === 1 ? t(one) : t(many).replace('{n}', String(n)));
+  // One closed row under the list: what the press does as its title, and as its state whether the
+  // connector it needs is running. Open, the explanation and the button (usability round 3).
   return html`
-    <${Space} below="section">
-      <${Note} kind="aside">
+    <${FoldSection} id=${id} num=${num} title=${plural('fleet.migrate.headOne', 'fleet.migrate.head')}
+      sub=${ready ? t('fleet.migrate.subReady') : t('fleet.migrate.subNoConnector')} open=${open} onToggle=${onToggle}>
         <${Stack} gap="small">
           ${/* TITLED BY WHAT THE PRESS DOES, not by a diagnosis. It used to read "18 of your agents
                 cannot sign in", and then the list below it showed a group of 12 called "Cannot sign
                 in" and a group of 6 called "Never connected" — so the heading was wrong about a third
                 of its own number, and a reader was left reconciling 18, 12, 6 and 19. The two reasons
                 are the groups' to tell; this box is about the one press that fixes both. */''}
-          <${SubHeading} level=${3}>${plural('fleet.migrate.headOne', 'fleet.migrate.head')}<//>
           <${Note} kind="lead">${plural('fleet.migrate.whatOne', 'fleet.migrate.what')}<//>
           <${Note}>${t('fleet.migrate.keeps')}<//>
           ${/* Directly above the button, because it is the answer to "why can I not press this".
@@ -234,7 +242,6 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
           <//>
           ${outcome && html`<${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//>`}
         <//>
-      <//>
     <//>
   `;
 }
@@ -244,27 +251,30 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
  * tab, so it carries an h1; inside Settings & Controls the section header is already on screen and
  * a second heading of the same words is the thing a reader has to work out is not a mistake.
  * @param {{ embedded?: boolean, starter?: any,
- *   onFigures?: ((f: { agents: number, problems: number, connected: number, doneWeek: number }) => void) | null,
- *   listId?: string, listNum?: string }} [props]
+ *   onFigures?: ((f: { agents: number, problems: number, connected: number, doneWeek: number, movable: number }) => void) | null,
+ *   listId?: string, listNum?: string, signinNum?: string }} [props]
  */
-export default function FleetView({ embedded = false, starter = null, onFigures = null, listId, listNum } = {}) {
+export default function FleetView({ embedded = false, starter = null, onFigures = null, listId, listNum, signinNum } = {}) {
   const [agents, setAgents] = useState(null);
+  const [migration, setMigration] = useState(null);
+  // The row that offers a new sign-in is closed until the person opens it (usability round 3).
+  const [signinOpen, setSigninOpen] = useState(false);
   // The page that holds the fleet draws its figures from the agents this view loaded (how many
-  // there are, how many cannot sign in, how many are connected now, what they finished this week),
-  // so it is told them and asks the node nothing of its own.
+  // there are, how many need a look, how many are connected now, what they finished this week, how
+  // many could get a new sign-in), so it is told them and asks the node nothing of its own.
   useEffect(() => {
     if (!onFigures || !agents) return;
     onFigures({
       agents: agents.length,
-      problems: agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state)).length,
+      problems: agents.filter(agentNeedsAttention).length,
       connected: agents.filter(a => a.credential?.connected).length,
       doneWeek: agents.reduce((n, a) => n + (a.stats?.tasks?.doneWeek ?? 0), 0),
+      movable: (migration?.would_move ?? []).length,
     });
-  }, [agents, onFigures]);
+  }, [agents, migration, onFigures]);
   const fleetLoad = useLoadState();
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
-  const [migration, setMigration] = useState(null);
   // WHICH press is running, not WHETHER one is. A single boolean was read by all eighteen row
   // buttons at once, so pressing one turned every one of them into "Working…" — and a person who
   // pressed the button on web-researcher watched the whole list change and could not tell what they
@@ -433,7 +443,7 @@ export default function FleetView({ embedded = false, starter = null, onFigures 
   }
   if (!agents) return frame(fleetLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${Spinner} text=${t('fleet.loading')} />`);
 
-  const problems = agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state));
+  const problems = agents.filter(agentNeedsAttention);
   const shown = onlyProblems ? problems : agents;
 
   // WHICH ROWS GET A MOVE BUTTON, answered by the node rather than re-derived here. `would_move` is
@@ -470,32 +480,17 @@ export default function FleetView({ embedded = false, starter = null, onFigures 
       ${agents.length === 0
         ? html`${starter}<${EmptyState} title=${t('fleet.emptyTitle')} text=${t('fleet.emptyText')} />`
         : html`
-          ${/* THE ALARM COMES FIRST. The starter card ("create two agents") used to be above this,
-                so at 1280x460 the whole first screen invited a person to make MORE agents while
-                eighteen of theirs were locked out, and the warning began 660px down. When nothing
-                is broken there is no banner and the starter card is the top card, which is the
-                right order for that case and the reason this is a slot rather than a fixed spot. */''}
-          ${migration && (migration.would_move ?? []).length > 0 && html`
-            ${/* `() => migrate()` AND NOT `migrate`. The banner hands its button's onClick straight
-                  to this prop, so passing the function itself makes the click EVENT the first
-                  argument — and the first argument is now `only`, the agent to move. A MouseEvent
-                  is truthy, so the call became `{ agents: [<MouseEvent>] }`; the route drops
-                  non-strings and is left with an empty list, which reads as "move these named
-                  agents, of which there are none" and answers NOTHING_TO_MIGRATE. The bulk button
-                  therefore did nothing, on a page that had just said sixteen agents would move.
-                  Harmless until `migrate` grew a parameter on 2026-09-03, which is what makes it
-                  worth a comment rather than a silent fix: the next parameter added here brings it
-                  straight back. Found by the refusal log added the same day — `named: []` was the
-                  whole diagnosis, in one line. */''}
-            <${MigrateBanner} migration=${migration} migrating=${migrating} outcome=${outcome} onPress=${() => migrate()} />
-          `}
-          ${/* What the agents did this week, before their sign-in health: the work is why they exist. */''}
-          <${Space} below="large"><${WeekBlock} agents=${agents} /><//>
+          ${/* THE LIST COMES FIRST, then the offer of a new sign-in as one closed row under it
+                (usability round 3: the banner above the list put the list at 870px). The groups in
+                the list already say which agents cannot sign in; the row says what one press does
+                about it and whether the connector it needs runs. The starter still comes after. */''}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
             <${Space} below="large"><${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//><//>
           `}
 
           ${listed(html`
+          ${/* What the agents did this week, over their sign-in health: the work is why they exist. */''}
+          <${Space} below="large"><${WeekBlock} agents=${agents} /><//>
           <${Line} wrap gap="medium" below="large">
             <${Mark} kind="count" tone="tally">${agents.length === 1
               ? t('fleet.countAgentsOne')
@@ -603,6 +598,21 @@ export default function FleetView({ embedded = false, starter = null, onFigures 
             <//>
           `)}
           `)}
+          ${migration && (migration.would_move ?? []).length > 0 && html`
+            ${/* `() => migrate()` AND NOT `migrate`. The fold hands its button's onClick straight
+                  to this prop, so passing the function itself makes the click EVENT the first
+                  argument — and the first argument is now `only`, the agent to move. A MouseEvent
+                  is truthy, so the call became `{ agents: [<MouseEvent>] }`; the route drops
+                  non-strings and is left with an empty list, which reads as "move these named
+                  agents, of which there are none" and answers NOTHING_TO_MIGRATE. The bulk button
+                  therefore did nothing, on a page that had just said sixteen agents would move.
+                  Harmless until `migrate` grew a parameter on 2026-09-03, which is what makes it
+                  worth a comment rather than a silent fix: the next parameter added here brings it
+                  straight back. Found by the refusal log added the same day — `named: []` was the
+                  whole diagnosis, in one line. */''}
+            <${MigrateFold} id="fleet-signin" num=${signinNum} open=${signinOpen} onToggle=${() => setSigninOpen(v => !v)}
+              migration=${migration} migrating=${migrating} outcome=${outcome} onPress=${() => migrate()} />
+          `}
           ${/* THE STARTER COMES AFTER THE AGENTS A PERSON HAS. It stood over the list, so a page
                 opened to see how nineteen agents are doing began with an offer to make two more.
                 With no agent it is the first thing on the page (above), which is where a person

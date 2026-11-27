@@ -12,6 +12,7 @@
  * @structure LibrariesTab() — state (packs, details, filters, queries, expanded) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'libraries'.
  * @version-history
+ *   v2.2.1 -- 2026-11-27 -- `folds` also holds the three shelves, unset until the person presses one.
  *   v2.2.0 -- 2026-11-27 -- The dependency map it already reads is also narrowed to the reader's own
  *     apps (`appsUsing.mine`: pack id → filenames), so the page can say which deprecated library an
  *     app of theirs still loads; and the fold state of the faces and the AI rows (usability pass of
@@ -47,7 +48,8 @@ export default function LibrariesTab({ showToast }) {
   const [filters, setFilters] = useState({ base: emptyFilter(), ui: emptyFilter(), third: emptyFilter() });
   const [queries, setQueries] = useState({ base: '', ui: '', third: '' });
   const [shown, setShownState] = useState({ base: 20, ui: 20, third: 20 });
-  // The page's two rows that open in place: the faces, and the rule and facts for an AI.
+  // The page's rows that open in place: the three shelves (unset: open when the shelf holds a library
+  // in use, libraries/page.js), the faces, and the rule and facts for an AI.
   const [folds, setFolds] = useState({ faces: false, ai: false });
 
   // The list is fetched in the reader's language, so a language switch fetches it again.

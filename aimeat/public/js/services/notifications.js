@@ -10,6 +10,8 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   2026-11-27 — storedI18n: a join request stored with only its English title is said in the
+ *     reader's language (notiftext.join_request*), as a new one is from its i18n.
  *   2026-11-27 — saidNotice: a place the stored notice does not carry says nothing, so a notice stored
  *     before its template gained a variable shows no brace.
  *   2026-11-26 — readerVars says an operator service's `off`, `private_read` and `help` in the reader's language.
@@ -174,9 +176,21 @@ export function saidNotice(key, vars) {
   for (const [, name] of String(tpl).matchAll(/\{(\w+)\}/g)) if (!(name in all)) all[name] = '';
   return said(key, all);
 }
+/**
+ * How to say a notice stored before its sender wrote `i18n`: a join request kept only its English
+ * title ('alice@node requested to join "Org"', services/organism-join-requests/requests.ts until
+ * 2026-11-27), so the reader's words are read back from it. Null for every other notice.
+ */
+function storedI18n(n) {
+  if (n?.i18n?.key || n?.type !== 'organism_join_request') return n?.i18n || null;
+  const m = /^(.+?) requested to join "(.*)"$/.exec(String(n.title || ''));
+  if (!m) return null;
+  const who = m[1].includes('@') ? m[1].slice(0, m[1].lastIndexOf('@')) : m[1];
+  return { key: n.body ? 'join_request_message' : 'join_request', vars: { who, organism: m[2], message: n.body || '' } };
+}
 /** The title in the reader's language when the record says how; else what the sender wrote. */
-export function titleOf(n) { return (n?.i18n?.key && saidNotice(`notiftext.${n.i18n.key}.title`, n.i18n.vars || {})) || n?.title || ''; }
-export function bodyOf(n) { return (n?.i18n?.key && saidNotice(`notiftext.${n.i18n.key}.body`, readerVars(n.i18n.key, n.i18n.vars || {}))) || n?.body || ''; }
+export function titleOf(n) { const i = storedI18n(n); return (i?.key && saidNotice(`notiftext.${i.key}.title`, i.vars || {})) || n?.title || ''; }
+export function bodyOf(n) { const i = storedI18n(n); return (i?.key && saidNotice(`notiftext.${i.key}.body`, readerVars(i.key, i.vars || {}))) || n?.body || ''; }
 
 /**
  * Variables the sender filled in its own words, said again in the reader's language: `scope_words`

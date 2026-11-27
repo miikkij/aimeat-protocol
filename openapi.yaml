@@ -49506,8 +49506,10 @@ paths:
                     properties:
                       total_memory_keys:
                         type: integer
+                        description: Live memory keys of the account, the person's own and those of every agent of it (the set GET /v1/data-wallet and the Memory page count).
                       total_storage_files:
                         type: integer
+                        description: Stored files of the same set.
                       active_consents:
                         type: integer
                       rules_by_recipient_type:
@@ -87460,8 +87462,8 @@ paths:
                           permSummary:
                             type: object
                             properties:
-                              total_memory_keys: { type: integer }
-                              total_storage_files: { type: integer }
+                              total_memory_keys: { type: integer, description: "Live memory keys of the account: the person's own and those of every agent of it, the set the Memory page counts." }
+                              total_storage_files: { type: integer, description: "Stored files of the same set." }
                               active_consents: { type: integer }
                               consent_quota: { type: integer }
                               rules_by_recipient_type: { type: object, additionalProperties: { type: integer } }

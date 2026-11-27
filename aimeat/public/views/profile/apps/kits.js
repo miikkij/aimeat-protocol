@@ -15,6 +15,8 @@
  * @structure KitsSection({ num, gallery, showToast })
  * @usage html`<${KitsSection} num="07" gallery=${galleryUrl} showToast=${showToast} />`
  * @version-history
+ *   v1.1.0 — 2026-11-27 — `fold` ({ open, onToggle }): a closed row that names the kit the person's
+ *     own new apps start from, or that none is chosen.
  *   v1.0.0 — 2026-10-30 — Initial (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  */
 import { h } from 'preact';
@@ -46,7 +48,7 @@ function metaOf(entry) {
   return a('kitChosen', { title: entry.title || entry.kit });
 }
 
-export function KitsSection({ num, gallery, showToast }) {
+export function KitsSection({ num, gallery, showToast, fold = null }) {
   const [view, setView] = useState(null);      // GET /v1/designbook/kits/defaults; false when it failed
   const [kits, setKits] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -85,8 +87,12 @@ export function KitsSection({ num, gallery, showToast }) {
       <//>
     <//>`;
 
+  // Closed, the row names the kit the person's own new apps start from.
+  const own = view && view.own && !view.own.unavailable ? (view.own.title || view.own.kit) : null;
+  const sub = !view ? null : own || a('kitNoneChosen');
   return html`
-    <${Section} id="ap-kits" num=${num} title=${a('secKits')}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle} sub=${sub}
+      id="ap-kits" num=${num} title=${a('secKits')}>
       <${Note} kind="lead">${a('kitsLead')}<//>
       ${view === null ? html`<${Note} kind="loading">${a('kitsLoading')}<//>` : null}
       ${view === false ? html`<${Note} kind="quiet">${a('kitsFailed')}<//>` : null}

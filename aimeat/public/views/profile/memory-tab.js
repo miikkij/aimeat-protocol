@@ -5,6 +5,7 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.8.1 -- 2026-11-27 -- `memFolds`, `toggleMemFold`, `openMemFold` in the ctx: the cover's closed rows.
  *   v3.8.0 -- 2026-11-27 -- The cover's records are named by title: useSpaceTitles
  *     (memory-tab/space-titles.js) reads the value of each drawn row's newest record once per version
  *     when it is small, and ctx.titleFor gives the cover the title.
@@ -214,6 +215,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [spaceSort, setSpaceSort] = useState('updated');   // a key space page's order
   const [showRaw, setShowRaw] = useState(false);            // a record page: raw JSON instead of the readable form
   const [sysOpen, setSysOpen] = useState(false);            // the bookkeeping fold on the cover
+  const [memFolds, setMemFolds] = useState({});             // the cover's closed rows, by section id
   const [showSearch, setShowSearch] = useState(false);      // the search row under the masthead
   const [staleAll, setStaleAll] = useState(false);          // the stale section past its first eight
   const [moreOpen, setMoreOpen] = useState(new Set());      // the cover tables opened past their first twelve rows
@@ -808,6 +810,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     memFailed: memLoad.failed, filesFailed: filesLoad.failed, loadFiles,
     // the poster face
     view, pickView, titleFor: spaceTitles.titleFor, spaceSort, setSpaceSort: pickSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
+    memFolds, toggleMemFold: (id) => setMemFolds(f => ({ ...f, [id]: !f[id] })), openMemFold: (id) => setMemFolds(f => ({ ...f, [id]: true })),
     staleAll, setStaleAll: showAllStale, moreOpen, fullList, keyPages: pages, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,
     // entries
     memories, valueOf, valueCopyText, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,

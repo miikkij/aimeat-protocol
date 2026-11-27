@@ -19,6 +19,9 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?, opts?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-27 — permSummary's memory keys and files are counted over the account (the GHII and every
+ *     agent of it), the set the Memory page counts, where only the GHII's were; the same in GET
+ *     /v1/permissions/summary.
  *   2026-11-19 — Additive: each consent carries `holder`, the identity it is filed under, so the page
  *     names the agent that gave a consent.
  *   2026-11-19 — The consents and the trail are the account's, its agents' included, read through
@@ -111,11 +114,15 @@ export class DataWalletService {
       // holders (the account and every agent) are read once for both, in one query each.
       const holder = opts.consentHolder ?? ownerGaii;
       const holders = await accountConsentHolders(this.storage, holder);
+      // The keys and files are the account's too: the person's own and those their agents keep in
+      // their name, the set the Memory page counts (services/db/memory-tab-db-service.ts). Counted over
+      // the GHII alone, the two pages gave two numbers for the same data (131 against 140).
+      const keepers = holders.includes(ownerGaii) ? holders : [ownerGaii];
       const [consents, auditEntries, memoryKeys, fileTotals] = await Promise.all([
         listAccountConsents(this.storage, holder, {}, holders),
         consentAuditOf(this.storage, holders, { days: auditDays }),
-        this.storage.countMemory([ownerGaii], { excludeExpired: true }),
-        this.storage.sumStorageBytesForOwners([ownerGaii]),
+        this.storage.countMemory(keepers, { excludeExpired: true }),
+        this.storage.sumStorageBytesForOwners(keepers),
       ]);
 
       // Permission summary — derived from the active subset of the SAME consent list (no re-read).

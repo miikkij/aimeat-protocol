@@ -15,6 +15,9 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- The strip keeps what asks for a decision and what is unread; the latest
+ *     notice (the inbox's first row) and the devices (section 03's row) left it, so the inbox starts
+ *     higher.
  *   v1.21.0 -- 2026-11-27 -- Usability pass of the Settings pages: the inbox is the page, and what asks
  *     for a decision comes first (its figure in the notice tone leads the strip, its rows lead the list,
  *     then the unread); the strip draws nothing while the page holds nothing (hideZeros) and no longer
@@ -81,7 +84,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { Label } from '/components/Mark.js';
-import { groupWord, kindWord, sourceName, titleOf } from '/js/services/notifications.js';
+import { groupWord, kindWord, sourceName } from '/js/services/notifications.js';
 import { c, rel, day, firstLine, Switch, inboxRows, senderRows, needsAnswer, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { HelpTip, HelpLabel } from '/components/HelpTip.js';
@@ -100,16 +103,13 @@ export function renderCover(ctx) {
   const devices = ctx.devices.length;
   const firstLoad = ctx.loading && !items.length;
   // The figures, from what the page already read: what asks for a decision (only when something
-  // does, first and in the notice tone), what is unread, when the latest arrived, and the devices
-  // push reaches. With nothing at all the strip is not drawn (hideZeros).
-  const strip = ctx.itemsFailed ? null : firstLoad ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} hideZeros items=${[
+  // does, first and in the notice tone) and what is unread. The latest notice is the inbox's first
+  // row and the devices are section 03's row, so the strip no longer repeats them; it stood the
+  // inbox's first row at about 770 px. With nothing at all the strip is not drawn (hideZeros).
+  const strip = ctx.itemsFailed ? null : firstLoad ? html`<${FigureStrip} loading=${2} />` : html`<${FigureStrip} hideZeros items=${[
     needs ? { key: 'needs', n: needs, tone: 'notice', label: c('stripNeeds'), sub: c('stripNeedsSub') } : null,
     { key: 'unread', n: unread, tone: unread ? 'notice' : undefined, label: c('stripUnread'),
       sub: unread ? [...new Set(items.filter(n => !n.read).map(n => sourceName(n)))].join(' · ') : c('stripUnreadNone') },
-    items[0]
-      ? { key: 'latest', n: rel(items[0].createdAt), label: c('stripLatest'), sub: `${sourceName(items[0])} · ${titleOf(items[0])}` }
-      : { key: 'latest', n: '·', label: c('stripLatest'), sub: c('nothingYet') },
-    { key: 'devices', n: devices, label: c('stripDevices'), sub: devices ? ctx.devices.map(d => (d.thisBrowser ? c('thisBrowser') : c('family.' + d.family))).join(' · ') : c('stripDevicesNone') },
   ]} />`;
   // The start: folded once a notification has arrived; its button turns push on in this browser
   // while it is off and the browser and the server can do it.

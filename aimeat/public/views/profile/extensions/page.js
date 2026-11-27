@@ -13,6 +13,9 @@
  * @structure renderPage · secExtensions · secCortexes · secNew
  * @usage import { renderPage } from './extensions/page.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- Whose (mine, others, platform) is its own filter row, drawn only when
+ *     someone else has some; the filters by state, kind and part are drawn only over more than ten
+ *     (Filters total). The page's top was 641 px.
  *   v2.2.0 -- 2026-11-27 -- Usability pass. 01 is always the person's own server extensions; an own
  *     extension that needs them (stopped while an app calls it, or its last scheduled run failed)
  *     comes first in the list with its reason, and the strip counts it in the notice tone. The strip
@@ -160,9 +163,11 @@ function secExtensions(ctx, mine, others, num) {
       ${!ctx.extensions ? html`<${List} loading=${t('common.loading')} />` : !mine.length && F.who !== 'others' ? html`
         <${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${x('extEmptyHead')}</b> ${x('extEmptyBody')}<//>`} />
         <${Filters}>${facet(false, x('facetOthers'), others.length, () => ctx.setExtFilter({ who: 'others' }), 'others')}<//>` : html`
-        <${Filters}>
+        ${others.length || F.who === 'others' ? html`<${Filters}>
           ${facet(F.who !== 'others', x('facetMine'), mine.length, () => ctx.setExtFilter({ who: 'mine' }), 'mine')}
           ${facet(F.who === 'others', x('facetOthers'), others.length, () => ctx.setExtFilter({ who: 'others' }), 'others')}
+        <//>` : null}
+        <${Filters} total=${pool.length}>
           ${facet(F.state === 'active', x('facetActive'), count((e) => e.status === 'active'), () => ctx.setExtFilter({ state: F.state === 'active' ? '' : 'active' }), 'active')}
           ${facet(F.state === 'off', x('facetOff'), count((e) => e.status !== 'active'), () => ctx.setExtFilter({ state: F.state === 'off' ? '' : 'off' }), 'off')}
           ${facet(F.kind === 'apps', x('facetApps'), count((e) => kindOf(e) === 'apps'), () => ctx.setExtFilter({ kind: F.kind === 'apps' ? '' : 'apps' }), 'apps')}
@@ -205,10 +210,12 @@ function secCortexes(ctx, myCx, otherCx, platformCx, num, fold) {
     <${Section} id="ex-cortex" num=${num} title=${x('secCortex')} ...${props}>
       ${fold ? html`<${Actions}>${copyGuide}<//>` : null}
       ${!ctx.cortexes ? html`<${List} loading=${t('common.loading')} />` : html`
-        <${Filters}>
+        <${Filters} label=${x('secCortex')}>
           ${facet(F.who === 'mine', x('facetMine'), myCx.length, () => ctx.setCxFilter({ who: 'mine' }), 'mine')}
           ${facet(F.who === 'platform', x('facetPlatform'), platformCx.length, () => ctx.setCxFilter({ who: 'platform' }), 'platform')}
           ${facet(F.who === 'others', x('facetOthersPublic'), publicOthers.length, () => ctx.setCxFilter({ who: 'others' }), 'others')}
+        <//>
+        <${Filters} total=${pool.length}>
           ${facet(!!F.pub, x('facetPublic'), pool.filter((c) => c.visibility === 'public').length, () => ctx.setCxFilter({ pub: !F.pub }), 'pub')}
           ${parts.map((p) => facet(F.part === p, x('part.' + p), partCount(p), () => ctx.setCxFilter({ part: F.part === p ? '' : p }), 'p' + p))}
         <//>

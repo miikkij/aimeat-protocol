@@ -10,6 +10,8 @@
  * @structure DiscoverTab() — scope, query, view and the loads → the ctx bag → renderDiscoverView
  * @usage registered in profile.js TABS as id 'discover'
  * @version-history
+ *   v1.1.0 — 2026-11-27 — What changed last and a kind's rows leave out the node's built-in tools in
+ *     the own and shared scopes: "access list" and "admin config set" stood there dated 1.1.1970.
  *   v1.0.1 — 2026-08-30 — The page says it is counting while the map loads, and loads less: the own
  *     scope's counts and its recent rows on mount, the other scopes' counts only when chosen. On
  *     aimeat.io the four parallel enumerations took eight seconds with nothing on screen.
@@ -25,11 +27,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { getSession } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
-import { HUMAN_TYPES } from './discover/frame.js';
+import { HUMAN_TYPES, isBuiltIn } from './discover/frame.js';
 import { renderDiscoverView } from './discover/view.js';
 
 const SCOPES = ['own', 'public', 'shared'];
 const PAGE = 50;
+/** A scope's entries without the node's built-in tools, except in the public scope (frame.js isBuiltIn). */
+const mine = (scope, entries) => (scope === 'public' ? (entries || []) : (entries || []).filter(e => !isBuiltIn(e)));
 
 export default function DiscoverTab() {
   const [scope, setScope] = useState('own');
@@ -68,7 +72,7 @@ export default function DiscoverTab() {
   const loadMap = useCallback(async () => {
     loadFacets('own');
     const params = new URLSearchParams({ scope: 'own', per_page: '40', type: HUMAN_TYPES.join(',') });
-    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, own: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
+    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, own: mine('own', d.entries) })); }).catch(err => swallowed('discover-tab: recent', err));
   }, [get, loadFacets]);
   useEffect(() => { loadMap(); }, [loadMap]);
   useEffect(() => {
@@ -76,7 +80,7 @@ export default function DiscoverTab() {
     if (!facets[scope]) loadFacets(scope);
     if (recent[scope]) return;
     const params = new URLSearchParams({ scope, per_page: '40', type: HUMAN_TYPES.join(',') });
-    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, [scope]: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
+    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, [scope]: mine(scope, d.entries) })); }).catch(err => swallowed('discover-tab: recent', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a scope is counted once; the facets it already has are not a reason to count again
   }, [scope, recent, get, loadFacets]);
   const liveRef = useRef(loadMap); liveRef.current = loadMap;
@@ -115,7 +119,11 @@ export default function DiscoverTab() {
     let alive = true;
     setBrowse({ entries: [], total: 0, page: 1, loading: true });
     get(browseParams(1))
-      .then(d => { if (alive) setBrowse({ entries: d?.entries || [], total: d?.total || 0, page: 1, loading: false }); })
+      .then(d => {
+        if (!alive) return;
+        const entries = mine(scope, d?.entries);
+        setBrowse({ entries, total: Math.max(0, (d?.total || 0) - ((d?.entries || []).length - entries.length)), page: 1, loading: false });
+      })
       .catch(err => { swallowed('discover-tab: browse', err); if (alive) setBrowse({ entries: [], total: 0, page: 1, loading: false }); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewKey names every input the browse depends on
@@ -126,7 +134,9 @@ export default function DiscoverTab() {
     setBrowse(b => ({ ...b, loading: true }));
     try {
       const d = await get(browseParams(page));
-      setBrowse(b => ({ entries: [...b.entries, ...(d?.entries || [])], total: d?.total || b.total, page, loading: false }));
+      const entries = mine(scope, d?.entries);
+      const dropped = (d?.entries || []).length - entries.length;
+      setBrowse(b => ({ entries: [...b.entries, ...entries], total: Math.max(0, b.total - dropped), page, loading: false }));
     } catch (err) { swallowed('discover-tab: browse more', err); setBrowse(b => ({ ...b, loading: false })); }
   };
 

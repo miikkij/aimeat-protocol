@@ -16,6 +16,9 @@
  * @structure x · subOf · whenWords · scopeWords · stateOf · ReportsTab (default)
  * @usage registered in profile.js TABS as id 'reports', listed in the Business group of SIDEBAR_GROUPS.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A report's organism is named in words (orgWords): its name, "a removed
+ *     organism" when the scheduler found it gone, "an organism you cannot see" otherwise; the row
+ *     showed its id ("Organism org-seed-missing").
  *   v1.2.0 — 2026-11-27 — With no report the strip is not drawn (FigureStrip hideZeros) and the list's
  *     empty line is the page; a report that did not go out comes first in the list, the paused ones
  *     last; the one-entry contents rail goes.
@@ -73,11 +76,24 @@ function whenWords(v) {
   return x('cadence.unknown');
 }
 
+/**
+ * The organism a report names: its name when the person can see it, the suffix of the scope's own
+ * words for a removed organism (the scheduler found it gone) or one the person's list does not hold,
+ * and '…' while the list is read. Never its id ("Organism org-seed-missing"). `orgNames` is null
+ * until the person's organisms are read.
+ */
+function orgWords(v, orgNames) {
+  if (orgNames && orgNames[v.orgId]) return { org: orgNames[v.orgId] };
+  if (v.lastSkip === 'organism-gone') return { suffix: 'Gone' };
+  return orgNames ? { suffix: 'Unseen' } : { org: '…' };
+}
+
 /** Whose work the report covers, with the organism's name when the person can see it. */
 function scopeWords(v, orgNames) {
-  const org = orgNames[v.orgId] || v.orgId || '';
-  if (v.scope === 'organism') return x('scope.organism', { org });
-  if (v.scope === 'workspace') return x('scope.workspace', { org });
+  if (v.scope === 'organism' || v.scope === 'workspace') {
+    const w = orgWords(v, orgNames);
+    return w.suffix ? x(`scope.${v.scope}${w.suffix}`) : x('scope.' + v.scope, { org: w.org });
+  }
   if (v.scope === 'node') return x('scope.node');
   return x('scope.own');
 }
@@ -105,7 +121,7 @@ export default function ReportsTab({ showToast }) {
   const [items, setItems] = useState(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [orgNames, setOrgNames] = useState({});
+  const [orgNames, setOrgNames] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -127,7 +143,9 @@ export default function ReportsTab({ showToast }) {
   useEffect(() => {
     if (!needsOrgs) return undefined;
     let live = true;
-    getOrganismsTab().then((tab) => { if (live) setOrgNames(Object.fromEntries((tab?.mine || []).map((o) => [o.id, o.name]))); });
+    getOrganismsTab()
+      .then((tab) => { if (live) setOrgNames(Object.fromEntries((tab?.mine || []).map((o) => [o.id, o.name]))); })
+      .catch((e) => { swallowed('reports-tab: organisms', e); if (live) setOrgNames({}); });
     return () => { live = false; };
   }, [needsOrgs]);
 

@@ -14,6 +14,8 @@
  * @structure renderPage · head · figures · noOrganism · notEnabled · numbered
  * @usage import { renderPage } from './kyc/page.js';
  * @version-history
+ *   v1.4.0 — 2026-11-27 — The DPIA is a closed row of its own after the risk assessment (kyc-dpia,
+ *     assessment.js secDpia), in the rail too.
  *   v1.3.0 — 2026-11-27 — A figure strip under the head for a person who does the due diligence
  *     (customers, due for review and possible sanctions matches in the notice tone, and for an officer
  *     the suspicions still to decide), counted from the lists the page already reads, never a
@@ -50,7 +52,7 @@ import { cardDialog } from './card-dialogs.js';
 import { secSuspicions, openCases } from './suspicions.js';
 import { secSettings } from './settings.js';
 import { secMine, mineHas } from './mine.js';
-import { secAssessment } from './assessment.js';
+import { secAssessment, secDpia } from './assessment.js';
 
 const html = htm.bind(h);
 
@@ -164,6 +166,7 @@ function numbered(ctx) {
   if (ctx.card.id) add('kyc-card', x('card.title'), (n) => secCard(ctx.card, n));
   add('kyc-suspicions', x('secSuspicions'), (n) => secSuspicions(ctx.su, ctx.cu, n));
   if (ctx.ra.may) add('kyc-assessment', x('secAssessment'), (n) => secAssessment(ctx.ra, n));
+  if (ctx.ra.may && ctx.ra.dpia?.item) add('kyc-dpia', x('dpia.title'), (n) => secDpia(ctx.ra, n));
   if (ctx.st.reader) add('kyc-settings', x('secSettings'), (n) => secSettings(ctx.st, n));
   if (mine) addMine();
   return parts;

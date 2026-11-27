@@ -15,6 +15,8 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.20.0 -- 2026-11-27 -- One way on per note (Suggest placement); Enrich, Split and Delete are in
+ *     the More menu (CardMenu inline): four equal buttons stood on every note.
  *   v1.19.1 -- 2026-11-27 -- No emoji: the New organism and New workspace choices say their words
  *     alone, an organism the filing will create is marked with a plain +, and the owed-reply aside
  *     drops its link emoji. Organism and workspace in a filing target are set apart by " / " instead
@@ -88,6 +90,7 @@ import { Mark, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
 import { Card } from '/components/Card.js';
+import { CardMenu } from '/components/CardMenu.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
@@ -565,17 +568,17 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
           <${PeekToggle} view=${view} label=${t('profile.notebook.toggleView')} onToggle=${cycleView} />
           <${Mark} kind="time">${relTime(note.updated_at || note.created_at)}<//>
         <//>
+        ${/* One way on per note: placing it is what a note is kept for. Enrich, split and delete are in
+              the More menu; four equal buttons stood on every note. A step that runs is not offered again. */''}
         <${Row} wrap gap="small">
-          <${Action} small disabled=${planning} onClick=${() => handleEnrich()}>
-            ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
-          <//>
           <${Action} small disabled=${sorting} onClick=${() => handleSuggest()}>
             ${sorting ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
           <//>
-          <${Action} small disabled=${distributing} onClick=${() => handleDistribute()}>
-            ${distributing ? t('profile.notebook.splitting') : t('profile.notebook.splitBtn')}
-          <//>
-          <${Action} small tone="danger" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}<//>
+          <${CardMenu} inline="end" label=${t('profile.notebook.moreActions')} actions=${[
+            planning ? null : { key: 'enrich', label: t('profile.notebook.enrichBtn'), run: () => handleEnrich() },
+            distributing ? null : { key: 'split', label: t('profile.notebook.splitBtn'), run: () => handleDistribute() },
+            { key: 'delete', label: t('profile.notebook.deleteBtn'), danger: true, run: () => onDelete(note.key) },
+          ].filter(Boolean)} />
         <//>
       <//>
 

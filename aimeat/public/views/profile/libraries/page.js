@@ -13,6 +13,12 @@
  * @structure renderPage · shelf · secFaces · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.23.0 -- 2026-11-27 -- Usability round 3: each shelf is one row that says how many libraries it
+ *     holds, how many an app loads and how many deprecated ones the reader's apps still load; a shelf
+ *     opens by itself only when it holds a library in use (the 84 open rows made the page 12 800 px).
+ *     The shelf's old count words are its lead. The head's deprecated tag went: it counted every
+ *     deprecated library on the node (3) where the strip counts the ones the reader's apps still load
+ *     (1); the strip's rule is the one kept, and each shelf's Deprecated filter counts the node's.
  *   v1.22.0 -- 2026-11-27 -- Usability pass of the Settings pages: the three shelves stay open; the
  *     faces and the AI rule with its facts are rows that say their state and open in place. A
  *     deprecated library one of the reader's own apps still loads leads its shelf, its count leads
@@ -54,7 +60,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -88,7 +93,6 @@ export function renderPage(ctx) {
   const third = all.filter((p) => shelfOf(p) === 'third');
   const inUse = all.filter((p) => used(p) > 0).length;
   const provenN = all.filter(proven).length;
-  const deprecatedN = all.filter((p) => p.status === 'deprecated').length;
   const appsUsing = ctx.appsUsing;   // { using, total, mine } or null
   const top = all.slice().sort((a, b) => used(b) - used(a)).slice(0, 3).filter((p) => used(p) > 0).map((p) => `${p.id} ${used(p)}`).join(' · ');
   // A deprecated library that one of the reader's own apps still loads: the one thing here that
@@ -106,9 +110,9 @@ export function renderPage(ctx) {
       sub: top ? x('stripTop', { list: top }) : '' },
   ]} />`;
   const sections = [
-    { id: 'lb-base', label: x('secBase'), count: packs ? base.length : '' },
-    { id: 'lb-ui', label: x('secUi'), count: packs ? ui.length : '' },
-    { id: 'lb-third', label: x('secThird'), count: packs ? third.length : '' },
+    { id: 'lb-base', label: x('secBase'), count: packs ? base.length : '', open: () => ctx.setFold('base', true) },
+    { id: 'lb-ui', label: x('secUi'), count: packs ? ui.length : '', open: () => ctx.setFold('ui', true) },
+    { id: 'lb-third', label: x('secThird'), count: packs ? third.length : '', open: () => ctx.setFold('third', true) },
     { id: 'lb-faces', label: x('secFaces'), count: ctx.fonts ? ctx.fonts.base.length + ctx.fonts.added.length : '' },
     { id: 'lb-ai', label: x('secAi'), count: '' },
   ].map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
@@ -119,10 +123,10 @@ export function renderPage(ctx) {
       title=${t('librariesTab.tabLabel')}
       sub=${x('titleSub')}
       help="concept.library"
-      marks=${packs ? [
-        { label: x('chipProven', { n: provenN }) },
-        deprecatedN ? { label: x('chipDeprecated', { n: deprecatedN }) } : null,
-      ] : []}
+      marks=${/* The deprecated count is said once: the strip's (deprecated AND loaded by the reader's
+        own apps), the one that asks something of the reader. The tag counted every deprecated library
+        on the node (3 against the strip's 1); each shelf's Deprecated filter still counts those. */
+        packs ? [{ label: x('chipProven', { n: provenN }) }] : []}
       desc=${x('desc')}
       actions=${html`
         <${Loud} copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
@@ -133,9 +137,9 @@ export function renderPage(ctx) {
       sections=${sections}
       pagesLabel=${x('pages')}
       pages=${pageLinks()}>
-      ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
-      ${shelf(ctx, 'ui', '02', x('secUi'), x('secUiSub'), ui, false)}
-      ${shelf(ctx, 'third', '03', x('secThird'), x('secThirdSub'), third, false)}
+      ${shelf(ctx, 'base', '01', x('secBase'), base)}
+      ${shelf(ctx, 'ui', '02', x('secUi'), ui)}
+      ${shelf(ctx, 'third', '03', x('secThird'), third)}
       ${secFaces(ctx, '04')}
       ${secAI(ctx, '05', all)}
     <//>`;
@@ -143,8 +147,16 @@ export function renderPage(ctx) {
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
 
-function shelf(ctx, key, num, title, sub, list, first) {
+function shelf(ctx, key, num, title, list) {
   const F = ctx.filters[key];
+  // One row that says how many libraries the shelf holds and how many an app loads. It opens by
+  // itself only when it holds a library in use (or a deprecated one the reader's apps still load):
+  // 84 open rows made a 12 800 px page. The person's own press wins from then on.
+  const inUseN = list.filter((p) => used(p) > 0).length;
+  const staleN = list.filter((p) => isStale(ctx, p)).length;
+  const open = ctx.folds?.[key] ?? (inUseN > 0 || staleN > 0);
+  const foldSub = !ctx.packs ? null : [x('shelfCount', { n: list.length }), x('shelfInUse', { n: inUseN }),
+    staleN ? x('shelfStale', { n: staleN }) : null].filter(Boolean).join(' · ');
   const q = (ctx.queries[key] || '').trim().toLowerCase();
   const count = (f) => list.filter(f).length;
   let rows = list;
@@ -183,8 +195,9 @@ function shelf(ctx, key, num, title, sub, list, first) {
   ];
   const ids = { base: 'lb-base', ui: 'lb-ui', third: 'lb-third' };
   return html`
-    <${PageSection} id=${ids[key]} num=${num} title=${title} count=${ctx.packs ? sub : null} first=${first}>
+    <${FoldSection} id=${ids[key]} num=${num} title=${title} sub=${foldSub} open=${open} onToggle=${() => ctx.setFold(key, !open)}>
       ${!ctx.packs ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
+        <${Note} kind="lead">${x(`sec${key === 'base' ? 'Base' : key === 'ui' ? 'Ui' : 'Third'}Sub`)}<//>
         <${Filters}>${facets}<//>
         <${SearchLine} value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} label=${x('search.' + key)}
           onInput=${(e) => ctx.setQuery(key, e.target.value)} note=${x('searchOrder')} />

@@ -12,6 +12,7 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.23.0 -- 2026-11-27 -- The filter row is drawn only over a shelf of more than ten (Filters total).
  *   v1.22.0 -- 2026-11-27 -- Usability pass. The strip says what an agent finds here and how much of it
  *     it can call, what is the person's own, what the operator rejected of theirs (notice tone, only
  *     then) and the calls, with hideZeros; the head's tags, which repeated it, go. A shelf is drawn
@@ -175,7 +176,7 @@ function shelf(ctx, key, num, title, sub, list, first) {
   return html`
     <${PageSection} id=${ids[key]} num=${num} title=${title} count=${sub} first=${first}>
       ${!ctx.groups ? loadingRow() : !list.length ? html`<${Note} kind="quiet">${x('emptyAll')}<//>` : html`
-        <${Filters}>
+        <${Filters} total=${list.length}>
           ${facet(!F.who && !F.use && !F.priced && !F.vouched, x('facetAll'), list.length, () => set({ who: '', use: '', priced: false, vouched: false }), 'all')}
           ${facet(F.who === 'own', x('facetOwn'), count((g) => g.own), () => tog('who', 'own'), 'own')}
           ${facet(F.who === 'others', x('facetOthers'), count((g) => !g.own), () => tog('who', 'others'), 'others')}

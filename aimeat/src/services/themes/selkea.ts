@@ -24,6 +24,9 @@
  * @structure SELKEA_ID · SELKEA_COLOURS · styleTokens · SHAPES · themeCss · selkeaTheme
  * @usage import { selkeaTheme, SELKEA_ID } from './selkea.js';
  * @version-history
+ *   v1.3.3 — 2026-11-27 — The column heads' line runs unbroken under the whole head row (it broke at
+ *     every column gap on lists without listing--cols); the closed page start is one light row with
+ *     no box on every page, not only in a head's row.
  *   v1.3.2 — 2026-11-27 — A list row's name stands 14px from its mark (it touched it), and the column
  *     heads end in an ink line so the list visibly starts under them.
  *   v1.3.1 — 2026-11-27 — The start closed in a head's row (PageStart inline) has no box: the
@@ -150,8 +153,9 @@ function themeCss(): string {
 
 /* The page start is a white box with an ink frame and a solid sun offset; its label stands on the sun. */
 .page-start { background: var(--card-bg); border: 2px solid var(--text); border-radius: var(--shape-corner); box-shadow: 6px 6px 0 var(--sun); padding: 16px 20px; margin-bottom: 14px; }
-/* Closed in the head's row (PageStart inline), the start is only its word: no box around it. */
-.page-start.page-start--inline.page-start--folded { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
+/* Closed, on every page, the start is one light row (a chevron and its words): no box around it. */
+.page-start.page-start--folded { background: none; border: 0; box-shadow: none; padding: 0; margin: 0 0 10px; }
+.page-start.page-start--inline.page-start--folded { margin: 0; }
 .page-start-head .poster-label { background: var(--sun); color: var(--on-sun); padding: 4px 10px; border-radius: var(--shape-corner-control); }
 
 /* A prompt to copy is a white box with an ink frame, and its copy action is a filled button. */
@@ -192,8 +196,11 @@ function themeCss(): string {
    name stood against the mark. */
 :root .listing--cols[class*="listing--mark-"] > .listing-row > :first-child { padding-right: 0; }
 :root .listing--cols[class*="listing--mark-"] > .listing-row > :nth-child(2) { padding-left: 14px; }
-/* The column heads end in a line, so the list visibly starts under them. */
-:root .listing-row--head > * { padding-bottom: .5rem; border-bottom: 1.5px solid var(--text); }
+/* The column heads end in ONE line under the whole row, so the list visibly starts under them. The row
+   is display: contents, so each head cell draws its part, and the part reaches across the column gap
+   to the next cell (border-image-outset); the last cell stops at the list's edge. */
+:root .listing-row--head > * { padding-bottom: .5rem; border-bottom: 1.5px solid var(--text); border-image: linear-gradient(var(--text), var(--text)) 1 / 0 0 1.5px 0 / 0 4rem 0 0; }
+:root .listing-row--head > :last-child { border-image-outset: 0; }
 /* A tab is an outlined button; the chosen one stands on the sun. */
 :root .poster-tab { padding: 7px 12px; border: 1.5px solid var(--text); border-radius: var(--shape-corner-control); background: var(--card-bg); color: var(--text); font-weight: 700; text-transform: none; letter-spacing: 0; box-shadow: none; }
 :root .poster-tab:hover, :root .poster-tab.is-on { background: var(--sun); color: var(--on-sun); }

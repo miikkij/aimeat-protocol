@@ -100,6 +100,9 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.19.0 — 2026-11-27 — Filters `total`: no filter row over a list of ten or fewer; a Filter that
+ *     counts 0 and is not chosen is not drawn. Additive: a caller without `total` keeps its row.
+ *     RowOpen: the "Open"/"Close" word with the chevron at the end of a row that opens in place.
  *   v1.18.4 — 2026-11-27 — A foldable group heading draws the drawn Chevron instead of the arrow letters.
  *   v1.18.3 — 2026-11-27 — SearchLine's clear button draws the close Glyph instead of the ✕ letter.
  *   v1.18.2 — 2026-11-14 — SearchLine's field is a find field the browser's autofill cannot fill
@@ -194,7 +197,8 @@
 import { h, createContext, Fragment } from 'preact';
 import { useContext } from 'preact/hooks';
 import htm from 'htm';
-import { Actions, Glyph, Chevron } from '/components/Action.js';
+import { Action, Actions, Glyph, Chevron } from '/components/Action.js';
+import { t } from '/js/i18n.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { CardMenu } from '/components/CardMenu.js';
@@ -428,6 +432,15 @@ export function Doors({ menu, menuLabel, title, children }) {
   return html`<div class="listing-doors" ...${useCell(title)}>${children}${menu ? html`<${RowMenu} items=${menu} label=${menuLabel} />` : null}</div>`;
 }
 
+/**
+ * The word that opens a Row with `onToggle` (added 2026-11-27): "Open" or "Close" with the drawn
+ * chevron, in the Doors. It has no handler of its own: its press reaches the row's toggle, as a press
+ * anywhere on the row does. A mark alone on the row's end said nothing about what it does.
+ */
+export function RowOpen({ open }) {
+  return html`<${Action} small row expanded=${!!open}>${open ? t('listRow.close') : t('listRow.open')} <${Chevron} small down=${!!open} /><//>`;
+}
+
 export function Panel({ doors, text, id, title, mark, children }) {
   // title + mark (added by page group G1a): the opened record's own title in the poster record face,
   // with its status mark at the right (an agent's task).
@@ -512,17 +525,23 @@ export function Group({ title, count, folded, onFold, foldLabel, doors, quiet, w
  * The row of filters over a list, where each filter is its own on-or-off (a facet row): the filter
  * row of the Tabs component (components/Tabs.js, css/components/tab-row.css). A row where exactly
  * one of the choices is on is `<Tabs tone="filter">` itself.
+ * `total` (added 2026-11-27): how many things the unfiltered list holds; with ten or fewer the row is
+ * not drawn, since a short list is read whole (a page showed ten filters over one skill).
  */
-export function Filters({ label, children }) {
+export const FILTERS_FROM = 11;
+export function Filters({ label, total, children }) {
+  if (typeof total === 'number' && total < FILTERS_FROM) return null;
   return html`<div class="tab-row tab-row--filter" role="group" aria-label=${label}>${children}</div>`;
 }
 
 /**
  * One filter: the Tab in its filter tone (Jouni's decision "Tabs and filters"), the chosen one on the
  * sun, its count the tally Count. `attention` for a filter that points at something to look at,
- * `end` for the one that stands apart at the row's end.
+ * `end` for the one that stands apart at the row's end. A filter that counts 0 and is not chosen is
+ * not drawn: it would only show an empty list (2026-11-27).
  */
 export function Filter({ on, count, onClick, attention, end, disabled, title, children }) {
+  if (count === 0 && !on) return null;
   const tab = html`<${Tab} tone="filter" on=${!!on} pressed=${!!on} count=${count} attention=${attention} disabled=${disabled} title=${title} onClick=${onClick}>${children}<//>`;
   return end ? html`<span class="list-filter--end">${tab}</span>` : tab;
 }

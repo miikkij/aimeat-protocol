@@ -23,10 +23,15 @@
  *   their own that carry a heading and an intro for when they stand alone. Here the page's section
  *   or the sign-in row above them already says both, so each is given `inRow` and leaves them out
  *   (until 2026-09-26 a page rule, .ac-kept and .ac-panel, hid them after they were drawn).
- * @structure renderPage · marks · mastActions · strip · secretTile · secSignIn · secKeys ·
+ * @structure renderPage · foldOf · openAndScroll · mastActions · strip · secretTile · secSignIn · secKeys ·
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.38.0 -- 2026-11-27 -- Usability round 3: how you sign in stays open; every other section is a
+ *     closed row whose words say its state (foldOf, `ctx.folds`), and the doors, the page's start and
+ *     the rail open a row before they scroll. Each figure is said once: the head's tags went and the
+ *     sign-in section's count with them (the strip says both), except on a store-bought node, whose
+ *     strip waits in "Lisätiedot".
  *   v1.37.0 -- 2026-11-26 -- The eight sections are five with their parts: 01 how you sign in, 02 who acts in your name, 03 your accounts in other services (03.1 the attached MCP servers, 03.2 the secrets), 04 share groups, 05 your address for an AI (05.1 how an AI reads this page). The section ids are the old ones.
  *   v1.36.0 -- 2026-11-07 -- Section 02 ends with the line to the Receivers page and how many receivers the account has: a receiver key is a credential an outside program writes into the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.35.0 -- 2026-11-01 -- On a node the store sold with a build queue (site.build_queue_url), the MCP servers section, with its "Connect to aimeat.io", is section 02 before the "Lisätiedot" fold, so the build code card's link reaches it (commercial's crew52 walk).
@@ -127,6 +132,14 @@ import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
 /** The line a form says after it acted ({ text, error } or nothing). */
 const msg = (m) => (m ? html`<${Note} kind="message" error=${m.error}>${m.text}<//>` : null);
 
+/**
+ * A closed row of this page (usability round 3): every section but how you sign in is one row whose
+ * words say its state, open while the person opened it (`ctx.folds` by section id, access-tab.js).
+ */
+const foldOf = (ctx, id) => ({ fold: true, open: !!ctx.folds?.[id], onToggle: () => ctx.toggleFold(id) });
+/** Open a closed row, then scroll to it (a door or the page's start that points into one). */
+const openAndScroll = (ctx, id) => { ctx.openFold(id); setTimeout(() => scrollToSection(id), 30); };
+
 export function renderPage(ctx) {
   const ov = ctx.ov;
   const rail = [
@@ -156,7 +169,7 @@ export function renderPage(ctx) {
       ...(builders ? [{ id: 'ac-mcp', num: '02', label: x('rail.mcp'), count: ctx.mcpCount == null ? '' : String(ctx.mcpCount) }] : []),
       { id: 'ac-more', num: moreNum, label: x('morePlace'), count: '' },
     ]
-    : rail.map(([num, id, label, count]) => ({ id, num, label, count }));
+    : rail.map(([num, id, label, count]) => ({ id, num, label, count, open: id === 'ac-signin' ? undefined : () => ctx.openFold(id) }));
   // Built only once the overview is in: every section reads it.
   const rest = () => html`
     ${secKeys(ctx)}
@@ -165,18 +178,18 @@ export function renderPage(ctx) {
     ${secSecrets(ctx)}
     ${secGroups(ctx)}
     ${secAddresses(ctx)}
-    ${secRoads()}`;
+    ${secRoads(ctx)}`;
   return html`
     <${SettingsPage} name="ac"
       crumb=${crumb()}
       title=${t('profile.tabs.access')} sub=${x('titleSub')} help="concept.scope"
-      marks=${place ? [] : marks(ctx)}
+      marks=${/* Each figure is said once, in the strip: the tags said the same counts again. */[]}
       desc=${x('desc')}
       actions=${mastActions(ctx)}
       start=${customerNode()
         ? html`<${PageStart} id="access" purpose=${t('pageStart.access.purposePlace')} next=${t('pageStart.access.nextPlace')}
-            action=${{ onClick: () => scrollToSection('ac-keys'), label: t('pageStart.access.actionPlace') }} />`
-        : html`<${PageStart} id="access" action=${{ onClick: () => scrollToSection('ac-keys') }} />`}
+            action=${{ onClick: () => { ctx.setMoreOpen(true); openAndScroll(ctx, 'ac-keys'); }, label: t('pageStart.access.actionPlace') }} />`
+        : html`<${PageStart} id="access" action=${{ onClick: () => openAndScroll(ctx, 'ac-keys') }} />`}
       strip=${place ? null : strip(ctx)}
       railTitle=${x('railTitle')}
       sections=${sections}
@@ -191,20 +204,6 @@ export function renderPage(ctx) {
               open=${ctx.moreOpen} onToggle=${() => ctx.setMoreOpen(!ctx.moreOpen)}>${ctx.moreOpen ? html`${strip(ctx)}${rest()}` : null}<//>`
           : rest()}`}
     <//>`;
-}
-
-/** The mast's tags: apps (on the sun), two-step (coral while off), tokens and accounts, sessions (dim). */
-function marks(ctx) {
-  const ov = ctx.ov;
-  if (!ov) return [];
-  const s = ov.sign_in;
-  return [
-    { label: x('chipApps', { n: ov.appGrants.total }), tone: 'sun' },
-    // Two-step off is a choice on a store-bought node, not an alarm: the buyer signs in by emailed link.
-    s.two_factor.enabled ? { label: x('chipTwoStepOn') } : { label: x('chipTwoStepOff'), tone: customerNode() ? undefined : 'coral' },
-    { label: x('chipTokensAccounts', { tokens: ov.accessTokens.total, accounts: ov.connections?.connections?.length || 0 }) },
-    { label: x('chipSessions', { n: s.sessions.mine.total }), tone: 'dim' },
-  ];
 }
 
 /** The one loud action (a passkey while there is none, a new token after that) and the doors under it. */
@@ -225,7 +224,7 @@ function mastActions(ctx) {
       : html`<${Loud} onClick=${() => ctx.toggleForm(true)}>${x('slabToken')}<//><${Note} kind="hint" slab inline>${x('slabTokenHint')}<//>`}
     <${Actions}>
       ${wantPasskey ? html`<${Action} small onClick=${() => ctx.toggleForm(true)}>${x('doorNewToken')}<//>` : null}
-      <${Action} small soft onClick=${() => scrollToSection('ac-roads')}>${x('doorToAi')}<//>
+      <${Action} small soft onClick=${() => openAndScroll(ctx, 'ac-roads')}>${x('doorToAi')}<//>
     <//>`;
 }
 
@@ -277,7 +276,9 @@ function secSignIn(ctx) {
   // On a store-bought node an option not taken is not an alarm: the buyer's sign-in link is in use.
   const state = (fine, words) => html`<${Mark} kind="status" tone=${fine ? 'fine' : customerNode() ? 'off' : 'attention'}>${words}<//>`;
   return html`
-    <${Section} id="ac-signin" num="01" title=${x('secSignIn')} count=${sub} first=${true}>
+    ${/* The strip says the same figures over the page; on a store-bought node, where the strip waits
+          in "Lisätiedot", the section says them. */''}
+    <${Section} id="ac-signin" num="01" title=${x('secSignIn')} count=${customerNode() ? sub : null} first=${true}>
       <${Note} kind="lead">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}<//>
       ${s.managed_by ? html`<${Box}><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}<//>` : null}
       <${List} cols="name-state">
@@ -320,7 +321,7 @@ function secKeys(ctx) {
   const unused = counts.unused;
   const more = list.length > shown.length;
   return html`
-    <${Section} id="ac-keys" num="02" title=${x('secKeys')} count=${x('secKeysSub', { apps: ov.appGrants.total, tokens: ov.accessTokens.total })}>
+    <${Section} ...${foldOf(ctx, 'ac-keys')} id="ac-keys" num="02" title=${x('secKeys')} sub=${x('secKeysSub', { apps: ov.appGrants.total, tokens: ov.accessTokens.total })}>
       <${Note} kind="lead">${x('keysIntro')}<//>
       ${all.length ? html`
         <${Tabs} tone="filter" value=${ctx.filter} onSelect=${(f) => ctx.setFilter(f)}
@@ -408,7 +409,7 @@ function secAccounts(ctx) {
   const c = ctx.ov.connections;
   const count = c?.connections?.length || 0;
   return html`
-    <${Section} id="ac-accounts" num="03" title=${x('secAccounts')} count=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
+    <${Section} ...${foldOf(ctx, 'ac-accounts')} id="ac-accounts" num="03" title=${x('secAccounts')} sub=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
       <${Note} kind="lead">${x('accountsIntro')}<//>
       ${c?.enabled ? html`<${ConnectionsSection} inRow showToast=${ctx.showToast} />` : html`<${Note} kind="quiet">${x('accountsOffBody')}<//>`}
     <//>`;
@@ -425,7 +426,10 @@ function secAccounts(ctx) {
  */
 function secMcp(ctx, num = '03.1') {
   return html`
-    <${Section} id="ac-mcp" num=${num} title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
+    ${/* Standing before "Lisätiedot" on a store-bought node with a build queue (num 02), it stays open:
+          the Home's build code card sends the buyer to its "Connect to aimeat.io". */''}
+    <${Section} ...${num === '02' ? {} : foldOf(ctx, 'ac-mcp')} id="ac-mcp" num=${num} title=${x('secMcp')}
+      sub=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
       <${Note} kind="lead">${x('mcpIntro')}<//>
       <${McpServersSection} inRow showToast=${ctx.showToast} />
     <//>`;
@@ -441,7 +445,7 @@ function secMcp(ctx, num = '03.1') {
 function secSecrets(ctx) {
   const list = ctx.secrets || [];
   return html`
-    <${Section} id="ac-secrets" num="03.2" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
+    <${Section} ...${foldOf(ctx, 'ac-secrets')} id="ac-secrets" num="03.2" title=${x('secSecrets')} sub=${x('secSecretsSub', { n: list.length })}>
       <${Note} kind="lead">${x('secretsIntro')}<//>
       ${ctx.secretsFailed ? html`<${Note} kind="quiet">${x('secrets.loadFailed')}<//>` : null}
       ${list.length ? html`
@@ -498,7 +502,7 @@ function secretFold(ctx) {
 function secGroups(ctx) {
   const groups = ctx.ov.groups?.groups || [];
   return html`
-    <${Section} id="ac-groups" num="04" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
+    <${Section} ...${foldOf(ctx, 'ac-groups')} id="ac-groups" num="04" title=${x('secGroups')} sub=${x('secGroupsSub', { n: groups.length })}>
       <${Note} kind="lead">${x('groupsIntro')}<//>
       <${SharingGroupsSection} inRow showToast=${ctx.showToast} initial=${ctx.ov.groups} />
       <${SharesIncomingSection} inRow />
@@ -519,7 +523,7 @@ function secAddresses(ctx) {
     customerNode() ? null : ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
   ].filter(Boolean);
   return html`
-    <${Section} id="ac-addresses" num="05" title=${x('secAddresses')} count=${x('secAddressesSub')}>
+    <${Section} ...${foldOf(ctx, 'ac-addresses')} id="ac-addresses" num="05" title=${x('secAddresses')} sub=${x('secAddressesSub')}>
       <${Note} kind="lead">${x('addressesIntro')}<//>
       <${Facts} rows=${[
         ...rows.map(([k, v, sub]) => ({
@@ -533,10 +537,10 @@ function secAddresses(ctx) {
 
 /* ── 08 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secRoads() {
+function secRoads(ctx) {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="ac-roads" num="05.1" title=${x('secRoads')}>
+    <${Section} ...${foldOf(ctx, 'ac-roads')} id="ac-roads" num="05.1" title=${x('secRoads')} sub=${x('secRoadsSub')}>
       <${Roads} wide>
         <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
           doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />

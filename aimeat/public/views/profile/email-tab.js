@@ -11,6 +11,8 @@
  * @structure EmailTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'email'.
  * @version-history
+ *   v2.4.1 -- 2026-11-27 -- contactName says nothing for a contact the person's list does not hold;
+ *     it answered the contact's id, a UUID on the sent mail's row.
  *   v2.4.0 -- 2026-11-27 -- connect(p, renew): "Connect again" on a mailbox that needs a new sign-in runs the
  *     provider's connect round; the wait (js/connection-wait.js) listens for the `connections` live domain
  *     instead of polling and notices the row made active again, not only a new row. Every refusal is said
@@ -108,7 +110,9 @@ export default function EmailTab({ showToast }) {
 
   const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
   const providerOf = (id) => providers.find(p => p.id === id) || null;
-  const contactName = (id) => { const r = contacts.find(x => x.contact_id === id); return r ? (r.display_name || r.saved_name || r.email || id) : (id || ''); };
+  // A contact the person's list does not hold (removed since, or a company's book) has no name here:
+  // nothing is said rather than its id, and the row's subject names the message.
+  const contactName = (id) => { const r = contacts.find(x => x.contact_id === id); return r ? (r.display_name || r.saved_name || r.email || '') : ''; };
   const openContact = () => openTabEvent('contacts');
 
   /* ── the address ── */

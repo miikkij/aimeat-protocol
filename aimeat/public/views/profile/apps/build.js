@@ -10,6 +10,9 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-27 -- secAgents and secBuild take their number and a `fold` ({ open, onToggle }):
+ *     with it each is a closed row whose words say its state (how many apps bring an agent and how many
+ *     skills; the two ways to start).
  *   v2.0.1 -- 2026-11-26 -- The agents section is 02.2, a part of the apps list (02); the page has
  *     three whole-numbered sections for a person with apps (apps/page.js).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): Section,
@@ -56,7 +59,7 @@ import { Action, Actions } from '/components/Action.js';
 
 /* ── 04 · Agents and skills ───────────────────────────────────────────────────────────────────── */
 
-export function secAgents(ctx) {
+export function secAgents(ctx, num = '02.2', fold = null) {
   const apps = ctx.apps || [];
   const withAgents = apps.filter((x) => x.manifest?.cortex?.agents?.length);
   const bound = ctx.bound || {};
@@ -64,8 +67,11 @@ export function secAgents(ctx) {
   for (const app of apps) for (const s of bound[appRef(app)] || []) pairs.push({ skill: s.name, app: nameOf(app) });
   const withSkill = apps.filter((x) => (bound[appRef(x)] || []).length).length;
   const picked = apps.find((x) => x.filename === ctx.agentPick) || null;
+  // Closed, the row says how many apps bring an agent and how many skills they have.
   return html`
-    <${Section} id="ap-agents" num="02.2" title=${a('secAgents')} count=${null}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle}
+      sub=${a('agentsState', { agents: withAgents.length, skills: pairs.length })}
+      id="ap-agents" num=${num} title=${a('secAgents')} count=${null}>
       <${Facts} wide flush rows=${[
         {
           k: a('agentsLabel'),
@@ -109,9 +115,11 @@ export function secAgents(ctx) {
 
 /* ── 05 · Build a new one ─────────────────────────────────────────────────────────────────────── */
 
-export function secBuild(ctx, { formOnly, num }) {
+export function secBuild(ctx, { formOnly, num, fold = null }) {
+  // Closed, the row says the two ways a new app starts (in a chat, or from a finished file).
   return html`
-    <${Section} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle} sub=${formOnly ? a('uploadState') : a('secBuildSub')}
+      id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
       ${formOnly ? null : html`
         <${Actions}>
           <${Action} small copy=${ctx.buildPrompt} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))}>${a('promptDoor')}<//>

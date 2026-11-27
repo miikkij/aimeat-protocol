@@ -6,6 +6,9 @@
  *   explains itself the designed way (.claude/rules/page-guidance.md): the page's start (PageStart
  *   "actions") and the title's question mark (concept.service).
  * @version-history
+ *   v1.24.0 -- 2026-11-27 -- Both service lists have a head row; a row's end says "Open" or "Close"
+ *     with the chevron (List RowOpen); the strip's catalogue figure is drawn once the catalogue was
+ *     read (it was a lone '·').
  *   v1.23.1 -- 2026-11-27 -- A service row's open mark draws the Chevron (down while open, right while closed) instead of ▼ ▶.
  *   v1.23.0 -- 2026-11-27 -- Settings usability pass: the two view tabs become sections beside the
  *     contents rail. 01 My services (svc-mine) is open and first, with the publish form opening in
@@ -81,10 +84,10 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { scrollToSection } from '/components/Rail.js';
-import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
+import { List, Row, Name, Desc, Doors, Panel, RowOpen } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
-import { Action, Loud, Icon, Chevron } from '/components/Action.js';
+import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Card } from '/components/Card.js';
 import { Fields, FormActions } from '/components/Field.js';
@@ -119,6 +122,9 @@ function schemaRow(schema, label) {
   return { k: label, v: html`<${Code} block scroll>${preview}<//>` };
 }
 
+/** The head row of both service lists: the service, what it does (and whose), its kind and price. */
+const svcHead = () => [t('profile.services.colService'), t('profile.services.colDoes'), t('profile.services.colPrice')];
+
 /** Expandable service row used in both My Services and Catalogue */
 function ServiceCard({ svc, expanded, onToggle, actions }) {
   const displayName = svc.display_name || svc.displayName || svc.name || '';
@@ -133,7 +139,7 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
           ${category && html`<${Mark}>${category}<//>`}
           <${Mark}>${priceAndPacing(svc, t)}<//>
         <//>
-        <${Icon} small expanded=${!!expanded}><${Chevron} down=${!!expanded} /><//>
+        <${RowOpen} open=${!!expanded} />
       <//>
       ${expanded && html`
         <${Panel} doors=${actions}>
@@ -267,7 +273,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
       ${showPubForm
         ? html`<${Space} below="large"><${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} /><//>`
         : html`<${Space} below="large"><${Loud} onClick=${() => setShowPubForm(true)}>${t('profile.services.publishBtn')}<//><//>`}
-      <${List} cols="name-desc-doors" empty=${t('profile.services.emptyMine')}>
+      <${List} cols="name-desc-doors" empty=${t('profile.services.emptyMine')} head=${myServices.length ? svcHead() : null}>
         ${myServices.map(s => {
           const svcId = s.id || s.action_id;
           return html`<${ServiceCard}
@@ -288,7 +294,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
         placeholder=${t('profile.services.allCategories')} options=${SERVICE_CATEGORIES} />
     <//>
     ${!catalogue ? html`<${List} loading=${t('profile.services.loading')} />`
-      : html`<${List} cols="name-desc-doors" empty=${catFilter ? t('profile.services.catalogueEmptyCategory') : t('profile.services.catalogueEmptyAll')}>
+      : html`<${List} cols="name-desc-doors" head=${catalogue.length ? svcHead() : null} empty=${catFilter ? t('profile.services.catalogueEmptyCategory') : t('profile.services.catalogueEmptyAll')}>
           ${catalogue.map(s => {
             const svcId = s.id || s.action_id;
             return html`<${ServiceCard}
@@ -317,9 +323,11 @@ export default function ServicesTab({ session, showToast, onStats }) {
     { key: 'mine', n: mine.length, label: t('profile.services.stripPublished'),
       sub: categories ? t('profile.services.stripPublishedSub', { n: categories }) : undefined },
     { key: 'paced', n: paced, label: t('profile.services.stripPaced'), sub: t('profile.services.stripPacedSub') },
-    { key: 'catalogue', n: catalogue ? catalogue.length : '·', tone: catalogue ? undefined : 'dim', label: t('profile.services.stripCatalogue'),
-      sub: catalogue ? (catFilter || undefined) : t('profile.services.stripCatalogueSub'),
-      onClick: () => { openCatalogue(); scrollToSection('svc-catalogue'); } },
+    // The catalogue's figure only once it has been read: before that it was a lone '·', a mark with
+    // no number; section 02's row says how to open it.
+    catalogue ? { key: 'catalogue', n: catalogue.length, label: t('profile.services.stripCatalogue'),
+      sub: catFilter || undefined,
+      onClick: () => { openCatalogue(); scrollToSection('svc-catalogue'); } } : null,
   ]} />`;
   const sections = [
     { id: 'svc-mine', num: '01', label: t('profile.services.mine'), count: myServices ? String(mine.length) : undefined },

@@ -22,6 +22,8 @@
  * @structure secBuilders(ctx) — the section · rungRow · GrantForm
  * @usage import { secBuilders } from './builders.js';
  * @version-history
+ *   v2.2.0 — 2026-11-27 — secBuilders takes its number and a `fold`: a closed row that says how many
+ *     others may build, or that only the person does.
  *   v2.1.1 — 2026-11-26 — The section is 03.1, a part of Build (03) (apps/page.js).
  *   v2.1.0 — 2026-10-02 — The name field is the shared ContactPicker, owners only: typing a name
  *     suggests the owner's contacts and the members who listed themselves in the directory, the
@@ -126,7 +128,7 @@ function GrantForm({ apps, onGrant, busy }) {
  * failed, and null while it is in flight; `ctx.onGrantBuilder` / `ctx.onRevokeBuilder` are what it
  * does about it.
  */
-export function secBuilders(ctx) {
+export function secBuilders(ctx, num = '03.1', fold = null) {
   const apps = ctx.apps || [];
   const b = ctx.builders;
   const failed = b === false;
@@ -143,8 +145,12 @@ export function secBuilders(ctx) {
     return found ? nameOf(found) : filename;
   };
 
+  // Closed, the row says how many others may build (one account counted once), or only you.
+  const others = new Set([...blanket.map((g) => g.grantee), ...perAppRows.map((g) => g.account)]).size;
+  const sub = loading || failed ? null : others ? a('buildersState', { n: others }) : a('buildersStateNone');
   return html`
-    <${Section} id="ap-builders" num="03.1" title=${a('secBuilders')}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle} sub=${sub}
+      id="ap-builders" num=${num} title=${a('secBuilders')}>
       <${Note} kind="lead">${a('secBuildersLead')}<//>
       ${loading ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
       ${failed ? html`<${Note} kind="quiet">${a('bldFailed')}<//>` : null}

@@ -15,6 +15,8 @@
  * @structure renderCover · lettersSub · secAddress · addressBody · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.25.2 -- 2026-11-27 -- A sent mail's line leaves out a recipient with no name (it showed the
+ *     contact's UUID); the subject names the row.
  *   v1.25.1 -- 2026-11-27 -- The mailboxes list carries a head row (mailbox, what your agent does, state), as
  *     every list of columns on a Settings page does.
  *   v1.25.0 -- 2026-11-27 -- A mailbox that needs a new sign-in has "Connect again" as its row's main action, the
@@ -274,7 +276,7 @@ function secSent(ctx, num) {
         ${shown.map(m => html`
           <${Row} key=${m.id}>
             <${When} at=${clock(m.createdAt)}>${rel(m.createdAt)}<//>
-            <${Name} meta=${`${ctx.contactName(m.contactId)} · ${c('kind.' + (m.kind || 'transactional'))} · ${statusWord(m.status)}`}>${m.subject || c('noSubject')}<//>
+            <${Name} meta=${[ctx.contactName(m.contactId), c('kind.' + (m.kind || 'transactional')), statusWord(m.status)].filter(Boolean).join(' · ')}>${m.subject || c('noSubject')}<//>
             <${Cell} meta>${channelWord(m)}${m.organismId ? html`<br />${c('asOrganism')}` : null}<//>
             <${Doors}>${m.contactId ? html`<${Action} small row soft onClick=${() => ctx.openContact(m.contactId)}>${c('openContact')}<//>` : null}<//>
           <//>`)}

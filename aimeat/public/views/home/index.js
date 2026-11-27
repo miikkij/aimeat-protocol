@@ -16,6 +16,9 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-27: The system updates (news-band.js) are one closed row at the end of the home, after
+ *     the layout's blocks, so what waits for the person and their work come first; still outside the
+ *     block list, so no layout removes it.
  *   2026-11-25: What is new since the last look (news-band.js) stands under the nameplate and what
  *     waits for the person, when those two lead the layout; in any other layout it is first as before.
  *     It is still drawn outside the layout's block list, so no layout can remove it.
@@ -114,8 +117,6 @@ import { useRailSections, contentsRail } from '/components/ContentsRail.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const addressAsksForSettings = () => new URLSearchParams(location.search).get('settings') === '1';
-/** The blocks the system updates stand under when they lead the layout: who the person is, then what waits for them. */
-const NEWS_AFTER = ['home.nameplate', 'home.waiting'];
 
 /** Which home an account had when it last opened it in this browser: true (the finished home),
  *  false (the onboarding one), or null (never here, or storage refused). A per-browser convenience:
@@ -280,9 +281,10 @@ export default function HomeView({ navigate }) {
         freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
         locale=${getLocale()}
-        placeholders=${true}
-        lead=${html`<${NewsBand} key="news" session=${session} navigate=${navigate} />`}
-        leadAfter=${NEWS_AFTER} />`;
+        placeholders=${true} />
+      ${/* The system updates are one row at the end, outside the layout's blocks so no layout removes
+            it: the home leads with what waits for the person and their work (news-band.js). */''}
+      <${NewsBand} key="news" session=${session} navigate=${navigate} />`;
 
   return html`
     <${PageFrame} width=${withRail ? 'rail' : 'wide'}>

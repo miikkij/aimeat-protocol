@@ -13,6 +13,8 @@
  * @structure renderPage · isStale · shelfFold · shelf · shelfBody · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.28.0 -- 2026-11-27 -- The filter row is drawn only over a shelf of more than ten (Filters
+ *     total); a filter that counts 0 is not drawn (List.js Filter).
  *   v1.27.0 -- 2026-11-27 -- Usability pass: "Your skills" stays first and open; workspace skills are
  *     drawn only when there are some; "A new skill", this server's library and "How an agent loads a
  *     skill" are rows that open in place (the first open while the person has no skill or a draft is
@@ -194,7 +196,7 @@ function shelfBody(ctx, key, list) {
   const clear = () => set({ who: '', vis: '', recent: false, replaced: false, builtin: false });
   return html`
       ${!ctx.library ? loadingRow() : !list.length ? (key === 'own' ? null : html`<${Note} kind="quiet">${x(key === 'node' ? 'emptyNode' : 'emptyWs')}<//>`) : html`
-        <${Filters}>
+        <${Filters} total=${list.length}>
           ${facet(isAll, x('facetAll'), list.length, clear, 'all')}
           ${key === 'own' ? facet(F.who === 'bound', x('facetBound'), count((s) => bindingFile(s)), () => tog('who', 'bound'), 'bound') : null}
           ${key === 'own' ? facet(F.who === 'free', x('facetFree'), count((s) => !bindingFile(s) && !(s.linkedBy || []).length && !s.supersededBy), () => tog('who', 'free'), 'free') : null}

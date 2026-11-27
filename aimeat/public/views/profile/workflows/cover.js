@@ -14,6 +14,9 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.19.0 -- 2026-11-27 -- The empty list carries the sentence to give one's own AI (a PromptCard of
+ *     pageStart.workflows.prompt): it pointed at the start, which is closed. The list section is
+ *     "Saved workflows" (secList), no longer the page's own title.
  *   v1.18.0 -- 2026-11-27 -- Usability pass on the person's three situations. The strip's first figure
  *     counts every workflow (its line how many run on a schedule) and the strip takes hideZeros, so an
  *     empty page has no band of zeros; "done in their last run" is gone and "waiting" and "stopped short"
@@ -72,6 +75,7 @@ import { renderDetail } from './detail.js';
 import { renderRun } from './run.js';
 import { renderForm } from './form.js';
 import { Hint } from '/components/Hint.js';
+import { PromptCard } from '/components/PromptCard.js';
 import { LoadFailed } from '/js/load-state.js';
 
 export function renderWorkflowsView(ctx) {
@@ -121,7 +125,7 @@ function renderCover(ctx) {
   // new one as a row.
   const shown = [
     waiting ? { id: 'wp-waiting', label: c('secWaiting'), count: waiting } : null,
-    { id: 'wp-list', label: t('profile.workflows.title'), count: items.length },
+    { id: 'wp-list', label: c('secList'), count: items.length },
     { id: 'wp-new', label: c('secNew') },
   ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
   const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
@@ -145,10 +149,17 @@ function secWorkflows(ctx, items, n, first) {
   // The filter is drawn once there is something to filter.
   const doors = items.length ? html`<${Tab} tone="fold" on=${!ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(false)}>${c('all')}<//><${Tab} tone="fold" on=${ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(true)}>${c('onlyProblems')}<//>` : null;
   return html`
-    <${PageSection} id="wp-list" num=${n} title=${t('profile.workflows.title')} count=${items.length ? `${items.length} · ${c('secListSub')}` : ''} doors=${doors} first=${first}>
+    <${PageSection} id="wp-list" num=${n} title=${c('secList')} count=${items.length ? `${items.length} · ${c('secListSub')}` : ''} doors=${doors} first=${first}>
       ${ctx.itemsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
         : ctx.loading && !items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
-        : !list.length ? html`<${Note} kind="quiet">${items.length ? c('emptyProblems') : c('empty')}<//>`
+        : !list.length && items.length ? html`<${Note} kind="quiet">${c('emptyProblems')}<//>`
+        // With no workflow, the empty line carries the sentence it names: the start that held it is
+        // closed until the person opens it.
+        : !list.length ? html`<${Stack}>
+            <${Note} kind="quiet">${c('empty')}<//>
+            <${PromptCard} quiet label=${t('pageStart.promptLabel')} prompt=${t('pageStart.workflows.prompt')}
+              copyLabel=${t('pageStart.copy')} copiedLabel=${t('common.copied')} />
+          <//>`
         : workflowRows(ctx, list, { head: true })}
       ${ctx.checkNote ? html`<${Box} name=${ctx.checkNote.title}
         end=${html`<${Action} small soft onClick=${() => ctx.setCheckNote(null)}>${c('close')}<//>`}>${ctx.checkNote.text}<//>` : null}

@@ -12,6 +12,12 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.45.0 -- 2026-11-27 -- Usability round 3, the full page: the connection stays open while there is no
+ *     key and is a closed row with one; budget (02), what spends (02.1), models (03) and fine-tuning (04,
+ *     its four parts inside) are closed rows whose words say their state (`ctx.folds`); the rail and the
+ *     roles aside open a row before they scroll. "No own key" is said once, in the head's paragraph (the
+ *     tag, the connection's count and its bold lead went), the tags that repeated the strip went, and the
+ *     strip says that the server pays instead of naming its host. The simple view is unchanged.
  *   v1.44.1 -- 2026-11-26 -- The page no longer asks for its figures first: the page kit puts them
  *     first on every page (SettingsPage v1.7.0).
  *   v1.44.0 -- 2026-11-24 -- The page is ordered by what a person needs first: the figures over the
@@ -80,6 +86,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { customerNode } from '/js/site.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
+import { Section } from '/components/Section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -203,7 +210,13 @@ export function renderPage(ctx) {
   const polCount = ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '';
   const part = (id, num, title, sub, body) => html`
     <${FoldSection} id=${id} num=${num} title=${title} sub=${sub} open=${!!ctx.folds[id]} onToggle=${() => ctx.toggleFold(id)}>${body}<//>`;
-  const opens = (id) => () => ctx.openFold(id);
+  // A part of 04 opens 04 too: the parts are drawn only inside it.
+  const PARAM_PARTS = ['ai-providers', 'ai-roles', 'ai-policy', 'ai-gen-rules'];
+  const opens = (id) => () => { if (PARAM_PARTS.includes(id)) ctx.openFold('ai-params'); ctx.openFold(id); };
+  // A closed row of the full page (usability round 3): the connection stays open while there is no
+  // key (it is the first thing to do); budget, consumers, models and fine-tuning are rows that say
+  // their state, opened by the person (ctx.folds, the same store as 04's parts).
+  const row = (id) => ({ open: !!ctx.folds[id], onToggle: () => ctx.toggleFold(id) });
   return html`
     <${SettingsPage} name="ai"
       crumb=${crumb()}
@@ -213,11 +226,11 @@ export function renderPage(ctx) {
         action=${ctx.keyed ? null : { onClick: () => scrollToSection('ai-connection') }} />`}
       railTitle=${x('railTitle')}
       sections=${[
-        { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
-        { id: 'ai-budget', num: '02', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-consumers', num: '02.1', label: x('secConsumers'), count: '' },
-        { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
-        { id: 'ai-params', num: '04', label: x('secParams'), count: '' },
+        { id: 'ai-connection', num: '01', label: x('secConnection'), count: '', open: ctx.keyed ? opens('ai-connection') : undefined },
+        { id: 'ai-budget', num: '02', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '', open: opens('ai-budget') },
+        { id: 'ai-consumers', num: '02.1', label: x('secConsumers'), count: '', open: opens('ai-consumers') },
+        { id: 'ai-routing', num: '03', label: x('rt.title'), count: '', open: opens('ai-routing') },
+        { id: 'ai-params', num: '04', label: x('secParams'), count: '', open: opens('ai-params') },
         { id: 'ai-providers', num: '04.1', label: x('pv.title'), count: ctx.pv.view ? String(ctx.pv.providers.length) : '', open: opens('ai-providers') },
         { id: 'ai-roles', num: '04.2', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '', open: opens('ai-roles') },
         { id: 'ai-policy', num: '04.3', label: x('pol.title'), count: polCount, open: opens('ai-policy') },
@@ -228,12 +241,13 @@ export function renderPage(ctx) {
       after=${html`<${ctx.ConfirmUI} />`}>
       ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
         ${ctx.rl.view && ctx.rl.waiting ? html`<${Note} kind="aside">${x('rl.stripWaiting', { n: ctx.rl.waiting })}${' '}
-          <${Action} small onClick=${() => { ctx.openFold('ai-roles'); scrollToSection('ai-roles'); }}>${x('rl.title')} →<//><//>` : null}
-        ${secConnection(ctx)}
-        ${secBudget(ctx, '02')}
-        ${secConsumers(ctx, '02.1')}
-        ${secRouting(ctx, '03')}
-        <${PageSection} id="ai-params" num="04" title=${x('secParams')} count=${null}>
+          <${Action} small onClick=${() => { opens('ai-roles')(); setTimeout(() => scrollToSection('ai-roles'), 30); }}>${x('rl.title')} →<//><//>` : null}
+        ${secConnection(ctx, '01', ctx.keyed ? row('ai-connection') : null)}
+        ${secBudget(ctx, '02', row('ai-budget'))}
+        ${secConsumers(ctx, '02.1', row('ai-consumers'))}
+        ${secRouting(ctx, '03', row('ai-routing'))}
+        <${FoldSection} id="ai-params" num="04" title=${x('secParams')} sub=${[pvCount, rlCount].filter(Boolean).join(' · ')}
+          open=${!!ctx.folds['ai-params']} onToggle=${() => ctx.toggleFold('ai-params')}>
           <${Note} kind="lead">${x('paramsLead')}<//>
           ${part('ai-providers', '04.1', x('pv.title'), pvCount, secProviders(ctx, '04.1', true))}
           ${part('ai-roles', '04.2', x('rl.title'), rlCount, secRoles(ctx, '04.2', true))}
@@ -252,9 +266,11 @@ function mast(ctx) {
   // "no key" read as a fault (v31 K58).
   const marks = !s ? [] : simpleView(ctx)
     ? [ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null]
+    // A tag says only what the strip and the head's paragraph do not: the strip has the payer, the
+    // allowance and the day's budget, and the paragraph says there is no own key (round 3).
     : keyed
-    ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
-    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: allowanceMoney(ctx.chat.allowance_remaining_usd) }) } : null,
+    ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }]
+    : [
       // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
       ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null, { label: x('provider.openrouter') }];
   // On a customer's node the allowance is what the buyer paid for, not a starter gift (UX review C).
@@ -296,7 +312,8 @@ function strip(ctx) {
     ]} />`;
   }
   const rl = ctx.rl;
-  const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
+  // Who pays, in words a person reads: "the server" rather than its host name (localhost said nothing).
+  const payer = ctx.keyed ? x('stripOwnKey') : x('stripServerPays');
   return html`<${FigureStrip} items=${[
     { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
       sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: allowanceMoney(ctx.chat.allowance_remaining_usd || 0) }) : '') },
@@ -309,7 +326,7 @@ function strip(ctx) {
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secConnection(ctx, num = '01') {
+function secConnection(ctx, num = '01', fold = null) {
   const s = ctx.settings;
   // In the simple view this section sits in Lisäasetukset and is "Oma tekoälytili (valinnainen)",
   // with no "ei avainta" count: having no key is the ordinary case there (v31 K58).
@@ -334,22 +351,27 @@ function secConnection(ctx, num = '01') {
       actions=${html`<${Action} small disabled=${ctx.busy === 'conn'} onClick=${() => ctx.saveConnection()}>${x('save')}<//>`} />
     ${msg(ctx.connMsg)}`;
   return html`
-    <${PageSection} id="ai-connection" num=${num} title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple ? null : count} first=${true}>
+    ${/* "No own key" is said once on the page, in the head's paragraph: the section's count and the
+          bold lead under it said it again. With a key the section is a closed row (fold). */''}
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle} sub=${count}
+      id="ai-connection" num=${num} title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple || !ctx.keyed ? null : count} first=${true}>
       ${creditFirst ? html`<${Note} kind="lead">${x('simple.noKey')}<//>` : null}
       <${Facts} rows=${[
         { k: x('providerLabel'), v: providers, sub: creditFirst ? null : x('providerHint') },
         own ? { k: x('keyLabel'), v: key, sub: s.hasApiKey ? x('keyStoredHint') : x('keyHint'), actions: keyDoors } : null,
       ].filter(Boolean)} />
-      ${!ctx.keyed && !simple ? html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>` : null}
+      ${!ctx.keyed && !simple ? html`<${Note} kind="quiet">${x('noKeyBody', { host: ctx.host })}<//>` : null}
     <//>`;
 }
 
 /* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secBudget(ctx, num = '07') {
+function secBudget(ctx, num = '07', fold = null) {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num=${num} title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
+  // With `fold` the section is a closed row whose words are the day's budget and today's spend.
+  const f = { fold: !!fold, open: fold?.open, onToggle: fold?.onToggle };
+  if (!u) return html`<${Section} ...${f} id="ai-budget" num=${num} title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -372,7 +394,8 @@ function secBudget(ctx, num = '07') {
     ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
     : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
-    <${PageSection} id="ai-budget" num=${num} title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
+    <${Section} ...${f} sub=${x('secBudgetSub', { n: money(budget), today: money(spent) })}
+      id="ai-budget" num=${num} title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
         { key: 'budget', k: html`<${HelpLabel} term="ai.daily_budget" label=${x('dailyBudget')}>${x('dailyBudget')}<//>`, v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
@@ -410,7 +433,7 @@ function chart(ctx, history, r) {
 
 /* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secConsumers(ctx, num = '08') {
+function secConsumers(ctx, num = '08', fold = null) {
   const top = (ctx.roll?.apps || []).filter((a) => !a.app.includes(':')).slice(0, 3).map((a) => a.app);
   const chat = ctx.chat;
   // What the own key never reaches here, as the server says it (own_key.not_covered, services/
@@ -426,7 +449,9 @@ function secConsumers(ctx, num = '08') {
     v: !crewsMissed ? x('consumerCrewsNodeBody') : onNode.length ? x('consumerCrewsMixed', { agents: onNode.join(', ') }) : x('consumerCrewsBody'),
   };
   return html`
-    <${PageSection} id="ai-consumers" num=${num} title=${x('secConsumers')} count=${null}>
+    <${Section} fold=${!!fold} open=${fold?.open} onToggle=${fold?.onToggle}
+      sub=${top.length ? x('consumersState', { apps: top.join(', ') }) : x('consumersStateNone')}
+      id="ai-consumers" num=${num} title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },

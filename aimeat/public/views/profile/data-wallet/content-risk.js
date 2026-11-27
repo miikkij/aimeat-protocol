@@ -22,6 +22,7 @@
  * @structure useContentRisk() → risk · riskCount(risk) · secContentRisk(ctx, num)
  * @usage const risk = useContentRisk({ federated, confirm, toast }); … secContentRisk({ ...ctx, risk }, '08')
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The section is one of the page's closed rows (foldOf), its state words the row's.
  *   v1.0.0 — 2026-11-22 — Initial (wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy).
  */
 import { h } from 'preact';
@@ -38,7 +39,7 @@ import { Note } from '/components/Note.js';
 import { Action } from '/components/Action.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { Facts } from '/components/Facts.js';
-import { n, dateWord, whoOf, wsName } from './frame.js';
+import { n, dateWord, whoOf, wsName, foldOf } from './frame.js';
 
 const html = htm.bind(h);
 const cr = (key, vars) => t('dwpage.cr.' + key, vars);
@@ -155,16 +156,18 @@ function itemRow(risk, item, names) {
 export function secContentRisk(ctx, num) {
   const risk = ctx.risk;
   const lead = html`<${Note} kind="lead">${cr('lead')} <${HelpTip} term="content.risk_mark" label=${cr('term')} /><//>`;
+  // One closed row whose words say how many marked items wait (riskCount), open while the person opened it.
+  const fold = foldOf(ctx, 'dw-risk');
   if (!risk.items) {
-    return html`<${Section} id="dw-risk" num=${num} title=${cr('title')}>${lead}${risk.failed
+    return html`<${Section} ...${fold} id="dw-risk" num=${num} title=${cr('title')}>${lead}${risk.failed
       ? html`<${Note} kind="quiet">${cr('loadFailed')}<//>` : html`<${Note} kind="loading">${t('dwpage.loading')}<//>`}<//>`;
   }
-  if (risk.off) return html`<${Section} id="dw-risk" num=${num} title=${cr('title')} count=${riskCount(risk)}>${lead}<${Note} kind="quiet">${cr('off')}<//><//>`;
+  if (risk.off) return html`<${Section} ...${fold} id="dw-risk" num=${num} title=${cr('title')} sub=${riskCount(risk)}>${lead}<${Note} kind="quiet">${cr('off')}<//><//>`;
   const counts = Object.fromEntries(STATUSES.map((s) => [s, risk.items.filter((it) => it.status === s).length]));
   const shown = risk.items.filter((it) => it.status === risk.filter);
   const names = ctx.names;
   return html`
-    <${Section} id="dw-risk" num=${num} title=${cr('title')} count=${riskCount(risk)}>
+    <${Section} ...${fold} id="dw-risk" num=${num} title=${cr('title')} sub=${riskCount(risk)}>
       ${lead}
       <${Tabs} tone="filter" value=${risk.filter} onSelect=${(v) => risk.setFilter(v)}
         items=${STATUSES.map((s) => ({ value: s, label: cr('filter.' + s), count: n(counts[s]) }))} />

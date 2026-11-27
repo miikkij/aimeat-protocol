@@ -9,6 +9,9 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- isBuiltIn, builtInOf, bookOf, countOf: one count per scope for the head's
+ *     tag, the scope picker and the rail (the rail counted every entry, 162, the tag left out the
+ *     bookkeeping, 132), and the node's built-in tools left out of the own and shared scopes.
  *   v1.12.1 -- 2026-11-27 -- kindName and kindSub show a kind with no word as the node sent it: a
  *     data package's row showed "discover.type.dataset" and "discover.cover.kindSub.dataset".
  *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (QuestionDesk, List with its Row, Cell, Name, Desc and Doors, Figure, Found, SettingsPage with its crumb and rail as data): the page passes data and writes no class (page group G8).
@@ -61,6 +64,19 @@ export const kindName = (type) => has('discover.type.' + type) || type;
 export const kindSub = (type) => has('discover.cover.kindSub.' + type);
 export const SCOPES = ['own', 'public', 'shared'];
 
+/** An entry the node itself offers (a built-in tool or route, owner `node@<node>`): not the person's
+ *  own, and not something that changed (its date is the epoch). The directory lists these in every
+ *  scope so an agent finds what it can call; this page leaves them out of the own and shared scopes. */
+export const isBuiltIn = (e) => typeof e?.owner === 'string' && e.owner.startsWith('node@');
+/** How many built-in entries a scope's facets count: only the node's own capabilities carry the tag
+ *  `node` (services/discovery/sources/node-capabilities-source.ts). The public scope keeps them. */
+export const builtInOf = (f, scope) => (!f || scope === 'public' ? 0 : (f.tags || []).find(x => x.value === 'node')?.count || 0);
+/** The machine's bookkeeping records in a scope's facets. */
+export const bookOf = (f) => f?.segments.find(s => s.type === 'memory' && s.segment === 'bookkeeping')?.count || 0;
+/** The one count a scope shows everywhere on the page (the head's tag, the scope picker, the rail):
+ *  its entries without the bookkeeping and without the built-in ones. */
+export const countOf = (f, scope) => (f ? Math.max(0, f.total - bookOf(f) - builtInOf(f, scope)) : 0);
+
 /** Split a text at the query words and mark them (the List's Found); plain strings when there is no query. */
 export function hl(text, words) {
   const s = String(text || '');
@@ -74,7 +90,7 @@ export const placeOf = (e) => (e.place ? `${e.place.organism} › ${e.place.work
 
 /** The search desk: the field, the scope beside it with a count per scope, one hint. */
 export function desk(ctx) {
-  const count = (s) => { const f = ctx.facets[s]; if (!f) return ''; return (s === 'public' && f.types.some(x => x.count >= 50)) ? `${num(f.total)}+` : num(f.total); };
+  const count = (s) => { const f = ctx.facets[s]; if (!f) return ''; return (s === 'public' && f.types.some(x => x.count >= 50)) ? `${num(countOf(f, s))}+` : num(countOf(f, s)); };
   const hint = !ctx.facets[ctx.scope] ? html`<${Note} kind="loading" inline>${c('loading')}<//>` : ctx.query ? c('hintResults') : c('hint');
   return html`<${QuestionDesk}
     value=${ctx.q}

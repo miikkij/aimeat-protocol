@@ -5,6 +5,10 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.35.0 -- 2026-11-27 -- The closed row says its state in a word beside the name (stateMark: new,
+ *     onboarding, problem), a sign-in that cannot work (signInMark) and an unseen change in a word too
+ *     (changeWord), where only a coloured line under the name said it. The coral name follows
+ *     agentNeedsAttention, the count the page's strip and the fleet page use.
  *   v2.34.3 -- 2026-11-27 -- The capabilities mark opens and closes with the drawn Chevron instead of
  *     the arrow letters.
  *   v2.34.2 -- 2026-11-27 -- Pop out and the host console link draw the external Glyph after their
@@ -174,6 +178,7 @@ import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderOperatorBad
 import { RunModeSwitch } from './agent-card-run-mode.js';
 import { FactsLine, LastTaskLine, PurchaseLimitLine, AutonomyLine, StoppedLine, WildcardLine } from './agent-card-autonomy.js';
 import { RefusalNote, AccessLine, InvitesLine, hasRefusals } from './agent-card-access.js';
+import { agentNeedsAttention, SIGN_IN_ATTENTION } from '/js/services/agents.js';
 import { ClearanceLine } from './agent-card-clearance.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
@@ -381,8 +386,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <${Row} onToggle=${() => onToggle(agent.name)}
           draggable=${!!drag} grip=${drag?.grip} dragging=${drag?.dragging}
           onDragStart=${drag?.onDragStart} onDragOver=${drag?.onDragOver} onDrop=${drag?.onDrop} onDragEnd=${drag?.onDragEnd}>
-          <${Name} attention=${state === 'problem' || hasRefusals(agent)} flag=${change?.flag} flagTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
-            tag=${hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null}
+          <${Name} attention=${agentNeedsAttention(agent)} flag=${change?.flag} flagTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
+            tag=${[stateMark(state), signInMark(agent.credential), changeWord(change),
+              hasRefusals(agent) ? html`<${Mark} key="refused" kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null]}
             marks=${renderOperatorBadge(agent)}
             after=${working}>${agent.display_name || agent.name}<//>
           <${Cell} line>
@@ -565,6 +571,32 @@ function changeMark(changes) {
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
   const failed = (changes.tasksFailed || 0) > 0;
   return { flag: failed ? 'error' : 'new', title };
+}
+
+/**
+ * A closed row's state in words beside the name, for the states that ask for a look (new, onboarding,
+ * problem). A working agent, a tool connection and an internal agent need none: the columns say it.
+ */
+const STATE_TONES = { new: 'off', onboarding: 'attention', problem: 'danger' };
+function stateMark(state) {
+  const tone = STATE_TONES[state];
+  return tone ? html`<${Mark} key="state" kind="status" tone=${tone}>${t('profile.agents.detail.state.' + state)}<//>` : null;
+}
+
+/** A sign-in that cannot work, or runs out soon (credential.state, the fleet page's words), beside the name. */
+function signInMark(credential) {
+  const s = credential?.state;
+  if (!SIGN_IN_ATTENTION.has(s)) return null;
+  const words = s === 'expiring' ? t('profile.agents.page.signInExpiring') : t('fleet.state.' + s);
+  return html`<${Mark} key="signin" kind="status" tone=${s === 'expiring' ? 'attention' : 'danger'}>${words}<//>`;
+}
+
+/** The unseen change under the name (changeMark's flag) said in a word too, never only as a coloured line. */
+function changeWord(change) {
+  if (!change) return null;
+  return change.flag === 'error'
+    ? html`<${Mark} key="change" kind="status" tone="danger" title=${change.title}>${t('profile.agents.page.changeFailed')}<//>`
+    : html`<${Mark} key="change" kind="status" tone="attention" title=${change.title}>${t('profile.agents.page.changeNew')}<//>`;
 }
 
 /** The first line of a notice: its title, and after it what comes next. */

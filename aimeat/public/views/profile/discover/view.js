@@ -15,6 +15,9 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.16.0 -- 2026-11-27 -- One count per scope (frame.js countOf) in the head's tag, the scope
+ *     rail and the picker: the rail said "Own 162" (every entry) and the tag "132 items" (without the
+ *     bookkeeping). The node's built-in tools are left out of the own and shared kinds and counts.
  *   v1.15.0 -- 2026-11-27 -- The cover draws a section only once it holds something (What changed
  *     last, Places, Bookkeeping) and numbers them after the filter; a scope with nothing in it is the
  *     search field and one line that says what fills it and how; the head's figures that are zero are
@@ -58,7 +61,7 @@ import { Card, CardGrid } from '/components/Card.js';
 import { Tabs } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
 import { Action, Actions } from '/components/Action.js';
-import { c, num, kindName, kindSub, HUMAN_TYPES, desk, entryRows, crumb, renderPage, rel } from './frame.js';
+import { c, num, kindName, kindSub, HUMAN_TYPES, desk, entryRows, crumb, renderPage, rel, bookOf, builtInOf, countOf } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { PageStart } from '/components/PageStart.js';
 
@@ -79,16 +82,18 @@ const scopeItems = (ctx, countOf) => SCOPE_IDS.map(s => ({
 }));
 
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
-function kindsOf(f) {
+function kindsOf(f, scope) {
   if (!f) return [];
-  const book = f.segments.find(s => s.type === 'memory' && s.segment === 'bookkeeping')?.count || 0;
-  return f.types.map(x => (x.value === 'memory' ? { ...x, count: x.count - book, book } : x)).filter(x => x.count > 0);
+  const book = bookOf(f);
+  const builtIn = builtInOf(f, scope);
+  return f.types.map(x => (x.value === 'memory' ? { ...x, count: x.count - book, book }
+    : x.value === 'capability' ? { ...x, count: x.count - builtIn } : x)).filter(x => x.count > 0);
 }
 function renderCover(ctx) {
   const f = ctx.facets[ctx.scope];
-  const kinds = kindsOf(f);
-  const book = f?.segments.find(s => s.type === 'memory' && s.segment === 'bookkeeping')?.count || 0;
-  const total = f ? f.total - book : 0;
+  const kinds = kindsOf(f, ctx.scope);
+  const book = bookOf(f);
+  const total = countOf(f, ctx.scope);
   const places = f?.places || [];
   const orgs = new Set(places.map(p => p.organismId));
   // What is drawn: the kinds always (with nothing in the scope, its one line is the page's empty
@@ -113,7 +118,7 @@ function renderCover(ctx) {
         kinds.length ? { label: c('chipKinds', { n: kinds.length }) } : null,
         orgs.size ? { label: c('chipOrgs', { n: orgs.size }) } : null,
         book ? { label: c('chipBook', { n: num(book) }) } : null,
-        ctx.facets.shared?.total ? { label: c('chipShared', { n: num(ctx.facets.shared.total) }), tone: 'coral' } : null,
+        countOf(ctx.facets.shared, 'shared') ? { label: c('chipShared', { n: num(countOf(ctx.facets.shared, 'shared')) }), tone: 'coral' } : null,
       ]}
       desc=${c('desc')}
       actions=${html`<${Actions}>
@@ -124,7 +129,7 @@ function renderCover(ctx) {
       railTitle=${c('railTitle')}
       sections=${shown.length > 1 ? shown : undefined}
       pagesLabel=${c('scopes')}
-      pages=${scopeItems(ctx, (s) => (ctx.facets[s] ? num(ctx.facets[s].total) : '→'))}>
+      pages=${scopeItems(ctx, (s) => (ctx.facets[s] ? num(countOf(ctx.facets[s], s)) : '→'))}>
       ${secKinds(ctx, kinds)}
       ${numOf['dv-recent'] ? secRecent(ctx, numOf['dv-recent']) : null}
       ${numOf['dv-places'] ? secPlaces(ctx, places, numOf['dv-places']) : null}
@@ -263,7 +268,7 @@ function renderKind(ctx, type) {
       { label: c('chipItems', { n: num(n) }) },
       ...segs.slice(0, 6).map(s => html`<${Filter} key=${s.segment} on=${ctx.segment === s.segment} count=${num(s.count)} onClick=${() => ctx.setSegment(ctx.segment === s.segment ? '' : s.segment)}>${s.segment}<//>`),
     ],
-    railGroup: { label: c('secKinds'), items: kindsOf(f).map(k => ({ key: k.value, mark: '→', label: kindName(k.value), count: num(k.count), on: k.value === type, onClick: () => ctx.pickView({ kind: 'kind', type: k.value }) })) },
+    railGroup: { label: c('secKinds'), items: kindsOf(f, ctx.scope).map(k => ({ key: k.value, mark: '→', label: kindName(k.value), count: num(k.count), on: k.value === type, onClick: () => ctx.pickView({ kind: 'kind', type: k.value }) })) },
     children: html`<${Note} kind="lead">${kindSub(type)}<//>${browseBody(ctx)}`,
   });
 }

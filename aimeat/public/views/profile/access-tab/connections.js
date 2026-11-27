@@ -15,6 +15,9 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.11.0 — 2026-11-27 — A provider's name is said in the reader's language where it has words in it
+ *     (providerLabel: "Liitä SharePoint and OneDrive" was English on a Finnish page), and a connected
+ *     account's line names its provider instead of the provider's id.
  *   v1.10.0 — 2026-11-27 — A connect round is waited on with js/connection-wait.js, shared with the Email page:
  *     the node's `connections` live domain instead of a poll every 1.2 s, and a renewed sign-in (the same row
  *     made active again) counts as finished; the row count did not move for it.
@@ -54,7 +57,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Action, Actions } from '/components/Action.js';
@@ -82,6 +85,14 @@ const NOTES = {
 
 /** Providers whose one sign-in reaches several accounts, so the person names the one they mean. */
 const NAMES_AN_ACCOUNT = new Set(['facebook']);
+
+/**
+ * A provider's name in the reader's language. The node's label is English ("SharePoint and OneDrive
+ * (writing)", "Gmail (sending)") and stays the same for an API caller; a locale key
+ * `profile.access.cxProvider.<id>` (a hyphen in the id written as _) says it here when there is one,
+ * and a brand name needs none.
+ */
+const providerLabel = (id, fallback) => tOr(`profile.access.cxProvider.${String(id ?? '').replace(/-/g, '_')}`, fallback ?? id ?? '');
 
 /**
  * @param {{ showToast: Function, inRow?: boolean }} props `inRow`: the section stands inside a page
@@ -338,7 +349,7 @@ export function ConnectionsSection({ showToast, inRow }) {
     <${List} cols="name-state" keepCols empty=${t('profile.access.cxEmpty') || 'No connected accounts yet.'}>
       ${connections.map(c => html`
         <${Row} key=${c.id} hover>
-          <${Name} meta=${`${c.provider ?? ''}${c.status === 'needs_reauth' ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting') : ''}`}>${c.accountLabel}<//>
+          <${Name} meta=${`${providerLabel(c.provider, providers.find(p => p.id === c.provider)?.label)}${c.status === 'needs_reauth' ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting') : ''}`}>${c.accountLabel}<//>
           <${Doors}>
             ${c.status === 'needs_reauth' && html`
               <${Action} small row onClick=${() => connect({ id: c.provider })}>${t('profile.access.cxReconnect') || 'Reconnect'}<//>
@@ -355,7 +366,7 @@ export function ConnectionsSection({ showToast, inRow }) {
     <${List} cols="name-state" keepCols empty=${t('profile.access.cxAgentsEmpty') || 'Your agents have not connected any accounts.'}>
       ${agentConnections.map(c => html`
         <${Row} key=${c.id} hover>
-          <${Name} meta=${(t('profile.access.cxAgentMeta') || '{provider} · agent {agent}').replace('{provider}', c.provider ?? '').replace('{agent}', c.agent ?? '')}>${c.accountLabel}<//>
+          <${Name} meta=${(t('profile.access.cxAgentMeta') || '{provider} · agent {agent}').replace('{provider}', providerLabel(c.provider, providers.find(p => p.id === c.provider)?.label)).replace('{agent}', c.agent ?? '')}>${c.accountLabel}<//>
           <${Doors}>
             <${Action} small row tone="danger" onClick=${() => revokeAgent(c)}>${t('profile.access.cxDisconnect') || 'Disconnect'}<//>
           <//>
@@ -394,7 +405,7 @@ export function ConnectionsSection({ showToast, inRow }) {
           onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
           ${busy === p.id
             ? (t('profile.access.cxConnecting') || 'Connecting…')
-            : `${t('profile.access.cxConnect') || 'Connect'} ${p.label ?? ''}`}
+            : `${t('profile.access.cxConnect') || 'Connect'} ${providerLabel(p.id, p.label)}`}
         <//>
       <//>
       ${!p.attachFields && html`

@@ -8,6 +8,8 @@
  *   Nodes sub-tab the page's start (PageStart id "nodes") opens the register form as its action and
  *   folds once a server is registered. The Node stats sub-tab draws its own start and question mark.
  * @version-history
+ *   v1.25.1 -- 2026-11-27 -- The server list's section is "Registered servers" with its count; it
+ *     repeated the page's title and its tab.
  *   v1.25.0 -- 2026-11-27 -- On the Nodes sub-tab a figure strip under the head says where the server stands: its connection as a word (fine when connected, warn when not) with when it last connected, and the messages its queue keeps (notice while it has no connection), from the status the list already reads (NodesList hands its list up with onNodes). Not drawn while no server is registered (FigureStrip hideZeros), so an empty page is the list's one line, which now says what fills it and the one way to fill it. The server list's section has the id pn-servers. While the register form is open, Add server is drawn quiet (Loud quiet) and the form's Register is the one loud action. No control was removed.
  *   v1.24.0 -- 2026-11-08 -- The settings a label does not explain get their question mark: the
  *     register form's Server ID (nodes.serverId) and Agent identifiers (nodes.agentIds), and the
@@ -174,7 +176,7 @@ function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm,
   };
 
   return html`
-    <${Section} band id="pn-servers" title=${t('profile.nodes.title')} first>
+    <${Section} band id="pn-servers" title=${t('profile.nodes.secRegistered')} count=${nodes ? nodes.length : undefined} first>
     ${/* While the register form is open, its Register is the loud action and this one is quiet. */''}
     <${Space} below="large"><${Loud} quiet=${showNodeForm} onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//><//>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}

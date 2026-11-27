@@ -8,6 +8,8 @@
  *   that connects the person's AI over MCP with this server's address) and the title's question
  *   mark (concept.connect). How the page explains itself: .claude/rules/page-guidance.md.
  * @version-history
+ *   v1.19.0 -- 2026-11-27 -- The tools' list has a head row; a row's end says "Open" or "Close" with
+ *     the chevron (List RowOpen) instead of the ▼ ▶ letter alone.
  *   v1.18.0 -- 2026-11-26 -- The page leads with where things stand: a figure strip (how many tools,
  *     when one was last here, how many nobody has used in 30 days), then the tools as section 01 and
  *     how to add one as section 02, with the contents rail. The create card stood above the list.
@@ -62,9 +64,9 @@ import { PageSection } from '/components/PageSection.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
-import { List, Row as ListRow, Name, Desc, Doors } from '/components/List.js';
+import { List, Row as ListRow, Name, Desc, Doors, RowOpen } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Row } from '/components/Layout.js';
@@ -172,7 +174,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     ${chatSessions.length === 0
       ? html`<${Note} kind="quiet">${t('profile.chatSessions.empty')}<//>`
       : html`
-        <${List} cols="name-desc-doors">
+        <${List} cols="name-desc-doors" head=${[x('colTool'), x('colSeen'), x('colName')]}>
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
           return html`
@@ -194,7 +196,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                     <//>`}>
               <${Name}>${s.display_name || s.name || '-'}<//>
               <${Desc}>${t('profile.chatSessions.lastSeen')}: ${s.last_seen ? timeAgo(s.last_seen) : '-'}<//>
-              <${Doors}><${Mark}>${s.name || ''}<//><${Icon} small>${isExpanded ? '\u25BC' : '\u25B6'}<//><//>
+              <${Doors}><${Mark}>${s.name || ''}<//><${RowOpen} open=${isExpanded} /><//>
             <//>
           `;
         })}

@@ -12,6 +12,11 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.7.0 -- 2026-11-27 -- Usability round 3: What waits for you is drawn only while something waits,
+ *     and the numbers move up when it is not; the newest apps and their health stay open; agents and
+ *     skills, build, builders and the style kit are closed rows (FoldSection, `ctx.folds`) that state
+ *     their state; the upload door and the rail open a row before they scroll. The head's tags went
+ *     (each repeated a figure of the strip).
  *   v2.6.0 -- 2026-11-26 -- For a person with apps the seven sections are three with their parts: 01
  *     what waits, 02 the newest apps (02.1 health, 02.2 agents), 03 build (03.1 builders, 03.2 the
  *     style kit). The apps list stands before its health. The section ids are the old ones.
@@ -112,39 +117,65 @@ export function renderPage(ctx) {
     { key: 'grants', n: grants.length, label: a('stripGrants'), sub: grants.length ? grants.map((g) => grantName(ctx, g)).slice(0, 2).join(' · ') : a('stripGrantsNone') },
   ]} />`;
 
-  const marks = [
-    none ? { label: a('chipNone'), tone: 'coral' } : { label: a('chipCount', { n: apps.length }) },
-    none ? { label: a('chipFirst'), tone: 'dim' } : drafts.length ? { label: a('chipDrafts', { n: drafts.length }), tone: 'coral' } : null,
-    none ? null : { label: a('chipOpens', { n: fmt(opens) }), tone: 'dim' },
-  ];
+  // The head says no number the strip already says (how many apps, drafts, opens): no tags.
+  const marks = [];
 
+  // The upload form is in the build row, which is closed until opened: open it, then scroll.
+  const toBuild = () => { ctx.openFold('build'); setTimeout(() => scrollToSection('ap-build'), 30); };
   const actions = none
     ? html`<${Loud} control copy=${ctx.buildPrompt} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))}>${a('promptDoor')}<//>
       <${Actions}>
-        <${Action} small onClick=${() => scrollToSection('ap-build')}>${a('uploadDoor')}<//>
+        <${Action} small onClick=${toBuild}>${a('uploadDoor')}<//>
         <${Action} small soft href=${catalogUrl()} newTab>${a('catalogDoor')}<//>
       <//>`
     : html`<${Loud} href=${catalogUrl()} newTab>${a('catalogDoor')}<//>
-      <${Actions}><${Action} small onClick=${() => scrollToSection('ap-build')}>${a('uploadDoor')}<//><//>`;
+      <${Actions}><${Action} small onClick=${toBuild}>${a('uploadDoor')}<//><//>`;
 
-  const sections = none
-    ? [{ id: 'ap-first', num: '01', label: a('secFirst'), count: '' }, { id: 'ap-waiting', num: '02', label: a('secWaiting'), count: 0 }, { id: 'ap-kunto', num: '03', label: a('secKunto'), count: '' }, { id: 'ap-build', num: '04', label: a('uploadLabel'), count: '' }]
-    // Three whole-numbered sections for a person with apps: what waits, the apps (with their health
-    // and what agents do with them as its parts) and building (with the builders and the style kit).
-    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-newest', num: '02', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-kunto', num: '02.1', label: a('secKunto'), count: '' }, { id: 'ap-agents', num: '02.2', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '03', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '03.1', label: a('secBuilders'), count: '' }, { id: 'ap-kits', num: '03.2', label: a('secKits'), count: '' }];
-  const kitsSection = html`<${KitsSection} num=${none ? '05' : '03.2'} gallery=${ctx.gallery} showToast=${ctx.showToast} />`;
-  if (none) sections.push({ id: 'ap-kits', num: '05', label: a('secKits'), count: '' });
+  // What waits is a section only while something waits (an empty "Waiting for you 0" stood first on
+  // the page); the numbers after it move up by one when it is not there.
+  const hasWaiting = waiting > 0;
+  const pad = (n) => String(n).padStart(2, '0');
+  const fold = (key) => ({ open: !!ctx.folds?.[key], onToggle: () => ctx.toggleFold(key), openRail: () => ctx.openFold(key) });
+  let sections;
+  let nums;
+  if (none) {
+    // 01 the first step, (02 what waits), then health, upload and the style kit.
+    let n = 1;
+    nums = { first: pad(n++), waiting: hasWaiting ? pad(n++) : null, kunto: pad(n++), build: pad(n++), kits: pad(n) };
+    sections = [{ id: 'ap-first', num: nums.first, label: a('secFirst'), count: '' },
+      hasWaiting ? { id: 'ap-waiting', num: nums.waiting, label: a('secWaiting'), count: waiting } : null,
+      { id: 'ap-kunto', num: nums.kunto, label: a('secKunto'), count: '' },
+      { id: 'ap-build', num: nums.build, label: a('uploadLabel'), count: '', open: fold('build').openRail },
+      { id: 'ap-kits', num: nums.kits, label: a('secKits'), count: '', open: fold('kits').openRail }].filter(Boolean);
+  } else {
+    // Whole-numbered sections for a person with apps: what waits (when something does), the apps
+    // (with their health and what agents do with them as its parts) and building (with the builders
+    // and the style kit). The newest and the health are open; the rest are closed rows.
+    const base = hasWaiting ? 1 : 0;
+    const appsNum = pad(base + 1);
+    const buildNum = pad(base + 2);
+    nums = { waiting: hasWaiting ? '01' : null, newest: appsNum, kunto: `${appsNum}.1`, agents: `${appsNum}.2`, build: buildNum, builders: `${buildNum}.1`, kits: `${buildNum}.2` };
+    sections = [hasWaiting ? { id: 'ap-waiting', num: nums.waiting, label: a('secWaiting'), count: waiting } : null,
+      { id: 'ap-newest', num: nums.newest, label: a('secNewest'), count: Math.min(apps.length, 6) },
+      { id: 'ap-kunto', num: nums.kunto, label: a('secKunto'), count: '' },
+      { id: 'ap-agents', num: nums.agents, label: a('secAgents'), count: '', open: fold('agents').openRail },
+      { id: 'ap-build', num: nums.build, label: a('secBuild'), count: '', open: fold('build').openRail },
+      { id: 'ap-builders', num: nums.builders, label: a('secBuilders'), count: '', open: fold('builders').openRail },
+      { id: 'ap-kits', num: nums.kits, label: a('secKits'), count: '', open: fold('kits').openRail }].filter(Boolean);
+  }
+  const kitsSection = html`<${KitsSection} num=${nums.kits} gallery=${ctx.gallery} showToast=${ctx.showToast} fold=${fold('kits')} />`;
+  const waitingSection = hasWaiting ? secWaiting(ctx, drafts, sharedDrafts, grants, nums.waiting) : null;
 
   return html`
-    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${loading ? [] : marks}
+    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${marks}
       desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${loading ? null : strip}
       start=${html`<${PageStart} id="apps" done=${loading ? null : !none} action=${ctx.buildPrompt ? { copy: ctx.buildPrompt } : null} />`}
       railTitle=${a('railTitle')} sections=${sections} pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />
         ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}`}>
-      ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, sharedDrafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}${kitsSection}`
+      ${none ? html`${secFirst(ctx)}${waitingSection}${secKunto(ctx, nums.kunto)}${secBuild(ctx, { formOnly: true, num: nums.build, fold: fold('build') })}${kitsSection}`
         : loading ? (ctx.appsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />` : html`<${Note} kind="loading">${t('common.loading')}<//>`)
-        : html`${secWaiting(ctx, drafts, sharedDrafts, grants, '01')}${secNewest(ctx, apps)}${secKunto(ctx, '02.1')}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '03' })}${secBuilders(ctx)}${kitsSection}`}
+        : html`${waitingSection}${secNewest(ctx, apps, nums.newest, !hasWaiting)}${secKunto(ctx, nums.kunto)}${secAgents(ctx, nums.agents, fold('agents'))}${secBuild(ctx, { formOnly: false, num: nums.build, fold: fold('build') })}${secBuilders(ctx, nums.builders, fold('builders'))}${kitsSection}`}
     <//>`;
 }
 
@@ -269,12 +300,12 @@ function secKunto(ctx, num) {
 
 /* ── 03 · Last changed ────────────────────────────────────────────────────────────────────────── */
 
-function secNewest(ctx, apps) {
+function secNewest(ctx, apps, num = '02', first = false) {
   const rows = [...apps].sort((p, q) => String(q.created_at || '').localeCompare(String(p.created_at || ''))).slice(0, 6);
   const grantRefs = new Set((ctx.grants || []).map((g) => g.app));
   const doors = html`<${Action} small soft href=${catalogUrl()} newTab>${a('allInCatalog', { n: apps.length })}<//>`;
   return html`
-    <${Section} id="ap-newest" num="02" title=${a('secNewest')} count=${rows.length} doors=${doors}>
+    <${Section} id="ap-newest" num=${num} title=${a('secNewest')} count=${rows.length} doors=${doors} first=${first}>
       <${List} cols="mark-name-desc-state-n-doors" keepCols
         head=${['', a('colApp'), a('colDesc'), a('colNote'), { label: a('colOpens'), num: true }, '']}
         rows=${rows} render=${(app) => {

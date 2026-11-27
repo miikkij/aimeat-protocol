@@ -7,6 +7,14 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.30.0 -- 2026-11-27 -- Usability round 3: section 02 (Add an agent, with 02.1-02.4) and 03 (Allow
+ *     always) are closed FoldSection rows that state their state (how many proposals wait; how many
+ *     permissions are on); the list stays open. The head no longer repeats the strip (the title count and
+ *     the agents, ready, waiting and problems tags go; the strip keeps them). The page counts the waiting
+ *     proposals itself (GET /v1/agents/v2/agent-proposals), so the count and the aside hold while 02 is
+ *     closed; New agent, Connect and the aside open 02 before they scroll. "Needs attention" is
+ *     agentNeedsAttention, the fleet page's rule too (the list now asks include=stats,credentials): this
+ *     page counted the node's problem verdict and refusals, the fleet only a sign-in that cannot work.
  *   v4.29.2 -- 2026-11-27 -- The platform list's fold draws the Chevron (down while closed, up while
  *     open, as the ▼ ▲ it replaces).
  *   v4.29.1 -- 2026-11-27 -- A refused permission save keeps the dialog open and answers it the refusal in
@@ -163,9 +171,9 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
-import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
+import { listAgents, updateAgentScopes, deleteAgent, agentNeedsAttention } from '/js/services/agents.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { useAgentGroups } from './agents/agent-groups-state.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -177,7 +185,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
-import { AllowAlwaysSection } from './agents/allow-always-section.js';
+import { AllowAlwaysFold } from './agents/allow-always-section.js';
 import { OperatorServicesOff } from './agents/operator-services-off.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Action, Actions, Loud, Chevron } from '/components/Action.js';
@@ -193,7 +201,6 @@ import { loadAgentOrder, saveAgentOrder, loadSeen, saveSeen, markTabSeen, effect
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
 import ScopesModal, { scopeRefusalWords } from './agents/scopes-modal.js';
-import { hasRefusals } from './agents/agent-card-access.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
 import { AgentGuide, NoAgentsYet, NoComputersHere, useTakesComputers } from './agents/agent-guide.js';
@@ -223,6 +230,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // open, because connecting an AI is the first thing to do here.
   const [connectOpen, setConnectOpen] = useState(() => loadFold(session?.owner, 'connect', true));
   const [newOpen, setNewOpen] = useState(false);
+  // Section 02 (the ways to add an agent) is one closed row that says what waits there.
+  const [addOpen, setAddOpen] = useState(false);
+  // Section 03 (Allow always) likewise; a permission notice opens it (allow-always-section.js).
+  const [alwaysOpen, setAlwaysOpen] = useState(false);
   const [newDraft, setNewDraft] = useState(null);
   const [waitingCount, setWaitingCount] = useState(0);
   const [cliExpanded, setCliExpanded] = useState(false);
@@ -356,6 +367,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
       const resp = await apiGet('/v1/agents/device-authorize/pending');
       if (resp?.data?.requests) setPendingRequests(resp.data.requests);
     } catch (err) { swallowed('agents-tab: loadPending', err); }
+    // The proposals that wait, counted here as well as in the panel (new-agent-panel.js), because the
+    // panel is not drawn while section 02 is closed and the strip and the row still say how many wait.
+    try {
+      const resp = await apiGet('/v1/agents/v2/agent-proposals');
+      setWaitingCount((resp?.data?.proposals ?? []).filter(x => x.state === 'proposed').length);
+    } catch (err) { swallowed('agents-tab: loadProposals', err); }
   }
 
   async function loadData() {
@@ -363,7 +380,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
       // ONE request for the whole fleet: agents + per-agent stats (task/message counts, latest
       // activity timestamps, active-task list, onboarding) via ?include=stats. Replaces the old
       // 1 + N×5 per-agent fan-out (~185 requests for 46 agents).
-      const list = await listAgents(session.owner, { include: 'stats' });
+      // credentials: whether each agent can still sign in, half of agentNeedsAttention (the fleet's rule too).
+      const list = await listAgents(session.owner, { include: 'stats,credentials' });
       setAgents(list);
       fleetLoad.ok();
       onStats?.({ agents: list.length });
@@ -438,9 +456,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
     const FLEET_DOMAINS = ['agents', 'agent-tasks', 'agent-messages', 'agent-onboarding'];
     const handler = (e) => {
       const d = e.detail?.domains;           // Set<string> | null (null = everything changed)
+      // device-auth requests ride the 'agents' domain; a proposal also rides 'open-items'
+      if (!d || d.has('agents') || d.has('open-items')) pendingRef.current();
       if (d && !FLEET_DOMAINS.some(x => d.has(x))) return;
       loadRef.current();
-      if (!d || d.has('agents')) pendingRef.current();   // device-auth requests ride the 'agents' domain
     };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
@@ -596,28 +615,30 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // rows show, so the strip and the table cannot disagree.
   const ready = agents.filter(a => ['production', 'idle'].includes(agentState(a))).length;
   const never = agents.filter(a => !a.last_seen).length;
-  // A refused agent is a problem too: it looks connected and its work does not get done.
-  const problems = agents.filter(a => agentState(a) === 'problem' || hasRefusals(a));
+  // One rule with the fleet page (agentNeedsAttention): a sign-in that cannot work, the node's problem
+  // verdict, or a refused permission (an agent that looks connected and whose work does not get done).
+  const problems = agents.filter(agentNeedsAttention);
   const federated = agents.filter(a => a.federate).length;
   const tools = agents.filter(a => a.mode === 'workstation').length;
   const waiting = pendingRequests.length + waitingCount;
   const latest = agents.reduce((best, a) => (a.last_seen && (!best || a.last_seen > best.last_seen)) ? a : best, null);
   const running = Object.values(activeTasksMap).reduce((n, list) => n + (list?.length || 0), 0);
 
-  const openNew = () => { setNewOpen(true); requestAnimationFrame(() => scrollToSection('agp-new')); };
-  const openConnect = () => { setConnectOpen(true); saveFold(session?.owner, 'connect', true); requestAnimationFrame(() => scrollToSection('agp-connect')); };
+  // Each of these opens section 02 first, because its parts are drawn only while it is open.
+  const openAdd = (id) => { setAddOpen(true); requestAnimationFrame(() => requestAnimationFrame(() => scrollToSection(id))); };
+  const openNew = () => { setNewOpen(true); openAdd('agp-new'); };
+  const openConnect = () => { setConnectOpen(true); saveFold(session?.owner, 'connect', true); openAdd('agp-connect'); };
   const toggleConnect = () => { const next = !connectOpen; setConnectOpen(next); saveFold(session?.owner, 'connect', next); };
   const connectDoor = html`<${Action} small soft onClick=${toggleConnect}>${connectOpen ? p('close') : p('open')}<//>`;
 
-  // A tag that counts nothing yet is dim, as main drew it (og-chip--dim).
+  // The strip says how many agents there are, how many are ready, wait and have a problem; the head's
+  // tags say only what the strip does not (federated agents, tool connections).
   const marks = [
-    { label: p('chipAgents', { n: agents.length }) },
-    { label: p('chipReady', { n: ready }) },
-    { label: p('chipWaiting', { n: waiting }), tone: waiting ? 'coral' : 'dim' },
-    problems.length > 0 ? { label: p('chipProblems', { n: problems.length }), tone: 'coral' } : null,
     federated > 0 ? { label: p('chipFederated', { n: federated }), tone: 'dim' } : null,
     tools > 0 ? { label: p('chipTools', { n: tools }), tone: 'dim' } : null,
   ];
+  // Section 02's closed row says what waits there, or how many ways it offers.
+  const addSub = waitingCount > 0 ? tn('profile.agents.page.addSubWaiting', waitingCount) : p('addSub');
   const strip = [
     { key: 'agents', n: agents.length, label: p('stripAgents'), sub: p('stripAgentsSub', { ready, never }) },
     { key: 'waiting', n: waiting, label: p('stripWaiting'), sub: p('stripWaitingSub') },
@@ -627,14 +648,15 @@ export default function AgentsTab({ session, showToast, onStats }) {
     { key: 'problems', n: problems.length, label: p('stripProblems'), sub: problems.length ? problems.slice(0, 3).map(a => a.display_name || a.name).join(' · ') : p('stripProblemsSub') },
   ];
   const pickExample = (draft) => { setNewDraft(draft); openNew(); };
+  const showAdd = () => setAddOpen(true);
   const sections = [
     { id: 'agp-list', num: '01', label: p('secAgents'), count: agents.length },
     { id: 'agp-add', num: '02', label: p('secAdd'), count: null },
-    { id: 'agp-guide', num: '02.1', label: t('profile.agents.guide.title'), count: null },
-    { id: 'agp-basic', num: '02.2', label: t('profile.agents.basic.title'), count: null },
-    { id: 'agp-new', num: '02.3', label: t('profile.agents.new.title'), count: waitingCount || null },
-    { id: 'agp-connect', num: '02.4', label: p('secConnect'), count: null },
-    { id: 'agp-always', num: '03', label: t('profile.agents.always.title'), count: null },
+    { id: 'agp-guide', num: '02.1', label: t('profile.agents.guide.title'), count: null, open: showAdd },
+    { id: 'agp-basic', num: '02.2', label: t('profile.agents.basic.title'), count: null, open: showAdd },
+    { id: 'agp-new', num: '02.3', label: t('profile.agents.new.title'), count: waitingCount || null, open: showAdd },
+    { id: 'agp-connect', num: '02.4', label: p('secConnect'), count: null, open: showAdd },
+    { id: 'agp-always', num: '03', label: t('profile.agents.always.title'), count: null, open: () => setAlwaysOpen(true) },
   ];
 
   // One panel element, placed first while a proposal waits and third otherwise (v31 K49). The same
@@ -645,7 +667,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   return html`
     <${SettingsPage} name="agp"
       crumb=${[t('nav.profile'), t('profile.tabs.agents')]}
-      title=${t('profile.agents.title')} sub=${agents.length} help="concept.agent"
+      title=${t('profile.agents.title')} help="concept.agent"
       marks=${marks}
       desc=${p('lede')}
       actions=${html`
@@ -672,8 +694,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <${ConfirmUI} />`}>
           ${/* What waits for the person is said first, with the button that goes to it. The section
                 keeps its place, so the numbers on the page run in order (Jouni, 2026-11-24). */''}
-          ${waitingCount > 0 ? html`<${Note} kind="aside">${p('waitingCount', { n: waitingCount })}${' '}
-            <${Action} small onClick=${() => scrollToSection('agp-new')}>${t('profile.agents.new.title')} →<//><//>` : null}
+          ${waitingCount > 0 ? html`<${Note} kind="aside">${tn('profile.agents.page.waitingAside', waitingCount)}${' '}
+            <${Action} small onClick=${() => openAdd('agp-new')}>${p('waitingShow')} →<//><//>` : null}
 
           <${Section} id="agp-list" num="01" first=${true} title=${p('secAgents')} count=${agents.length}>
             ${agents.length === 0
@@ -729,7 +751,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
           ${/* The ways to get an agent, as the parts of one section: the question, the two ready agents,
                 an agent of the person's own (with what waits for approval) and connecting an AI. */''}
-          <${Section} id="agp-add" num="02" title=${p('secAdd')}>
+          <${Section} fold id="agp-add" num="02" title=${p('secAdd')} sub=${addSub} open=${addOpen} onToggle=${() => setAddOpen(v => !v)}>
           <${Note} kind="lead">${p('addLede')}<//>
           <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} num="02.1" />
           <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} num="02.2" />
@@ -811,9 +833,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
           ${/* What every AI of the person may do without asking (agents/allow-always-section.js). A
                 permission notice links here with section=allow-always. */''}
-          <${Section} id="agp-always" num="03" title=${t('profile.agents.always.title')}>
-            <${AllowAlwaysSection} showToast=${showToast} />
-          <//>
+          <${AllowAlwaysFold} showToast=${showToast} num="03" open=${alwaysOpen} setOpen=${setAlwaysOpen} />
     <//>
   `;
 }

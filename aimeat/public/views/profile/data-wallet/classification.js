@@ -16,6 +16,8 @@
  * @structure acceptStep(policy, item, decision) · useClassification() → cls · secClassification(ctx, num)
  * @usage const cls = useClassification({ federated, confirm, toast }); … secClassification({ ...ctx, cls }, '05')
  * @version-history
+ *   v1.10.0 — 2026-11-27 — The section is one of the page's closed rows (foldOf); its state words are the
+ *     row's (classificationCount).
  *   v1.9.0 — 2026-10-18 — protectsLess counts a wider audience cap (maxAudience) as protecting less,
  *     as levels.ts weakerFields does now (plan doc-mvdipuyqraas, L3.1).
  *   v1.8.0 — 2026-10-02 — The question mark that explains the classification switch: classification.switch (components/HelpTip.js).
@@ -76,7 +78,7 @@ import { Modal } from '/components/Modal.js';
 import { Fields } from '/components/Field.js';
 import { TextArea } from '/components/TextField.js';
 import { t } from '/js/i18n.js';
-import { x, n, dateWord, timeWord, accessorWords, whoOf } from './frame.js';
+import { x, n, dateWord, timeWord, accessorWords, whoOf, foldOf } from './frame.js';
 import { useExceptions, exceptionsGroup, exceptionDialog } from './classification-exceptions.js';
 
 const PAGE = 50;
@@ -488,7 +490,7 @@ export function secClassification(ctx, num) {
     ? (cls.failed ? html`<${Note} kind="quiet">${x('cls.loadFailed')}<//>` : html`<${Note} kind="loading">${x('loading')}<//>`)
     : sections(cls, ctx.session?.owner);
   return html`
-    <${Section} id="dw-class" num=${num} title=${x('cls.title')} count=${classificationCount(cls)}>
+    <${Section} ...${foldOf(ctx, 'dw-class')} id="dw-class" num=${num} title=${x('cls.title')} sub=${classificationCount(cls)}>
       <${Note} kind="lead">${x('cls.lead')}<//>
       ${body}
       ${reasonDialog(cls)}

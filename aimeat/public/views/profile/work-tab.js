@@ -8,6 +8,9 @@
  *   (.claude/rules/page-guidance.md): PageStart "work" under the head and the title's question mark
  *   concept.work_request.
  * @version-history
+ *   v1.23.0 -- 2026-11-27 -- One count for "to you": the strip's sub line counts the open requests as
+ *     section 01 does and names the delivered work apart (it counted both, 3 against 2); each list
+ *     has a head row; the title is the menu's word (profile.work.title).
  *   v1.22.0 -- 2026-11-27 -- With no work in either direction the strip is not drawn (FigureStrip hideZeros, its first figure now counts every work item) and the page is section 01 with one line that says how a request gets here; the sent requests and the delivered record are drawn once they hold something, the numbers and the rail follow what is drawn, and one section has no rail. A request that waits for an answer, then work to deliver, comes first in the inbox; a delivery that waits for a rating first in the sent list.
  *   v1.21.0 -- 2026-11-27 -- The page leads with where things stand: a figure strip (requests that wait for an answer, work to deliver, deliveries that wait for a rating, work delivered) from the overview it already reads. The three lists are sections with the contents rail instead of view tabs: 01 requests to the person (wk-inbox), 02 requests they sent (wk-sent), 03 work they delivered (wk-delivered) as a FoldSection row that says how many. Accept is the one loud action; Deliver on a row is a quiet Action that opens the same dialog. No list or control was removed.
  *   v1.20.0 -- 2026-11-15 -- Accept and Decline say what they do (the past-tense "Work accepted" was the label and the error toast); accept, decline and deliver have their own error toasts; the Deliver dialog's placeholder goes through t(). A Delivered view lists the work the person delivered as a provider (GET /v1/work/overview `delivered`), with what was sent and the rating, so a delivered item no longer leaves no record. Decline and Rate are the control-tall action (Action `control`), the touch target Accept has.
@@ -232,7 +235,8 @@ export default function WorkTab({ session, showToast, onStats }) {
   function renderList(items, type, emptyKey) {
     if (!items) return html`<${List} loading=${t('profile.work.loading')} />`;
     const empty = emptyKey || { sent: 'profile.work.sentEmpty', delivered: 'profile.work.deliveredListEmpty' }[type] || 'profile.work.empty';
-    return html`<${List} cols="name-desc-doors" empty=${t(empty)}>${byAttention(items, type).map(w => {
+    const head = items.length ? [t('profile.work.colWork'), t(type === 'sent' ? 'profile.work.colToWhom' : 'profile.work.colFromWhom'), t('profile.work.colState')] : null;
+    return html`<${List} cols="name-desc-doors" head=${head} empty=${t(empty)}>${byAttention(items, type).map(w => {
       // The work routes name the item `tracking_code`; the other names are older shapes.
       const tc = w.tracking_code || w.tc || w.id || w.work_id;
       const said = type === 'sent' || type === 'delivered' ? deliveredText(w.output) : null;
@@ -285,13 +289,16 @@ export default function WorkTab({ session, showToast, onStats }) {
   // waits for a rating, and what they accepted and still deliver. With nothing at all the strip is
   // not drawn (hideZeros).
   const loaded = workInbox !== null && workSent !== null && workDelivered !== null;
-  const toYou = (workInbox?.length ?? 0) + (workDelivered?.length ?? 0);
+  // "To you" is section 01's count, the open requests to the person; what they already delivered is
+  // section 03's, and the strip names it apart. It counted both as "to you" (3 against the section's 2).
+  const toYou = workInbox?.length ?? 0;
+  const doneByYou = workDelivered?.length ?? 0;
   const fromYou = workSent?.length ?? 0;
   const answerN = (workInbox || []).filter(w => ['pending', 'offered'].includes(w.status)).length;
   const deliverN = (workInbox || []).filter(w => ['accepted', 'in_progress'].includes(w.status)).length;
   const rateN = (workSent || []).filter(w => w.status === 'delivered').length;
   const strip = !loaded ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} wrap hideZeros items=${[
-    { key: 'all', n: toYou + fromYou, label: t('profile.work.stripAll'), sub: t('profile.work.stripAllSub', { in: toYou, out: fromYou }) },
+    { key: 'all', n: toYou + fromYou + doneByYou, label: t('profile.work.stripAll'), sub: t('profile.work.stripAllSub', { in: toYou, out: fromYou, done: doneByYou }) },
     { key: 'answer', n: answerN, tone: answerN ? 'notice' : undefined, label: t('profile.work.stripAnswer'), sub: answerN ? t('profile.work.stripAnswerSub') : undefined },
     { key: 'rate', n: rateN, tone: rateN ? 'notice' : undefined, label: t('profile.work.stripRate') },
     { key: 'deliver', n: deliverN, label: t('profile.work.stripDeliver') },
@@ -301,7 +308,7 @@ export default function WorkTab({ session, showToast, onStats }) {
   // What is drawn: the requests to the person always (with nothing anywhere, its one line is the
   // page's empty line); the sent requests and the delivered record only once they hold something.
   // The numbers and the rail follow what is drawn, and one section has no rail.
-  const nothing = loaded && toYou + fromYou === 0;
+  const nothing = loaded && toYou + fromYou + doneByYou === 0;
   const shown = [
     { id: 'wk-inbox', label: t('profile.work.secInbox'), count: workInbox?.length },
     workSent?.length ? { id: 'wk-sent', label: t('profile.work.secSent'), count: workSent.length } : null,

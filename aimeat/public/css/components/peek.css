@@ -8,6 +8,8 @@
  *   from the theme tokens only; no corner, frame, shadow or case of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The one-line view is the text's own colour (it was the grey of a hint), and
+ *     the fade ends in the card's ground (--card-bg), not a darker one that greyed the note.
  *   v1.0.0 — 2026-09-26 — Initial (page group G4, the notebook).
  */
 
@@ -20,7 +22,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-dim, var(--text));
+  color: var(--text);
 }
 .peek--peek {
   max-height: 9rem;
@@ -34,6 +36,6 @@
   right: 0;
   bottom: 0;
   height: 2.5rem;
-  background: linear-gradient(transparent, var(--bg-dim, var(--card)));
+  background: linear-gradient(transparent, var(--card-bg, var(--card)));
   pointer-events: none;
 }
