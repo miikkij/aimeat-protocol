@@ -20,11 +20,14 @@
  *   an operator's own Stripe account, and after the buyer's one-press confirmation on another seller's
  *   (commerce/card-adult-ask.ts). A line that renews (auto_renew) keeps the card for the renewals
  *   (setup_future_usage off_session).
- * @structure STRIPE_CHECKOUT_HANDLER_ID · openStripeCheckout · stripeCheckoutHandler
+ * @structure STRIPE_CHECKOUT_HANDLER_ID · stripeExpiresAt · openStripeCheckout · stripeCheckoutHandler
  * @usage
  *   const { url } = await openStripeCheckout(config, session, psp, returnUrl);
  *   registerPaymentHandler(stripeCheckoutHandler(config));
  * @version-history
+ *   v1.0.4 — 2026-11-28 — The card page's expiry stays under 24 hours (stripeExpiresAt): a session
+ *     lifetime of a day or more made Stripe refuse every card page, as it refused the membership
+ *     bought without an account on real Stripe test mode.
  *   v1.0.3 — 2026-11-27 — openStripeCheckout takes `customerEmail`, which the card page fills in (a
  *     membership bought without an account, commerce/membership-guest.ts).
  *   v1.0.2 — 2026-10-30 — A credit card on a seller's own Stripe account waits for the buyer's
@@ -46,6 +49,18 @@ export const STRIPE_CHECKOUT_HANDLER_ID = 'com.stripe.checkout';
 /** Whether a line asks for automatic renewal, which keeps the card for later charges. */
 function renews(session: CheckoutSessionRecord): boolean {
   return session.items.some(i => (i.input as { auto_renew?: unknown } | undefined)?.auto_renew === true);
+}
+
+/**
+ * The card page's `expires_at` in Unix seconds: the AIMEAT session's own expiry, held inside the
+ * window Stripe takes, at least 30 minutes and less than 24 hours after the page is made. A longer
+ * session lifetime (the operator's commerce session setting) made Stripe refuse every card page.
+ */
+export function stripeExpiresAt(sessionExpiresAt: string, nowMs: number = Date.now()): number {
+  const now = Math.floor(nowMs / 1000);
+  const wanted = Math.floor(new Date(sessionExpiresAt).getTime() / 1000);
+  const latest = now + 23 * 3600;
+  return Math.min(latest, Math.max(now + 1800, Number.isFinite(wanted) ? wanted : now + 1800));
 }
 
 /** `url` with the query parameters added, keeping what it already had. */
@@ -89,8 +104,8 @@ export async function openStripeCheckout(
     'metadata[aimeat_buyer]': meta.aimeat_buyer,
     'payment_intent_data[metadata][aimeat_session]': meta.aimeat_session,
     'payment_intent_data[description]': `AIMEAT checkout ${session.id}`,
-    // Stripe's own session expiry is at least 30 minutes; the AIMEAT session's is what counts.
-    expires_at: String(Math.max(Math.floor(Date.now() / 1000) + 1800, Math.floor(new Date(session.expiresAt).getTime() / 1000))),
+    // The AIMEAT session's expiry, inside the window Stripe takes (stripeExpiresAt).
+    expires_at: String(stripeExpiresAt(session.expiresAt)),
     ...(renews(session) ? { customer_creation: 'always', 'payment_intent_data[setup_future_usage]': 'off_session' } : {}),
     ...(opts.customerEmail ? { customer_email: opts.customerEmail } : {}),
   };
