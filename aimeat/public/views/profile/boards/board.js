@@ -11,6 +11,8 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.16.1 — 2026-11-27 — Who posts is shown only on a shared or public board: a private board takes
+ *     posts from its keeper only, and the choice there decided nothing.
  *   v1.16.0 — 2026-11-08 — The rules fold's settings explain themselves: boards.whoSees,
  *     boards.whoPublishes, boards.noticeLifetime and boards.partners on their Choices. The partner
  *     hint is gone: it said the flag did nothing, and the explanation says what it does (the board's
@@ -168,7 +170,9 @@ function rulesFold(ctx, b, mine) {
   return html`
     <${Fields} cols=${2}>
       ${choice('visibility', c('fSees'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]], 'boards.whoSees')}
-      ${choice('posting', c('fPosts'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]], 'boards.whoPublishes')}
+      ${/* A private board takes posts from its keeper only, whatever its rule (services/boards/post.ts),
+            so the choice is shown only where it decides something. */''}
+      ${r.visibility === 'private' ? null : choice('posting', c('fPosts'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]], 'boards.whoPublishes')}
       <${TextField} id="bp-r-cats" label=${c('fCategories')} value=${r.categories} disabled=${!mine} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
       ${choice('ttl', c('fLifetime'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]], 'boards.noticeLifetime')}
       ${r.visibility === 'public' ? html`

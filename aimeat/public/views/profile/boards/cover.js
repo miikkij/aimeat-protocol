@@ -15,6 +15,7 @@
  * @structure renderBoardsView · expiresSoon · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.18.1 -- 2026-11-27 -- The new board form asks who posts only for a shared or public board.
  *   v1.18.0 -- 2026-11-27 -- Usability pass: the followed boards stay first and open; the newest notices
  *     are drawn only when the followed boards have some; others' public boards are a row that says how
  *     many and opens in place (open while the person follows none); every section is numbered after
@@ -215,7 +216,8 @@ export function ownBoardForm(ctx) {
       <${TextField} id="bp-f-desc" label=${c('fDesc')} value=${f.description} onInput=${(v) => set('description', v)} placeholder=${t('profile.boards.descPlaceholder')} />
       <${Fields} cols=${2}>
         ${choice('visibility', c('fSees'), 'boards.whoSees', [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
-        ${choice('posting', c('fPosts'), 'boards.whoPublishes', [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
+        ${/* A private board takes posts from its keeper only (services/boards/post.ts): no choice to show. */''}
+        ${f.visibility === 'private' ? null : choice('posting', c('fPosts'), 'boards.whoPublishes', [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
         <${TextField} id="bp-f-cats" label=${c('fCategories')} hint=${c('categoriesHint')} value=${f.categories} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
         ${choice('ttl', c('fLifetime'), 'boards.noticeLifetime', [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
       <//>
