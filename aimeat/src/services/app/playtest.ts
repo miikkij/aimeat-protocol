@@ -35,6 +35,8 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.4.1 — 2026-11-27 — `boots` counts the Atelier shell's status card as something on screen: an
+ *     app that needs a sign-in draws its sign-in card there and hides the empty main region.
  *   v1.4.0 — 2026-11-27 — The audit asks scenario-run.ts for the scenarios: a run is started once,
  *     goes on on the node when it is long, and is read with the same request again.
  *   v1.3.0 — 2026-11-26 — The audit bundle carries `scenarios`: the builder's own scenarios from the
@@ -163,11 +165,19 @@ const AUDIO_PROBE_JS = `(() => {
   window.addEventListener('pointerdown', () => { rec.gestured = true; }, true);
 })()`;
 
-/** Has the app drawn its own surface yet: a canvas, or a main region it fills itself. */
+/**
+ * Has the app drawn its own surface yet: a canvas, a main region it fills itself, or the Atelier
+ * shell's own status card. The shell of an app that needs a sign-in hides its empty main region and
+ * draws the sign-in card in its place (static/sdk-libs/atelier/shell.js, the boot gate), which is
+ * what this check asks a page to do. Without the third case every such app failed `boots`:
+ * measured on ten builds on 2026-11-27, six of six that need a sign-in.
+ */
 const BOOT_JS = `(() => {
   const canvas = document.querySelector('canvas');
   const main = document.querySelector('main, [role="main"], #app, #game, #root, .app');
-  const painted = !!canvas || (!!main && main.getBoundingClientRect().height > 40);
+  const gate = document.querySelector('.ak-app__status:not([hidden])');
+  const tall = (el) => !!el && el.getBoundingClientRect().height > 40;
+  const painted = !!canvas || tall(main) || tall(gate);
   return {
     painted,
     canvas: !!canvas,

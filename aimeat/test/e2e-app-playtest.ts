@@ -12,6 +12,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=app-playtest
  * @version-history
+ *   v1.2.0 — 2026-11-27 — An Atelier app that needs a sign-in passes `boots`: the shipped shell,
+ *     published as it is, shows its sign-in card. Six measured builds of such apps failed the check.
  *   v1.1.0 — 2026-10-05 — The app reaches the node's own origin and no private address (secaudit
  *     2026-10, SSRF-1), measured with a server on this machine's private network address.
  *   v1.0.0 — 2026-09-02 — Initial (the game playtest bench).
@@ -236,9 +238,28 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
         assert(anon.status === 401, `anonymous 401, got ${anon.status}`);
     });
 
+    // The Atelier shell of an app that needs a sign-in hides its empty main region and draws the
+    // sign-in card in its place. That card is the thing on screen, and `boots` has to see it.
+    const gated = `ptgate${Date.now()}.html`;
+    await test('an Atelier app that needs a sign-in boots: its sign-in card is what a visitor sees', async () => {
+        const shell = String((await json('/v1/app-templates/shell-atelier')).body?.data?.template?.content ?? '');
+        assert(shell.includes('aimeat-atelier'), 'the shipped shell loads the kit');
+        const page = shell.replace(/(<meta name="aimeat-register" content=")[^"]*(")/, '$1custom:playtest-gate$2');
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ filename: gated, mime_type: 'text/html', content: b64(page), name: 'Gate', description: 'An Atelier app that needs a sign-in.' }),
+        });
+        assert(pub.status === 201, `publish ${gated}: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+        const r = await json(`/v1/apps/me/${gated}/audit?playtest=true`, { headers: auth(a.token) });
+        const pt = r.body?.data?.live?.playtest;
+        if (!pt?.ran) skip(`no browser on this node: ${pt?.reason}`);
+        const boots = (pt.checks as any[]).find(c => c.id === 'boots');
+        assert(boots?.ok === true, `boots sees the sign-in card: ${JSON.stringify(boots)}`);
+    });
+
     console.log('\nCleanup');
     await test('Delete both apps', async () => {
-        for (const file of [good, dark]) {
+        for (const file of [good, dark, gated]) {
             const r = await json(`/v1/apps/${file}`, { method: 'DELETE', headers: auth(a.token) });
             assert(r.status === 200, `delete ${file}: ${r.status}`);
         }

@@ -401,9 +401,8 @@ function composeBody(config: AimeatConfig): string {
     + 'register, never from the bare shell: list the genres with `GET ' + base
     + '/v1/designbook?kind=genre`, fork the one that has the page\'s register with `GET ' + base
     + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
-    + 'below has the menu). FORK BY COPYING, NEVER BY RETYPING. With files of your own: save `' + base
-    + '/v1/app-templates/genre-<id>?format=raw` (or `shell-atelier`) as the app\'s file, EDIT that file in place, publish it. '
-    + 'Without files: `aimeat_app_draft_seed { filename, template }`, `aimeat_app_draft_replace`, `aimeat_app_draft_publish`. '
+    + 'below has the menu). COPY THE GENRE, NEVER RETYPE IT: with files, save that address with `?format=raw` and EDIT it; '
+    + 'without, `aimeat_app_draft_seed { filename, template }`. '
     + 'Every Atelier app declares the register it committed to — '
     + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already has, '
     + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
@@ -871,7 +870,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '5. Anything it must NOT do?\n\n'
     + 'THE LEVEL DECIDES THE REST. `proto`: ask 1, 2 and 4 only, draw no layouts, no introduction, the data map only for shared data, read parts `libraries` and `patterns` only. `plain`: no introduction unless asked, no `genre` or `book`. `fine` or no answer: all of it.\n\n'
     + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and, unless the level is `proto`, `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n'
-    + 'WHEN THE PERSON HAS ALREADY ANSWERED AND TOLD YOU TO DECIDE, ask nothing and draw no layouts: write the plan once, with your own choices each `"state": "done"`.\n\n';
+    + 'AN ORDER THAT SAYS TO DECIDE: ask nothing, draw no layouts, write the plan once with `"state": "done"`.\n\n';
   full += buildDataMapStep('atelier') + INTRODUCTION_QUESTION + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.

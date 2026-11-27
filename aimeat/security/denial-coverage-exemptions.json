@@ -95,13 +95,9 @@
     }
   },
   "anonymous_only": {
-    "test/e2e-app-draft-edit.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "c251b4361225c0cf"
-    },
     "test/e2e-app-playtest.ts": {
       "reason": "Reviewed 2026-11-15: the suite does refuse a second signed-in owner (test 'a stranger cannot play another owner's app through this door'), and the route answers that refusal with 404 by design, because the audit log is the owner's and to anyone else the app has none (src/routes/apps/legal.ts, GET /v1/apps/:owner/:filename/audit). The detector counts only a 403 or an isError as a second-principal refusal.",
-      "sha": "5b4e60cb2a02586b"
+      "sha": "b57d23f6cbe11d6c"
     },
     "test/e2e-commerce-own-tools.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
