@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-27 — Section 6: the person's packages stay with a pseudonym as the author, a purchase stays
+ *     in the seller's sales under a pseudonym, and their seller list and package subscriptions go
+ *     (services/packages/sale/package-erasure.ts, secaudit2026nov26).
  *   2026-11-26 — Section 1: the account export is a background job of the parts the person chooses, with
  *     the file contents in ZIP files; an AI starts it with aimeat_account_export and never gets the
  *     links (services/owner-export/, routes/owners/exports.ts).
@@ -410,7 +413,11 @@ let knowledge age, and you should offer them, not wait to be asked:
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a
   pseudonym: finished work and disputes (the other party has a right to them), other people's ledger
-  lines and receipts, and AI provenance records. A data processing agreement the operator made with
+  lines and receipts, and AI provenance records. Their packages stay for the people and nodes that
+  got or bought them, with a pseudonym as the author, so nobody can publish a new version of one or
+  change who may pull it; a purchase they made stays in the seller's sales under a pseudonym. Their
+  list of the nodes that sell their packages and their package subscriptions, with the saved
+  payment reference, go. A data processing agreement the operator made with
   them stays as the operator's record, without their account. One line stays in the node's list of data subject requests too: the
   account name and when the erasure was done, as the proof that it was. Their name becomes free for
   someone else. If that person later publishes an app at one of their old app addresses, or a

@@ -2883,6 +2883,13 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the subscriptions due for automatic renewal and their catalogue entries, in the package-sales system namespace that no principal addresses. The saved payment reference goes only to the payment handler that issued it."
     },
+    "src/services/packages/sale/package-erasure.ts": {
+      "reads": {
+        "getMemory": 4,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-27 (secaudit2026nov26), the node's own read: the account erasure finds the package sale records that name the erased person, in the package-account-sales, package-entitlements and package-sales system namespaces that no principal addresses, and pseudonymises or deletes them. Nothing is shown or authorised from the read."
+    },
     "src/services/packages/sale/package-sale-catalogue.ts": {
       "reads": {
         "getMemory": 1,
