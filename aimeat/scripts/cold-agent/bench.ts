@@ -38,6 +38,9 @@
  *   --briefs list,map     only these briefs · --dir <folder>   where rounds are kept (default: aimeat-atelier-bench in the home folder)
  *   --no-playtest         skip the node's own browser run of each app
  * @version-history
+ *   v1.0.1 — 2026-11-27 — A bench node stays up for 24 hours without a request, as long as its
+ *     tokens last, and a round's commands are refused from another checkout than the one that
+ *     prepared it, where they would start empty nodes under the round's name.
  *   v1.0.0 — 2026-11-27 — Initial (wish-atelier-vakiokoe-samat-tilaukset-claude-code-sessioille-j-lj).
  */
 import { spawnSync } from 'node:child_process';
@@ -80,7 +83,12 @@ function roundName(round: string): string {
 interface SandboxState { port: number; baseUrl: string; owners: { name: string; token: string }[]; agent: { token: string } | null }
 
 function sandbox(name: string, ...flags: string[]): void {
-    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/sandbox.ts', '--name', name, ...flags], { cwd: AIMEAT, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/sandbox.ts', '--name', name, ...flags], {
+        cwd: AIMEAT, encoding: 'utf8',
+        // A bench node stays up as long as its tokens last. The sandbox's own six hours ended a node
+        // between the prepare and a session started the same evening.
+        env: { ...process.env, AIMEAT_SANDBOX_IDLE_HOURS: process.env.AIMEAT_SANDBOX_IDLE_HOURS ?? '24' },
+    });
     if (r.status !== 0) throw new Error(`the sandbox ${name} did not come up: ${(r.stderr || r.stdout || '').trim().split('\n').slice(-3).join(' ')}`);
 }
 
@@ -107,11 +115,21 @@ function repoCommit(): string {
 
 // ── The round on disk ──────────────────────────────────────────────────────────
 interface RunEntry { brief: string; instance: string; baseUrl: string; dir: string; marker: string; ownerName: string; org?: string; nodeCommit: string }
-interface Manifest { round: string; createdAt: string; repoCommit: string; runs: RunEntry[] }
+interface Manifest { round: string; createdAt: string; repoCommit: string; aimeatDir?: string; runs: RunEntry[] }
 
 const manifestPath = (a: Args) => join(a.dir, a.round, 'round.json');
+/**
+ * The round as `prepare` wrote it. Its nodes keep their state and data in the checkout that
+ * prepared them, so every later command runs from that checkout: from another one it would start
+ * five empty nodes under the round's name and audit those.
+ */
 function readManifest(a: Args): Manifest | null {
-    return existsSync(manifestPath(a)) ? JSON.parse(readFileSync(manifestPath(a), 'utf8')) as Manifest : null;
+    if (!existsSync(manifestPath(a))) return null;
+    const m = JSON.parse(readFileSync(manifestPath(a), 'utf8')) as Manifest;
+    if (m.aimeatDir && resolve(m.aimeatDir).toLowerCase() !== resolve(AIMEAT).toLowerCase()) {
+        throw new Error(`round ${m.round} was prepared from ${m.aimeatDir}, where its nodes keep their data. Run this command there: cd "${m.aimeatDir}" && pnpm atelier-bench ${a.command} …`);
+    }
+    return m;
 }
 
 function writeRunFolder(run: RunEntry, brief: Brief, agentToken: string): void {
@@ -133,7 +151,7 @@ async function prepare(a: Args): Promise<void> {
     const round = roundName(a.round);
     const briefs = BRIEFS.filter(b => !a.briefs || a.briefs.includes(b.id));
     if (!briefs.length) throw new Error(`--briefs ${a.briefs?.join(',')}: none of ${BRIEFS.map(b => b.id).join(', ')}`);
-    const manifest: Manifest = readManifest(a) ?? { round, createdAt: new Date().toISOString(), repoCommit: repoCommit(), runs: [] };
+    const manifest: Manifest = readManifest(a) ?? { round, createdAt: new Date().toISOString(), repoCommit: repoCommit(), aimeatDir: resolve(AIMEAT), runs: [] };
     mkdirSync(join(a.dir, round), { recursive: true });
     for (const brief of briefs) {
         const instance = `${round}-${brief.id}`;
