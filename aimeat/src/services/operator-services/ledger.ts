@@ -42,6 +42,7 @@
  *   clearOperatorOff · markTold · forgetPerson
  * @usage const { before } = await markRemoved(storage, nodeId, 'desk-helper', 'alice', gaii);
  * @version-history
+ *   v2.2.1 — 2026-11-27 — shardOf says why its sha256 is a partition function (code scanning 1844).
  *   v2.2.0 — 2026-11-26 — `person_off`: the person's off kept beside the state while a required entry goes
  *     on (S9); markRemoved and markRemovedIfServices keep the proof, so the fences know a live agent (S4).
  *   v2.1.0 — 2026-11-26 — `operator_off` beside the state (setOperatorOff, clearOperatorOff), carried over
@@ -101,7 +102,13 @@ const KEY_PREFIX = 'operator-service.';
 const INDEX_KEY = 'operator-services.index';
 const owner = (nodeId: string) => `system@${nodeId}`;
 
-/** The record an account's line is in: a stable hash of the account name, 00..3f. */
+/**
+ * The record an account's line is in: a stable hash of the account name, 00..3f. The input is an
+ * account name and the output picks one of 64 records, so this is a partition function, not a stored
+ * secret: CodeQL js/insufficient-password-hash (code scanning 1844) reads the agent id of an OAuth
+ * refresh token record as a password source, and that alert is dismissed as a false positive with
+ * this reason. The hash stays sha256, because every stored line was placed by it.
+ */
 export function shardOf(account: string): string {
   return (createHash('sha256').update(account).digest()[0] & (SHARDS - 1)).toString(16).padStart(2, '0');
 }

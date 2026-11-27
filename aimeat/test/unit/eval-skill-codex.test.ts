@@ -8,6 +8,7 @@
  *   CODEX_HOME turns the person's own skills off, and a renewed sign-in is copied back only when
  *   the person's own is unchanged.
  * @version-history
+ *   v1.1.0 — 2026-11-27 — quoteArg: the Windows argv backslash rule (code scanning 1843).
  *   v1.0.0 — 2026-11-26 — Initial (wish-same-repo-tooling-for-codex-and-claude-code-agents-md-held-t).
  */
 import { describe, expect, it } from 'vitest';
@@ -16,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  gradeRegex, loadSuite, parseCodexArgs, parseFrontmatter, planCalls, readEvents, scoreRun, skillFired,
+  gradeRegex, loadSuite, parseCodexArgs, parseFrontmatter, planCalls, quoteArg, readEvents, scoreRun, skillFired,
   syncAuthBack, writeCodexHome, type Grader,
 } from '../../../scripts/eval-skill-codex.mjs';
 
@@ -152,5 +153,17 @@ describe('options', () => {
     expect(() => parseCodexArgs(['--max-cost-usd', '3'])).toThrow(/does not take --max-cost-usd/);
     expect(() => parseCodexArgs(['-j', '9'])).toThrow(/-j is 1 to 4/);
     expect(parseCodexArgs(['--runs', '2', '--case', 'commit-*', '--dry-run'])).toMatchObject({ runs: 2, caseGlob: 'commit-*', dryRun: true, concurrency: 2 });
+  });
+});
+
+describe('quoting an argument for the codex shim', () => {
+  it('leaves a plain argument and the backslashes of a path alone', () => {
+    expect(quoteArg('exec')).toBe('exec');
+    expect(quoteArg('C:\\dev\\x')).toBe('C:\\dev\\x');
+    expect(quoteArg('C:\\my dir\\x')).toBe('"C:\\my dir\\x"');
+  });
+  it('doubles the backslashes before a quote and before the closing quote', () => {
+    expect(quoteArg('a\\"b c')).toBe('"a\\\\\\"b c"');
+    expect(quoteArg('C:\\my dir\\')).toBe('"C:\\my dir\\\\"');
   });
 });

@@ -23,6 +23,7 @@
  * @usage
  *   const out = await patchMemoryRecord({ storage, config, stats, peers }, { auth: req.auth!, caller, reader, organismChecked: true }, input);
  * @version-history
+ *   2026-11-27 — MAX_MERGE_ATTEMPTS 6 → 12: twelve simultaneous writers all land whatever the timing.
  *   2026-11-26 — A patch as the person by an operator service's agent is fenced by its entry's prefixes.
  *   2026-11-25 — A merge that turns a knowledge package manifest into one the manifest schema refuses
  *     is refused 422 SCHEMA_VALIDATION_FAILED (services/knowledge/manifest-write.ts).
@@ -87,10 +88,13 @@ import { visibilityToZone, isAnonymousGaii } from '../../utils/visibility-words.
 import { memoryContentBytes } from '../../utils/memory-content.js';
 
 /**
- * How many times a losing writer re-reads and re-merges before giving up with a 409. Six is chosen
- * against the real contention this was built for: a pipeline with six writers on one record.
+ * How many times a losing writer re-reads and re-merges before giving up with a 409. A swap fails only
+ * when another writer's swap landed in between, so N attempts let N writers that each patch once at
+ * the same moment all land, whatever the timing. Twelve is the contention the E2E suite promises
+ * (e2e-memory-patch-mcp, test 13). Six left that to the random wait, and on a slow PostgreSQL run
+ * (nightly sweep, 2026-11-27) one of the twelve was refused after six attempts.
  */
-export const MAX_MERGE_ATTEMPTS = 6;
+export const MAX_MERGE_ATTEMPTS = 12;
 
 /** The longest wait before the first retry, in ms; retry n waits up to n times this, at random. */
 export const MERGE_BACKOFF_MS = 25;

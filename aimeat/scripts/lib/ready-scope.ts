@@ -33,6 +33,7 @@
  *   PostgreSQL.
  * @structure changedFiles() · isTextOnly() · sameCode() · htmlShape() · targetedSuites() · isWideText() · readyScope() (codeReach in ./ready-reach.ts)
  * @version-history
+ *   v2.1.1 — 2026-11-27 — htmlShape drops comments until none is left (code scanning 1842).
  *   v2.1.0 — 2026-11-25 — A text change reaches the runner's suites without the e2e- prefix too.
  *   v2.0.0 — 2026-11-24 — A code change runs the suites it can reach (ready-reach.ts), not the whole
  *     sweep; the whole sweep stays for a change on every request's path and for the nightly.
@@ -99,7 +100,12 @@ export function codeShape(source: string, file: string): { shape: string; string
 
 /** The tags of a page with comments dropped and the prose inside attribute values (alt, title) blanked. */
 export function htmlShape(source: string): string {
-  const tags = source.replace(/<!--[\s\S]*?-->/g, '').match(/<[^>]*>/g) ?? [];
+  // Repeated until nothing changes: one pass over `<!<!-- x -->-- y -->` leaves a comment behind
+  // (code scanning 1842).
+  let text = source;
+  let before: string;
+  do { before = text; text = text.replace(/<!--[\s\S]*?-->/g, ''); } while (text !== before);
+  const tags = text.match(/<[^>]*>/g) ?? [];
   // Each quote kind on its own: a value in double quotes may hold an apostrophe ("the world's").
   return tags.map(t => t.replace(/="([^"]*\s[^"]*)"/g, '="S"').replace(/='([^']*\s[^']*)'/g, "='S'")).join('');
 }

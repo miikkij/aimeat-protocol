@@ -45,6 +45,8 @@ describe('a page', () => {
   it('changes in text when only the words between tags, a comment or an alt text change', () => {
     expect(htmlShape('<p>Old words</p>')).toBe(htmlShape('<p>New words</p>'));
     expect(htmlShape('<!-- old note --><p>x</p>')).toBe(htmlShape('<!-- new note --><p>x</p>'));
+    // A comment nested inside a comment leaves nothing behind (code scanning 1842).
+    expect(htmlShape('<!<!-- a -->-- <b> --><p>x</p>')).toBe(htmlShape('<p>x</p>'));
     expect(htmlShape('<img alt="An old picture caption" src="a.png">')).toBe(htmlShape('<img alt="A new picture caption" src="a.png">'));
   });
   it('changes in code when a tag, a link or a class changes', () => {

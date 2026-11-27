@@ -32,6 +32,7 @@
  *   readEvents — score a run · writeCodexHome, syncAuthBack — the isolated home · planCalls,
  *   runCodexEval — the run · parseCodexArgs — the CLI options
  * @version-history
+ *   v1.0.1 — 2026-11-27 — quoteArg doubles the backslashes before a quote (code scanning 1843).
  *   v1.0.0 — 2026-11-26 — Initial (wish-same-repo-tooling-for-codex-and-claude-code-agents-md-held-t).
  */
 import { spawn, spawnSync } from 'node:child_process';
@@ -187,9 +188,14 @@ export function syncAuthBack(home, original, realHome = join(homedir(), '.codex'
   return 'copied back';
 }
 
-/** Quotes one argument for the Windows shell that runs the npm `codex` shim. */
-function quoteArg(a) {
-  return /[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a;
+/**
+ * Quotes one argument for the Windows shell that runs the npm `codex` shim, by the Windows argv rule:
+ * backslashes are literal except before a quote, so a run of them before a quote, and before the
+ * closing quote at the end, is doubled. A path such as C:\dev\x\ keeps its single backslashes.
+ */
+export function quoteArg(a) {
+  if (!/[\s"&|<>^]/.test(a)) return a;
+  return `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
 }
 
 /** Runs one `codex exec` in `cwd` with the prompt on stdin. Resolves { answer, events, timedOut }. */
