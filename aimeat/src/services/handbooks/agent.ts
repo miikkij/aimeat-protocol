@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.90.0 -- 2026-11-27 -- An app's membership is bought with a checkout item { kind: "membership" }.
  *   v1.89.1 -- 2026-11-27 -- An operator service is switched on for the owner's account, not "for everyone".
  *   v1.89.0 -- 2026-11-26 -- A required operator agent: do not try to remove, stop or narrow it; say why and
  *     whom to ask; say the private read and its reason.
@@ -283,6 +284,9 @@ answer, where they can allow it for all of their AIs. Only your owner, signed in
 is a verified adult (yes or no, the method, the time; never a birth date): ask it before you buy or
 open adult content for them. \`aimeat_subscription_list\` and \`aimeat_subscription_cancel\` are their
 subscriptions to plans extensions offer; you subscribe with a checkout item \`{ kind: "subscription" }\`.
+A membership of an app its owner sells is one of them: GET /v1/apps/<owner>/<file>/membership names the
+roles for sale and their price, and a checkout item \`{ kind: "membership", app: "<owner>/<file>", tool: "<role>" }\`
+buys one period; tell your owner the price first.
 When you export something your owner made with AI (a comic episode as PDF, PNG or CBZ),
 \`aimeat_provenance_embed\` writes the provenance into the file itself, with the records its pictures
 came with, so the file says how it was made wherever it goes.

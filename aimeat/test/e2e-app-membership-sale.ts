@@ -16,7 +16,7 @@
  *        membership and the app refuses the lapsed member.
  *     4. A refund (charge.refunded on the seller's webhook) removes the membership.
  *     5. A buyer without an account pays with an email address; the address's new account is a
- *        member at once, and its renewal is kept.
+ *        member at once, and its renewal is kept; a closed node refuses such a purchase.
  *     6. The outside Stripe sale: invoice.paid makes the payer a member to the period's end, a
  *        redelivery does nothing, cancel_at_period_end stops the renewal, a refund removes it; seller
  *        B's webhook cannot make a member of seller A's app.
@@ -177,9 +177,11 @@ try {
   });
 
   await test('1b. FAILURE: a malformed price is refused with the field it is about', async () => {
+    // The contract's validation answers first (VALIDATION_ERROR); the plan's own check says the same.
     const r = await plan({ roles: {}, terms: { [ROLE]: { days: 30 } }, sale: { [ROLE]: { amount: 4.9, currency: 'EUR' } } });
-    expectRefusal(r, 400, 'INVALID_INPUT');
-    assert(/sale\.member\.amount/.test(r.body.error.message), r.body.error.message);
+    assert(r.status === 400 && /amount/.test(JSON.stringify(r.body.error)), `refused naming the amount: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const pub = await json(`/v1/apps/${seller.name}/${APP}/membership`);
+    assert(pub.body.data.for_sale.length === 0, 'and nothing was stored');
   });
 
   await test('1c. The owner prices the role; anyone reads the price, the period, the renewal and the seller', async () => {
@@ -331,6 +333,18 @@ try {
     const subs = await json('/v1/commerce/subscriptions', { headers: auth(newcomer.token) });
     const sub = (subs.body.data.subscriptions as any[]).find(s => s.kind === 'membership');
     assert(sub?.active_until === row.expiresAt && sub.auto_renew === true, `its renewal is kept: ${JSON.stringify(sub)}`);
+  });
+
+  await test('5b. FAILURE: on a closed node a purchase without an account is refused, and the page says so', async () => {
+    const before = node.config.registrationMode;
+    node.config.registrationMode = 'closed';
+    try {
+      const pub = await json(`/v1/apps/${sellerB.name}/${APP}/membership`);
+      assert(pub.body.data.guest.open === false, `not offered: ${JSON.stringify(pub.body.data.guest)}`);
+      const open = await json(`/v1/apps/${sellerB.name}/${APP}/membership/guest`, { method: 'POST',
+        body: JSON.stringify({ role: ROLE, email: `closed.${stamp}@example.com`, return_url: `${BASE}/v1/app-join` }) });
+      expectRefusal(open, 403, 'REGISTRATION_CLOSED');
+    } finally { node.config.registrationMode = before; }
   });
 
   console.log('\n6. Sold on the seller\'s own Stripe');

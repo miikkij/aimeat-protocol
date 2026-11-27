@@ -41,6 +41,7 @@
 import { el, injectPanelStyle, fmtDate } from './dom.js';
 import { t, pickLang } from './i18n.js';
 import { partiesSection, isAppPartyRow } from './panel-parties.js';
+import { money as fmtMoney } from '../_core/format.js';
 
 const MODES = ['open', 'members-only', 'invite-only'];
 
@@ -437,10 +438,65 @@ export function mountJoinPanel(iam, opts) {
       out.textContent = r.alreadyMember ? S('joinAlready') : (r.passive ? S('joinPassive') : S('joinSent'));
     } catch (e) { out.textContent = (e && e.message) ? S('failedWith', { why: e.message }) : S('failed'); }
   });
+  // A role the owner sells comes first: its price, period, renewal and seller, and the buy button.
+  const buy = el('div', { cls: cls('aim-iam-buy') });
   host.appendChild(el('section', { cls: cls('aim-iam') }, [
+    buy,
     el('h3', { cls: cls('aim-iam-h'), text: S('joinTitle') }),
     el('div', { cls: cls('aim-iam-form') }, [note, btn]),
     out,
   ]));
+  if (iam.membership) {
+    mountBuy(iam, buy, lang, S, cls).catch((e) => { console.debug('aimeat-iam: the membership offer was not read', e); });
+  }
   return { destroy: () => { host.textContent = ''; } };
+}
+
+/** A price in micro-units, through the SDK's one money formatter. */
+function money(_lang, micros, currency) {
+  return fmtMoney(micros / 1_000_000, currency);
+}
+
+/**
+ * The buy block of the join panel (AIMEAT.iam.membership): finishes a purchase the card page returned
+ * to, then offers every role sold on this node's checkout. Not signed in, it asks for the email
+ * address the membership is for, when the node takes a purchase without an account.
+ */
+async function mountBuy(iam, host, lang, S, cls) {
+  const say = el('p', { cls: cls('aim-iam-lead') });
+  const done = await iam.membership.finish().catch((e) => ({ error: e }));
+  if (done && done.error) say.textContent = S('failedWith', { why: done.error.message });
+  else if (done && done.cancelled) say.textContent = S('buyCancelled');
+  else if (done && done.guest) say.textContent = S('buyGuestDone');
+  if (done && done.member) await iam.refresh().catch((e) => { console.debug('aimeat-iam: standing not read after the purchase', e); });
+  const st = await iam.membership.status();
+  const mine = st.me && st.me.member;
+  if (mine) {
+    if (mine.expires_at) host.appendChild(el('p', { cls: cls('aim-iam-lead'), text: S('buyDone', { d: fmtDate(mine.expires_at) }) }));
+    return;
+  }
+  const roles = (st.for_sale || []).filter((r) => r.buy_here);
+  if (!roles.length || (st.me && st.me.is_owner)) { if (say.textContent) host.appendChild(say); return; }
+  const signedIn = !!st.me;
+  if (!signedIn && !(st.guest && st.guest.open)) return;
+  const email = signedIn ? null : el('input', { attrs: { type: 'email', placeholder: S('buyEmail'), 'aria-label': S('buyEmail'), autocomplete: 'email' } });
+  const rows = roles.map((r) => {
+    const b = el('button', { cls: cls('aim-iam-btn'), text: S('buyBtn'), attrs: { type: 'button' } });
+    b.addEventListener('click', async () => {
+      try {
+        const address = email ? /** @type {HTMLInputElement} */ (email).value.trim() : '';
+        if (email && !address) { say.textContent = S('buyEmailMissing'); return; }
+        await iam.membership.buy(r.role, email ? { email: address } : {});
+      } catch (e) { say.textContent = (e && e.message) ? S('failedWith', { why: e.message }) : S('failed'); }
+    });
+    return el('div', { cls: cls('aim-iam-form') }, [
+      el('p', { cls: cls('aim-iam-lead'), text: S('buyLine', { role: r.role, price: money(lang, r.amount, r.currency), days: r.days }) + ' ' + S(r.renews ? 'buyRenews' : 'buyOnce') }),
+      b,
+    ]);
+  });
+  host.appendChild(el('h3', { cls: cls('aim-iam-h'), text: S('buyTitle') }));
+  host.appendChild(el('p', { cls: cls('aim-iam-lead'), text: S('buySeller', { seller: (st.seller && st.seller.display_name) || '' }) }));
+  if (email) host.appendChild(email);
+  for (const row of rows) host.appendChild(row);
+  host.appendChild(say);
 }

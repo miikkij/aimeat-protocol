@@ -19,13 +19,15 @@
  *   role's capabilities from the same vocabulary, and guard() asks the node or the app's IAM extension,
  *   which sees the person in ctx.caller. AIMEAT.parties is detected, never required.
  * @structure init() · me() · refresh() · check() · can/gate/guard (gate.js) · request() · roster() ·
- *   admin() · adminFetch() · parties() · party() · setRegistration() · MemberAdmin/JoinPanel (panel.js) ·
+ *   admin() · adminFetch() · parties() · party() · setRegistration() · membership (membership.js) · MemberAdmin/JoinPanel (panel.js) ·
  *   normalise() · attach('iam', …)
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-iam.js"></script>
  *   await AIMEAT.iam.init({ ext: 'nuotta-iam' });
  *   if (AIMEAT.iam.can('analyse')) showTab();            // hint
  *   await AIMEAT.iam.guard('bid', () => runScoring());   // asks the server
  * @version-history
+ *   v1.5.0 — 2026-11-27 — membership.status(), buy(role), finish() and cancel(role): buying a role the
+ *     owner sells, with or without an account (iam/membership.js), and JoinPanel's buy button.
  *   v1.4.0 — 2026-11-01 — A person registered to the app (AIMEAT.parties) is a member: me().kind and
  *     identity, can() and guard() with their sign-in, the session event; parties(), party(op, person)
  *     and setRegistration() for the owner, and MemberAdmin's registered people section (WP9d).
@@ -52,6 +54,7 @@ import { mountMemberAdmin, mountJoinPanel, leastPower } from './panel.js';
 import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest, nodeDismissGuest,
   nodeInvites, nodeCancelInvite, nodeAudit, nodePeople } from './node-roster.js';
 import { partiesState, partySetRole, partyRemove, partyStop, partyResume, partyRegistrationSet } from './node-parties.js';
+import { makeMembership } from './membership.js';
 
 const { authFetch: accountFetch } = makeSession('aimeat-iam.js');
 
@@ -643,6 +646,9 @@ const iam = {
 function requireInit() {
   if (!state.ext && !state.app) throw new Error('aimeat-iam: call AIMEAT.iam.init({ app }) or init({ ext }) first');
 }
+
+// Buying a membership of this app (iam/membership.js): what is for sale, the purchase, its cancel.
+iam.membership = makeMembership(() => state.app, accountFetch, accountSignedIn);
 
 // can/gate/guard read the cached state and, for guard, the live gate.
 const gateApi = makeGate({ me: () => state.me }, (input) => iam.check(input));

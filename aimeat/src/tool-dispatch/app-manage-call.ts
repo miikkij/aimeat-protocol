@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-27 -- member_plan_set sends `sale`, the roles the owner sells.
  *   2026-11-27 -- spec_set forwards `confirm`.
  *   2026-11-26 -- scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 -- freshness reaches GET /v1/apps/:owner/:filename/freshness.
@@ -214,7 +215,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'member_plan_get':
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/plan`);
         case 'member_plan_set': {
-            const body: Input = pick(input, ['roles', 'seats', 'terms', 'access']);
+            const body: Input = pick(input, ['roles', 'seats', 'terms', 'access', 'sale']);
             if (input.roster_visibility !== undefined && input.roster_visibility !== null) body.rosterVisibility = input.roster_visibility;
             if (input.manage_roles !== undefined && input.manage_roles !== null) body.manageRoles = input.manage_roles;
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/members/plan`, body);

@@ -34,6 +34,8 @@
  *   through the SDK's formatter; an unknown code keeps the node's own sentence (members-shared.js
  *   refusal).
  * @version-history
+ *   v0.63.0 — 2026-11-27 — joinRequest offers a role the owner sells (price, period, renewal, seller)
+ *     with a buy button before the ask: the card page when signed in, the node's join page when not.
  *   v0.62.0 — 2026-10-02 — joinRequest says a refusal in the page's language, and a person declined
  *     less than a week ago reads when they may ask again instead of a form the node would refuse
  *     (me().requested.retryAt).
@@ -43,6 +45,7 @@
 import { el, clear, resolve, enter } from './dom.js';
 import { tm } from './members-i18n.js';
 import { wantsSample, sampleBadge, watch, ready, refusal, refusalWords, day } from './members-shared.js';
+import { money as fmtMoney } from '../_core/format.js';
 
 export { members } from './members-admin.js';
 
@@ -93,7 +96,19 @@ export function joinRequest(spec) {
     if (sample) { form(null); root.appendChild(status); return; }
     const iam = await ready(spec);
     if (!iam) { root.appendChild(el('p', { class: 'ak-mem__none' }, tm('members.noLib'))); return; }
+    // Back from the card page: the purchase completes here, and the standing is read again.
+    if (iam.membership) {
+      try {
+        const back = await iam.membership.finish();
+        if (back && back.member) await iam.refresh();
+      } catch (e) {
+        status.textContent = tm('members.failed', { why: refusal(e) || String(e) });
+      }
+    }
     const me = iam.me();
+    // A role the owner sells is offered before the ask: signed in it is bought here, signed out on
+    // the node's own join page, which takes an email address in place of an account.
+    if (!me || (!me.isOwner && !me.member)) await offerPurchase(iam, root, !!me);
     if (!me) { status.textContent = tm('join.signIn'); root.appendChild(status); return; }
     if (me.isOwner) { root.hidden = true; return; }
     if (me.member) {
@@ -123,6 +138,45 @@ export function joinRequest(spec) {
   run().then(function () { enter(root); });
   const stop = watch(run, root);
   return { el: root, destroy: function () { stop(); if (root.parentNode) root.parentNode.removeChild(root); } };
+}
+
+/** A price in micro-units, through the SDK's one money formatter. */
+function price(micros, currency) {
+  return fmtMoney(micros / 1_000_000, currency);
+}
+
+/**
+ * The roles the owner sells (AIMEAT.iam.membership), each with its price, period and renewal, and a
+ * buy button: signed in it opens the card page, signed out it opens the node's join page. Draws
+ * nothing when nothing is sold, or the library predates the membership sale.
+ */
+async function offerPurchase(iam, root, signedIn) {
+  if (!iam.membership) return;
+  let st;
+  try {
+    st = await iam.membership.status();
+  } catch (e) {
+    // The ask below still works; the block says the offer could not be read rather than hiding it.
+    root.appendChild(el('p', { class: 'ak-mem__none' }, tm('members.failed', { why: refusal(e) || String(e) })));
+    return;
+  }
+  const roles = ((st && st.for_sale) || []).filter(function (r) { return r.buy_here; });
+  if (!roles.length || (!signedIn && !(st.guest && st.guest.open))) return;
+  const box = el('div', { class: 'ak-mem__buy', 'data-ak-part': 'buy' });
+  box.appendChild(el('p', { class: 'ak-mem__intro' }, tm('join.buySeller', { seller: (st.seller && st.seller.display_name) || '' })));
+  const said = el('p', { class: 'ak-mem__status', role: 'status' });
+  for (const r of roles) {
+    box.appendChild(el('p', { class: 'ak-mem__intro' },
+      tm('join.buyLine', { role: r.role, price: price(r.amount, r.currency), days: String(r.days) }) + ' ' + tm(r.renews ? 'join.buyRenews' : 'join.buyOnce')));
+    box.appendChild(el('button', { type: 'button', class: 'ak-btn ak-btn--primary', 'data-ak-part': 'buy-' + r.role, on: {
+      click: function () {
+        if (!signedIn) { window.location.assign(iam.membership.joinUrl()); return; }
+        iam.membership.buy(r.role).catch(function (e) { said.textContent = tm('members.failed', { why: refusal(e) || String(e) }); });
+      },
+    } }, tm('join.buy')));
+  }
+  box.appendChild(said);
+  root.appendChild(box);
 }
 
 // ── accessState: a members-only area ─────────────────────────────────────────────────────────

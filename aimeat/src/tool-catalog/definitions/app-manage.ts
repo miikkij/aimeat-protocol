@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-27 — member_plan_set takes `sale`: the roles the owner sells, their price and renewal, and
+ *     the owner's own Stripe Price ids (commerce/membership-sale.ts).
  *   2026-11-27 — scenarios_set and audit name the picture a scenario run answers per run at the
  *     phone and the desktop size, and say to use the node's browser before one of the caller's own.
  *   2026-11-27 — scenarios_set says what a scenario run gets (an account per size and theme, a
@@ -185,7 +187,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     expires_at: { type: 'string', description: 'For member_set: when the membership ends, as a date such as "2026-12-31T00:00:00Z". It wins over days. An empty string means it does not end.' },
     roles: { type: 'object', description: 'For member_plan_set: each role and the offering ids a member in that role uses free, { "member": ["<offering id>"] }. A role with no entry gives nothing free.', zod: z.record(z.string(), z.array(z.string().max(INPUT_LIMITS.id))) },
     seats: { type: 'object', description: 'For member_plan_set: each role and how many people may hold it at once, { "editor": 3 }. A role with no entry has no limit.', zod: z.record(z.string(), z.number().min(0)) },
-    terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.', zod: z.record(z.string(), z.object({ days: z.number().positive().optional(), renewal: z.enum(['manual', 'self-serve', 'none']).optional() })) },
+    terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "self-serve" } }. renewal is "manual", "self-serve" or "none" and says what is meant to happen. A role priced in sale is bought for days at a time and needs days.', zod: z.record(z.string(), z.object({ days: z.number().positive().optional(), renewal: z.enum(['manual', 'self-serve', 'none']).optional() })) },
+    sale: { type: 'object', description: 'For member_plan_set: the roles you sell, { "member": { "amount": 4900000, "currency": "EUR", "renews": true, "stripePrices": ["price_..."] } }. amount is one period in 6-decimal micro-units (4.90 EUR is 4900000); the period is terms.<role>.days. renews false is a one-time payment. stripePrices are Price ids of your own Stripe account whose payments make the payer a member through your Stripe webhook. The money goes to your own Stripe account and no platform fee is taken. A person buys on the app\'s join page /v1/app-join?app=<owner>/<file>, an agent with a checkout line { kind: "membership", app: "<owner>/<file>", tool: "<role>" }. Omit sale to keep what is sold.', zod: z.record(z.string(), z.object({ amount: z.number().int().positive().optional(), currency: z.string().length(3).optional(), renews: z.boolean().optional(), stripePrices: z.array(z.string().max(255)).max(10).optional() })) },
     access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members have access at all.' },
     roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
     manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
@@ -276,7 +279,7 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'take a person off the list of people who opened the app without a role. It blocks nobody; they appear again on their next visit. The owner, and members whose role the plan names as managing the roster' },
     member_plan_get: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'what membership of the app means: the free access per role, seats, terms, who pays, who reads the roster, and which roles manage it. Owner only' },
-    member_plan_set: { fields: F(['filename', 'roles'], ['owner', 'seats', 'terms', 'access', 'roster_visibility', 'manage_roles']), scope: 'commerce:sell',
+    member_plan_set: { fields: F(['filename', 'roles'], ['owner', 'seats', 'terms', 'access', 'roster_visibility', 'manage_roles', 'sale']), scope: 'commerce:sell',
         summary: 'replace the whole membership plan (read it first with member_plan_get). It applies to approvals from now on; people approved before keep what they have until they are approved again. Owner only' },
     member_sweep: { fields: F(['filename'], ['owner']), scope: 'exchange:grant',
         summary: 'close every membership whose end date has passed now, and take back its free access, instead of waiting for the hourly run. Owner only' },

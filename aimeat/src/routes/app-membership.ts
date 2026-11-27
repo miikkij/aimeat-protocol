@@ -31,6 +31,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { CommerceError } from '../commerce/errors.js';
+import { PaymentError } from '../commerce/payment-handlers.js';
 import { getCarryPlan, getMember, seatsTaken, accountOf } from '../services/app/members.js';
 import { appDisplayName, resolveAppFilename } from '../services/app/app-ref.js';
 import { registrationRefusal } from '../services/owner/provisioning.js';
@@ -70,8 +71,9 @@ export function appMembershipRouter(config: AimeatConfig, storage: Storage): Rou
     return { owner, filename, appId: `${owner}/${filename}`, ownerGhii };
   }
 
+  // A refusal of the checkout or of the payment provider (CommerceError, PaymentError) keeps its code and status.
   const fail = (res: Response, err: unknown): void => {
-    if (err instanceof CommerceError) { res.status(err.statusCode).json(error(config.nodeId, err.code, err.message)); return; }
+    if (err instanceof CommerceError || err instanceof PaymentError) { res.status(err.statusCode).json(error(config.nodeId, err.code, err.message)); return; }
     throw err;
   };
 

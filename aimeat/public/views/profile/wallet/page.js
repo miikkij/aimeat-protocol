@@ -13,6 +13,8 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.25.0 — 2026-11-27 — The subscriptions (wallet/subscriptions.js) after the money, when the person
+ *     has one: an app membership or a plan that renews on their card, and the press that stops it.
  *   v1.24.0 — 2026-11-27 — Usability pass on the person's three situations. The ways to get paid and
  *     how your AI uses the wallet are fold rows that say their state (in use n of 3; rows your agents
  *     made); the transactions are drawn once there is one, and money once there is a share or a money
@@ -83,6 +85,7 @@ import { Roads, Road } from '/components/Roads.js';
 import { Space } from '/components/Layout.js';
 import { x, money, morsels, signed, dateWord, sourcesOf, crumb, pageLinks, openTab, GRANTED } from './frame.js';
 import { txRow, railRow, shareRow, moneyRow } from './rows.js';
+import { secSubscriptions } from './subscriptions.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 // A money trade has a money currency and a money total above 0. A use of a free item is a session at
@@ -104,6 +107,7 @@ export function renderPage(ctx) {
     { id: 'wal-sources', label: x('secSources'), count: rows ? `${signed(l.earned)} / ${signed(-l.spent)}` : '' },
     rows ? { id: 'wal-ledger', label: x('secLedger'), count: String(ctx.rowsTotal) } : null,
     trades ? { id: 'wal-money', label: x('secMoney'), count: sh ? money(sh.total, sh.currency) : '' } : null,
+    (ctx.subscriptions || []).length ? { id: 'wal-subs', label: x('secSubs'), count: String(ctx.subscriptions.filter((s) => s.active && s.auto_renew).length) } : null,
     { id: 'wal-rails', label: x('secRails'), count: ctx.payout ? `${railsOn} / 3` : '' },
     { id: 'wal-roads', label: x('secRoads'), count: '' },
   ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
@@ -117,6 +121,7 @@ export function renderPage(ctx) {
         ${secSources(ctx, numOf['wal-sources'])}
         ${numOf['wal-ledger'] ? secLedger(ctx, numOf['wal-ledger']) : null}
         ${numOf['wal-money'] ? secMoney(ctx, numOf['wal-money']) : null}
+        ${numOf['wal-subs'] ? secSubscriptions(ctx, numOf['wal-subs']) : null}
         ${secRails(ctx, numOf['wal-rails'])}
         ${secRoads(ctx, numOf['wal-roads'])}`}
     <//>`;

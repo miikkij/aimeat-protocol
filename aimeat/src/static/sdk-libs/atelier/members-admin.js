@@ -269,7 +269,10 @@ export function members(spec) {
           const own = (spec.actions || []).map(function (a) {
             return button(a.label, a.tone || 'ghost', function () { Promise.resolve(a.run(m)).then(function () { render(); }); }, sample);
           });
-          const since = m.since ? (variant === 'table' ? day(m.since) : tm('members.since', { d: day(m.since) })) : '';
+          const joined = m.since ? (variant === 'table' ? day(m.since) : tm('members.since', { d: day(m.since) })) : '';
+          // A bought membership: paid until when, and whether it renews (commerce/membership-sale.ts).
+          const paid = m.paid && m.paid.until ? tm(m.paid.renews ? 'members.paidRenews' : 'members.paidEnds', { d: day(m.paid.until) }) : '';
+          const since = [joined, paid].filter(Boolean).join(' · ');
           return row(person(m.owner, m.displayName, m.email), since, own.concat([
             sel,
             button(tm('members.remove'), 'ghost', sample ? noop : function () {
@@ -420,19 +423,42 @@ export function members(spec) {
           value: cur.terms && cur.terms[r] && cur.terms[r].days ? String(cur.terms[r].days) : '', placeholder: tm('plan.noEnd') }));
         const mgr = /** @type {HTMLInputElement} */ (el('input', { type: 'checkbox', 'aria-label': tm('plan.manages') + ' ' + r,
           checked: (cur.manageRoles || []).indexOf(r) !== -1 ? true : null }));
-        return { r: r, seats: seats, days: days, mgr: mgr, node: el('tr', {}, [
+        // The role's price: one period, in the currency's main unit (4.90), and whether it renews.
+        const sold = (cur.sale && cur.sale[r]) || null;
+        const priceIn = /** @type {HTMLInputElement} */ (el('input', { type: 'text', inputmode: 'decimal', class: 'ak-input ak-mem__num', 'aria-label': tm('plan.price') + ' ' + r,
+          value: sold && sold.amount ? (sold.amount / 1_000_000).toFixed(2) : '', placeholder: tm('plan.notSold') }));
+        const currency = /** @type {HTMLInputElement} */ (el('input', { type: 'text', maxlength: '3', class: 'ak-input ak-mem__num', 'aria-label': tm('plan.currency') + ' ' + r,
+          value: (sold && sold.currency) || 'EUR' }));
+        const renews = /** @type {HTMLInputElement} */ (el('input', { type: 'checkbox', 'aria-label': tm('plan.renews') + ' ' + r,
+          checked: !sold || sold.renews !== false ? true : null }));
+        const stripe = /** @type {HTMLInputElement} */ (el('input', { type: 'text', class: 'ak-input', 'aria-label': tm('plan.stripePrices') + ' ' + r,
+          value: sold && sold.stripePrices ? sold.stripePrices.join(', ') : '', placeholder: 'price_…' }));
+        return { r: r, seats: seats, days: days, mgr: mgr, priceIn: priceIn, currency: currency, renews: renews, stripe: stripe, node: el('tr', {}, [
           el('th', { scope: 'row' }, r), el('td', {}, [seats]), el('td', {}, [days]), el('td', {}, [mgr]),
+          el('td', {}, [priceIn, currency]), el('td', {}, [renews]), el('td', {}, [stripe]),
         ]) };
       });
       const save = button(tm('plan.save'), 'primary', sample ? noop : function () {
-        const seats = {}; const terms = {}; const manageRoles = [];
+        const seats = {}; const terms = {}; const manageRoles = []; const sale = {};
+        let badPrice = '';
         rows.forEach(function (x) {
           if (x.seats.value !== '') seats[x.r] = Number(x.seats.value);
-          if (x.days.value !== '') terms[x.r] = { days: Number(x.days.value) };
+          // The renewal word the plan already had stays with the role.
+          if (x.days.value !== '') terms[x.r] = Object.assign({}, (cur.terms && cur.terms[x.r]) || {}, { days: Number(x.days.value) });
           if (x.mgr.checked) manageRoles.push(x.r);
+          const raw = x.priceIn.value.trim();
+          const prices = x.stripe.value.split(/[\s,]+/).filter(Boolean);
+          // One decimal mark and at most two decimals: "4.90" or "4,90". Anything else is asked again.
+          if (raw && !/^\d+([.,]\d{1,2})?$/.test(raw)) badPrice = x.r;
+          if (raw || prices.length) {
+            sale[x.r] = Object.assign(
+              raw ? { amount: Math.round(Number(raw.replace(',', '.')) * 100) * 10_000, currency: x.currency.value.trim().toUpperCase() } : {},
+              { renews: x.renews.checked, stripePrices: prices });
+          }
         });
+        if (badPrice) { failure = tm('plan.priceBad', { role: badPrice }); notice = ''; render(); return; }
         act(function () {
-          return iam.setPlan({ roles: cur.roles || {}, access: access.value, rosterVisibility: vis.value, seats: seats, terms: terms, manageRoles: manageRoles });
+          return iam.setPlan({ roles: cur.roles || {}, access: access.value, rosterVisibility: vis.value, seats: seats, terms: terms, manageRoles: manageRoles, sale: sale });
         }, function () { return tm('plan.saved'); });
       }, sample);
       return el('div', { class: 'ak-mem__group ak-mem__plan', 'data-ak-part': 'plan' }, [
@@ -441,9 +467,11 @@ export function members(spec) {
         el('label', { class: 'ak-mem__plan-row' }, [el('span', {}, tm('plan.visibility')), vis]),
         el('table', { class: 'ak-mem__table' }, [
           el('thead', {}, [el('tr', {}, [el('th', { scope: 'col' }, tm('members.role')), el('th', { scope: 'col' }, tm('plan.seats')),
-            el('th', { scope: 'col' }, tm('plan.days')), el('th', { scope: 'col' }, tm('plan.manages'))])]),
+            el('th', { scope: 'col' }, tm('plan.days')), el('th', { scope: 'col' }, tm('plan.manages')),
+            el('th', { scope: 'col' }, tm('plan.price')), el('th', { scope: 'col' }, tm('plan.renews')), el('th', { scope: 'col' }, tm('plan.stripePrices'))])]),
           el('tbody', {}, rows.map(function (x) { return x.node; })),
         ]),
+        el('p', { class: 'ak-mem__hint' }, tm('plan.saleHint')),
         save,
       ]);
     }

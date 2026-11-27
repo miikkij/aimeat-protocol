@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-27 — The member actions' line says how a role is sold (`sale` in member_plan_set).
  *   2026-11-27 — The scenarios line: the node's browser is the first one to use, and a run at the
  *     phone and the desktop size answers a picture address (services/app/scenario-pictures.ts).
  *   2026-11-27 — The scenarios line says what a run gets: an account of its own per size and theme,
@@ -393,7 +394,11 @@ access; \`member_decline\` declines a request (the person may ask again after se
 \`member_dismiss\` clears a visitor from the list; \`member_audit\` reads who decided what, newest
 first. \`member_plan_get\` and \`member_plan_set\` read and replace what each role gets free, its seats,
 its term, and \`manage_roles\`: the roles whose holders run the roster beside the owner, without the
-plan, the sweep or a managing role. \`member_sweep\` closes the memberships that have ended. Each
+plan, the sweep or a managing role. To SELL a role, \`member_plan_set\` takes \`sale\`: { "<role>":
+{ amount (micro-units), currency, renews, stripePrices } } with the period in \`terms.<role>.days\`;
+the app's join page /v1/app-join?app=<owner>/<file> and its join panel then sell it, the money goes to
+the owner's own Stripe, no platform fee is taken, and the node renews, ends and refunds it. Never build
+a checkout or an outside payment service for a membership. \`member_sweep\` closes the memberships that have ended. Each
 action needs the permission its route needs: app:write to read, app:manage to decline, dismiss or
 cancel an invitation, exchange:grant to approve, remove or sweep, commerce:sell to set the plan. Anybody can call two of them on somebody
 else's app: \`member_me\` answers your own role and request there, and \`member_request\` (with

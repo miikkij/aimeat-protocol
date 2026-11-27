@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.10.0 — 2026-11-27 — member_plan_set passes `sale`, the roles the owner sells (commerce/membership-sale.ts).
  *   v1.9.0 — 2026-11-26 — scenarios_set calls writeScenariosFor (services/app/design-spec-ops.ts).
  *   v1.8.0 — 2026-11-26 — freshness calls appFreshnessFor (services/app/freshness.ts).
  *   v1.7.0 — 2026-11-26 — criteria_set calls writeCriteriaFor (services/app/design-spec-ops.ts).
@@ -99,7 +100,7 @@ export async function appManageMemberAction(
     case 'member_plan_get':
       return opAnswer(await readCarryPlan(storage, config, caller, ref));
     case 'member_plan_set': {
-      const body = pick(args, ['roles', 'seats', 'terms', 'access']);
+      const body = pick(args, ['roles', 'seats', 'terms', 'access', 'sale']);
       if (present(args.roster_visibility)) body.rosterVisibility = args.roster_visibility;
       if (present(args.manage_roles)) body.manageRoles = args.manage_roles;
       return opAnswer(await setCarryPlan(storage, config, caller, ref, body));

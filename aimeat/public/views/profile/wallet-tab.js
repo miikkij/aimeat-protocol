@@ -12,6 +12,8 @@
  * @structure WalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'wallet'
  * @version-history
+ *   v2.2.0 — 2026-11-27 — Reads the person's subscriptions (GET /v1/commerce/subscriptions) and stops a
+ *     renewal with one press (wallet/subscriptions.js).
  *   v2.1.0 — 2026-11-27 — The fold state of the page's two rows (rails, roads), which wallet/page.js
  *     draws as rows that open in place; nothing else changes.
  *   v2.0.0 — 2026-09-04 — The poster face (design canvas "AIMEAT Lompakko-sivu", direction A): the
@@ -31,7 +33,7 @@ import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { renderPage } from './wallet/page.js';
-import { x, GRANTED, openTab, morsels } from './wallet/frame.js';
+import { x, GRANTED, openTab, morsels, dateWord } from './wallet/frame.js';
 
 const PAGE = 200;
 const MAX_PAGES = 5;
@@ -48,6 +50,7 @@ export default function WalletTab({ session, showToast, onStats }) {
   const [orders, setOrders] = useState([]);
   const [payout, setPayout] = useState(null);
   const [earnings, setEarnings] = useState(null);
+  const [subscriptions, setSubscriptions] = useState([]);
   const [agents, setAgents] = useState([]);
   const [filter, setFilterState] = useState('all');
   const [shown, setShown] = useState(FIRST_SHOWN);
@@ -100,6 +103,7 @@ export default function WalletTab({ session, showToast, onStats }) {
     } catch (e) { swallowed('wallet: load', e); }
     apiGet('/v1/commerce/payout').then((r) => setPayout(r?.data ?? false)).catch((e) => { swallowed('wallet: payout', e); setPayout(false); });
     apiGet('/v1/commerce/beneficiary/earnings').then((r) => setEarnings(r?.data ?? null)).catch((e) => { swallowed('wallet: earnings', e); setEarnings(null); });
+    apiGet('/v1/commerce/subscriptions').then((r) => setSubscriptions(r?.data?.subscriptions || [])).catch((e) => { swallowed('wallet: subscriptions', e); });
     apiGet('/v1/agents').then((r) => setAgents(Array.isArray(r?.data?.agents) ? r.data.agents : Array.isArray(r?.data) ? r.data : [])).catch((e) => { swallowed('wallet: agents', e); });
   }, [federated, loadRows]);   // eslint-disable-line react-hooks/exhaustive-deps -- onStats is a stable prop wrapper
 
@@ -189,10 +193,22 @@ export default function WalletTab({ session, showToast, onStats }) {
   const saveStripe = () => rail(() => apiPut('/v1/commerce/payout/stripe', { secret_key: keyDraft.trim() }), x('rail.keySaved'));
   const saveX402 = () => rail(() => apiPut('/v1/commerce/payout/x402', { address: addrDraft.trim() }), x('rail.addressSaved'));
   const removeStripe = () => confirm(x('rail.confirmRemoveKey'), () => rail(() => apiDelete('/v1/commerce/payout/stripe'), x('rail.keyRemoved')), { danger: true });
+  // Stop a subscription's renewal; the period already paid runs to its end (commerce/subscriptions.ts).
+  const stopRenewal = (s) => confirm(x('subs.confirmStop', { date: dateWord(s.active_until) }), async () => {
+    setBusy(`sub:${s.ext}/${s.plan}`);
+    try {
+      const r = await apiPost(`/v1/commerce/subscriptions/${encodeURIComponent(s.ext)}/${encodeURIComponent(s.plan)}/cancel`, {});
+      if (r?.ok === false) throw r;
+      toast(x('subs.stopped'));
+      const list = await apiGet('/v1/commerce/subscriptions').catch((e) => { swallowed('wallet: subscriptions', e); return null; });
+      if (list?.data) setSubscriptions(list.data.subscriptions || []);
+    } catch (e) { toast(errText(e, x('saveFailed')), true); }
+    setBusy(false);
+  });
   const removeX402 = () => confirm(x('rail.confirmRemoveAddress'), () => rail(() => apiDelete('/v1/commerce/payout/x402'), x('rail.addressRemoved')), { danger: true });
 
   const ctx = {
-    session, federated, wallet, rows, rowsTotal, rowsPartial: rows.length < rowsTotal, sessions, orders, payout, earnings, agents, self,
+    session, federated, wallet, rows, rowsTotal, rowsPartial: rows.length < rowsTotal, sessions, orders, payout, earnings, agents, self, subscriptions, stopRenewal,
     filter, shown, filtered, counts, first, last, shares, railsOn, openTx, openRail, openShares, folds, keyDraft, addrDraft, railMsg, requestMsg, busy, ConfirmUI,
     setFilter, showMore, toggleTx, toggleRail, toggleShares, toggleFold, openFold, setKeyDraft, setAddrDraft, saveStripe, saveX402, removeStripe, removeX402, requestToday,
     openAgents: () => openTab('agents'),

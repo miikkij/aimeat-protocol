@@ -24,7 +24,7 @@
  *   A node that runs the test money rail (utils/test-money-guard.ts) completes a purchase with it, so
  *   the path is proven end to end in E2E without Stripe.
  *
- *   LIFECYCLE: an open purchase lives a day; sweepGuestPurchases (the hourly member sweep) deletes
+ *   LIFECYCLE: an open purchase lives 23 hours (a card page may live less than a day); sweepGuestPurchases (the hourly member sweep) deletes
  *   open ones past that and delivered ones after 30 days.
  * @structure NS_PURCHASE · GuestPurchase · isGuestMembershipId · openGuestPurchase ·
  *   completeGuestPurchase · sweepGuestPurchases
@@ -50,7 +50,8 @@ import { logger } from '../utils/logger.js';
 
 export const NS_PURCHASE = 'app-member-purchase';
 const KEY_PREFIX = 'appmempur.';
-const OPEN_MS = 24 * 3_600_000;
+// Under a day: Stripe refuses a card page whose expiry is 24 hours or more from its creation.
+const OPEN_MS = 23 * 3_600_000;
 const KEEP_DELIVERED_MS = 30 * 86_400_000;
 const DAY_MS = 86_400_000;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;

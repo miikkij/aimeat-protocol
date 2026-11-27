@@ -10,6 +10,7 @@
  *   questionsSchema · boardRulesInput · organismAudienceInput · wsGrantShape · tokenMap
  * @usage import { flexibleBoolean } from '../input-schemas.js';  owner_scope: { …, zod: flexibleBoolean }
  * @version-history
+ *   v1.6.0 — 2026-11-27 — itemShape takes kind `membership`: one period of a role an app's owner sells.
  *   v1.5.0 — 2026-10-31 — itemShape takes kind `package-account`, a package its author sells to accounts.
  *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.3.0 — 2026-10-18 — itemShape takes kind `subscription` (Comicland v3 A-5).
@@ -43,7 +44,7 @@ export const LinkSchema = z.object({
 
 /** The items of a checkout session (src/commerce/session-service.ts). */
 export const itemShape = z.array(z.object({
-    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription']).optional(),
+    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription', 'membership']).optional(),
     agent: z.string().max(300).optional(),
     offer_id: z.string().max(100).optional(),
     org: z.string().max(200).optional(),

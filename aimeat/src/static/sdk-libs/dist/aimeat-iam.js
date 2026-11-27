@@ -254,6 +254,17 @@
       joinAlready: "You already have access.",
       joinPending: "You asked on {d}. The owner has not decided yet.",
       joinDeclined: "The owner declined your earlier request. You can ask again.",
+      buyTitle: "Buy a membership",
+      buyLine: "{role}: {price} for {days} days.",
+      buyRenews: "It renews by itself, and you can stop the renewal in your wallet at any time.",
+      buyOnce: "One payment, no renewal.",
+      buySeller: "Sold by {seller}. You pay on Stripe's own page.",
+      buyBtn: "Buy membership",
+      buyEmail: "Your email address",
+      buyEmailMissing: "Give the email address the membership is for.",
+      buyDone: "You are a member until {d}.",
+      buyGuestDone: "The membership is paid. Open the message sent to your email address to continue.",
+      buyCancelled: "The payment was cancelled. Nothing was charged.",
       notOwner: "Only the owner manages members.",
       failed: "That did not go through.",
       failedWith: "That did not go through: {why}",
@@ -328,6 +339,17 @@
       joinAlready: "Sinulla on jo pääsy.",
       joinPending: "Pyysit pääsyä {d}. Omistaja ei ole vielä päättänyt.",
       joinDeclined: "Omistaja hylkäsi aiemman pyyntösi. Voit pyytää uudelleen.",
+      buyTitle: "Osta jäsenyys",
+      buyLine: "{role}: {price}, {days} päivää.",
+      buyRenews: "Jäsenyys uusiutuu itsestään. Voit lopettaa uusinnan lompakossa milloin tahansa.",
+      buyOnce: "Kertamaksu, ei uusintaa.",
+      buySeller: "Myyjä on {seller}. Maksat Stripen omalla sivulla.",
+      buyBtn: "Osta jäsenyys",
+      buyEmail: "Sähköpostiosoitteesi",
+      buyEmailMissing: "Anna sähköpostiosoite, jolle jäsenyys tulee.",
+      buyDone: "Olet jäsen {d} asti.",
+      buyGuestDone: "Jäsenyys on maksettu. Jatka avaamalla sähköpostiisi tullut viesti.",
+      buyCancelled: "Maksu peruttiin. Mitään ei veloitettu.",
       notOwner: "Vain omistaja hallinnoi jäseniä.",
       failed: "Se ei mennyt läpi.",
       failedWith: "Se ei mennyt läpi: {why}",
@@ -402,6 +424,17 @@
       joinAlready: "Ya tienes acceso.",
       joinPending: "Pediste acceso el {d}. El propietario todavía no ha decidido.",
       joinDeclined: "El propietario rechazó tu solicitud anterior. Puedes pedirlo de nuevo.",
+      buyTitle: "Comprar una membresía",
+      buyLine: "{role}: {price} por {days} días.",
+      buyRenews: "Se renueva sola, y puedes detener la renovación en tu monedero cuando quieras.",
+      buyOnce: "Un solo pago, sin renovación.",
+      buySeller: "La vende {seller}. Pagas en la propia página de Stripe.",
+      buyBtn: "Comprar membresía",
+      buyEmail: "Tu dirección de correo",
+      buyEmailMissing: "Escribe la dirección de correo para la que es la membresía.",
+      buyDone: "Eres miembro hasta el {d}.",
+      buyGuestDone: "La membresía está pagada. Abre el mensaje que llegó a tu correo para continuar.",
+      buyCancelled: "Se canceló el pago. No se cobró nada.",
       notOwner: "Solo el propietario administra a los miembros.",
       failed: "No se pudo completar.",
       failedWith: "No se pudo completar: {why}",
@@ -526,6 +559,61 @@
       ]));
     }
     return el("section", { cls: cls("aim-iam-sec") }, body);
+  }
+
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns && ns.fmt ? ns.fmt : null;
+  }
+  function person() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    const auth = ns && ns.auth;
+    const p = auth && typeof auth.displayPrefs === "function" ? auth.displayPrefs() : null;
+    return { region: p && p.region || null, timezone: p && p.timezone || null };
+  }
+  var refusedReported = "";
+  function asPerson(call, opts, clock) {
+    const p = person();
+    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
+    if (!p.region && !zone) return call(void 0, opts);
+    try {
+      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
+    } catch (e) {
+      const which = (p.region || "") + "|" + (zone || "");
+      if (refusedReported !== which) {
+        refusedReported = which;
+        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
+        e.message);
+      }
+      return call(void 0, opts);
+    }
+  }
+  function num(n, opts) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const f = fmt();
+    if (f && typeof f.num === "function") return f.num(n, opts);
+    try {
+      return asPerson((tag, o) => n.toLocaleString(tag, o), opts, false);
+    } catch {
+      return String(n);
+    }
+  }
+  function money(n, currency, opts) {
+    const f = fmt();
+    if (f && typeof f.money === "function") return f.money(n, currency, opts);
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const code = String(currency || "USD").toUpperCase();
+    const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
+    const o = Object.assign(
+      { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits },
+      opts
+    );
+    try {
+      return asPerson((tag, oo) => n.toLocaleString(tag, oo), o, false);
+    } catch {
+      return num(n) + " " + code;
+    }
   }
 
   // src/static/sdk-libs/iam/panel.js
@@ -881,14 +969,75 @@
         out.textContent = e && e.message ? S("failedWith", { why: e.message }) : S("failed");
       }
     });
+    const buy = el("div", { cls: cls("aim-iam-buy") });
     host.appendChild(el("section", { cls: cls("aim-iam") }, [
+      buy,
       el("h3", { cls: cls("aim-iam-h"), text: S("joinTitle") }),
       el("div", { cls: cls("aim-iam-form") }, [note, btn]),
       out
     ]));
+    if (iam2.membership) {
+      mountBuy(iam2, buy, lang, S, cls).catch((e) => {
+        console.debug("aimeat-iam: the membership offer was not read", e);
+      });
+    }
     return { destroy: () => {
       host.textContent = "";
     } };
+  }
+  function money2(_lang, micros, currency) {
+    return money(micros / 1e6, currency);
+  }
+  async function mountBuy(iam2, host, lang, S, cls) {
+    const say = el("p", { cls: cls("aim-iam-lead") });
+    const done = await iam2.membership.finish().catch((e) => ({ error: e }));
+    if (done && done.error) say.textContent = S("failedWith", { why: done.error.message });
+    else if (done && done.cancelled) say.textContent = S("buyCancelled");
+    else if (done && done.guest) say.textContent = S("buyGuestDone");
+    if (done && done.member) await iam2.refresh().catch((e) => {
+      console.debug("aimeat-iam: standing not read after the purchase", e);
+    });
+    const st = await iam2.membership.status();
+    const mine = st.me && st.me.member;
+    if (mine) {
+      if (mine.expires_at) host.appendChild(el("p", { cls: cls("aim-iam-lead"), text: S("buyDone", { d: fmtDate(mine.expires_at) }) }));
+      return;
+    }
+    const roles = (st.for_sale || []).filter((r) => r.buy_here);
+    if (!roles.length || st.me && st.me.is_owner) {
+      if (say.textContent) host.appendChild(say);
+      return;
+    }
+    const signedIn = !!st.me;
+    if (!signedIn && !(st.guest && st.guest.open)) return;
+    const email = signedIn ? null : el("input", { attrs: { type: "email", placeholder: S("buyEmail"), "aria-label": S("buyEmail"), autocomplete: "email" } });
+    const rows = roles.map((r) => {
+      const b = el("button", { cls: cls("aim-iam-btn"), text: S("buyBtn"), attrs: { type: "button" } });
+      b.addEventListener("click", async () => {
+        try {
+          const address = email ? (
+            /** @type {HTMLInputElement} */
+            email.value.trim()
+          ) : "";
+          if (email && !address) {
+            say.textContent = S("buyEmailMissing");
+            return;
+          }
+          await iam2.membership.buy(r.role, email ? { email: address } : {});
+        } catch (e) {
+          say.textContent = e && e.message ? S("failedWith", { why: e.message }) : S("failed");
+        }
+      });
+      return el("div", { cls: cls("aim-iam-form") }, [
+        el("p", { cls: cls("aim-iam-lead"), text: S("buyLine", { role: r.role, price: money2(lang, r.amount, r.currency), days: r.days }) + " " + S(r.renews ? "buyRenews" : "buyOnce") }),
+        b
+      ]);
+    });
+    host.appendChild(el("h3", { cls: cls("aim-iam-h"), text: S("buyTitle") }));
+    host.appendChild(el("p", { cls: cls("aim-iam-lead"), text: S("buySeller", { seller: st.seller && st.seller.display_name || "" }) }));
+    if (email) host.appendChild(email);
+    for (const row of rows) host.appendChild(row);
+    host.appendChild(say);
   }
 
   // src/static/sdk-libs/iam/node-roster.js
@@ -1051,6 +1200,128 @@
     const body = { open: !!args.open };
     if (args.role) body.role = args.role;
     return un2(call(base2(appId) + "/parties/registration", { method: "PUT", body: JSON.stringify(body) }));
+  }
+
+  // src/static/sdk-libs/iam/membership.js
+  function base3(appId) {
+    const [owner, filename] = String(appId).split("/");
+    return "/v1/apps/" + encodeURIComponent(owner || "") + "/" + encodeURIComponent(filename || "") + "/membership";
+  }
+  function refusal(res, fallback) {
+    const e = (
+      /** @type {Error & { code?: string, status?: number }} */
+      new Error(res && res.error && res.error.message || fallback)
+    );
+    e.code = res && res.error && res.error.code;
+    e.status = res && res.status;
+    return e;
+  }
+  async function plain(path, opts) {
+    const r = await fetch(resolveNodeUrl() + path, { ...opts, headers: { "Content-Type": "application/json", ...opts && opts.headers } });
+    let body;
+    try {
+      body = await r.json();
+    } catch (e) {
+      return { ok: false, status: r.status, data: void 0, error: { code: "UNREADABLE_ANSWER", message: "The node answered something that is not JSON (" + String(e) + ")" } };
+    }
+    return { ok: r.ok, status: r.status, data: body && body.data, error: body && body.error };
+  }
+  function makeMembership(appOf, call, signedIn) {
+    const app = function() {
+      const a = appOf();
+      if (!a) throw new Error('aimeat-iam: membership needs AIMEAT.iam.init({ app: "owner/file.html" }) first');
+      return a;
+    };
+    const returnUrl = function(opts) {
+      return opts && opts.returnUrl || window.location.href.split("#")[0];
+    };
+    const membership = {
+      /** The node's own join page for this app, where anybody, signed in or not, sees the price and buys. */
+      joinUrl() {
+        return resolveNodeUrl() + "/v1/app-join?app=" + encodeURIComponent(app());
+      },
+      /** What is for sale and the caller's own standing (GET /v1/apps/:owner/:filename/membership). */
+      async status() {
+        const res = signedIn() ? await call(base3(app())) : await plain(base3(app()));
+        if (!res.ok) throw refusal(res, "The membership could not be read");
+        return res.data;
+      },
+      /**
+       * Buy one period of `role`. Signed in: opens a checkout and sends the person to the card page.
+       * Not signed in: `opts.email` is required, and the purchase is made for that address.
+       * @param {string} role
+       * @param {{ email?: string, autoRenew?: boolean, returnUrl?: string, redirect?: boolean }} [opts]
+       *   redirect: false resolves with { url } instead of leaving the page.
+       */
+      async buy(role, opts) {
+        const autoRenew = !(opts && opts.autoRenew === false);
+        let url;
+        if (signedIn()) {
+          const open = await call("/v1/commerce/checkout-sessions", { method: "POST", body: JSON.stringify({
+            items: [{ kind: "membership", app: app(), tool: role, input: { auto_renew: autoRenew } }]
+          }) });
+          if (!open.ok) throw refusal(open, "The purchase could not be opened");
+          const card = await call("/v1/commerce/checkout-sessions/" + encodeURIComponent(open.data.session.id) + "/card", {
+            method: "POST",
+            body: JSON.stringify({ return_url: returnUrl(opts) })
+          });
+          if (!card.ok) throw refusal(card, "The card page could not be opened");
+          url = card.data.url;
+        } else {
+          if (!opts || !opts.email) throw new Error("aimeat-iam: buy() without a signed-in account needs { email }");
+          const open = await plain(base3(app()) + "/guest", { method: "POST", body: JSON.stringify({
+            role,
+            email: opts.email,
+            return_url: returnUrl(opts),
+            auto_renew: autoRenew
+          }) });
+          if (!open.ok) throw refusal(open, "The purchase could not be opened");
+          url = open.data.url;
+        }
+        if (opts && opts.redirect === false) return { url };
+        window.location.assign(url);
+        return { url };
+      },
+      /**
+       * On the page the card page returned to: complete the purchase. Resolves with null when this page
+       * was not opened by a card page, { cancelled: true } when the person gave up, { member: true } for
+       * a signed-in purchase, and { guest: true, message } for a purchase made without an account (the
+       * next step is in the person's email).
+       */
+      async finish() {
+        const q = new URLSearchParams(window.location.search);
+        const id = q.get("aimeat_checkout");
+        if (!id) return null;
+        const clean = new URL(window.location.href);
+        for (const k of ["aimeat_checkout", "stripe_session", "cancelled"]) clean.searchParams.delete(k);
+        window.history.replaceState(window.history.state, "", clean.toString());
+        if (q.get("cancelled") === "1") return { cancelled: true };
+        const cs = q.get("stripe_session");
+        if (/^gm_/.test(id)) {
+          const res2 = await plain(base3(app()) + "/guest/complete", { method: "POST", body: JSON.stringify({ purchase: id, stripe_session: cs }) });
+          if (!res2.ok) throw refusal(res2, "The purchase could not be completed");
+          return { guest: true, message: res2.data.message };
+        }
+        const res = await call("/v1/commerce/checkout-sessions/" + encodeURIComponent(id) + "/complete", {
+          method: "POST",
+          body: JSON.stringify({ payment: { handler: "com.stripe.checkout", instrument: cs } })
+        });
+        if (!res.ok && !(res.error && res.error.code === "SESSION_NOT_OPEN")) throw refusal(res, "The card payment could not be completed");
+        return { member: true };
+      },
+      /** Stop the renewal of the caller's membership as `role`; the paid period runs to its end. */
+      async cancel(role) {
+        const s = await membership.status();
+        const sub = (s.me && s.me.subscriptions || []).find(function(x) {
+          return x.role === role && x.auto_renew;
+        });
+        if (!sub) throw new Error("aimeat-iam: no renewing membership as " + role);
+        const res = await call("/v1/commerce/subscriptions/" + encodeURIComponent(sub.ext) + "/" + encodeURIComponent(role) + "/cancel", { method: "POST", body: "{}" });
+        if (!res.ok) throw refusal(res, "The renewal could not be stopped");
+        return res.data.subscription;
+      }
+    };
+    return membership;
   }
 
   // src/static/sdk-libs/iam/index.js
@@ -1554,17 +1825,17 @@
      * @param {{ name: string, party_ref?: string, role?: string }} person  A row of parties().parties.
      * @returns {Promise<any>}
      */
-    party(op, person) {
+    party(op, person2) {
       requireInit();
       if (!state.app) return Promise.resolve({ ok: false, error: "registered people belong to the node roster; init with { app }" });
       const app = (
         /** @type {string} */
         state.app
       );
-      if (op === "role") return partySetRole(authFetch2, app, String(person.party_ref || ""), String(person.role || ""));
-      if (op === "stop") return partyStop(authFetch2, app, person.name);
-      if (op === "resume") return partyResume(authFetch2, app, person.name);
-      if (op === "remove") return partyRemove(authFetch2, app, person.name);
+      if (op === "role") return partySetRole(authFetch2, app, String(person2.party_ref || ""), String(person2.role || ""));
+      if (op === "stop") return partyStop(authFetch2, app, person2.name);
+      if (op === "resume") return partyResume(authFetch2, app, person2.name);
+      if (op === "remove") return partyRemove(authFetch2, app, person2.name);
       return Promise.resolve({ ok: false, error: '"' + op + '" is not an operation on a registered person' });
     },
     /**
@@ -1618,6 +1889,7 @@
   function requireInit() {
     if (!state.ext && !state.app) throw new Error("aimeat-iam: call AIMEAT.iam.init({ app }) or init({ ext }) first");
   }
+  iam.membership = makeMembership(() => state.app, accountFetch, accountSignedIn);
   var gateApi = makeGate({ me: () => state.me }, (input) => iam.check(input));
   iam.can = gateApi.can;
   iam.gate = gateApi.gate;

@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-27 — A membership the owner sells is the node's: the plan's `sale`, joinRequest's Buy
+ *     button and AIMEAT.iam.membership; never a checkout or a payment service of the app's own
+ *     (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  *   2026-11-27 — Step 7: the node's browser first (scenarios, the audit with the playtest, and the
  *     picture each run answers), and no browser installed or library replaced to see the app. Five
  *     measured builds each installed a browser and wrote a test driver; three replaced the sign-in.
@@ -446,7 +449,12 @@ changed after you fetched it says so.
    \`aimeat-auth.js\` and use \`AIMEAT.atelier.members({ target, app, roles })\` for the owner's
    screen, \`joinRequest({ target, app })\` for the visitor's ask and
    \`accessState({ target, app, cap, render })\` around a members-only area; never write a member
-   list, a role select or a join form of your own. The same holds for the other libraries: a
+   list, a role select or a join form of your own. **A membership the owner sells is the node's
+   too:** the owner prices the role in the plan (\`sale\` with \`terms.<role>.days\`, set by their
+   AI through \`aimeat_app_manage member_plan_set\` or the plan tab), and \`joinRequest\` then shows
+   the price, the period and a Buy button; in code it is \`AIMEAT.iam.membership\` (status, buy,
+   finish, cancel, joinUrl). Never build a checkout, a Stripe call or an outside payment service
+   of your own for it: the node renews, ends and refunds the membership itself. The same holds for the other libraries: a
    workspace's people are \`workspaceTeam({ target, org, ws })\` and the first-run choice of where the
    app keeps its data is \`workspacePicker({ target, app, onReady })\` (both over
    \`aimeat-organism.js\`), a public form is \`intakeForm({ target, org, ws, formId })\` and the

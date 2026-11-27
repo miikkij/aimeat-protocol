@@ -11,6 +11,7 @@
  * @structure accountRightsTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.0.2 — 2026-11-27 — aimeat_subscription_list names an app membership and how to buy one.
  *   v1.0.1 — 2026-10-30 — aimeat_adult_status says that a card payment to a seller who does not run the
  *     node is confirmed by the owner in person (secaudit2026oct26 round 8c, commerce-07).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-3, A-5, A-8).
@@ -32,7 +33,7 @@ export const accountRightsTools = [
     },
     {
         name: 'aimeat_subscription_list',
-        description: 'Your owner\'s subscriptions to plans that extensions offer (a creator\'s or a studio\'s monthly plan, for example), running and ended: the plan, its price, when it runs until, and whether it renews on the kept card. To subscribe, open a checkout with an item { kind: "subscription", app: <extension>, tool: <plan id> } (aimeat_checkout_open).',
+        description: 'Your owner\'s subscriptions to plans that extensions offer (a creator\'s or a studio\'s monthly plan, for example), running and ended: the plan, its price, when it runs until, and whether it renews on the kept card. To subscribe, open a checkout with an item { kind: "subscription", app: <extension>, tool: <plan id> } (aimeat_checkout_open). A membership of an app that its owner sells is listed here too (kind "membership", with app and role): buy one with an item { kind: "membership", app: "<owner>/<app file>", tool: "<role>" }; GET /v1/apps/<owner>/<file>/membership names the roles for sale and their price.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Subscriptions', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -15608,6 +15608,8 @@ Known schemas:
       "members.remove": "Remove",
       "members.role": "Role",
       "members.since": "since {d}",
+      "members.paidRenews": "paid until {d}, renews",
+      "members.paidEnds": "paid until {d}, renewal stopped",
       "members.visit1": "1 visit, on {d}",
       "members.visits": "{n} visits, last {d}",
       "members.confirmRemove": "Remove {who}?",
@@ -15626,6 +15628,11 @@ Known schemas:
       "join.member": "You are a member, as {role}.",
       "join.already": "You already have access.",
       "join.signIn": "Sign in to ask for access.",
+      "join.buy": "Buy membership",
+      "join.buyLine": "{role}: {price} for {days} days.",
+      "join.buyRenews": "It renews by itself, and you can stop the renewal in your wallet at any time.",
+      "join.buyOnce": "One payment, no renewal.",
+      "join.buySeller": "You can buy a membership. Sold by {seller}; you pay on Stripe's own page.",
       "access.title": "This part is for members",
       "access.intro": "You can ask the owner to let you in.",
       "sample.badge": "Sample content",
@@ -15682,6 +15689,13 @@ Known schemas:
       "plan.manages": "Manages members",
       "plan.noLimit": "no limit",
       "plan.noEnd": "no end",
+      "plan.price": "Price per period",
+      "plan.currency": "Currency",
+      "plan.notSold": "not sold",
+      "plan.renews": "Renews",
+      "plan.stripePrices": "Your Stripe prices",
+      "plan.priceBad": 'The price of "{role}" is not a price: write it like 4.90.',
+      "plan.saleHint": "A role with a price is sold on this app's join page, and the period is its Days. The money goes to your own Stripe account, and no platform fee is taken. Your Stripe prices (price_…) are the ones you sell this role with on your own Stripe links; their payments make the payer a member through your Stripe webhook.",
       "plan.save": "Save plan",
       "plan.saved": "The plan is saved. It applies to approvals from now on.",
       "settings.on": "On",
@@ -15717,6 +15731,8 @@ Known schemas:
       "members.remove": "Poista",
       "members.role": "Rooli",
       "members.since": "{d} alkaen",
+      "members.paidRenews": "maksettu {d} asti, uusinta päällä",
+      "members.paidEnds": "maksettu {d} asti, uusinta peruttu",
       "members.visit1": "1 käynti, {d}",
       "members.visits": "{n} käyntiä, viimeksi {d}",
       "members.confirmRemove": "Poistetaanko {who}?",
@@ -15735,6 +15751,11 @@ Known schemas:
       "join.member": "Olet jäsen, roolina {role}.",
       "join.already": "Sinulla on jo pääsy.",
       "join.signIn": "Kirjaudu sisään, niin voit pyytää pääsyä.",
+      "join.buy": "Osta jäsenyys",
+      "join.buyLine": "{role}: {price}, {days} päivää.",
+      "join.buyRenews": "Jäsenyys uusiutuu itsestään. Voit lopettaa uusinnan lompakossa milloin tahansa.",
+      "join.buyOnce": "Kertamaksu, ei uusintaa.",
+      "join.buySeller": "Voit ostaa jäsenyyden. Myyjä on {seller}, ja maksat Stripen omalla sivulla.",
       "access.title": "Tämä osa on jäsenille",
       "access.intro": "Voit pyytää omistajalta pääsyä.",
       "sample.badge": "Esimerkkisisältö",
@@ -15791,6 +15812,13 @@ Known schemas:
       "plan.manages": "Hallinnoi jäseniä",
       "plan.noLimit": "ei rajaa",
       "plan.noEnd": "ei loppua",
+      "plan.price": "Hinta jaksolta",
+      "plan.currency": "Valuutta",
+      "plan.notSold": "ei myynnissä",
+      "plan.renews": "Uusiutuu",
+      "plan.stripePrices": "Stripe-hintasi",
+      "plan.priceBad": 'Roolin "{role}" hinta ei ole hinta: kirjoita se muodossa 4,90.',
+      "plan.saleHint": "Hinnoiteltu rooli on myynnissä sovelluksen liittymissivulla, ja jakso on sen päivät. Raha menee omalle Stripe-tilillesi, eikä alustamaksua peritä. Stripe-hintasi (price_…) ovat ne hinnat, joilla myyt roolia omilla Stripe-linkeilläsi. Niiden maksut tekevät maksajasta jäsenen Stripe-webhookisi kautta.",
       "plan.save": "Tallenna ehdot",
       "plan.saved": "Ehdot on tallennettu. Ne koskevat tästä eteenpäin tehtäviä hyväksyntöjä.",
       "settings.on": "Päällä",
@@ -15826,6 +15854,8 @@ Known schemas:
       "members.remove": "Quitar",
       "members.role": "Rol",
       "members.since": "desde el {d}",
+      "members.paidRenews": "pagado hasta el {d}, se renueva",
+      "members.paidEnds": "pagado hasta el {d}, renovación detenida",
       "members.visit1": "1 visita, el {d}",
       "members.visits": "{n} visitas, la última el {d}",
       "members.confirmRemove": "¿Quitar a {who}?",
@@ -15844,6 +15874,11 @@ Known schemas:
       "join.member": "Eres miembro, con el rol {role}.",
       "join.already": "Ya tienes acceso.",
       "join.signIn": "Inicia sesión para pedir acceso.",
+      "join.buy": "Comprar membresía",
+      "join.buyLine": "{role}: {price} por {days} días.",
+      "join.buyRenews": "Se renueva sola, y puedes detener la renovación en tu monedero cuando quieras.",
+      "join.buyOnce": "Un solo pago, sin renovación.",
+      "join.buySeller": "Puedes comprar una membresía. La vende {seller}; pagas en la propia página de Stripe.",
       "access.title": "Esta parte es para miembros",
       "access.intro": "Puedes pedirle acceso al propietario.",
       "sample.badge": "Contenido de muestra",
@@ -15900,6 +15935,13 @@ Known schemas:
       "plan.manages": "Administra miembros",
       "plan.noLimit": "sin límite",
       "plan.noEnd": "sin fin",
+      "plan.price": "Precio por periodo",
+      "plan.currency": "Moneda",
+      "plan.notSold": "no se vende",
+      "plan.renews": "Se renueva",
+      "plan.stripePrices": "Tus precios de Stripe",
+      "plan.priceBad": 'El precio de "{role}" no es un precio: escríbelo como 4,90.',
+      "plan.saleHint": "Un rol con precio se vende en la página de alta de esta aplicación, y el periodo son sus días. El dinero va a tu propia cuenta de Stripe y no se cobra comisión de plataforma. Tus precios de Stripe (price_…) son los que usas para vender este rol con tus propios enlaces de Stripe; sus pagos hacen miembro a quien paga a través de tu webhook de Stripe.",
       "plan.save": "Guardar condiciones",
       "plan.saved": "Las condiciones están guardadas. Se aplican a las aprobaciones desde ahora.",
       "settings.on": "Activado",
@@ -16373,7 +16415,9 @@ Known schemas:
                 });
               }, sample);
             });
-            const since = m.since ? variant === "table" ? day2(m.since) : tm("members.since", { d: day2(m.since) }) : "";
+            const joined = m.since ? variant === "table" ? day2(m.since) : tm("members.since", { d: day2(m.since) }) : "";
+            const paid = m.paid && m.paid.until ? tm(m.paid.renews ? "members.paidRenews" : "members.paidEnds", { d: day2(m.paid.until) }) : "";
+            const since = [joined, paid].filter(Boolean).join(" · ");
             return row(person2(m.owner, m.displayName, m.email), since, own.concat([
               sel,
               button2(tm("members.remove"), "ghost", sample ? noop : function() {
@@ -16578,24 +16622,84 @@ Known schemas:
               checked: (cur.manageRoles || []).indexOf(r) !== -1 ? true : null
             })
           );
-          return { r, seats, days, mgr, node: el("tr", {}, [
+          const sold = cur.sale && cur.sale[r] || null;
+          const priceIn = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "text",
+              inputmode: "decimal",
+              class: "ak-input ak-mem__num",
+              "aria-label": tm("plan.price") + " " + r,
+              value: sold && sold.amount ? (sold.amount / 1e6).toFixed(2) : "",
+              placeholder: tm("plan.notSold")
+            })
+          );
+          const currency = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "text",
+              maxlength: "3",
+              class: "ak-input ak-mem__num",
+              "aria-label": tm("plan.currency") + " " + r,
+              value: sold && sold.currency || "EUR"
+            })
+          );
+          const renews = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "checkbox",
+              "aria-label": tm("plan.renews") + " " + r,
+              checked: !sold || sold.renews !== false ? true : null
+            })
+          );
+          const stripe = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "text",
+              class: "ak-input",
+              "aria-label": tm("plan.stripePrices") + " " + r,
+              value: sold && sold.stripePrices ? sold.stripePrices.join(", ") : "",
+              placeholder: "price_…"
+            })
+          );
+          return { r, seats, days, mgr, priceIn, currency, renews, stripe, node: el("tr", {}, [
             el("th", { scope: "row" }, r),
             el("td", {}, [seats]),
             el("td", {}, [days]),
-            el("td", {}, [mgr])
+            el("td", {}, [mgr]),
+            el("td", {}, [priceIn, currency]),
+            el("td", {}, [renews]),
+            el("td", {}, [stripe])
           ]) };
         });
         const save = button2(tm("plan.save"), "primary", sample ? noop : function() {
           const seats = {};
           const terms = {};
           const manageRoles = [];
+          const sale = {};
+          let badPrice = "";
           rows.forEach(function(x) {
             if (x.seats.value !== "") seats[x.r] = Number(x.seats.value);
-            if (x.days.value !== "") terms[x.r] = { days: Number(x.days.value) };
+            if (x.days.value !== "") terms[x.r] = Object.assign({}, cur.terms && cur.terms[x.r] || {}, { days: Number(x.days.value) });
             if (x.mgr.checked) manageRoles.push(x.r);
+            const raw = x.priceIn.value.trim();
+            const prices = x.stripe.value.split(/[\s,]+/).filter(Boolean);
+            if (raw && !/^\d+([.,]\d{1,2})?$/.test(raw)) badPrice = x.r;
+            if (raw || prices.length) {
+              sale[x.r] = Object.assign(
+                raw ? { amount: Math.round(Number(raw.replace(",", ".")) * 100) * 1e4, currency: x.currency.value.trim().toUpperCase() } : {},
+                { renews: x.renews.checked, stripePrices: prices }
+              );
+            }
           });
+          if (badPrice) {
+            failure = tm("plan.priceBad", { role: badPrice });
+            notice = "";
+            render();
+            return;
+          }
           act(function() {
-            return iam.setPlan({ roles: cur.roles || {}, access: access.value, rosterVisibility: vis.value, seats, terms, manageRoles });
+            return iam.setPlan({ roles: cur.roles || {}, access: access.value, rosterVisibility: vis.value, seats, terms, manageRoles, sale });
           }, function() {
             return tm("plan.saved");
           });
@@ -16609,12 +16713,16 @@ Known schemas:
               el("th", { scope: "col" }, tm("members.role")),
               el("th", { scope: "col" }, tm("plan.seats")),
               el("th", { scope: "col" }, tm("plan.days")),
-              el("th", { scope: "col" }, tm("plan.manages"))
+              el("th", { scope: "col" }, tm("plan.manages")),
+              el("th", { scope: "col" }, tm("plan.price")),
+              el("th", { scope: "col" }, tm("plan.renews")),
+              el("th", { scope: "col" }, tm("plan.stripePrices"))
             ])]),
             el("tbody", {}, rows.map(function(x) {
               return x.node;
             }))
           ]),
+          el("p", { class: "ak-mem__hint" }, tm("plan.saleHint")),
           save
         ]);
       }
@@ -16721,7 +16829,16 @@ Known schemas:
         root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.noLib")));
         return;
       }
+      if (iam.membership) {
+        try {
+          const back = await iam.membership.finish();
+          if (back && back.member) await iam.refresh();
+        } catch (e) {
+          status.textContent = tm("members.failed", { why: refusal(e) || String(e) });
+        }
+      }
       const me = iam.me();
+      if (!me || !me.isOwner && !me.member) await offerPurchase(iam, root, !!me);
       if (!me) {
         status.textContent = tm("join.signIn");
         root.appendChild(status);
@@ -16759,6 +16876,46 @@ Known schemas:
       stop();
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
+  }
+  function price(micros, currency) {
+    return money(micros / 1e6, currency);
+  }
+  async function offerPurchase(iam, root, signedIn2) {
+    if (!iam.membership) return;
+    let st;
+    try {
+      st = await iam.membership.status();
+    } catch (e) {
+      root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.failed", { why: refusal(e) || String(e) })));
+      return;
+    }
+    const roles = (st && st.for_sale || []).filter(function(r) {
+      return r.buy_here;
+    });
+    if (!roles.length || !signedIn2 && !(st.guest && st.guest.open)) return;
+    const box = el("div", { class: "ak-mem__buy", "data-ak-part": "buy" });
+    box.appendChild(el("p", { class: "ak-mem__intro" }, tm("join.buySeller", { seller: st.seller && st.seller.display_name || "" })));
+    const said = el("p", { class: "ak-mem__status", role: "status" });
+    for (const r of roles) {
+      box.appendChild(el(
+        "p",
+        { class: "ak-mem__intro" },
+        tm("join.buyLine", { role: r.role, price: price(r.amount, r.currency), days: String(r.days) }) + " " + tm(r.renews ? "join.buyRenews" : "join.buyOnce")
+      ));
+      box.appendChild(el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "buy-" + r.role, on: {
+        click: function() {
+          if (!signedIn2) {
+            window.location.assign(iam.membership.joinUrl());
+            return;
+          }
+          iam.membership.buy(r.role).catch(function(e) {
+            said.textContent = tm("members.failed", { why: refusal(e) || String(e) });
+          });
+        }
+      } }, tm("join.buy")));
+    }
+    box.appendChild(said);
+    root.appendChild(box);
   }
   function accessState(spec) {
     const sample = wantsSample2(spec);

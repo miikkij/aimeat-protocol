@@ -16,6 +16,7 @@
  * @structure SPA_PAGE_PATHS
  * @usage import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
  * @version-history
+ *   v1.5.0 — 2026-11-27 — /v1/app-join, an app's membership page (views/app-join.js).
  *   v1.4.0 — 2026-11-23 — /v1/file-open, the page a file link opened in a new tab reaches when the tab
  *     cannot read the file.
  *   v1.3.1 — 2026-11-22 — Comment only: the old /app-catalog.html beside /v1/appcat is removed.
@@ -78,6 +79,7 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/start',
   '/v1/app-grant',   // H-2 app-grant consent page (SPA)
   '/v1/app-open',    // Opening an app or a page that needs a sign-in (SPA, ?app=<owner>/<file>, ?portfolio=<user>, ?company=<id>; routes/apps/open.ts, routes/page-open.ts)
+  '/v1/app-join',    // An app's membership: its price and the purchase, signed in or with an email address (SPA, ?app=<owner>/<file>; routes/app-membership.ts)
   '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
   '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
   '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
