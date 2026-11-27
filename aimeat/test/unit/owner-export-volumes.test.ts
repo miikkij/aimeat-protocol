@@ -7,6 +7,7 @@
  *   itself with its SHA-256 right, and the JSON writer (json-stream.ts) writes a list read in pages as
  *   the same JSON JSON.stringify writes, a piece at a time.
  * @version-history
+ *   v1.1.0 — 2026-11-27 — Every volume stays under its size with many small files and a large buffer.
  *   v1.0.0 — 2026-11-26 — Initial (wish-owner-data-export-as-a-chosen-parts-background-job).
  */
 import { describe, it, expect } from 'vitest';
@@ -60,6 +61,27 @@ describe('VolumeWriter', () => {
       }
       expect(await entriesOf(join(dir, vols[0].file))).toEqual(['files/you/f0.png']);
       expect(await entriesOf(join(dir, vols[2].file))).toEqual(['files/you/f2.png', 'manifest.json']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps every volume under its size with many small files, the central directory counted', async () => {
+    // Production, 2026-11-27: 4109 files made a volume 0.2 MB over its 1024 MiB, because the central
+    // directory written at the close (one record per entry, with the name) was not counted.
+    const dir = mkdtempSync(join(tmpdir(), 'aimeat-export-'));
+    try {
+      const max = 64 * 1024;
+      const w = new VolumeWriter(dir, 'aimeat-export-carol-2026-11-27', max);
+      for (let i = 0; i < 600; i++) {
+        const b = randomBytes(150);
+        await w.add(`files/agents/a-very-long-agent-name-for-the-test/folder/sub-folder/document-number-${i}.bin`, b, { size: b.length, mimeType: 'application/octet-stream' });
+      }
+      // A Buffer of a known length that does not fit the room left goes to the next volume, not past the size.
+      await w.add('memories/you-0001.ndjson', Buffer.alloc(40 * 1024, 0x61));
+      const vols = await w.finish();
+      expect(vols.length).toBeGreaterThan(1);
+      for (const v of vols) expect(v.bytes).toBeLessThanOrEqual(max);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

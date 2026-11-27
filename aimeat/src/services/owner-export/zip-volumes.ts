@@ -13,6 +13,9 @@
  *   const w = new VolumeWriter(dir, 'aimeat-export-alice-2026-11-26', 1024 * 1024 * 1024);
  *   await w.add('account.json', readable); …; const volumes = await w.finish();
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The central directory is counted as entries are written, and a Buffer's or a
+ *     string's length decides its volume before it is written: a production export of 4109 files made
+ *     a volume 0.2 MB over its 1024 MiB, and a 64 MB NDJSON file could pass the size by itself.
  *   v1.0.0 — 2026-11-26 — Initial (wish-owner-data-export-as-a-chosen-parts-background-job).
  */
 import { createWriteStream, type WriteStream } from 'node:fs';
@@ -40,8 +43,19 @@ interface Open {
   hash: Hash;
   closed: Promise<void>;
   entries: number;
+  /** Bytes the central directory will take when the volume is closed: one record per entry. */
+  central: number;
   failed: Error | null;
 }
+
+/**
+ * What one entry adds to the central directory written at the end: a 46-byte record, its name, and a
+ * zip64 extra field of up to 32 bytes. The end records take END_RESERVE once. Counted while writing,
+ * so a volume of thousands of files stays under its size: without it, 4109 files on a production node
+ * made a volume 0.2 MB over 1024 MiB (2026-11-27).
+ */
+const centralOf = (name: string): number => 46 + Buffer.byteLength(name) + 32;
+const END_RESERVE = 128;
 
 /** Types whose bytes are compressed already: stored as they are, so the node spends no time on them. */
 const STORED = /^(image\/(?!svg)|video\/|audio\/|application\/(zip|gzip|x-7z|x-rar|pdf|octet-stream))/i;
@@ -63,9 +77,10 @@ export class VolumeWriter {
     return this.done.reduce((s, v) => s + v.bytes, 0) + this.written();
   }
 
-  /** Bytes left in the current volume before it is closed. */
+  /** Bytes left in the current volume before it is closed, its central directory counted. */
   room(): number {
-    return Math.max(0, this.maxBytes - this.written());
+    const central = this.current ? this.current.central : 0;
+    return Math.max(0, this.maxBytes - this.written() - central - END_RESERVE);
   }
 
   private open(): Open {
@@ -74,7 +89,7 @@ export class VolumeWriter {
     const archive = new ZipArchive({ zlib: { level: 6 } });
     const out = createWriteStream(join(this.dir, file));
     const hash = createHash('sha256');
-    const vol: Open = { n, file, archive, out, hash, entries: 0, failed: null, closed: Promise.resolve() };
+    const vol: Open = { n, file, archive, out, hash, entries: 0, central: 0, failed: null, closed: Promise.resolve() };
     vol.closed = new Promise<void>((resolve, reject) => {
       out.on('close', () => resolve());
       out.on('error', (e: Error) => { vol.failed = e; reject(e); });
@@ -95,12 +110,14 @@ export class VolumeWriter {
   }
 
   /**
-   * Add one entry. `size` is its length when it is known before (a stored file): one larger than the
-   * room left goes to a new volume. A source of unknown length goes where the current volume is, and
-   * the volume is closed after it when it is full.
+   * Add one entry. Its length is known before for a Buffer, a string, or a stream given `size` (a
+   * stored file): an entry larger than the room left goes to a new volume. A stream of unknown length
+   * (account.json, the second entry of the first volume) goes where the current volume is, and the
+   * volume is closed after it when it is full.
    */
   async add(name: string, source: Buffer | string | Readable | AsyncIterable<Buffer | string>, opts: { size?: number; mimeType?: string } = {}): Promise<void> {
-    if (this.current && this.current.entries > 0 && opts.size !== undefined && opts.size > this.room()) {
+    const known = opts.size ?? (Buffer.isBuffer(source) ? source.length : typeof source === 'string' ? Buffer.byteLength(source) : undefined);
+    if (this.current && this.current.entries > 0 && known !== undefined && known + centralOf(name) > this.room()) {
       await this.close(this.current);
       this.current = null;
     }
@@ -114,8 +131,9 @@ export class VolumeWriter {
       vol.archive.append(input as Buffer, { name, store, callback: () => { vol.archive.off('error', failed); resolve(); } } as never);
     });
     vol.entries += 1;
+    vol.central += centralOf(name);
     if (vol.failed) throw vol.failed;
-    if (this.written() >= this.maxBytes) {
+    if (this.room() === 0) {
       await this.close(vol);
       this.current = null;
     }
