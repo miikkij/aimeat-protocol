@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-27 — Step 1: an order that carries its answers and says to decide gets no questions and
+ *     no drawn layouts. Five measured builds each drew two or three layouts for a person who had
+ *     said to decide.
  *   2026-11-27 — Step 4: describe() also answers `use`, and find("<use>") names the components for
  *     a job (static/sdk-libs/atelier/index.js, aimeat-atelier 0.73.0). No line added.
  *   2026-11-25 — Steps 7 to 9 read the size matrix and the owed items by level from
@@ -303,6 +306,10 @@ changed after you fetched it says so.
    specification's parts \`libraries\` and \`patterns\` only; then a one-line proposal and build. On
    \`plain\`: no introduction unless they ask, and parts \`genre\` and \`book\` stay unread. On the
    finest, or with no answer, all of it.
+   **WHEN THE PERSON HAS ALREADY ANSWERED AND TOLD YOU TO DECIDE** (an order that carries its
+   answers and says not to ask), ask nothing and draw no layouts: write the plan once with
+   \`structure_set\`, your own choices each \`"state": "done"\`, and build. Drawn layouts are for a
+   person who will choose between them.
    **START THE STRUCTURE PAGE BEFORE THE FIRST QUESTION** on a new app: pick a filename, call
    \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose, proposals }\` and put
    \`page_url\` from the answer in your first message. Unless the level is \`proto\`,

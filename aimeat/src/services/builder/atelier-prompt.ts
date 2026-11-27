@@ -28,6 +28,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.52.0 — 2026-11-27 — The interview: one line for an order that already carries its answers
+ *     and says to decide (no questions, no drawn layouts, the plan written once). Additive.
  *   v1.51.0 — 2026-11-27 — "The frame, the moments and the owner's templates" (atelier-moments.ts,
  *     part `screens`) after "The phone and the desktop": optional for the builder, and no existing
  *     sentence changes (wish-atelier-contextual-templates-pyynt-lohko-ask).
@@ -863,7 +865,8 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n'
     + 'THE LEVEL DECIDES THE REST. `proto`: ask 1, 2 and 4 only, draw no layouts, no introduction, the data map only for shared data, read parts `libraries` and `patterns` only. `plain`: no introduction unless asked, no `genre` or `book`. `fine` or no answer: all of it.\n\n'
-    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and, unless the level is `proto`, `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
+    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and, unless the level is `proto`, `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n'
+    + 'WHEN THE PERSON HAS ALREADY ANSWERED AND TOLD YOU TO DECIDE, ask nothing and draw no layouts: write the plan once, with your own choices each `"state": "done"`.\n\n';
   full += buildDataMapStep('atelier') + INTRODUCTION_QUESTION + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.
