@@ -201,13 +201,13 @@
       "digest": "sha256:9113ded5332f5d409d8dc74d"
     },
     "node:aimeat-app-builder": {
-      "reviewedOn": "2026-11-22",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/services/node/templates.ts",
         "aimeat/src/services/app/spec-gate.ts"
       ],
-      "digest": "sha256:857dfb301f223eaf18a5fcb3",
+      "digest": "sha256:ebc720cb2832104a0597b942",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
@@ -218,7 +218,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:92d7d013d4ce9359beda1c75"
+      "digest": "sha256:2cc16a54b829af1295e7db48"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:e3137f600b04c070771ba31e",
+      "digest": "sha256:5777c574d107d46d9dfc2d55",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -724,13 +724,13 @@
       "aimeat/src/services/app/publish-next-steps.ts": "a0b92ac4006caf40"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
+      "aimeat/src/services/builder/app-layers.ts": "4b582ff5f8ffa323",
       "aimeat/src/services/node/templates.ts": "09267eb5c518ab0c",
       "aimeat/src/services/app/spec-gate.ts": "95bb1883f65b8ebb"
     },
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/builder/atelier-prompt.ts": "ef55612fb42370bf",
-      "aimeat/src/services/builder/atelier-layers.ts": "de2eb1a20631506d",
+      "aimeat/src/services/builder/atelier-layers.ts": "dc5d544bd516761a",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "68c0e5a7e6d5edc9",
       "aimeat/src/services/design-book/component.ts": "12d4355f129e437f"
     },
@@ -840,7 +840,7 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
+      "aimeat/src/services/builder/app-layers.ts": "4b582ff5f8ffa323",
       "aimeat/src/routes/app-templates.ts": "0a8ffcc61866cb38",
       "aimeat/src/services/builder/atelier-prompt.ts": "ef55612fb42370bf",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
