@@ -10,6 +10,15 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- A workspace row says what is inside before it is opened: what it holds by
+ *     kind (documents first), its purpose and its three newest documents by title (one bounded index
+ *     read per readable workspace, workspace-peek.js), who works there and when it last changed; a
+ *     locked one says who decides, beside Request access. The last change is never named by its space
+ *     and id. The list's cut is name-desc-who-doors; "Who works here" moved into the row's menu. The
+ *     loud "+ New workspace" left the bar: it is the section head's plain action on the shared
+ *     place's page, which holds whether the name field shows (creating, onCreating). Import, the map
+ *     and the sort stand under the list. The menu items, the people panel and the map box have no
+ *     emoji, and an access request's message has no dash before it.
  *   v1.21.1 -- 2026-11-14 -- A team workspace's row is named in the reader's language (wsDisplayName, team setup T24).
  *   v1.21.0 -- 2026-11-08 -- The archived mark, the to-review mark and the archived fold's title have no
  *     emoji (no emoji in the interface).
@@ -73,7 +82,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { Mermaid } from '/components/Mermaid.js';
@@ -81,16 +90,16 @@ import { Box } from '/components/Box.js';
 import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Tab } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { Row as Line } from '/components/Layout.js';
-import { List, Row, Name, Cell, Lead, Stats, Stat, Doors } from '/components/List.js';
+import { List, Row, Name, Desc, Who, Doors } from '/components/List.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
-import { fmtDate, relTime, wsDisplayName } from '/views/profile/organisms/helpers.js';
+import { relTime, wsDisplayName } from '/views/profile/organisms/helpers.js';
+import { useWorkspacePeeks } from './workspace-peek.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
@@ -101,13 +110,17 @@ import { authHeaders } from '/js/services/auth.js';
  * lets the user create a new one (→ opens its setup/generate screen) or open/delete an existing one.
  * Rendered embedded in OrganismHome's Workspaces tab (the back/export topbar + organism title
  * moved to the home header). onCount reports the discovered workspace count for the tab badge. */
-export function WorkspaceList({ org, showToast, onOpen, onCount }) {
+export function WorkspaceList({ org, showToast, onOpen, onCount, creating: creatingProp, onCreating }) {
   const orgId = org.id;
   const { confirm, ConfirmUI } = useConfirm();
   const [list, setList] = useState(null);   // null = loading, or the first load failed (wsLoad.failed)
   const wsLoad = useLoadState();
   const { ok: wsLoadOk, fail: wsLoadFail } = wsLoad;
-  const [creating, setCreating] = useState(false);
+  // "+ New workspace" is the section head's action on the shared place's page, so the page may hold
+  // whether the name field shows (creating + onCreating); without them the list holds it itself.
+  const [creatingOwn, setCreatingOwn] = useState(false);
+  const creating = creatingProp ?? creatingOwn;
+  const setCreating = (v) => { if (onCreating) onCreating(v); else setCreatingOwn(v); };
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState('');           // organism dependency-overview chart (mermaid)
@@ -166,6 +179,13 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     return arr;
   }, [list, sortMode, customOrder]);
   const archivedList = useMemo(() => (list || []).filter(w => w.archived), [list]);
+  // Purpose and newest documents of every readable workspace the list shows (an archived one only
+  // while its fold is open): one bounded index read each, again only when the workspace changed.
+  const peekRows = useMemo(() => [...activeSorted, ...(archivedOpen ? archivedList : [])]
+    .filter(w => w.access !== 'none' && wsStats[w.id]?.hasManifest)
+    .map(w => { const s = wsStats[w.id]; return { id: w.id, sig: `${s.lastEv?.at || ''}:${s.recs}:${s.docs}` }; }),
+  [activeSorted, archivedList, archivedOpen, wsStats]);
+  const peeks = useWorkspacePeeks(orgId, peekRows);
 
   // Drop on a row: move the dragged workspace to the target's position; switch to manual order and save.
   const onDropRow = (targetId) => {
@@ -329,20 +349,36 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     } catch (e) { showToast((e && e.message) || 'Import failed'); }
     finally { setBusy(false); }
   };
-  // One enriched meta line per row: "{n} records · {n} docs · last: goal/x published 2 h ago".
-  const metaLine = (w) => {
+  // What a row says before the workspace is opened: what is in it by kind (documents first), its
+  // purpose and newest documents by title (the bounded index read, workspace-peek.js), who works
+  // there and when it last changed. A row never names an item by its space and id.
+  const countsLine = (w) => {
     const s = wsStats[w.id];
-    if (!s) return w.access === 'owner' ? (t('organisms.yours') || 'yours') : (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?');
-    if (!s.hasManifest) return t('organisms.wsNotSetUp') || 'new — set up when opened';
-    const parts = [
-      s.recs === 1 ? (t('organisms.recOne') || '1 record') : (t('organisms.recMany') || '{n} records').replace('{n}', String(s.recs)),
-      s.docs === 1 ? (t('organisms.docOne') || '1 document') : (t('organisms.docMany') || '{n} documents').replace('{n}', String(s.docs)),
-    ];
-    if (s.lastEv) {
-      const verb = s.lastEv.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited');
-      parts.push(`${t('organisms.lastLabel') || 'last:'} ${s.lastEv.type}/${s.lastEv.instance} ${verb} ${relTime(s.lastEv.at)}`);
-    } else parts.push(t('organisms.noActivityYet') || 'no activity yet');
-    return parts.join(' · ');
+    if (!s) return w.access === 'owner' ? t('organisms.yours') : t('organisms.byCreator', { creator: w.created_by || '?' });
+    if (!s.hasManifest) return t('organisms.wsNotSetUp');
+    if (!s.docs && !s.recs) return t('organisms.wsEmpty');
+    return [
+      s.docs ? (s.docs === 1 ? t('organisms.docOne') : t('organisms.docMany', { n: s.docs })) : null,
+      s.recs ? (s.recs === 1 ? t('organisms.recOne') : t('organisms.recMany', { n: s.recs })) : null,
+    ].filter(Boolean).join(' · ');
+  };
+  const newestLine = (w) => {
+    const newest = peeks[w.id]?.newest || [];
+    if (!newest.length) return undefined;
+    const titles = newest.map(d => (d.draft ? `${d.title} (${t('organisms.draft')})` : d.title));
+    return t('organisms.wsNewest', { titles: titles.join(' · ') });
+  };
+  const whoLine = (w) => {
+    const owners = wsStats[w.id]?.owners || [];
+    if (!owners.length) return '';
+    const names = owners.map(o => (o.isSelf ? t('organisms.you') : o.owner));
+    const shown = names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', ');
+    const agents = owners.reduce((n, o) => n + (o.agents || []).length, 0);
+    return agents ? `${shown} · ${tn('organisms.wsAgents', agents)}` : shown;
+  };
+  const whenLine = (w) => {
+    const ev = wsStats[w.id]?.lastEv;
+    return ev ? t('organisms.wsChanged', { when: relTime(ev.at) }) : t('organisms.noActivityYet');
   };
 
   // Who works in a workspace: one line per person, with their marks.
@@ -351,9 +387,12 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
       ${(wsStats[w.id]?.owners || []).map(o => html`
         <${Row} key=${'p-' + o.owner}>
           <${Name} tag=${[
-            o.isCreator ? html`<${Mark} key="c" tone="fine">${t('organisms.creatorTag') || 'creator'}<//>` : null,
-            o.isSelf ? html`<${Mark} key="y" tone="sun">${t('organisms.you') || 'you'}<//>` : null,
-          ]} after=${html`${!o.isLocalNode ? html` <${Note} kind="meta" inline>${'🌐 '}${(o.node)}<//>` : null}${(o.agents || []).length > 0 ? html` <${Note} kind="meta" inline>${'🤖'} ${(o.agents || []).length}<//>` : null}`}>${'👤 '}${(o.owner)}<//>
+            o.isCreator ? html`<${Mark} key="c" tone="fine">${t('organisms.creatorTag')}<//>` : null,
+            o.isSelf ? html`<${Mark} key="y" tone="sun">${t('organisms.you')}<//>` : null,
+          ]} meta=${[
+            !o.isLocalNode ? t('organisms.wsOnServer', { server: o.node }) : '',
+            (o.agents || []).length ? tn('organisms.wsAgents', (o.agents || []).length) : '',
+          ].filter(Boolean).join(' · ') || undefined}>${o.owner}<//>
         <//>`)}
     <//>`;
   // The access requests of a workspace the reader owns, each with its answer.
@@ -361,7 +400,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     <${List} cols="name-doors" dense empty=${t('organisms.noRequests') || 'No access requests.'}>
       ${reqInbox.map(r => html`
         <${Row} key=${r.requester}>
-          <${Name} desc=${r.message ? '— ' + r.message : undefined}>${(r.requester)}<//>
+          <${Name} desc=${r.message || undefined}>${(r.requester)}<//>
           <${Doors}>${r.status === 'approved'
             ? html`<${Mark} kind="status" tone="fine">✓ ${t('organisms.approved') || 'approved'}<//><${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}<//>`
             // A decided request shows its answer, never the two answer buttons again: a "no" keeps one
@@ -374,20 +413,26 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         <//>`)}
     <//>`;
 
+  // One workspace: its name with what is in it by kind, its purpose and newest documents, who works
+  // there and when it changed, and Open (or, locked, who decides and Request access).
   const renderWsRow = (w, canDrag) => {
     const locked = w.access === 'none';
     const reviews = apprByWs[w.id] || 0;
     const people = (wsStats[w.id]?.owners || []).length;
     const peopleOpen = openPeopleWs === w.id;
     const reqOpen = openReqWs === w.id;
-    const menuItems = w.access === 'owner' ? [
-      { label: t('organisms.requests') || 'Access requests', icon: '👥', onClick: () => toggleInbox(w) },
-      { label: t('organisms.export') || 'Export backup (.zip)', icon: '⬇', onClick: () => doExport(w) },
-      w.archived
-        ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => setArchived(w, false) }
-        : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => setArchived(w, true) },
-      { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
-    ] : [];
+    const menuItems = [
+      people > 0 ? { label: t('organisms.participants'), onClick: () => setOpenPeopleWs(p => (p === w.id ? null : w.id)) } : null,
+      ...(w.access === 'owner' ? [
+        { label: t('organisms.requests'), onClick: () => toggleInbox(w) },
+        { label: t('organisms.export'), onClick: () => doExport(w) },
+        w.archived
+          ? { label: t('organisms.unarchive'), onClick: () => setArchived(w, false) }
+          : { label: t('organisms.archive'), onClick: () => setArchived(w, true) },
+        { label: t('organisms.delete'), danger: true, onClick: () => remove(w.id, w.name || w.id) },
+      ] : []),
+    ].filter(Boolean);
+    const purpose = peeks[w.id]?.summary || '';
     return html`
       <${Row} key=${w.id} draggable=${canDrag} dragOver=${dragOverId === w.id}
         onDragStart=${canDrag ? ((e) => { dragIdRef.current = w.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
@@ -396,20 +441,17 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         onDrop=${canDrag ? (() => onDropRow(w.id)) : undefined}
         onDragEnd=${canDrag ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}
         open=${peopleOpen || reqOpen} panel=${html`${peopleOpen ? peopleList(w) : null}${reqOpen ? requestList(w) : null}`}>
-        <${Lead} text=${'🗂'} />
         <${Name} onOpen=${locked ? undefined : () => onOpen(w.id)}
-          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived: read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
-          meta=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}>${wsDisplayName(org, w.id, w.name || w.id)}<//>
-        <${Cell} line>${locked ? html`<span>${'🔒'}</span>` : null}<//>
-        <${Stats}>
-          ${people > 0 ? html`<${Stat}><${Tab} tone="fold" on=${peopleOpen} pressed=${peopleOpen} title=${t('organisms.participants') || 'Who works here'}
-            onClick=${(e) => { e.stopPropagation(); setOpenPeopleWs(p => (p === w.id ? null : w.id)); }}>${'👥'} ${people}<//><//>` : html`<${Stat} />`}
-          ${w.created_at ? html`<${Stat} date title=${t('organisms.createdAt') || 'Created'}>${fmtDate(w.created_at)}<//>` : null}
-        <//>
-        <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions') || 'More actions'}>
+          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint')}>${t('organisms.archived')}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${t('organisms.toReview').replace('{n}', String(reviews))}<//>` : null}`}
+          meta=${locked ? t('organisms.byCreator', { creator: w.created_by || '?' }) : countsLine(w)}>${wsDisplayName(org, w.id, w.name || w.id)}<//>
+        ${locked
+          ? html`<${Desc}>${t('organisms.wsLocked', { creator: w.created_by || '?' })}<//>`
+          : html`<${Desc} faint=${!purpose} sub=${newestLine(w)}>${purpose || '·'}<//>`}
+        <${Who} sub=${locked ? undefined : whenLine(w)}>${locked ? '' : whoLine(w)}<//>
+        <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions')}>
           ${locked
-            ? html`<${Action} small disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}<//>`
-            : html`<${Action} small onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}<//>`}
+            ? html`<${Action} small row disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess')}<//>`
+            : html`<${Action} small row onClick=${() => onOpen(w.id)}>${t('organisms.open')}<//>`}
         <//>
       <//>`;
   };
@@ -420,37 +462,41 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
       <${ConfirmUI} />
       <${FileDrop} hidden accept=".zip,application/zip" inputRef=${fileRef} onFiles=${([f]) => doImport(f)} />
 
-      <${Line} wrap below="medium">
-        ${creating ? html`
-          <${TextField} size="medium" autoFocus maxLength=${INPUT_LIMITS.name} placeholder=${t('organisms.workspaceName') || 'Workspace name'} ariaLabel=${t('organisms.workspaceName') || 'Workspace name'}
+      ${creating ? html`
+        <${Line} wrap below="medium">
+          <${TextField} size="medium" autoFocus maxLength=${INPUT_LIMITS.name} placeholder=${t('organisms.workspaceName')} ariaLabel=${t('organisms.workspaceName')}
             value=${newName} onInput=${setNewName} onEnter=${create} />
-          <${Loud} control onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}<//>
-          <${Action} small onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}<//>
-        ` : html`
-          <${Loud} control onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}<//>
-          <${Action} small disabled=${busy} title=${importWords} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}<//>
-          ${overview ? html`<${Action} small expanded=${showOverview} onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}<//>` : null}
-          ${activeSorted.length > 1 ? html`
-            <${Select} fit title=${t('organisms.sortTitle') || 'Sort'} ariaLabel=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
-              onChange=${(m) => { setSortMode(m); savePrefs(customOrder, m); }}
-              options=${[['custom', t('organisms.sortCustom') || 'My order'], ['name', t('organisms.sortName') || 'Name A–Z'], ['newest', t('organisms.sortNewest') || 'Newest first']]} />` : null}`}
-      <//>
-
-      <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
+          <${Loud} control onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create')}<//>
+          <${Action} small onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel')}<//>
+        <//>` : null}
 
       ${list === null ? (wsLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${Note} kind="loading" />`)
-        : list.length === 0 ? html`<${Note} kind="quiet">${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'}<//>`
+        : list.length === 0 ? html`<${Note} kind="quiet">${t('organisms.noWorkspaces')}<//>`
         : html`
-          <${List} cols="mark-name-tags-stats-doors" keepCols>${activeSorted.map(w => renderWsRow(w, true))}<//>
+          <${List} cols="name-desc-who-doors">${activeSorted.map(w => renderWsRow(w, true))}<//>
           ${sortMode === 'custom' && activeSorted.length > 1 ? html`
             <${Note}>${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}
           ${archivedList.length > 0 ? html`
             <${FoldSection} num="" title=${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archivedList.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
-              <${List} cols="mark-name-tags-stats-doors" keepCols>${archivedList.map(w => renderWsRow(w, false))}<//>
+              <${List} cols="name-desc-who-doors">${archivedList.map(w => renderWsRow(w, false))}<//>
             <//>` : null}`}
 
+      ${list && list.length ? html`
+        <${Line} wrap above="small">
+          <${Action} small soft disabled=${busy} title=${importWords} onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.import')}<//>
+          ${overview ? html`<${Action} small soft expanded=${showOverview} onClick=${() => setShowOverview(s => !s)}>${t('organisms.showMap')}<//>` : null}
+          ${activeSorted.length > 1 ? html`
+            <${Select} fit title=${t('organisms.sortTitle')} ariaLabel=${t('organisms.sortTitle')} value=${sortMode}
+              onChange=${(m) => { setSortMode(m); savePrefs(customOrder, m); }}
+              options=${[['custom', t('organisms.sortCustom')], ['name', t('organisms.sortName')], ['newest', t('organisms.sortNewest')]]} />` : null}
+        <//>
+        <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />` : html`
+        <${Line} wrap above="small">
+          <${Action} small soft disabled=${busy} title=${importWords} onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.import')}<//>
+        <//>`}
+
       ${overview && showOverview ? html`
-        <${Box} name=${'🔗 ' + (t('organisms.overview') || 'Overview — who & what uses this organism')}
+        <${Box} name=${t('organisms.overview')}
           end=${html`<${Action} small onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}<//>`}>
           <${Mermaid} chart=${overview} />
         <//>` : null}

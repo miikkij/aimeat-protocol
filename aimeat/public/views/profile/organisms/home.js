@@ -2,17 +2,27 @@
  * @file home.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Organism home page in the poster face (design canvas "AIMEAT Organismin sivu",
- *   direction A "Kansi ja sisällys"). One page that answers, in order: what is here (workspaces),
- *   who is here (members, agents), what has happened (the latest changes), how to bring an AI in
- *   (the instruction block), and only then how it is run (settings, a page of its own). A masthead
- *   with the name, the chips and the description, a strip of four figures, the sections under ink
- *   rules, and a sticky contents rail on the right that names each section with its count. The map
- *   and the table of contents are one folded row (two views of the same structure), the README
- *   another, and the AI instruction a third, opened by the hot slab in the masthead.
+ * @description One shared place's page (an organism) in the poster face. It answers, in order: what
+ *   is here (the workspaces, always open, each row saying what is inside before it is entered), what
+ *   waits for this person (a line in the band under the figures, red only for what this person
+ *   decides, and the waiting list itself after the workspaces), who is here (Members and Agents as
+ *   two rows that say their state), and what the place is about (README, Board, What has happened,
+ *   the map, the AI instruction, the directive and the measures, one row each that says its state
+ *   and opens in place). How it is run (settings) is a page of its own. One loud action, "For your
+ *   AI", opens the AI instruction's row. The rows are home-rows.js.
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v4.0.0 -- 2026-11-27 -- The page leads with its workspaces. What waits for the person is a line in
+ *     the band under the figures (red only for what this person decides: a request to join, an
+ *     approval of their own place), and the approvals or a team's three sections follow the
+ *     workspaces instead of pushing them down. Members and Agents are two rows under "People and
+ *     agents"; README, Board, What has happened, the map, Bring your AI here, the directive and the
+ *     measures are rows under "About this place" that say their state in one sentence and open in
+ *     place (home-rows.js). "+ New workspace" is a plain action in the Workspaces head, and "For your
+ *     AI" turns quiet while the new workspace's name is asked. The rail says "In this shared place".
+ *     One extra read: the board's newest notice and its count (GET /v1/boards/:id/posts?limit=1),
+ *     with the page's other reads and on the same live event.
  *   v3.16.0 -- 2026-11-26 -- The page of an organism that is not a team starts with the approvals that
  *     wait in it (approvals-section.js), decided on the row; the sections after it are numbered one
  *     higher while there is one. The waiting list opens this page for an approval with no workspace.
@@ -52,27 +62,19 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t, tOr } from '/js/i18n.js';
+import { t, tn, tOr } from '/js/i18n.js';
+import { apiGet } from '/js/api.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { recordRecent } from '/js/recents.js';
 import { fmtDate, orgName, orgDescription, exportOrganismZip } from '/views/profile/organisms/helpers.js';
-import { StructureOverview } from '/views/profile/organisms/widgets.js';
-import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
-import { DirectivePanel } from '/views/profile/organisms/directive-panel.js';
-import { MeasuresPanel } from '/views/profile/organisms/measures-panel.js';
-import { PerMemberNotice } from '/views/profile/organisms/per-member-setting.js';
-import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
-import { TimelinePanel, TimelineRecent, loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
+import { loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
-import { OrgMemberManager } from '/views/profile/organisms/members.js';
-import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
-import { BoardPreview } from '/views/profile/organisms/panels.js';
-import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { useTeam, TeamSections } from '/views/profile/organisms/team-sections.js';
 import { OrgApprovals } from './approvals-section.js';
+import { peopleSection, aboutSection } from './home-rows.js';
 import { swallowed } from '/js/swallowed.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -84,6 +86,8 @@ import { Row } from '/components/Layout.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { tr } from '/views/profile/organisms/poster-parts.js';
 
+const pad = (n) => String(n).padStart(2, '0');
+
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
   useViewCSS('/css/views/organism.css');
   const { confirm, ConfirmUI } = useConfirm();
@@ -91,18 +95,20 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [wsCount, setWsCount] = useState(null);
   const [pendingJoin, setPendingJoin] = useState(0);
   // How many approvals wait in this organism (approvals-section.js tells it): with one or more the
-  // page starts with their section, and every section after it is numbered one higher.
+  // band says so and their section follows the workspaces.
   const [approvalCount, setApprovalCount] = useState(0);
-  const [openReadme, setOpenReadme] = useState(false);
-  const [openMap, setOpenMap] = useState(false);
-  const [openAi, setOpenAi] = useState(false);
-  const [openDirective, setOpenDirective] = useState(false);
-  const [openMeasures, setOpenMeasures] = useState(false);
+  // Which rows under "People and agents" and "About this place" are open (home-rows.js).
+  const [opened, setOpened] = useState({});
+  const toggle = (key) => setOpened(o => ({ ...o, [key]: !o[key] }));
+  const openRow = (key) => setOpened(o => ({ ...o, [key]: true }));
+  // "+ New workspace" in the Workspaces head shows the name field in the list (workspace-list.js).
+  const [creatingWs, setCreatingWs] = useState(false);
   // While the creators see the value report per member, every member is told so with their own numbers.
   const [perMember, setPerMember] = useState(null);
   const [directive, setDirective] = useState({ directives: null, summary: null });
   const [fullTimeline, setFullTimeline] = useState(false);
   const [timeline, setTimeline] = useState(null);
+  const [board, setBoard] = useState(null);   // { n, newest } of the organism's board
   const team = useTeam(org);
 
   // Ownership is plural. `owners` is the truth; `creatorGhii` is the deprecated mirror of owners[0]
@@ -118,18 +124,21 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const typeLabel = tOr(`organisms.types.${org.type}`, org.type);
 
   // README, the structure graph (the map's data), the table-of-contents seed for the README prompt,
-  // and the history rows. Loaded together and refreshed on live updates.
+  // the history rows and the board's newest notice. Loaded together and refreshed on live updates.
   const [readme, setReadme] = useState(org.readme || '');
   const [graph, setGraph] = useState(null);
   const [tocSeed, setTocSeed] = useState('');
   useEffect(() => {
     let cancelled = false;
     const loadExtras = async () => {
-      const [g, full, toc, rows] = await Promise.all([
+      const [g, full, toc, rows, posts] = await Promise.all([
         orgService.getOrganismGraph(org.id),
         orgService.getOrganism(org.id),
         orgService.getOrganismOverview(org.id),
         loadTimelineRows(org.id).catch(err => { swallowed('home: timeline', err); return []; }),
+        org.boardId
+          ? apiGet(`/v1/boards/${encodeURIComponent(org.boardId)}/posts?limit=1`).catch(err => { swallowed('home: board', err); return null; })
+          : Promise.resolve(null),
       ]);
       if (cancelled) return;
       setGraph(g);
@@ -139,11 +148,13 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       setPerMember(full?.data?.value_per_member ?? null);
       setTocSeed(toc || '');
       setTimeline(rows);
+      const p = posts?.data;
+      setBoard(p ? { n: Number(p.total ?? (p.posts || []).length) || 0, newest: p.posts?.[0]?.created_at || null } : null);
     };
     loadExtras();
     const off = onLiveUpdate(['organisms'], loadExtras);
     return () => { cancelled = true; off(); };
-  }, [org.id]);
+  }, [org.id, org.boardId]);
 
   const saveReadme = async (md) => {
     await orgService.updateOrganism(org.id, { readme: md });
@@ -153,7 +164,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
   // A map node opens what it names: a workspace, a space's tab in its workspace, or the members.
   const onMapNav = (target) => {
-    if (target?.type === 'members') scrollToSection('og-members');
+    if (target?.type === 'members') { openRow('members'); setTimeout(() => scrollToSection('og-members'), 30); }
     else if (target?.wsId) onOpenWs(target.wsId, target.type === 'space' ? target.space : undefined);
   };
 
@@ -188,50 +199,51 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const last = timeline && timeline[0];
   const memberCount = (org.members || []).length;
   const agentCount = (org.agentGaiis || []).length;
-  const openAiSection = () => { setOpenAi(true); setTimeout(() => scrollToSection('og-ai'), 30); };
-  const readmeTitle = (readme.match(/^#\s+(.+)$/m) || [])[1] || '';
-  // The directive section: for a member when there is one, and always for its creators, who make it.
+  const goTo = (key, id) => { openRow(key); setTimeout(() => scrollToSection(id), 30); };
+  // The directive row: for a member when there is one, and always for its creators, who make it.
   const showDirective = canEdit || !!directive.directives;
-  // A team's page opens with its three sections (team-sections.js), and the organism's own follow.
-  // Without a team, the approvals that wait come first when there are any (a team's own waiting
-  // section names the team's approvals).
-  const approvalsFirst = !team && approvalCount > 0;
-  const shift = team ? 3 : approvalsFirst ? 1 : 0;
-  const num = (i) => String(i + shift).padStart(2, '0');
-  const teamRail = team ? [
-    { id: 'og-team-waiting', num: num(-2), label: t('organisms.team.waitingTitle'), count: team.items.length + team.approvals.length },
-    { id: 'og-team-brain', num: num(-1), label: t('organisms.team.brainTitle'), count: '·' },
-    { id: 'og-team-you', num: num(0), label: t('organisms.team.youTitle'), count: '·' },
-  ] : [];
-  // The rail: every section scrolls into view (the three folds open first), then Settings, a page of its own.
-  const sections = [
-    ...teamRail,
-    ...(approvalsFirst ? [{ id: 'og-approvals', num: num(0), label: t('organisms.approvals.title'), count: approvalCount }] : []),
-    { id: 'og-workspaces', num: num(1), label: tr('organisms.tabWorkspaces', 'Workspaces'), count: wsCount ?? '' },
-    { id: 'og-members', num: num(2), label: tr('organisms.tabMembers', 'Members'), count: memberCount },
-    { id: 'og-agents', num: num(3), label: tr('organisms.tabAgents', 'Agents'), count: agentCount },
-    { id: 'og-board', num: num(4), label: tr('organisms.tabBoard', 'Board'), count: '·' },
-    { id: 'og-history', num: num(5), label: tr('organisms.happened', 'What has happened'), count: timeline ? timeline.length : '' },
-    { id: 'og-readme', num: num(6), label: tr('organisms.readmeFold', 'README'), count: '→', open: () => setOpenReadme(true) },
-    { id: 'og-map', num: num(7), label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', open: () => setOpenMap(true) },
-    { id: 'og-ai', num: num(8), label: tr('organisms.forAi', 'For your AI'), count: '→', open: () => setOpenAi(true) },
-    ...(showDirective ? [{ id: 'og-directive', num: num(9), label: t('organisms.directive.title'), count: directive.summary?.review_due ? '!' : '→', open: () => setOpenDirective(true) }] : []),
-    // The organism's own measures: its creators and admins read the organism's report, so only they see them.
-    ...(canEdit ? [{ id: 'og-measures', num: num(10), label: t('organisms.measures.title'), count: '→', open: () => setOpenMeasures(true) }] : []),
-  ].map((s) => ({ ...s, href: '#' + s.id }));
-  const railTitle = tr('organisms.railTitle', 'In this organism');
+
+  // The sections in order, numbered as they are drawn: the workspaces, what waits (a team's three
+  // sections, or the approvals while any wait), the people, and the place itself.
+  const waitingParts = team ? [
+    { id: 'og-team-waiting', label: t('organisms.team.waitingTitle'), count: team.items.length + team.approvals.length },
+    { id: 'og-team-brain', label: t('organisms.team.brainTitle'), count: '·' },
+    { id: 'og-team-you', label: t('organisms.team.youTitle'), count: '·' },
+  ] : approvalCount > 0 ? [{ id: 'og-approvals', label: t('organisms.approvals.title'), count: approvalCount }] : [];
+  const parts = [
+    { id: 'og-workspaces', label: tr('organisms.tabWorkspaces', 'Workspaces'), count: wsCount ?? '' },
+    ...waitingParts,
+    { id: 'og-people', label: t('organisms.place.peopleTitle'), count: memberCount + agentCount },
+    { id: 'og-about', label: t('organisms.place.aboutTitle'), count: '→' },
+  ].map((s, i) => ({ ...s, num: pad(i + 1), href: '#' + s.id }));
+  const numOf = (id) => parts.find(s => s.id === id)?.num || '';
+  const railTitle = tr('organisms.railTitle', 'In this shared place');
   const rail = {
     title: railTitle,
     groups: [
-      { label: railTitle, items: sections.map(railSection) },
-      { items: [{ key: 'settings', mark: num(9 + (showDirective ? 1 : 0) + (canEdit ? 1 : 0)), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
+      { label: railTitle, items: parts.map(railSection) },
+      { items: [{ key: 'settings', mark: '·', label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
     ],
   };
   const visWord = t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility;
 
+  // What waits for this person, said in the band under the figures. Red only for what this person
+  // decides: a request to join or an approval in a place they run.
+  const teamWaits = team ? team.items.length + team.approvals.length : 0;
+  const waits = [
+    canEdit && pendingJoin > 0 ? { key: 'join', tone: 'danger', words: tn('organisms.place.bandJoin', pendingJoin), go: () => goTo('members', 'og-members') } : null,
+    !team && approvalCount > 0 ? { key: 'appr', tone: canEdit ? 'danger' : 'attention', words: tn('organisms.place.bandApprovals', approvalCount), go: () => scrollToSection('og-approvals') } : null,
+    teamWaits > 0 ? { key: 'team', tone: team.approvals.length ? 'danger' : 'attention', words: tn('organisms.place.bandTeam', teamWaits), go: () => scrollToSection('og-team-waiting') } : null,
+  ].filter(Boolean);
+  const band = waits.map(w => html`
+    <${Note} key=${w.key} kind="state" tone=${w.tone}>${w.words} <${Action} tone="inline" small onClick=${w.go}>${t('organisms.place.bandShow')}<//><//>`);
+
+  const peopleProps = { org, ghii, canEdit, isCreator, showToast, confirm, onChanged, perMember, memberCount, agentCount, pendingJoin, opened, toggle };
+  const aboutProps = { org, canEdit, showToast, readme, tocSeed, saveReadme, timeline, board, graph, onMapNav, directive, showDirective, fullTimeline, setFullTimeline, opened, toggle };
+
   return html`
     <${SettingsPage}
-      crumb=${[{ label: tr('organisms.title', 'Organisms'), onClick: onBack }, orgName(org)]}
+      crumb=${[{ label: tr('organisms.title', 'Shared places'), onClick: onBack }, orgName(org)]}
       title=${orgName(org)}
       marks=${[
         { label: typeLabel },
@@ -242,82 +254,32 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       ]}
       desc=${orgDescription(org) || null}
       actions=${html`
-        <${Loud} onClick=${openAiSection}>${tr('organisms.forAi', 'For your AI')}<//>
+        <${Loud} quiet=${creatingWs} onClick=${() => goTo('ai', 'og-ai')}>${tr('organisms.forAi', 'For your AI')}<//>
         <${Actions}>
           <${Action} small onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')}<//>
           <${Action} small soft onClick=${() => exportOrganismZip(org, showToast)}>${tr('organisms.exportBackup', 'Export backup')}<//>
         <//>`}
       strip=${html`<${FigureStrip} items=${[
         { key: 'ws', n: wsCount ?? '·', label: tr('organisms.figWorkspaces', 'workspaces') },
-        { key: 'members', n: memberCount, label: tr('organisms.figMembers', 'members'), sub: reqText || undefined },
+        { key: 'members', n: memberCount, label: tr('organisms.figMembers', 'members'), sub: reqText || undefined, tone: canEdit && pendingJoin ? 'notice' : undefined },
         { key: 'agents', n: agentCount, label: tr('organisms.figAgents', 'agents') },
         { key: 'last', n: last ? (last.isCurrent ? tr('timeline.now', 'now') : String(last.at).slice(0, 10)) : '·', tone: last ? 'coral' : undefined,
           label: tr('organisms.figLast', 'last change'), sub: last ? last.event : undefined },
-      ]} />`}
+      ]} />${band}`}
       rail=${rail}
       after=${html`<${ConfirmUI} />`}>
-      ${team ? html`<${TeamSections} team=${team} me=${ghii} num=${(i) => num(i - 3)} />` : html`
-        <${OrgApprovals} org=${org} ghii=${ghii} isCreator=${isCreator} isAdmin=${isAdmin} showToast=${showToast}
-          onOpenWs=${onOpenWs} id="og-approvals" num=${num(0)} first onCount=${setApprovalCount} />`}
-      <${Section} id="og-workspaces" num=${num(1)} first=${!team && !approvalsFirst} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
-        <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
+      <${Section} id="og-workspaces" num=${numOf('og-workspaces')} first title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}
+        doors=${creatingWs ? null : html`<${Action} small soft onClick=${() => setCreatingWs(true)}>${'+ '}${tr('organisms.newWorkspace', 'New workspace')}<//>`}>
+        <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} creating=${creatingWs} onCreating=${setCreatingWs} />
         <${Row} align="end">
-          <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>
+          <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is one subject inside a shared place, with its own readers.')}<//>
           <${HelpTip} term="concept.workspace" label=${tr('organisms.tabWorkspaces', 'Workspaces')} />
         <//>
       <//>
-
-      <${Section} id="og-members" num=${num(2)} title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
-        <${PerMemberNotice} info=${perMember} />
-        <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
-          showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />
-      <//>
-
-      <${Section} id="og-agents" num=${num(3)} title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
-        <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />
-      <//>
-
-      <${Section} id="og-board" num=${num(4)} title=${tr('organisms.tabBoard', 'Board')}>
-        ${org.boardId
-          ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
-          : html`<${Note}>${tr('organisms.noBoard', 'This organism has no board.')}<//>`}
-      <//>
-
-      <${Section} id="og-history" num=${num(5)} title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
-        doors=${fullTimeline ? null : html`<${Action} small soft onClick=${() => setFullTimeline(true)}>${tr('organisms.fullTimeline', 'Full timeline →')}<//>`}>
-        ${fullTimeline ? html`<${TimelinePanel} orgId=${org.id} defaultOpen=${true} />` : html`<${TimelineRecent} rows=${timeline} limit=${5} />`}
-      <//>
-
-      <${Section} fold wrap id="og-readme" num=${num(6)} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
-        ${readme || canEdit
-          ? html`<${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name} aiPromptSeed=${tocSeed} onSave=${saveReadme} />`
-          : html`<${Note}>${tr('organisms.readmeEmpty', 'No README yet.')}<//>`}
-      <//>
-
-      <${Section} fold id="og-map" num=${num(7)} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
-        <${Note}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
-        <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
-        <${Actions}><${Action} href=${`/v1/home?overview=1&focus=${encodeURIComponent(`organism:${org.id}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//><//>
-        <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure: table of contents')}
-          load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
-      <//>
-
-      <${Section} fold wrap id="og-ai" num=${num(8)} title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
-        <${Note} kind="lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}<//>
-        <${InstructionBlock} orgId=${org.id} />
-      <//>
-
-      ${showDirective ? html`
-        <${Section} fold wrap id="og-directive" num=${num(9)} title=${t('organisms.directive.title')} sub=${t('organisms.directive.sub')}
-          open=${openDirective} onToggle=${() => setOpenDirective(o => !o)}>
-          <${DirectivePanel} org=${org} directives=${directive.directives} summary=${directive.summary} canEdit=${canEdit} />
-        <//>` : null}
-
-      ${canEdit ? html`
-        <${Section} fold wrap id="og-measures" num=${num(10)} title=${t('organisms.measures.title')} sub=${t('organisms.measures.sub')}
-          open=${openMeasures} onToggle=${() => setOpenMeasures(o => !o)}>
-          ${/* Read when opened: the organism's report is counted on demand, never on every page load. */''}
-          ${openMeasures ? html`<${MeasuresPanel} org=${org} />` : null}
-        <//>` : null}
+      ${team ? html`<${TeamSections} team=${team} me=${ghii} first=${false} num=${(i) => numOf(['og-team-waiting', 'og-team-brain', 'og-team-you'][i - 1])} />` : html`
+        <${OrgApprovals} org=${org} ghii=${ghii} isCreator=${isCreator} isAdmin=${isAdmin} showToast=${showToast}
+          onOpenWs=${onOpenWs} id="og-approvals" num=${numOf('og-approvals')} onCount=${setApprovalCount} />`}
+      ${peopleSection({ ...peopleProps, num: numOf('og-people') })}
+      ${aboutSection({ ...aboutProps, num: numOf('og-about') })}
     <//>`;
 }

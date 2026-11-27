@@ -14,6 +14,8 @@
  * @structure useTeam · PromptPath · TeamSections
  * @usage const team = useTeam(org); … ${team ? html`<${TeamSections} team=${team} me=${owner} num=${num} />` : null}
  * @version-history
+ *   v1.2.0 — 2026-11-27 — TeamSections takes `first`: the shared place's page draws the three sections
+ *     after its workspaces, so the first of them has a rule over it there; additive.
  *   v1.1.0 — 2026-11-15 — "You in this team" says whether you went through the team's AI onboarding (T11).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T14, T15).
  */
@@ -107,10 +109,11 @@ function when(iso) {
 }
 
 /**
- * The three sections, numbered from `num(1)`.
- * @param {{ team: any, me: string, num: (i: number) => string }} p
+ * The three sections, numbered from `num(1)`. `first` (default true): the first of them opens the
+ * page, with no rule over it; the shared place's page draws them after its workspaces and passes false.
+ * @param {{ team: any, me: string, num: (i: number) => string, first?: boolean }} p
  */
-export function TeamSections({ team, me, num }) {
+export function TeamSections({ team, me, num, first = true }) {
   const { status, items, approvals } = team;
   const orgHref = (ws) => `/v1/profile?tab=organisms&org=${encodeURIComponent(status.organism_id)}${ws ? `&ws=${encodeURIComponent(ws)}` : ''}`;
   const waitingRows = [
@@ -122,7 +125,7 @@ export function TeamSections({ team, me, num }) {
   const ctx = status.context;
   const ws = status.workspaces ?? {};
   return html`
-    <${Section} id="og-team-waiting" num=${num(1)} first=${true} title=${x('waitingTitle')} count=${waitingRows.length}>
+    <${Section} id="og-team-waiting" num=${num(1)} first=${first} title=${x('waitingTitle')} count=${waitingRows.length}>
       ${waitingRows.length
         ? html`<${LineList} rows=${waitingRows} />`
         : html`<${Note}>${x('waitingNone')}<//>`}

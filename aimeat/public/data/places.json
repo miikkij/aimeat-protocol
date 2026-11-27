@@ -15,13 +15,15 @@
         ] },
         { "id": "organisms", "labelKey": "profile.tabs.organisms", "sections": [
           { "id": "og-workspaces", "num": "01", "labelKey": "organisms.tabWorkspaces" },
-          { "id": "og-members", "num": "02", "labelKey": "organisms.tabMembers" },
-          { "id": "og-agents", "num": "03", "labelKey": "organisms.tabAgents" },
-          { "id": "og-board", "num": "04", "labelKey": "organisms.tabBoard" },
-          { "id": "og-history", "num": "05", "labelKey": "organisms.happened" },
-          { "id": "og-readme", "num": "06", "labelKey": "organisms.readmeFold" },
-          { "id": "og-map", "num": "07", "labelKey": "organisms.mapAndToc" },
-          { "id": "og-ai", "num": "08", "labelKey": "organisms.forAi" }
+          { "id": "og-people", "num": "02", "labelKey": "organisms.place.peopleTitle" },
+          { "id": "og-members", "num": "02.1", "labelKey": "organisms.tabMembers" },
+          { "id": "og-agents", "num": "02.2", "labelKey": "organisms.tabAgents" },
+          { "id": "og-about", "num": "03", "labelKey": "organisms.place.aboutTitle" },
+          { "id": "og-readme", "num": "03.1", "labelKey": "organisms.readmeFold" },
+          { "id": "og-board", "num": "03.2", "labelKey": "organisms.tabBoard" },
+          { "id": "og-history", "num": "03.3", "labelKey": "organisms.happened" },
+          { "id": "og-map", "num": "03.4", "labelKey": "organisms.mapAndToc" },
+          { "id": "og-ai", "num": "03.5", "labelKey": "organisms.forAiTitle" }
         ] },
         { "id": "memory", "labelKey": "profile.tabs.memory" },
         { "id": "contexts", "labelKey": "profile.tabs.contexts", "sections": [

@@ -11,6 +11,8 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.6.0 -- 2026-11-27 -- The document spaces' group comes before the records' group, so the tree and
+ *     a space page's rail list documents first, as the cover does.
  *   v1.5.1 -- 2026-11-14 -- The crumb names a team in the reader's language (orgName, team setup T24).
  *   v1.5.0 -- 2026-10-16 -- isDocPublic reads the share's end dates (`until`), as the node does.
  *   v1.4.0 -- 2026-09-26 -- buildBreadcrumb returns the crumb's steps as data for the library's Crumb
@@ -143,9 +145,11 @@ export function buildWorkspaceModel(ctx) {
     id, kind: 'stacked', label, desc, spaces, members: spaces.map(spaceTab),
     count: spaces.reduce((n, ot) => n + (orgService.isMemorySpace(ot) ? spaceCount(ot.name) : 0), 0) || null,
   });
+  // Documents before records: a person opens a workspace to read its pages first, so the tree and
+  // the space pages' rail list the document spaces first (the cover draws the same order).
   const groups = [{ id: 'related', kind: 'related', label: t('organisms.groupRelated') || 'Workspace', members: relatedMembers }];
-  if (recordTypes.length) groups.push(stackedGroup('group:records', t('organisms.groupRecords') || 'Records', t('organisms.groupRecordsDesc') || '', recordTypes));
   if (docSpaceTypes.length) groups.push(stackedGroup('group:documents', t('organisms.groupDocs') || 'Document spaces', t('organisms.groupDocsDesc') || '', docSpaceTypes));
+  if (recordTypes.length) groups.push(stackedGroup('group:records', t('organisms.groupRecords') || 'Records', t('organisms.groupRecordsDesc') || '', recordTypes));
   for (const cid of contractIds) {
     groups.push(stackedGroup('group:contract:' + cid, cid,
       (t('organisms.groupContractDesc') || 'Spaces provided by the {id} contract.').replace('{id}', cid),

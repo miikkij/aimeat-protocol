@@ -10,6 +10,9 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-11-27 — The cover's README, map and AI folds become one map of open rows (wsRows, for the
+ *     "Workspace" rows of workspace/cover-sections.js); the suggestions that wait here are read
+ *     (workspace-suggestions.js) and loadShare is passed so the Share row loads what it shows.
  *   2026-11-14 — A team workspace and its team are named in the reader's language (wsDisplayName, orgName; team setup T24).
  *   2026-10-16 — A page saved with "An AI made this" ticked carries the declaration as its provenance (js/page-authorship.js).
  *   2026-10-16 — An HTML page is saved through the drafts route (js/services/html-pages.js), which checks it and writes its text.
@@ -102,6 +105,7 @@ import { swallowed } from '/js/swallowed.js';
 import { LoadFailed } from '/js/load-state.js';
 import { WS_FAILED, nextWorkspaceState } from './workspace-load.js';
 import { useWorkspaceOpenDoc } from './workspace-open-doc.js';
+import { useWorkspaceSuggestions } from './workspace-suggestions.js';
 
 /** A refusal from a member change door, as the page says it: with the node's own reason. */
 const refusedText = (e) => (t('organisms.change.refused') || 'Not saved: {reason}').replace('{reason}', (e && e.message) || '');
@@ -182,11 +186,14 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [shareBusy, setShareBusy] = useState(false);
   const [sharePw, setSharePw] = useState('');                 // share-password input (never stored beyond the PUT)
   const [wsEvents, setWsEvents] = useState([]);               // activity events — the cover's strip and sections + per-space unseen marks
-  // The cover's three folds and its search row (cover.js). Closed until asked for, like the organism's.
-  const [openReadme, setOpenReadme] = useState(false);
-  const [openMap, setOpenMap] = useState(false);
-  const [openAi, setOpenAi] = useState(false);
+  // Which of the cover's "Workspace" rows are open (cover-sections.js), and its search row. Closed
+  // until asked for, like the shared place's rows.
+  const [wsRows, setWsRows] = useState({});
+  const toggleWsRow = (key) => setWsRows(o => ({ ...o, [key]: !o[key] }));
+  const openWsRow = (key) => setWsRows(o => ({ ...o, [key]: true }));
   const [showSearch, setShowSearch] = useState(false);
+  // The members' suggestions that wait here, for the cover's Suggestions row.
+  const { suggestions, decideSuggestion } = useWorkspaceSuggestions(orgId, wsId, showToast);
   // "Show as a tree": the rail swapped for the whole structure. A personal reading choice, so it
   // lives in the same home.prefs record as the margin pattern and follows the person to every workspace.
   const { prefs, writePrefs } = useHomePrefs();
@@ -756,7 +763,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     onBack, onBackToList, activeDoc, setActiveDoc, expandedSeries, setExpandedSeries, editingSec, setEditingSec,
     expandedRec, setExpandedRec, adding, addingId, addingSchema, addingInitial,
     sectionsByType, wsEvents, wsObjectives, wsGraph, wsTocSeed, saveWsReadme, onWsMapNav,
-    openReadme, setOpenReadme, openMap, setOpenMap, openAi, setOpenAi, showSearch, setShowSearch, railTree, setRailTree,
+    wsRows, toggleWsRow, openWsRow, suggestions, decideSuggestion, loadShare, showSearch, setShowSearch, railTree, setRailTree,
     share, shareBusy, sharePw, setSharePw, gateOn, showFlow, setShowFlow, showRegenerate, setShowRegenerate,
     delConfirm, setDelConfirm, sName, setSName, sSummary, setSSummary, sAutonomy, setSAutonomy,
     newSpaceName, setNewSpaceName, genBusy, setGenBusy, wsQuery, wsHits, wsSearching, setWsQuery, setWsHits,

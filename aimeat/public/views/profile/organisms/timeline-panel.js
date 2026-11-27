@@ -10,6 +10,8 @@
  * @structure TimelinePanel({ orgId })
  * @usage import { TimelinePanel } from '/views/profile/organisms/timeline-panel.js';
  * @version-history
+ *   v1.8.0 — 2026-11-27 — A history entry and its counts are in the reader's words (timeline-words.js):
+ *     the rows showed the node's English log line and "0 ws · 0d · 0r · 2" with an emoji.
  *   v1.7.0 — 2026-09-26 — Every part is a kit component (page group G2a): the latest rows are the Folds and FoldRow, the panel's body the Box, the timeline with its snapshot map the SnapshotTimeline (components/SnapshotTimeline.js, its own sheet), the loading line the Note, the empty and "pick a point" lines the section description (HeadDesc). The page writes no class.
  *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.5.0 — 2026-09-26 — Not opened by its parent, the timeline opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
@@ -36,13 +38,15 @@ import { HeadDesc } from '/components/SubHeading.js';
 import { SnapshotTimeline } from '/components/SnapshotTimeline.js';
 import { getStructureHistory } from '/js/services/organisms.js';
 import { buildOrganismMindmap } from '/views/profile/organisms/mindmap.js';
+import { timelineWords, totalsWords } from './timeline-words.js';
 
 /** A fingerprint value looks like { fingerprint, _event, _diff, _recordedAt }. Pull a display row. */
 function row(entry) {
   const v = entry?.value || {};
   return {
     version: entry.version,
-    event: v._event || v._diff || t('timeline.changed') || 'structure changed',
+    // The node's log line is English for an AI; the person reads it in their own words.
+    event: timelineWords(v._event || v._diff || ''),
     at: v._recordedAt || entry.recordedAt || '',
     actor: entry.actor || v._actor || '',
     fingerprint: v.fingerprint || null,
@@ -103,7 +107,7 @@ export function TimelineRecent({ rows, limit = 5 }) {
         return html`<${FoldRow} key=${r.fingerprint + r.at} kind="row"
           num=${r.isCurrent ? (t('timeline.now') || 'now') : String(r.at).slice(0, 10)}
           name=${r.event}
-          right=${tt ? `${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}` : null} />`;
+          right=${totalsWords(tt)} />`;
       })}
     <//>`;
 }
@@ -146,7 +150,7 @@ export function TimelinePanel({ orgId, defaultOpen = false }) {
                       key: String(r.at) + ':' + i,
                       date: `${String(r.at).slice(0, 10) || '—'}${r.isCurrent ? ` · ${t('timeline.now') || 'now'}` : ''}`,
                       event: r.event,
-                      counts: tt ? `${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}👤` : null,
+                      counts: totalsWords(tt),
                       on: selected === r.fingerprint,
                       onPick: () => setSelected(r.fingerprint),
                     };
