@@ -36,6 +36,7 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   2026-11-27 — The section "Members" (sections/members.js).
  *   2026-11-22 — Under 1100px, where the side rail is hidden, the same rail stands as one closed row
  *     after the band and before the sections (railFold, as on the Settings pages). Before, a narrow
  *     window showed no section menu at all.
@@ -117,6 +118,7 @@ const SECTION_LOADERS = {
   manage: () => import('/views/appcat/sections/manage.js'),
   internet: () => import('/views/appcat/sections/internet.js'),
   builders: () => import('/views/appcat/sections/builders.js'),
+  members: () => import('/views/appcat/sections/members.js'),
   people: () => import('/views/appcat/sections/people.js'),
   skills: () => import('/views/appcat/sections/skills.js'),
   search: () => import('/views/appcat/sections/search.js'),

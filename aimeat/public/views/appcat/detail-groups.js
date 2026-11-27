@@ -21,6 +21,8 @@
  * @structure GROUPS · SECTION_IDS · attentionOf(d, flags)
  * @usage const att = attentionOf(d, kunto(row, bound)); att.spec → ['…'] or undefined
  * @version-history
+ *   v1.5.0 — 2026-11-27 — "Members" (members) before the people registered without an account in
+ *     Building together: who holds a role, how far they paid, and what a role costs.
  *   v1.4.0 — 2026-11-01 — "People registered without an account" (people) after the builders in
  *     Building together (WP9d).
  *   v1.3.0 — 2026-10-29 — "Structure" (structure) after About in What this is: the app's steps and the
@@ -35,7 +37,7 @@ import { x } from '/views/appcat/i18n.js';
 export const GROUPS = [
   { id: 'edit', title: 'detail.groupEdit', ids: ['work', 'ai', 'history', 'versions', 'actions'] },
   { id: 'what', title: 'detail.groupWhat', ids: ['about', 'structure', 'spec', 'datamap', 'needs', 'skills'] },
-  { id: 'together', title: 'detail.groupTogether', ids: ['roadmap', 'builders', 'people', 'audit'] },
+  { id: 'together', title: 'detail.groupTogether', ids: ['roadmap', 'builders', 'members', 'people', 'audit'] },
   { id: 'publish', title: 'detail.groupPublish', ids: ['manage', 'internet', 'visitors', 'search', 'marks', 'aiact', 'legal', 'promote'] },
   { id: 'money', title: 'detail.groupMoney', ids: ['odps', 'monetize', 'cost', 'agents'] },
 ];
