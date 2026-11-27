@@ -270,8 +270,9 @@ function resultsFor(start: StartData) {
         const limit = await json('/v1/agents/evalclr/clearance', { method: 'PATCH', headers: auth, body: JSON.stringify({ clearance: 'sisainen' }) });
         assert(limit.status === 200 && limit.body.data.clearance === 'sisainen', `clearance: ${limit.status} ${JSON.stringify(limit.body?.error ?? limit.body?.data)}`);
         const h = { Authorization: `Bearer ${clr.token}` };
-        const direct = await json(`/v1/skills/${ref}`, { method: 'GET', headers: h });
-        assert(direct.status !== 200, `the agent's own read of the skill is refused: ${direct.status}`);
+        const direct = await json(`/v1/skills/${SKILL}?scope=user`, { method: 'GET', headers: h });
+        // The agent's own read of the skill: a manifest hidden from this reader reads as absent.
+        expectRefusal(direct, 404, 'NOT_FOUND');
         const run = await json(`/v1/evals/skill/${ref}/run`, { method: 'POST', headers: h, body: '{}' });
         assert(run.status === 404 && run.body?.error?.code === 'NOT_FOUND' && !JSON.stringify(run.body).includes('Sort however'), `run: ${run.status} ${JSON.stringify(run.body).slice(0, 300)}`);
         const own = await post(`${at}/run`, {});
