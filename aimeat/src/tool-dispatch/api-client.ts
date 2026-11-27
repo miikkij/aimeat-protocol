@@ -10,6 +10,8 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   2026-11-27 -- A node-relative path with a dot segment is refused before it is sent
+ *     (utils/same-origin-path.ts hasDotSegment; secaudit2026nov26).
  *   2026-11-04 -- `setFetch` replaces `setNodeHeaders`: the node's own dispatcher sends its
  *     requests in process (services/request-injector.ts) and needs no header of its own; nothing
  *     else called `setNodeHeaders` (codebase analysis 2026-11-03, item D-j).
@@ -57,6 +59,7 @@
  *   v2.1.0 — 2026-08-01 — TARGET-058 Phase 11b: ApiResponse models `meta`. It always arrived; not
  *     being in the type is why every tool handler dropped meta.provenance without anyone noticing.
  */
+import { hasDotSegment } from '../utils/same-origin-path.js';
 
 export interface ApiResponse {
   ok: boolean;
@@ -254,6 +257,14 @@ export class AimeatClient {
 
   /** One attempt. Node-relative paths go through the transport when one is set. */
   private async dispatch(method: string, path: string, body?: unknown): Promise<ApiResponse> {
+    // A handler builds its path from the caller's values, and encodeURIComponent leaves `.` and `..`,
+    // which the URL parser then removes: `/v1/ext/../auth/refresh` reached another route than the one
+    // the tool names (utils/same-origin-path.ts, secaudit2026nov26). Refused here, for every tool and
+    // every transport, before anything is sent.
+    if (!path.startsWith('http') && hasDotSegment(path)) {
+      this.lastStatus = 400;
+      return { ok: false, error: { code: 'INVALID_INPUT', message: 'A value may not be "." or "..": the request would reach another route than this tool\'s.' } };
+    }
     if (this.transport && !path.startsWith('http')) {
       const r = await this.transport.request(method, path, { body });
       this.lastStatus = r.status;

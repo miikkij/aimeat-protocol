@@ -10,6 +10,7 @@
  *   in-process on the same route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/request-injector.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A path with a dot segment is refused, not sent (secaudit2026nov26).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item D-j).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -71,6 +72,19 @@ const post = (body: unknown, headers: Record<string, string> = {}): RequestInit 
 });
 
 describe('a request the node sends itself in process', () => {
+  // secaudit2026nov26: a path built from a caller's value keeps `..`, which the URL parser removes,
+  // so the request reached another route than the one its builder named.
+  it('refuses a path with a dot segment instead of sending it to the route the dots resolve to', async () => {
+    for (const path of ['/sub/../echo', '/sub/%2e%2e/echo', '/sub/./echo', `${base}/sub/../echo`]) {
+      const answer = await withInProcessFetch({ port }, { forBearer: 'bearer-a' }, async (fetchIn) => {
+        const res = await fetchIn(path, post({}));
+        return { status: res.status, body: await res.json() };
+      });
+      expect(answer.status, path).toBe(400);
+      expect(answer.body.error.code, path).toBe('INVALID_INPUT');
+    }
+  });
+
   it('carries what the loopback fetch carried and reads the same answer', async () => {
     const overSocket = await (await fetch(`${base}/echo?x=1`, post({ a: 1 }))).json();
     const inProcess = await withInProcessFetch({ port }, { forBearer: 'bearer-a' },

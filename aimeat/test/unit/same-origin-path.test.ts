@@ -12,6 +12,8 @@
  *   route-level arms live with their routes (account-events.test.ts, e2e-mcp-proxy.ts).
  * @usage cd aimeat && pnpm exec vitest run test/unit/same-origin-path.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-27 — hasDotSegment, and the tool dispatch client that asks it before it sends
+ *     (secaudit2026nov26).
  *   v1.1.0 — 2026-11-10 — withQueryParam: a parameter lands before the fragment.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09 A2-3, A5-5).
  */
@@ -19,7 +21,8 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { isSameOriginPath, safeRedirectPath, withQueryParam } from '../../src/utils/same-origin-path.js';
+import { isSameOriginPath, safeRedirectPath, withQueryParam, hasDotSegment, isDotSegment } from '../../src/utils/same-origin-path.js';
+import { AimeatClient } from '../../src/tool-dispatch/api-client.js';
 import { safeNotificationLink } from '../../src/services/extension/notify.js';
 import { isSafeNotifActionEndpoint } from '../../src/services/notify.js';
 import { createPrincipalNotification } from '../../src/services/notifications/create.js';
@@ -29,6 +32,36 @@ const OFF_SITE = [
   '//evil.example/x', '/\\evil.example/x', '/\\/evil.example', '\\\\evil.example',
   '/\t/evil.example', '/\n/evil.example', '/\r\n/evil.example',
 ];
+
+describe('hasDotSegment: the path a URL parser would change', () => {
+  it('finds `.` and `..` in every spelling a URL parser removes', () => {
+    for (const p of ['/v1/ext/../auth/refresh', '/v1/ext/./x', '/v1/%2e%2e/auth', '/v1/%2E%2e/auth', '/v1/.%2e/a', '/v1/%2e./a',
+      '/v1/a\\..\\auth', '/v1/x/..', '..', '/v1/pub/a/../../auth/app-grant-silent?app=x']) {
+      expect(hasDotSegment(p), p).toBe(true);
+    }
+  });
+
+  it('leaves a path whose dots are part of a name, or sit in the query', () => {
+    for (const p of ['/v1/ext/my.ext/run', '/v1/memory/a.b.c', '/v1/x/...', '/v1/x/.hidden', '/v1/pub/a/b?next=../x', '/v1/a#../b', '/v1/%2e%2e%2e']) {
+      expect(hasDotSegment(p), p).toBe(false);
+    }
+    expect(isDotSegment('.')).toBe(true);
+    expect(isDotSegment('my.ext')).toBe(false);
+  });
+
+  it('the tool dispatch client refuses such a path and sends nothing', async () => {
+    const sent: string[] = [];
+    const client = new AimeatClient('http://node.invalid', 'bearer');
+    client.setFetch((async (url: string) => { sent.push(url); return new Response('{"ok":true}', { status: 200 }); }) as never);
+    const r = await client.post('/v1/ext/../auth/refresh', {});
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('INVALID_INPUT');
+    expect(client.lastStatus).toBe(400);
+    expect(sent).toEqual([]);
+    await client.get('/v1/ext/my.ext/run');
+    expect(sent).toEqual(['http://node.invalid/v1/ext/my.ext/run']);
+  });
+});
 
 describe('isSameOriginPath and safeRedirectPath', () => {
   it('keep a path of this node', () => {

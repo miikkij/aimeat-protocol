@@ -238,6 +238,16 @@ async function run() {
         assert(r.status === 400, `expected 400, got ${r.status}`);
     });
 
+    // secaudit2026nov26: a tool builds its path from the caller's values with encodeURIComponent,
+    // which leaves `.` and `..`, and the URL parser of the in-process request then removed them, so
+    // this input reached POST /v1/auth/refresh and answered 200 with a fresh token.
+    await test('a tool\'s path value cannot climb out of its segment either', async () => {
+        const r = await invoke(a.token, 'aimeat_extension_invoke', { extension_name: '..', instance_id: 'auth', action_id: 'refresh' });
+        assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+        assert(r.body?.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${r.body?.error?.code}`);
+        assert(!JSON.stringify(r.body).includes('"token"'), 'and no token comes back');
+    });
+
     await test('a missing path value is refused before anything is sent', async () => {
         const r = await invoke(a.token, TELEMETRY, {});
         assert(r.status === 400, `expected 400, got ${r.status}`);

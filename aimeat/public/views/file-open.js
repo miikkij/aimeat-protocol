@@ -19,6 +19,7 @@
  * @structure fileAddressOf() · handleAddressOf() · downloadPathOf() · FileOpen()
  * @usage '/v1/file-open': () => import('/views/file-open.js')   // spa.html ROUTES, ?path=<the /v1/pub address>
  * @version-history
+ *   v1.0.1 — 2026-11-27 — A `path` with a dot segment is not a file address (secaudit2026nov26).
  *   v1.0.0 — 2026-11-23 — Initial: a file link answered a signed-in person 401 on a signed-in-only node
  *     and 404 on an open node for a file that is not public.
  */
@@ -26,7 +27,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { api } from '/js/api.js';
+import { api, hasDotSegment } from '/js/api.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { swallowed } from '/js/swallowed.js';
@@ -36,10 +37,14 @@ import { Note } from '/components/Note.js';
 
 const html = htm.bind(h);
 
-/** The file address the link named, or '' when `path` is not a file address on this node. */
+/**
+ * The file address the link named, or '' when `path` is not a file address on this node. A path with
+ * a dot segment is none: the browser resolves the dots before it sends, so `/v1/pub/a/../../auth/x`
+ * passes the pattern and asks another route with the session (secaudit2026nov26).
+ */
 function fileAddressOf(search) {
   const path = new URLSearchParams(search).get('path') || '';
-  return /^\/v1\/pub\/[^/?#]+\/[^?#]+(\?[^#]*)?$/.test(path) ? path : '';
+  return /^\/v1\/pub\/[^/?#]+\/[^?#]+(\?[^#]*)?$/.test(path) && !hasDotSegment(path) ? path : '';
 }
 
 /** The same address asking for the download handle instead of the bytes. */

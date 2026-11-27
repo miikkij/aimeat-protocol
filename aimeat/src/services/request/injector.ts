@@ -37,6 +37,13 @@
  *   bearer (auth/injected-request.ts). A REST route takes a token bound to the MCP endpoint on such a
  *   request, as it took it with the loopback pass; no header carries anything for it.
  *
+ *   ONLY THE PATH ITS BUILDER NAMED. A path that holds a dot segment is answered 400 INVALID_INPUT
+ *   here and never sent (utils/same-origin-path.ts hasDotSegment). Every caller builds its path from
+ *   a caller's values, and encodeURIComponent leaves `.` and `..`, which fetch's URL parser removes:
+ *   `/v1/ext/../auth/refresh` reached POST /v1/auth/refresh with the caller's mark, and answered an
+ *   MCP-bound token with a token for every route (secaudit2026nov26). One check here covers all four
+ *   callers and any later one.
+ *
  *   A node created by createServer registers its app here for its port (server.ts). The process that
  *   listens also hands over its HTTP server (index-start.ts), and the dispatch then goes to that
  *   server. An app that is registered but whose server was not handed over (an in-process test node
@@ -50,6 +57,7 @@
  *     return { status: res.status, body: await res.json() };
  *   });
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A path with a dot segment is refused, not sent (secaudit2026nov26).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item D-j).
  */
 import http, { type RequestListener, type Server } from 'node:http';
@@ -59,6 +67,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Agent } from 'undici';
 import { markInjectedConnection } from '../../auth/injected-request.js';
 import { logger } from '../../utils/logger.js';
+import { hasDotSegment } from '../../utils/same-origin-path.js';
 
 /**
  * The async context a connection from a socket starts in: no request's stores. Taken when this
@@ -187,6 +196,15 @@ function connect(target: Target, port: number, bearer: string | null, callback: 
   setImmediate(() => callback(null, clientEnd));
 }
 
+/**
+ * The answer to a path with a dot segment: the refusal envelope's shape, read by every caller as a
+ * route's own refusal. The node id is not known here, and no caller reads it from a refusal.
+ */
+function dotSegmentRefusal(): Response {
+  const body = { ok: false, error: { code: 'INVALID_INPUT', message: 'A path value may not be "." or "..": the request would reach another route than the one named.' } };
+  return new Response(JSON.stringify(body), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
 /** A fetch whose path is node-relative and whose request goes to this node in process. */
 export type InProcessFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -210,8 +228,11 @@ export async function withInProcessFetch<T>(
       connect(target, port, opts.forBearer ?? null, callback as (err: Error | null, socket: Duplex | null) => void);
     },
   });
-  const fetchIn: InProcessFetch = (path, init) =>
-    fetch(path.startsWith(origin) ? path : `${origin}${path}`, { ...init, dispatcher: agent } as RequestInit);
+  const fetchIn: InProcessFetch = (path, init) => {
+    const relative = path.startsWith(origin) ? path.slice(origin.length) : path;
+    if (hasDotSegment(relative)) return Promise.resolve(dotSegmentRefusal());
+    return fetch(`${origin}${relative}`, { ...init, dispatcher: agent } as RequestInit);
+  };
   try {
     return await run(fetchIn);
   } finally {

@@ -9,10 +9,13 @@
  *
  * @structure
  *   - api(path, opts): core call — auth injection, timeout, 401-refresh, retry loop, envelope handling
+ *   - hasDotSegment(path): the path the browser would change before sending; api() refuses it
  *   - apiGet/apiPost/apiPut/apiPatch/apiDelete: HTTP-method shorthands over api()
  *   - parseJwtPayload/sleep: internal helpers (unverified JWT expiry check, backoff delay)
  *
  * @version-history
+ *   v1.6.0 -- 2026-11-27 -- hasDotSegment: a path with a `.` or `..` segment is refused before fetch, which
+ *     would resolve it to another route with the person's session (secaudit2026nov26, file-open).
  *   v1.5.1 -- 2026-11-27 -- OPERATOR_SERVICE_REFUSED (a service's own request the server refused) is said in
  *     the page's words too.
  *   v1.5.0 -- 2026-11-26 -- OPERATOR_SERVICE_REQUIRED and OPERATOR_SERVICE_KEY throw with the page's own words
@@ -39,7 +42,33 @@ import { swallowed } from '/js/swallowed.js';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
 
+/**
+ * True when the path part of `path` (before `?` or `#`) holds a `.` or `..` segment, in any spelling
+ * the browser's URL parser removes (`.`, `%2e`, `..`, `.%2e`, `%2e%2e`; a backslash separates too).
+ * The browser resolves them before it sends the request, so the request goes to another path than
+ * the one the page checked: /v1/pub/a/../../auth/app-grant-silent is GET /v1/auth/app-grant-silent
+ * with the person's session. The same rule as the node's src/utils/same-origin-path.ts hasDotSegment
+ * (secaudit2026nov26).
+ */
+export function hasDotSegment(path) {
+  const text = String(path);
+  const end = text.search(/[?#]/);
+  const head = end < 0 ? text : text.slice(0, end);
+  return head.split(/[/\\]/).some((segment) => {
+    const s = segment.toLowerCase().replaceAll('%2e', '.');
+    return s === '.' || s === '..';
+  });
+}
+
 export async function api(path, opts = {}) {
+  // A page builds its path from values a link or a person chose: one with a dot segment is refused,
+  // never sent, so the request always goes to the route the page named.
+  if (hasDotSegment(path)) {
+    const err = new Error('This address names a path the page does not ask for.');
+    err.code = 'INVALID_INPUT';
+    err.status = 400;
+    throw err;
+  }
   const headers = new Headers(opts.headers);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const method = (opts.method || 'GET').toUpperCase();
