@@ -14,6 +14,8 @@
  * @structure HelpQuestionCard
  * @usage html`<${HelpQuestionCard} msg=${msg} onReply=${() => onQuote(msg)} onReplyAi=${() => onReplyAi(msg)} />` (message-turn.js)
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The answer prompt copies under common.copyForAi, the one name of a prompt copy;
+ *     help.card.copyPrompt had the same words.
  *   v1.0.0 — 2026-11-14 — Initial (wish-pyyd-apua-nodessa-yhteinen-avunpyynt-v-yl-ihmisille-ja-heid-).
  */
 import { h } from 'preact';
@@ -59,7 +61,7 @@ function HelperSide({ v, onReply, onReplyAi, act, busy }) {
         <${Actions}>
           <${Action} small onClick=${onReply}>${x('reply')}<//>
           <${Action} small onClick=${onReplyAi}>${x('replyAi')}<//>
-          <${Action} small soft copy=${answerPrompt(v.question_id, v.subject)} copiedLabel=${x('copied')}>${x('copyPrompt')}<//>
+          <${Action} small soft copy=${answerPrompt(v.question_id, v.subject)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>
           ${v.may?.refer ? html`<${Action} small soft onClick=${() => setReferring(!referring)}>${x('refer')}<//>` : null}
           ${v.may?.pass ? html`<${Action} small soft onClick=${() => act(() => respondHelp(v.question_id, { action: 'pass' }), x('passedDone'))}>${x('pass')}<//>` : null}
         <//>` : null}

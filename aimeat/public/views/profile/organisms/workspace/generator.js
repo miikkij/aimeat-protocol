@@ -10,6 +10,8 @@
  * @structure WorkspaceGenerator
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
+ *   v1.9.1 -- 2026-11-28 -- The generator prompt and the fix prompt copy under common.copyForAi ("Copy
+ *     the prompt for your AI"), the one name of a prompt copy.
  *   v1.9.0 -- 2026-09-26 -- Every part is a library component that takes data: the section Card, the
  *     Sub-heading with its description, the Text areas, FormActions with the loud action (its spinner
  *     the Spinner) and the action link, and the Attention note with the row Label and each refusal as
@@ -128,7 +130,7 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
               ${genBusy ? html`<${Spinner} /> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
             <//>
           ` : null}
-          <${Action} small onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}<//>
+          <${Action} small onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyForAi')}<//>
         <//>
 
         <${HeadDesc}>${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}<//>
@@ -146,7 +148,7 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
             <${Label} block>${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}<//>
             <${Stack} gap="tight">${genErrors.map((e, i) => html`<${Note} kind="message" error key=${i}>${(e)}<//>`)}<//>
             <${FormActions}>
-              <${Action} small onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}<//>
+              <${Action} small onClick=${copyFixPrompt}>${t('common.copyForAi')}<//>
             <//>
           <//>
         `}

@@ -11,6 +11,8 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v2.3.1 -- 2026-11-28 -- The lead road's request copies under common.copyForAi ("Copy the prompt for
+ *     your AI"), the one name of a prompt copy.
  *   v2.3.0 -- 2026-11-27 -- Settings usability pass: 04 the instruction prompts is one row that says how
  *     many prompts and characters the calibration sends and opens in place (the rail opens it too),
  *     since they are rarely changed; 01 to 03 and 05 stay open. Its explanation (HelpTip
@@ -51,6 +53,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { t } from '/js/i18n.js';
 const html = htm.bind(h);
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -271,7 +274,7 @@ function secRoads(ctx) {
       <${Note} kind="lead">${x('roadsIntro')}<//>
       <${Roads}>
         <${Road} lead name=${x('roadLead')} text=${x('roadLeadBody', { name: ctx.project.name })} code=${request}
-          doors=${html`<${Action} small copy=${request}>${x('copyRequest')}<//>`} />
+          doors=${html`<${Action} small copy=${request}>${t('common.copyForAi')}<//>`} />
         <${Road} name=${x('roadSteps')} text=${x('roadStepsBody')} />
       <//>
       <${Note}>${x('hintRoads')}<//>

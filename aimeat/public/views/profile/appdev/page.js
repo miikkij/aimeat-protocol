@@ -15,6 +15,8 @@
  * @structure renderPage · secStart · secLearned · secProposals · secCurated
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v2.3.1 -- 2026-11-28 -- The head's loud copy and the flow and build rows' copies read common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy; they read flowSlab and copy.
  *   v2.3.0 -- 2026-11-27 -- The filter rows are drawn only over more than ten pitfalls (Filters total).
  *   v2.2.0 -- 2026-11-27 -- Usability pass: the pitfalls the agents filed are the main thing, first and
  *     open (most severe first, appdev-tab.js); the template proposals are drawn only when there are
@@ -102,7 +104,7 @@ export function renderPage(ctx) {
 
   // The head's marks repeated the strip and are gone.
   const actions = html`
-    <${Loud} control copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('flowSlab')}<//>
+    <${Loud} control copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${t('common.copyForAi')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.goTab('apps')}>${a('appsDoor')}<//><//>`;
   // The start: its button copies the flow prompt.
   const start = html`<${PageStart} id="appdev" done=${L ? filed > 0 : null}
@@ -158,7 +160,7 @@ function secStart(ctx, nr, open) {
           <${Name} meta=${a('flowMeta', { n: fmt(ctx.flow ? ctx.flow.length : 0) })}>${a('flowTitle')}<//>
           <${Desc}>${a('flowDesc')}<//>
           <${Doors}>
-            <${Action} small row copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('copy')}<//>
+            <${Action} small row copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${t('common.copyForAi')}<//>
             <${Action} small row soft onClick=${() => ctx.toggleShow('flow')}>${flowShown ? a('hide') : a('show')}<//>
             <${Action} small row soft disabled=${ctx.busy === 'item:flow'} onClick=${() => ctx.toggleOpenItem('flow')}>${item('flow') ? a('offWorklist') : a('toWorklist')}<//>
           <//>
@@ -168,7 +170,7 @@ function secStart(ctx, nr, open) {
           <${Name} meta=${ctx.buildLength ? a('buildMeta', { n: fmt(ctx.buildLength) }) : a('buildMetaShort')}>${a('buildTitle')}<//>
           <${Desc}>${a('buildDesc')}<//>
           <${Doors}>
-            <${Action} small row disabled=${ctx.busy === 'build'} onMouseEnter=${ctx.prefetchBuild} onFocus=${ctx.prefetchBuild} onClick=${ctx.copyBuild}>${a('copy')}<//>
+            <${Action} small row disabled=${ctx.busy === 'build'} onMouseEnter=${ctx.prefetchBuild} onFocus=${ctx.prefetchBuild} onClick=${ctx.copyBuild}>${t('common.copyForAi')}<//>
             <${Action} small row soft href=${buildPromptFileUrl()} download="aimeat-build-app.txt">${a('downloadFile')}<//>
             <${Action} small row soft disabled=${ctx.busy === 'item:build'} onClick=${() => ctx.toggleOpenItem('build')}>${item('build') ? a('offWorklist') : a('toWorklist')}<//>
           <//>

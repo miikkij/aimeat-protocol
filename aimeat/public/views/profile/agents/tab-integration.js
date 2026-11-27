@@ -6,6 +6,8 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
+ *   v1.25.1 -- 2026-11-28 -- The agent prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.25.0 -- 2026-11-26 -- An agent the operator set up (set_by_operator) shows one line in place of the
  *     onboarding checklist and the connect steps: the operator connected the service.
  *   v1.24.1 -- 2026-11-15 -- Saving an emptied webhook address removes the webhook (DELETE, after a
@@ -373,7 +375,7 @@ function bundleDoors({ agentName, curlText, installCmdText, agentPromptText, han
     <${Actions} under>
       <${Loud} copy=${agentPromptText}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')}>
-        ${t('profile.agents.detail.integration.copyAgentPrompt')}
+        ${t('common.copyForAi')}
       <//>
       <${Action} small copy=${installCmdText}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.installCommandCopied')}>

@@ -17,6 +17,8 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-11-28: The prompt copies under PromptCard's default words, common.copyForAi ("Copy the prompt
+ *     for your AI"); it read home.agent.copy.
  *   2026-11-19: The waiting state reads the pending requests on the live domains `agents` and
  *     `agent-onboarding` only, and no longer every 4 s (feature audit 2026-11-19, 4.6).
  *   2026-10-25: An approval of a new device taking over an existing agent sends end_other_sessions when
@@ -215,7 +217,6 @@ export function StepAgent({ onChanged, showToast }) {
             label=${tr('home.agent.promptLabel', 'The prompt')}
             prompt=${prompt}
             loud=${!waiting} quiet=${waiting}
-            copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
             copiedLabel=${tr('home.agent.copied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setWaiting(true)} />
         ` : html`

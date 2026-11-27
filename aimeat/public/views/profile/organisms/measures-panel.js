@@ -11,6 +11,8 @@
  * @structure MeasuresPanel({ org })
  * @usage html`<${MeasuresPanel} org=${org} />`
  * @version-history
+ *   v1.1.1 — 2026-11-28 — The prompt copies under PromptCard's default words, common.copyForAi ("Copy the
+ *     prompt for your AI"); it read organisms.measures.copy ("Copy").
  *   v1.1.0 — 2026-11-20 — "Per member": while a creator has turned it on, each active member's numbers
  *     from the same report (`by_member`), and that the members are told; otherwise a line saying it is
  *     off (wish-j-senkohtaiset-korjausluvut-tiimin-vet-j-lle-kun-luoja-kytke).
@@ -85,7 +87,7 @@ export function MeasuresPanel({ org }) {
             <//>`)}
         <//>`}
       <${Note}>${x('window')}<//>
-      <${PromptCard} label=${x('promptLabel')} prompt=${x('prompt', { name: org.name })} copyLabel=${x('copy')} />
+      <${PromptCard} label=${x('promptLabel')} prompt=${x('prompt', { name: org.name })} />
       ${perMember ? html`
         <${SubHeading}>${t('organisms.perMember.title')}<//>
         ${perMember.on ? html`

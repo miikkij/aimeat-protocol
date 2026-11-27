@@ -10,6 +10,8 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   v2.1.1 -- 2026-11-28 -- The agent editor's prompt copies under common.copyForAi ("Copy the prompt
+ *     for your AI"), the one name of a prompt copy; the build and skill prompts keep their own names.
  *   v2.1.0 -- 2026-11-27 -- secAgents and secBuild take their number and a `fold` ({ open, onToggle }):
  *     with it each is a closed row whose words say its state (how many apps bring an agent and how many
  *     skills; the two ways to start).
@@ -44,6 +46,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { useState, useRef } from 'preact/hooks';
+import { t } from '/js/i18n.js';
 const html = htm.bind(h);
 import { Section } from '/components/Section.js';
 import { a, nameOf, appRef, goTab } from './frame.js';
@@ -104,7 +107,7 @@ export function secAgents(ctx, num = '02.2', fold = null) {
               <${Space} above="medium">
                 <${Actions}>
                   <${Action} small disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}<//>
-                  <${Action} small soft copy=${ctx.agentPromptFor(picked)} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))}>${a('agentEditCopy')}<//>
+                  <${Action} small soft copy=${ctx.agentPromptFor(picked)} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))}>${t('common.copyForAi')}<//>
                 <//>
               <//>
               <${Note}>${a('agentClearHint')}<//>` : null}

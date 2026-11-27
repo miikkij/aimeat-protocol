@@ -13,6 +13,8 @@
  * @structure HtmlPageView · HtmlPageEditor
  * @usage import { HtmlPageView, HtmlPageEditor } from '/views/profile/organisms/html-page.js';
  * @version-history
+ *   v1.1.2 — 2026-11-28 — The page prompt copies under common.copyForAi ("Copy the prompt for your AI"),
+ *     the one name of a prompt copy.
  *   v1.1.1 — 2026-11-27 — Open in its own window draws the external Glyph instead of the ⧉ sign.
  *   v1.1.0 — 2026-10-16 — The frame shows the page's AI label and its writer (members only). The
  *     editor's "An AI made this page", saved as the page's provenance declaration.
@@ -152,7 +154,7 @@ export function HtmlPageEditor({ page, busy, onSave, onCancel }) {
         <${Note} kind="aside">${t('htmlPage.promptLead')}<//>
         <${TextField} value=${topic} onInput=${setTopic} placeholder=${t('htmlPage.topicPlaceholder')} ariaLabel=${t('htmlPage.topicPlaceholder')} />
         <${Line} wrap gap="small">
-          <${Action} small copy=${htmlPages.htmlPagePrompt(topic.trim())} copiedLabel=${t('htmlPage.promptCopied')}>${t('htmlPage.copyPrompt')}<//>
+          <${Action} small copy=${htmlPages.htmlPagePrompt(topic.trim())} copiedLabel=${t('htmlPage.promptCopied')}>${t('common.copyForAi')}<//>
         <//>
       <//>
       <${FormActions}>

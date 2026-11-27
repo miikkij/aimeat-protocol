@@ -12,6 +12,8 @@
  * @structure ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind })
  * @usage import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
  * @version-history
+ *   v1.7.1 — 2026-11-28 — The README prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy; it read "Generate with AI".
  *   v1.7.0 — 2026-09-26 — Every part is a kit component (page group G2a): the README is the Box (the editor's title and ways in its head, the Edit README way at its foot), the field the TextArea, the ways the Action (the AI prompt's copy is the Action's copy) and the Loud action, the lines the section description (HeadDesc). The page writes no class.
  *   v1.6.0 — 2026-09-26 — An organism's README and its draft are the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.5.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -87,7 +89,7 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
     return html`
       <${Box} name=${t('readme.editTitle') || 'Edit README'} end=${html`<${Actions}>
           <${Action} small onClick=${() => setPreview(p => !p)}>${preview ? (t('readme.write') || 'Write') : (t('readme.preview') || 'Preview')}<//>
-          ${aiPromptSeed !== undefined ? html`<${Action} small copy=${buildAiPrompt(kind, name, aiPromptSeed)} onCopied=${markCopied}>${t('readme.generateAi') || 'Generate with AI'}<//>` : null}
+          ${aiPromptSeed !== undefined ? html`<${Action} small copy=${buildAiPrompt(kind, name, aiPromptSeed)} onCopied=${markCopied}>${t('common.copyForAi')}<//>` : null}
           <${Action} small disabled=${busy} onClick=${() => { setDraft(markdown || ''); setEditing(false); }}>${t('common.cancel') || 'Cancel'}<//>
           <${Loud} control disabled=${busy} onClick=${save}>${busy ? (t('common.saving') || 'Saving…') : (t('common.save') || 'Save')}<//>
         <//>`}>

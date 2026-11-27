@@ -13,6 +13,10 @@
  * @structure renderPage · secExtensions · secCortexes · secNew
  * @usage import { renderPage } from './extensions/page.js';
  * @version-history
+ *   v2.3.1 -- 2026-11-28 -- The head's loud copy of the extension prompt and the cortex section's copy of
+ *     the cortex prompt read common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt
+ *     copy; they read "Create with AI" and "Copy the cortex guide". The new-one fold keeps the two
+ *     guides' own names, since it offers both side by side.
  *   v2.3.0 -- 2026-11-27 -- Whose (mine, others, platform) is its own filter row, drawn only when
  *     someone else has some; the filters by state, kind and part are drawn only over more than ten
  *     (Filters total). The page's top was 641 px.
@@ -112,7 +116,7 @@ export function renderPage(ctx) {
 
   const openForm = () => { ctx.setFormOpen(true); scrollToSection('ex-new'); };
   const mast = html`
-    <${Loud} control copy=${ctx.extPrompt} copiedLabel=${x('copied')} disabled=${!ctx.extPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${x('createSlab')}<//>
+    <${Loud} control copy=${ctx.extPrompt} copiedLabel=${x('copied')} disabled=${!ctx.extPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${t('common.copyForAi')}<//>
     <${Actions}><${Action} small onClick=${openForm}>${x('addFromFiles')}<//><//>`;
 
   // The cortexes are open once the person has one of their own; until then they are a fold that says
@@ -200,7 +204,7 @@ function secCortexes(ctx, myCx, otherCx, platformCx, num, fold) {
   const shown = rows.slice(0, ctx.cxShown);
   const parts = ['lib', 'prompt', 'schema', 'seed-data'];
   const partCount = (p) => pool.filter((c) => (c.component_types || []).includes(p)).length;
-  const copyGuide = html`<${Action} small soft copy=${ctx.cortexPrompt} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${x('copyCortexPrompt')}<//>`;
+  const copyGuide = html`<${Action} small soft copy=${ctx.cortexPrompt} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${t('common.copyForAi')}<//>`;
   // A fold while the person has no cortex of their own: its row says so and how many the platform
   // offers. The guide's copy, which stands at the head of the open section, opens with the fold.
   const props = fold

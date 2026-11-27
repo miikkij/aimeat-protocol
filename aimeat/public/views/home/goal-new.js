@@ -18,6 +18,8 @@
  * @structure default GoalNewView({ navigate })
  * @usage routed at /v1/home?new-goal=1 by spa.html (optional say=<sentence>)
  * @version-history
+ *   v2.0.1 — 2026-11-28 — The own-AI prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read home.goalNew.copyPrompt.
  *   v2.0.0 — 2026-10-25 — The AI's proposal first: sentence → plan → start. The rules form moved to
  *     goal-new-form.js under "Make it by hand" (Jouni, 2026-10-25).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -105,7 +107,7 @@ export default function GoalNewView({ navigate }) {
   const intro = html`<${PageIntro} title=${html`${g('title', 'A new goal')} <${HelpTip} term="concept.goal" label=${g('title', 'A new goal')} />`}
     sub=${g('subAi', 'Say what you want done. Your AI plans who does what and shows it to you before anything starts.')} />`;
   const ownAi = html`<${PromptCard} label=${g('ownAiPropose', 'Or give it to your own AI (Claude, ChatGPT, Codex…)')}
-    prompt=${ownAiGoalRequest(statement.trim() || '…')} copyLabel=${g('copyPrompt', 'Copy the prompt')} />`;
+    prompt=${ownAiGoalRequest(statement.trim() || '…')} />`;
 
   if (phase === 'started') {
     return html`<${PageFrame} width="narrow">${back}${intro}<${MissingAgents} goalId=${started.id} missing=${started.missing} navigate=${navigate} /><//>`;

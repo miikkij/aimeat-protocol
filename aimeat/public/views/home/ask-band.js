@@ -16,6 +16,8 @@
  * @structure AskBand
  * @usage html`<${AskBand} data=${inbox} props=${props} navigate=${ctx.navigate} />` (views/surface/blocks-home.js AskBlock)
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The own-AI prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy; it read home.ask.copyPrompt.
  *   v1.0.0 — 2026-11-14 — Initial (wish-pyyd-apua-nodessa-yhteinen-avunpyynt-v-yl-ihmisille-ja-heid-).
  */
 import { h } from 'preact';
@@ -94,7 +96,7 @@ export function AskBand({ data, props = {} }) {
         <${TextField} label=${x('fieldLabel')} placeholder=${props.placeholder || x('placeholder')}
           value=${say} onInput=${(v) => { setSay(v); setFound(null); }} onEnter=${find}
           actions=${html`<${Loud} control disabled=${busy || !say.trim()} onClick=${find}>${x('find')}<//>`} />
-        ${copyPrompt ? html`<${Note} kind="quiet">${x('ownAi')} <${Action} small soft copy=${askPrompt(say.trim())} copiedLabel=${x('copied')}>${x('copyPrompt')}<//><//>` : null}
+        ${copyPrompt ? html`<${Note} kind="quiet">${x('ownAi')} <${Action} small soft copy=${askPrompt(say.trim())} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//><//>` : null}
       <//>
       ${found ? html`
         ${kept.length ? html`

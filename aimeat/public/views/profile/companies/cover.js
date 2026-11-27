@@ -11,6 +11,8 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.14.3 -- 2026-11-28 -- The head's prompt copy reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.14.2 -- 2026-11-27 -- The strip's words agree with their number (tn: "2 yritystä", "0 laskua").
  *   v1.14.1 -- 2026-11-27 -- The front-page app is named by its manifest name; the row showed its file name.
  *   v1.14.0 -- 2026-11-27 -- A company row says what is inside before it is opened: its description
@@ -113,7 +115,7 @@ export function renderCover(ctx) {
       actions=${html`
         <${Actions}>
           <${Action} small onClick=${openCreate}>${c('createDoor')}<//>
-          <${Action} small onClick=${() => ctx.copyPrompt('list')}>${c('promptToChat')}<//>
+          <${Action} small onClick=${() => ctx.copyPrompt('list')}>${t('common.copyForAi')}<//>
         <//>`}
       strip=${strip}
       railTitle=${c('railTitle')}

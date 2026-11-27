@@ -13,6 +13,8 @@
  * @structure renderPage · shelf · secFaces · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.23.1 -- 2026-11-28 -- The rule for the person's AI copies under common.copyForAi ("Copy the prompt
+ *     for your AI"), the one name of a prompt copy, in the head and in the rule's box.
  *   v1.23.0 -- 2026-11-27 -- Usability round 3: each shelf is one row that says how many libraries it
  *     holds, how many an app loads and how many deprecated ones the reader's apps still load; a shelf
  *     opens by itself only when it holds a library in use (the 84 open rows made the page 12 800 px).
@@ -129,7 +131,7 @@ export function renderPage(ctx) {
         packs ? [{ label: x('chipProven', { n: provenN }) }] : []}
       desc=${x('desc')}
       actions=${html`
-        <${Loud} copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
+        <${Loud} copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${t('common.copyForAi')}<//>
         <${Actions}><${Action} small href="https://design-book.apps.aimeat.io/" newTab>Design Book<//><//>`}
       start=${html`<${PageStart} id="libraries" />`}
       strip=${strip}
@@ -250,7 +252,7 @@ function secAI(ctx, num, all) {
   const appsUsing = ctx.appsUsing;
   return html`
     <${FoldSection} id="lb-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${!!ctx.folds?.ai} onToggle=${() => ctx.setFold('ai', !ctx.folds?.ai)}>
-      <${Box} doors=${html`<${Action} small copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+      <${Box} doors=${html`<${Action} small copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>
       <//>

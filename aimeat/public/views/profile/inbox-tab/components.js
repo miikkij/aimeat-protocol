@@ -9,6 +9,8 @@
  *   re-exported from here; the composer is the Composer component's message tone
  *   (components/Composer.js, tone="message"). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.32.2 -- 2026-11-28 -- The reply prompt and the notebook prompt copy under common.copyForAi ("Copy
+ *     the prompt for your AI"), the one name of a prompt copy; they read common.copy.
  *   v1.32.1 -- 2026-11-27 -- The close and remove icon buttons draw the close Glyph instead of the ✕
  *     letter (a poll option's remove is named by field.remove, a key that exists); the command, the
  *     schedule and the notebook buttons drop their emoji and their words stand alone; Regenerate
@@ -316,7 +318,7 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
   const footer = hasMcpAi === false
     ? html`<${Loud} control onClick=${toMcpPage}>${t('inbox.ai.connectMcp')}<//>`
     : html`<${Loud} control disabled=${hasMcpAi === undefined} copy=${text} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-        onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>`;
+        onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copyForAi')}<//>`;
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false} footer=${footer}>
       <${Box} tone="edge">
@@ -397,7 +399,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <${TextArea} readOnly rows=${8} value=${promptText} />
             <${FormActions} end>
               <${Loud} control copy=${promptText} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-                onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>
+                onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copyForAi')}<//>
             <//>
             <${Note}>${t('inbox.notebook.pasteHint')}<//>
             <${TextArea} rows=${8} placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${setPasted} />

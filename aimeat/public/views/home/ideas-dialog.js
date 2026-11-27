@@ -18,6 +18,8 @@
  * @structure IdeasDialog({ open, onClose, tab, onPick, onPickApp })
  * @usage html`<${IdeasDialog} open=${open} onClose=${close} tab="agents" onPick=${(idea) => setSentence(idea.say)} />`
  * @version-history
+ *   v1.0.1 — 2026-11-28 — An idea's app request copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy; it read home.ideas.copyAppRequest.
  *   v1.0.0 — 2026-10-14 — Reads the node's list; the app tab can choose an idea for an agent's app
  *     (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  *   v0.1.0 — 2026-10-14 — Design draft.
@@ -25,7 +27,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { tOr } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { ChooserChoices, ChooserChoice } from '/components/Chooser.js';
 import { Card, CardGrid } from '/components/Card.js';
@@ -77,7 +79,7 @@ function AppIdeas({ ideas, onPick, onPickApp }) {
           ? html`<${Action} small onClick=${() => onPickApp(idea)}>${n('useForApp', 'Use this for the app')} →<//>`
           : html`
             ${agent && html`<${Action} small onClick=${() => onPick(agent)}>${n('makeAgent', 'Make its agent')} →<//>`}
-            ${!idea.ready_app && html`<${Action} small copy=${buildAppRequest(idea)} copiedLabel=${n('copied', 'Copied: paste it to your AI')}>${n('copyAppRequest', 'Copy the request for your AI')}<//>`}`;
+            ${!idea.ready_app && html`<${Action} small copy=${buildAppRequest(idea)} copiedLabel=${n('copied', 'Copied: paste it to your AI')}>${t('common.copyForAi')}<//>`}`;
         return html`<${Card} key=${idea.id} tone="framed"
           kicker=${idea.ready_app ? n('ready', 'Ready') + ': ' + idea.ready_app : n('idea', 'Idea')}
           name=${idea.name} doors=${doors}>

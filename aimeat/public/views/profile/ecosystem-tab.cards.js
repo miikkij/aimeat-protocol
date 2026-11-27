@@ -8,6 +8,8 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.20.1 -- 2026-11-28 -- The sample prompt's copy reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy; it read common.copy.
  *   v1.20.0 -- 2026-11-27 -- The sample prompt's copy is a quiet Action, so the page keeps one loud action (approving a waiting request); the emoji before the MCP box name and the technical details fold go (no emoji in the interface).
  *   v1.19.0 -- 2026-11-08 -- The event subscriptions' heading opens what each event in the picker sends and when (ecosystem.events; .claude/rules/page-guidance.md).
  *   v1.18.1 -- 2026-09-26 -- The sample prompt's copy button stands beside the prompt again (Beside;
@@ -159,7 +161,7 @@ export function EcoAskInClaude({ app }) {
           ${organismName
             ? html`
               <${Label} block>${t('profile.ecosystem.mcpSampleLabel')}<//>
-              <${Beside} side=${html`<${Action} small control copy=${samplePrompt}>${t('common.copy')}<//>`}>
+              <${Beside} side=${html`<${Action} small control copy=${samplePrompt}>${t('common.copyForAi')}<//>`}>
                 <${Code} block>${samplePrompt}<//>
               <//>
               <${Hint}>${t('profile.ecosystem.mcpAccessNote')}<//>`

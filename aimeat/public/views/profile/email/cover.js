@@ -15,6 +15,8 @@
  * @structure renderCover · lettersSub · secAddress · addressBody · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.25.3 -- 2026-11-28 -- The head's prompt copy reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.25.2 -- 2026-11-27 -- A sent mail's line leaves out a recipient with no name (it showed the
  *     contact's UUID); the subject names the row.
  *   v1.25.1 -- 2026-11-27 -- The mailboxes list carries a head row (mailbox, what your agent does, state), as
@@ -151,7 +153,7 @@ export function renderCover(ctx) {
       desc=${c('desc')}
       actions=${html`
         <${Loud} quiet=${ctx.changing || !toConnect} onClick=${() => scrollToSection('em-mailboxes')}>${c('connectMailbox')}<//>
-        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//><//>`}
+        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//><//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
       sections=${shown}

@@ -15,6 +15,8 @@
  *   secPage · secChange · secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.21.1 -- 2026-11-28 -- The roads' requests and the agent rule copy under common.copyForAi ("Copy the
+ *     prompt for your AI"), the one name of a prompt copy.
  *   v1.21.0 -- 2026-11-27 -- Who can open the page is a row of the visibility section with its value (anyone,
  *     people signed in here, the members of one organism) and Change, which opens the three choices in place, one
  *     row each with what choosing it does; one organism is picked from the person's own. A page that needs a
@@ -373,7 +375,7 @@ function roads(ctx, hasPage) {
   return html`
     <${Roads} cols="three" wide>
       <${Road} lead name=${x('roadAi')} text=${hasPage ? x('roadAiBody') : x('roadAiBodyNew')} code=${ctx.aiRequestText()}
-        doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}<//>`} />
+        doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${t('common.copyForAi')}<//>`} />
       <${Road} name=${x('roadBuilder')} text=${hasPage ? x('roadBuilderBody') : x('roadBuilderBodyNew')}
         doors=${html`<${Action} small onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}<//>`} />
       <${Road} name=${x('roadImport')} text=${x('roadImportBody', { max: ctx.maxKb })} doors=${importDoors}>
@@ -390,9 +392,9 @@ function secFirst(ctx, n) {
       <${Note} kind="quiet"><b>${x('emptyNone')}</b> ${x('emptyNoneSub')}<//>
       <${Roads} cols="three" wide>
         <${Road} lead name=${x('roadMat')} text=${x('roadMatBody')} code=${mat}
-          doors=${html`<${Action} small disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('copyRequest')}<//><${Action} small soft onClick=${() => ctx.navigate('/v1/home')}>${x('goHome')}<//>`} />
+          doors=${html`<${Action} small disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${t('common.copyForAi')}<//><${Action} small soft onClick=${() => ctx.navigate('/v1/home')}>${x('goHome')}<//>`} />
         <${Road} name=${x('roadAi')} text=${x('roadAiBodyNew')}
-          doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}<//>`} />
+          doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${t('common.copyForAi')}<//>`} />
         <${Road} name=${x('roadBuilder')} text=${x('roadBuilderBodyNew')}
           doors=${html`<${Action} small onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}<//>`} />
       <//>
@@ -403,7 +405,7 @@ function secFirst(ctx, n) {
 function secAgent(ctx, state, n) {
   return html`
     <${FoldSection} id="pf-ai" num=${n} title=${x('secAi')} sub=${x('secAiSub')} open=${ctx.aiOpen} onToggle=${() => ctx.toggleAi()}>
-      <${Box} doors=${html`<${Action} small onClick=${() => ctx.copyRule()}>${x('copyRule')}<//>`}>
+      <${Box} doors=${html`<${Action} small onClick=${() => ctx.copyRule()}>${t('common.copyForAi')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>
         <${Code}>GET ${apexUrl(ctx.ownerName)}<//> → <${Code}>aimeat_portfolio_publish { html }<//> · ${x('ruleNoMcp')} <${Code}>PUT /v1/portfolio/upload { html }<//>

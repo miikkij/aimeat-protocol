@@ -28,6 +28,8 @@
  *   every sentence on the page says computer.
  * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   v1.4.1 — 2026-11-28 — The programs prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read home.machines.programs.copyPrompt.
  *   v1.4.0 — 2026-10-31 — "Show in the overview" on each computer: the Overview page opened on it (views/home/overview.js).
  *   v1.3.0 — 2026-10-31 — Each computer lists the programs it may start for its agents, and the person
  *     allows or stops each one; a copyable prompt does the same from their own AI (./machine-programs.js;
@@ -271,8 +273,7 @@ export default function MachinesView({ navigate }) {
         ${machines.map((c) => html`
           <${Machine} key=${c.id} c=${c} others=${machines.filter((o) => o.id !== c.id)} onChanged=${load} confirm=${confirm} />`)}
         ${machines.some((c) => c.programs?.length) && html`
-          <${PromptCard} label=${tr('home.machines.programs.ownAi', 'Manage the programs from your own AI')} prompt=${programsPrompt()}
-            copyLabel=${tr('home.machines.programs.copyPrompt', 'Copy the prompt')} />`}
+          <${PromptCard} label=${tr('home.machines.programs.ownAi', 'Manage the programs from your own AI')} prompt=${programsPrompt()} />`}
       <//>`;
 
   return html`

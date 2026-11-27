@@ -12,6 +12,8 @@
  *   stepReflect · proposalList · stepSynthesize · output · pasteBox
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   v2.2.1 -- 2026-11-28 -- A step's one prompt and the rewrite prompt copy under common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v2.2.0 -- 2026-11-27 -- Settings usability pass: making the next version from an option is a quiet
  *     action (Action), so New run in the calibration's head stays the page's one loud action.
  *   v2.1.0 -- 2026-11-08 -- The checkpoints' Weight column head opens the explanation of how a checkpoint's weight makes the score (term calibrator.weight; .claude/rules/page-guidance.md).
@@ -47,6 +49,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { t } from '/js/i18n.js';
 const html = htm.bind(h);
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Row, Name, Desc, Cell, Doors } from '/components/List.js';
@@ -151,7 +154,7 @@ function stepDoors(ctx, run, detail, step) {
     <${RunStepDoors}>
       <${Actions}>
         <${Action} small disabled=${running || !can || !ctx.keyed} onClick=${() => ctx.runStep(run.batchId, step)}>${x('runStepHere')}<//>
-        ${prompts.length === 1 ? html`<${Action} small soft copy=${prompts[0].text}>${x('copyStepPrompt')}<//>` : null}
+        ${prompts.length === 1 ? html`<${Action} small soft copy=${prompts[0].text}>${t('common.copyForAi')}<//>` : null}
         ${step === 'synthesize' ? html`<${Action} small soft onClick=${() => ctx.openPaste({ batchId: run.batchId, step, index: 0 })}>${x('pasteAnswer')}<//>` : null}
       <//>
       ${prompts.length > 1 ? html`<${RunCopies} label=${x('copyStepPrompts')}>${prompts.map((p, i) => html`<${Action} key=${i} small soft copy=${p.text}>${p.label}<//>`)}<//>` : null}
@@ -264,7 +267,7 @@ function stepSynthesize(ctx, run, detail) {
     ${options ? html`
       <${RunApply} note=${applying ? x('applyingHint') : x('applyHint')}>
         <${Action} small disabled=${applying || !ctx.keyed || !optionProposals(s, key).length} onClick=${() => ctx.applyOption(run.batchId, key)}>${applying ? x('applying') : x('applyOption', { option: key, v: (ctx.project.currentVersion || 0) + 1 })}<//>
-        <${Action} small soft copy=${ctx.applyText(detail, key)}>${x('copyApplyPrompt')}<//>
+        <${Action} small soft copy=${ctx.applyText(detail, key)}>${t('common.copyForAi')}<//>
       <//>` : null}`;
 }
 

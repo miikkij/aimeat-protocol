@@ -14,6 +14,8 @@
  * @structure useTeam · PromptPath · TeamSections
  * @usage const team = useTeam(org); … ${team ? html`<${TeamSections} team=${team} me=${owner} num=${num} />` : null}
  * @version-history
+ *   v1.2.1 — 2026-11-28 — The team's prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.2.0 — 2026-11-27 — TeamSections takes `first`: the shared place's page draws the three sections
  *     after its workspaces, so the first of them has a rule over it there; additive.
  *   v1.1.0 — 2026-11-15 — "You in this team" says whether you went through the team's AI onboarding (T11).
@@ -92,7 +94,7 @@ function PromptPath({ orgId }) {
   };
   return html`
     <${Section} fold id="og-team-prompt" num="" title=${x('promptTitle')} sub=${x('promptSub')} open=${open} onToggle=${() => setOpen((o) => !o)}>
-      ${prompt ? html`<${Actions}><${Action} small copy=${prompt} copiedLabel=${x('copied')}>${x('copyPrompt')}<//><//>` : null}
+      ${prompt ? html`<${Actions}><${Action} small copy=${prompt} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//><//>` : null}
       <${TextArea} label=${x('pasteLabel')} rows=${6} value=${text} onInput=${(v) => { setText(v); setPlan(null); setDone(null); }} />
       <${Actions}><${Action} small disabled=${!text.trim()} onClick=${() => paste(true)}>${x('check')}<//><//>
       ${plan ? html`

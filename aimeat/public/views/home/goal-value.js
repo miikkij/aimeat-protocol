@@ -13,6 +13,8 @@
  * @structure GoalValue({ goal })
  * @usage <${GoalValue} goal=${goal} /> in views/home/goal.js
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The baseline prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read home.goal.value.copy ("Copy").
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 3).
  */
 import { h } from 'preact';
@@ -71,8 +73,7 @@ export function GoalValue({ goal }) {
       ${!b && html`
         <${Note} kind="quiet">${g('noBaselineNote', 'Tell your AI how long the work takes you without AI, and this section counts the saving from it.')}<//>
         <${PromptCard} label=${g('promptLabel', 'Say it to your own AI')}
-          prompt=${fill(g('prompt', 'The goal "{title}" takes me about … without AI (per result, per week or per month). Save it as the goal\'s baseline.'), { title: goal.title })}
-          copyLabel=${g('copy', 'Copy')} />`}
+          prompt=${fill(g('prompt', 'The goal "{title}" takes me about … without AI (per result, per week or per month). Save it as the goal\'s baseline.'), { title: goal.title })} />`}
       ${v === null && b && html`<${Note} kind="quiet">${g('noResults', 'No result of this goal has been counted yet.')}<//>`}
     <//>`;
 }

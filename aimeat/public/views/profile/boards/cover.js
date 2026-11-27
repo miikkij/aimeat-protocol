@@ -15,6 +15,8 @@
  * @structure renderBoardsView · expiresSoon · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.18.3 -- 2026-11-28 -- The agent prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.18.2 -- 2026-11-27 -- The app guide link draws the external Glyph after its words instead of ↗.
  *   v1.18.1 -- 2026-11-27 -- The new board form asks who posts only for a shared or public board.
  *   v1.18.0 -- 2026-11-27 -- Usability pass: the followed boards stay first and open; the newest notices
@@ -244,7 +246,7 @@ function secApp(ctx) {
     <${Stack} gap="medium">
       <${SubHeading}>${c('agentTitle')}<//>
       <${Note}>${c('agentText')}<//>
-      <${Actions}><${Action} small onClick=${copyAgent}>${c('copyAgent')}<//><//>
+      <${Actions}><${Action} small onClick=${copyAgent}>${t('common.copyForAi')}<//><//>
     <//>`;
   return html`
     <${Beside} wide side=${side}>

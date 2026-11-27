@@ -19,6 +19,8 @@
  * @structure recordsGaps() · gapNames() · buildOrganismRecordsPrompt() · OrganismRecords({ org, canEdit, num, first })
  * @usage imported by views/profile/organisms/home-settings.js and views/admin/compliance-tab.records.js
  * @version-history
+ *   v1.1.1 — 2026-11-28 — The prompt copies under common.copyForAi, the one name of a prompt copy;
+ *     organisms.records.copy had the same words.
  *   v1.1.0 — 2026-11-13 — The reading order names the balancing test gaps.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.4).
  */
@@ -137,7 +139,7 @@ export function OrganismRecords({ org, canEdit, num, first }) {
   const rows = gapRows(gaps);
   return html`
     <${Section} id="og-set-records" num=${num} first=${first} title=${O('title')}
-      doors=${canEdit ? html`<${Action} small soft copy=${prompt}>${O('copy')}<//>` : null}>
+      doors=${canEdit ? html`<${Action} small soft copy=${prompt}>${t('common.copyForAi')}<//>` : null}>
       <${Note} kind="lead">${canEdit ? O('leadEdit') : O('leadRead')}<//>
       ${regs === null ? '' : regs.length === 0
         ? html`<${Note} kind="quiet">${O('none')}<//>`

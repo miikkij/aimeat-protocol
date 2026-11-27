@@ -44,6 +44,8 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.9.1 — 2026-11-28 — The text for the person's AI copies under common.copyForAi ("Copy the prompt
+ *     for your AI"), the one name of a prompt copy.
  *   v1.9.0 — 2026-11-27 — Usability round 3. The open things are grouped by kind, each kind one closed
  *     row that says how many and at which levels. A record, a file or a knowledge item the report names
  *     by its key is named by the key's last part in words, the key under it (nameOf); an address is
@@ -312,7 +314,7 @@ function ItemRow({ item, busy, onClose, onCopied }) {
         ${close ? html`<${Action} small row tone="danger" disabled=${busy} onClick=${() => onClose(item, close)}>${x('closeIt')}<//>` : null}
         ${place ? html`<${Action} small row onClick=${() => openTab(place[0])}>${x('goThere', { page: t(place[1]) })}<//>` : null}
         ${appHref ? html`<${Action} small row href=${appHref} newTab>${x('goThere', { page: t('catalog.title') })}<//>` : null}
-        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${x('copyForAi')}<//>
+        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${t('common.copyForAi')}<//>
       <//>
     <//>`;
 }
@@ -336,7 +338,7 @@ function ConflictRow({ item, busy, onLower, onCopied }) {
         ${lower ? html`<${Action} small row disabled=${busy} onClick=${() => onLower(item, lower)}>${x('cls.lowerIt')}<//>` : null}
         ${place ? html`<${Action} small row onClick=${() => openTab(place[0])}>${x('goThere', { page: t(place[1]) })}<//>` : null}
         ${appHref ? html`<${Action} small row href=${appHref} newTab>${x('goThere', { page: t('catalog.title') })}<//>` : null}
-        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${x('copyForAi')}<//>
+        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${t('common.copyForAi')}<//>
       <//>
     <//>`;
 }

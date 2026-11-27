@@ -11,6 +11,8 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.24.1 -- 2026-11-28 -- The request for the person's AI (in the head and on its road) and the rule
+ *     copy under common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.24.0 -- 2026-11-27 -- Usability pass of the Settings pages: what is installed stays 01 and what is
  *     on offer stays open (it is how one begins); an installed copy whose package has a newer version
  *     leads its list, then one that is not running, and their count leads the strip in the notice
@@ -120,7 +122,7 @@ export function renderPage(ctx) {
   ]} />`;
 
   const actions = html`
-    <${Loud} control disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//>
+    <${Loud} control disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.pickZip()}>${x('importZip')}<//><//>`;
   // What is installed and what is on offer stay open (what is on offer is how one begins); the
   // owner's own publications are drawn once there are any; how a new package is made and how an
@@ -227,7 +229,7 @@ function secNew(ctx, num) {
           ${open ? composeForm(ctx) : null}
         <//>
         <${Road} name=${x('roadAsk')} text=${x('roadAskBody')}
-          doors=${html`<${Action} small disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//><${Note} inline>${x('roadAskSub')}<//>`} />
+          doors=${html`<${Action} small disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//><${Note} inline>${x('roadAskSub')}<//>`} />
         <${Road} name=${x('roadZip')} text=${x('roadZipBody')}
           doors=${html`<${Action} small disabled=${ctx.busy === 'import'} onClick=${() => ctx.pickZip()}>${ctx.busy === 'import' ? x('importing') : x('pickFile')}<//>`} />
       <//>
@@ -283,7 +285,7 @@ function secAgent(ctx, num) {
   return html`
     <${FoldSection} id="pk-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${!!ctx.folds.ai} onToggle=${() => ctx.setFold('ai', !ctx.folds.ai)}>
       <${Note} kind="lead">${x('aiIntro')}<//>
-      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>
       <//>

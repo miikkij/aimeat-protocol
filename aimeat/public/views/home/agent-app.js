@@ -25,6 +25,8 @@
  * @structure default AgentAppView({ navigate })
  * @usage routed at /v1/home?agent=<name>&new-app=1[&say=<sentence>] by spa.html
  * @version-history
+ *   v1.0.1 — 2026-11-28 — Both prompts copy under PromptCard's default words, common.copyForAi ("Copy the
+ *     prompt for your AI"); they read home.agentApp.copy.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import { h } from 'preact';
@@ -229,7 +231,7 @@ export default function AgentAppView({ navigate }) {
       <${PageSection} group ends title=${p('promptTitle', 'The prompt')}>
         ${builder !== 'other' && html`
           <${PromptCard} loud=${builder === 'own'} quiet=${builder !== 'own'} label=${p('promptLabel', 'What you say to your AI')} prompt=${request}
-            copyLabel=${p('copy', 'Copy the prompt')} copiedLabel=${p('copied', 'Copied. Paste it to your AI')} />`}
+            copiedLabel=${p('copied', 'Copied. Paste it to your AI')} />`}
         ${builder === 'chat' && html`
           <${FormActions}><${Loud} control onClick=${toChat}>${p('toChat', 'Open the chat with this prompt')}<//><//>`}
         ${builder === 'other' && html`
@@ -239,7 +241,7 @@ export default function AgentAppView({ navigate }) {
           ${full.state === 'failed' && html`<${Note} kind="message" error>${full.text}<//>`}
           ${full.state === 'ready' && html`
             <${PromptCard} loud showPrompt=${false} label=${p('otherLabel', 'The whole prompt ({n} characters)').replace('{n}', String(full.text.length))} prompt=${full.text}
-              copyLabel=${p('copy', 'Copy the prompt')} copiedLabel=${p('copied', 'Copied. Paste it to your AI')} />
+              copiedLabel=${p('copied', 'Copied. Paste it to your AI')} />
             <${FormActions}><${Action} href="/v1/appcat?create=1">${p('otherAdd', 'Add the finished app here →')}<//><//>
             <${Note} kind="quiet">${p('otherTie', 'When the app is added, tie it to the agent on the agent\'s page: Apps, "Tie an app that already exists".')}<//>`}`}
       <//>

@@ -13,6 +13,8 @@
  *   keyDialog · readyCommands · keyOnce · dryRunBlock · extendDialog
  * @usage ${renderDialogs(ctx)} after the page
  * @version-history
+ *   v1.2.1 — 2026-11-28 — The key-once view's text for the person's AI copies under common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy; it read ai.copyShort ("Copy").
  *   v1.2.0 — 2026-11-09 — The key-once view shows two ready commands under the API key, for macOS,
  *     Linux and Git Bash and for Windows PowerShell, with the address, the API key and an example
  *     message in them, each with its copy button; a switch adds ?dry_run=true to both. They replace
@@ -279,7 +281,7 @@ function keyOnce(ctx, d) {
       <${Box} name=${x('key.aiLabel')}>
         <${Note} kind="hint">${x('key.aiHint')}<//>
         <${Code} block>${forAi}<//>
-        <${Actions}><${Action} small copy=${forAi} copiedLabel=${x('copied')}>${x('ai.copyShort')}<//><//>
+        <${Actions}><${Action} small copy=${forAi} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//><//>
       <//>
       ${dryRunBlock(ctx, d)}
     <//>`;

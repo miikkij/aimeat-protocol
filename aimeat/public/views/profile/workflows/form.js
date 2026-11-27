@@ -12,6 +12,8 @@
  * @structure renderForm · basics · varsBlock · stepFold · offerWords · endFold
  * @usage import { renderForm } from './form.js';
  * @version-history
+ *   v1.13.3 — 2026-11-28 — The head's improve prompt and the rail's chat prompt copy under
+ *     common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.13.2 — 2026-10-19 — A step's agent picker shows each agent's shown name (agentLabel), in alphabetical order.
  *   v1.13.1 — 2026-10-13 — A trigger the form does not draw (an app's event, rows added to a row space, a trigger with coalesce) is saved back as it was unless the person changes a trigger field. An app's event used to be saved back as "by hand".
  *   v1.13.0 — 2026-10-02 — The question marks that explain the workflow settings: schedule.cron, schedule.timezone (TextField help), workflow.step_timeout (Field group help), workflow.skip_done, workflow.fresh, workflow.parallel (yn() help argument), workflow.llm_checks (HelpTip beside its Choice); their grey hints moved into them (components/HelpTip.js).
@@ -73,7 +75,7 @@ export function renderForm(ctx) {
   const back = { label: editing ? c('backToWorkflow') : c('backTo'), onClick: () => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' }) };
   const doors = html`
     <${Loud} control disabled=${ctx.saving || !f.id.trim() || !f.steps.length} onClick=${() => ctx.handleSave()}>${c('save')}<//>
-    ${editing ? html`<${Action} small onClick=${() => ctx.copyPrompt('improve-mcp', f.id)}>${c('promptToChat')}<//>` : null}
+    ${editing ? html`<${Action} small onClick=${() => ctx.copyPrompt('improve-mcp', f.id)}>${t('common.copyForAi')}<//>` : null}
     <${Action} small soft onClick=${() => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' })}>${t('profile.cancel')}<//>`;
   const checks = [
     [f.steps.every(s => s.action || (s.agent && s.offer)), c('checkEveryStepOffer')],
@@ -86,7 +88,7 @@ export function renderForm(ctx) {
       ...checks.map(([ok, label], i) => ({ key: 'c' + i, plain: true, mark: ok ? '✓' : '✗', label, notice: !ok })),
       ...ctx.saveErrors.map((e, i) => ({ key: 'e' + i, plain: true, mark: '✗', label: e, notice: true })),
     ] },
-    { label: c('ratherInChat'), items: [{ key: 'chat', mark: '→', label: editing ? c('copyImprove') : c('copyPrompt'), onClick: () => ctx.copyPrompt(editing ? 'improve-mcp' : 'create-mcp', editing ? f.id : undefined) }] },
+    { label: c('ratherInChat'), items: [{ key: 'chat', mark: '→', label: t('common.copyForAi'), onClick: () => ctx.copyPrompt(editing ? 'improve-mcp' : 'create-mcp', editing ? f.id : undefined) }] },
   ];
 
   return renderPage(ctx, {

@@ -20,9 +20,12 @@
  * @structure PromptCard({ label, prompt, className, loud, quiet, copyLabel, copiedLabel, onCopied,
  *   saveIntent, agents, onGiveToAgent, showPrompt })
  * @usage
- *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
+ *   html`<${PromptCard} label=${t('...')} prompt=${text} />`   (the copy reads common.copyForAi)
  *   html`<${PromptCard} loud=${!copied} quiet=${copied} label=… prompt=… copyLabel=… />`
  * @version-history
+ *   2026-11-28: The copy's words default to common.copyForAi ("Copy the prompt for your AI"), the one
+ *     name of every prompt copy on the Settings pages and the home; a caller passes copyLabel only
+ *     when its copy is not that.
  *   2026-11-27: The More menu button draws the down Chevron instead of the ▾ letter.
  *   2026-09-27: `loud` and `quiet` name the copy's weight (the loud action or the action link), so a
  *     page passes a meaning instead of a class; `className` stays for the callers that pass one
@@ -106,7 +109,7 @@ export function PromptCard({
           <${CopyButton}
             text=${prompt}
             className=${copyClass}
-            label=${copyLabel}
+            label=${copyLabel || t('common.copyForAi')}
             copiedLabel=${copiedLabel}
             onCopied=${onCopied} />
           ${hasMenu && html`

@@ -17,6 +17,8 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-11-28: A playbook's prompt copies under common.copyForAi ("Copy the prompt for your AI"), the
+ *     one name of a prompt copy; it read home.playbooks.copy.
  *   2026-11-27: MailboxRow passes no mailbox emoji to its StatLine; the sentence stands alone.
  *   2026-11-14: YourTurn marks a thread a question of Ask someone who knows opened, and links it
  *     straight to that thread.
@@ -372,7 +374,7 @@ export function Playbooks({ playbooks, tour }) {
           <${Action} onClick=${() => copyPrompt(pb)}>
             ${copied === pb.id
               ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
-              : tr('home.playbooks.copy', 'Copy for my own AI')}
+              : t('common.copyForAi')}
           <//>
         <//>`)}>
       ${playbooks.map((pb) => html`

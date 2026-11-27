@@ -13,6 +13,8 @@
  * @structure renderPage · isStale · shelfFold · shelf · shelfBody · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.28.1 -- 2026-11-28 -- The rule (in the head and in its box) and the road's request copy under
+ *     common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.28.0 -- 2026-11-27 -- The filter row is drawn only over a shelf of more than ten (Filters
  *     total); a filter that counts 0 is not drawn (List.js Filter).
  *   v1.27.0 -- 2026-11-27 -- Usability pass: "Your skills" stays first and open; workspace skills are
@@ -119,7 +121,7 @@ export function renderPage(ctx) {
   const openNew = () => { ctx.setFold('new', true); scrollToSection('sk-new'); };
   const actions = html`
     <${Loud} quiet=${ctx.editor.open} onClick=${openNew}>${x('newSkill')}<//>
-    <${Actions}><${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//><//>`;
+    <${Actions}><${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${t('common.copyForAi')}<//><//>`;
 
   // The library is read rarely, so it is a row that says how many it holds; it opens by itself
   // when one of its skills an agent holds has been replaced. A new skill is a row too, open while
@@ -230,7 +232,7 @@ function secNew(ctx, num, open) {
       <${Note} kind="lead">${x('newIntro')}<//>
       <${Roads}>
         <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${agentRequest(ctx.ownerName)}
-          doors=${html`<${Action} small copy=${agentRequest(ctx.ownerName)} copiedLabel=${x('copied')}>${x('copyRequest')}<//>`} />
+          doors=${html`<${Action} small copy=${agentRequest(ctx.ownerName)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`} />
         <${Road} name=${e.editing ? x('roadEdit', { name: e.editing }) : x('roadWrite')} text=${x('roadWriteBody')}
           doors=${e.open ? null : html`<${Action} small onClick=${() => ctx.openEditor()}>${x('openEditor')}<//>`}>
           ${e.open ? html`
@@ -254,7 +256,7 @@ function secAgent(ctx, num, node, open) {
   const pub = node.filter((s) => s.visibility === 'public').length;
   return html`
     <${Section} fold id="sk-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${open} onToggle=${() => ctx.setFold('ai', !open)}>
-      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>
       <//>

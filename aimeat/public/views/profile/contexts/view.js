@@ -19,6 +19,9 @@
  *   fingerprintPart · corePart · foldPart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.6.2 — 2026-11-28 — The sentence that continues a context and the fingerprint request copy under
+ *     common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy; they read
+ *     "Continue in chat" and "Copy the request".
  *   v1.6.1 — 2026-11-27 — With no context the strip is not drawn (FigureStrip hideZeros), so the
  *     list's one empty line is the page; the not-updated figure has no attention tone (a context to
  *     archive does not wait for the person, and the list keeps the newest first).
@@ -232,7 +235,7 @@ function headPart(ctx, c) {
         { key: 'key', k: x('keyK'), v: c.key, mono: true, sub: x('keySub') },
       ]} />
       <${Actions}>
-        <${Loud} control copy=${sentence} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${x('continue')}<//>
+        <${Loud} control copy=${sentence} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${t('common.copyForAi')}<//>
         ${m.archived
           ? html`<${Action} small control disabled=${ctx.busy} onClick=${() => ctx.bringBack(c)}>${x('bringBack')}<//>`
           : html`<${Action} small control disabled=${ctx.busy} onClick=${() => ctx.archive(c)}>${x('archive')}<//>`}
@@ -259,7 +262,7 @@ function fingerprintPart(ctx, c, nextNum) {
       <${PageSection} id="ctx-fingerprint" num=${nextNum()} title=${x('fingerprint')}>
         <${Note} kind="quiet">${x('noFingerprint')}<//>
         <${Actions}>
-          <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${x('fingerprintCopy')}<//>
+          <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${t('common.copyForAi')}<//>
         <//>
         <${Note} kind="hint">${x('fingerprintHint', { sentence: ask })}<//>
       <//>`;
@@ -272,7 +275,7 @@ function fingerprintPart(ctx, c, nextNum) {
         ? x('fingerprintOlder', { date: date(fp.madeAt) })
         : x('fingerprintMade', { date: date(fp.madeAt) })}<//>
       ${older ? html`<${Actions}>
-        <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${x('fingerprintCopy')}<//>
+        <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${t('common.copyForAi')}<//>
       <//>` : null}
     <//>`;
 }

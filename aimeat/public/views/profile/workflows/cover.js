@@ -14,6 +14,8 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.19.1 -- 2026-11-28 -- The empty list's prompt and the two chat roads' prompts copy under
+ *     common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.19.0 -- 2026-11-27 -- The empty list carries the sentence to give one's own AI (a PromptCard of
  *     pageStart.workflows.prompt): it pointed at the start, which is closed. The list section is
  *     "Saved workflows" (secList), no longer the page's own title.
@@ -158,7 +160,7 @@ function secWorkflows(ctx, items, n, first) {
         : !list.length ? html`<${Stack}>
             <${Note} kind="quiet">${c('empty')}<//>
             <${PromptCard} quiet label=${t('pageStart.promptLabel')} prompt=${t('pageStart.workflows.prompt')}
-              copyLabel=${t('pageStart.copy')} copiedLabel=${t('common.copied')} />
+              copiedLabel=${t('common.copied')} />
           <//>`
         : workflowRows(ctx, list, { head: true })}
       ${ctx.checkNote ? html`<${Box} name=${ctx.checkNote.title}
@@ -214,8 +216,8 @@ function secNew(ctx, n, none) {
   return html`
     <${FoldSection} id="wp-new" num=${n} title=${c('secNew')} sub=${c('threeRoads')} open=${open} onToggle=${() => ctx.setFold('new', !open)}>
       <${Roads} cols="three">
-        ${road('mcp', c('roadMcpK'), c('roadMcpTitle'), c('roadMcpBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-mcp'); }}>${c('copyPrompt')}<//>`)}
-        ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-chat'); }}>${c('copyPrompt')}<//>
+        ${road('mcp', c('roadMcpK'), c('roadMcpTitle'), c('roadMcpBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-mcp'); }}>${t('common.copyForAi')}<//>`)}
+        ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-chat'); }}>${t('common.copyForAi')}<//>
           <${Action} small soft onClick=${e => { e.stopPropagation(); ctx.setRoad('chat'); ctx.setPasteOpen(true); }}>${c('pasteResult')}<//>`)}
         ${road('form', c('roadFormK'), c('roadFormTitle'), c('roadFormBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.pickView({ kind: 'create' }); }}>${c('openForm')}<//>`)}
       <//>

@@ -12,6 +12,8 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.23.1 -- 2026-11-28 -- The rule for the person's AI copies under common.copyForAi ("Copy the prompt
+ *     for your AI"), the one name of a prompt copy, in the head and in the rule's box.
  *   v1.23.0 -- 2026-11-27 -- The filter row is drawn only over a shelf of more than ten (Filters total).
  *   v1.22.0 -- 2026-11-27 -- Usability pass. The strip says what an agent finds here and how much of it
  *     it can call, what is the person's own, what the operator rejected of theirs (notice tone, only
@@ -118,7 +120,7 @@ export function renderPage(ctx) {
   ]} />`;
 
   const actions = html`
-    <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
+    <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${t('common.copyForAi')}<//>
     <${Actions}><${Action} small onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')}<//><//>`;
 
   // What is drawn: a shelf only when it holds something, and with nothing at all the extension shelf
@@ -245,7 +247,7 @@ function secAgent(ctx, num, all, calls, vouches) {
   return html`
     <${Section} fold id="cp-ai" num=${num} title=${x('secAi')} sub=${ctx.policy ? (ctx.policy.call_counting ? x('countAll') : x('countRegistry')) : ''}
       open=${ctx.aiOpen} onToggle=${ctx.toggleAiOpen}>
-      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>
       <//>

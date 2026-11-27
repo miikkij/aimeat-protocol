@@ -16,6 +16,8 @@
  * @structure JourneyPath · RoadChooser · ConnectBox (moved from journey.js) · PromptRoad
  * @usage html`<${JourneyPath} journey=${journey} />  <${RoadChooser} journey=${journey} />`
  * @version-history
+ *   v1.4.1 — 2026-11-28 — The proof and profile prompts copy under PromptCard's default words,
+ *     common.copyForAi ("Copy the prompt for your AI"); they read common.copyPrompt.
  *   v1.4.0 — 2026-10-31 — The path says how many stages are done and which is next, with what it is
  *     in one sentence; each stage says what it is on hover (v31 K27).
  *   v1.3.1 — 2026-10-16 — The road is saved only on top of a strict read of journey.state: a failed read
@@ -112,7 +114,7 @@ export function ConnectBox({ onMessage, claudeNote = null }) {
     <h3>${t('homeJourney.prove')}</h3>
     <p>${t('homeJourney.proveHint')}</p>
     <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} quiet
-      copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
+      copiedLabel=${t('common.copied')} />
     <${Action} onClick=${refreshHome}>${t('homeJourney.check')}<//>
     <${ChooserFold} summary=${t('homeJourney.deviceFlow')}>
       <${StepAgent} onChanged=${refreshHome} showToast=${onMessage} />
@@ -163,7 +165,7 @@ function PromptRoad() {
   return html`<${ChooserBox}>
     <p>${t('homeJourney.profilePromptIntro')}</p>
     <${PromptCard} label=${t('homeJourney.profile')} prompt=${prompt} quiet
-      copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
+      copiedLabel=${t('common.copied')} />
     <${PasteBox} id="home-paste-profile" label=${t('homeJourney.pasteLabel')} rows="4" value=${text}
       placeholder=${t('home.mat.pastePlaceholder')}
       onInput=${(e) => setText(e.currentTarget.value)} />

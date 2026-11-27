@@ -15,6 +15,8 @@
  * @structure StepCard({ item, onDone }) · NobodyCard({ item, navigate }) · goalPrompt(goal)
  * @usage html`<${StepCard} item=${{ goal_id, goal, work }} onDone=${reload} />`
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The step prompts copy under PromptCard's default words, common.copyForAi ("Copy
+ *     the prompt for your AI"); they read home.goal.copyPrompt.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { h } from 'preact';
@@ -111,7 +113,7 @@ export function StepCard({ item, onDone, showGoal }) {
           <${TextArea} label=${g('readyText', 'Ready text')} value=${tx} rows=${3} readOnly />
           <${Action} small copy=${tx} copiedLabel=${g('copied', 'Copied')}>${g('copyText', 'Copy the text')}<//>
         </div>`)}
-      ${w.prompt && html`<${PromptCard} label=${g('promptLabel', 'A ready prompt for any AI')} prompt=${w.prompt} copyLabel=${g('copyPrompt', 'Copy the prompt')} />`}
+      ${w.prompt && html`<${PromptCard} label=${g('promptLabel', 'A ready prompt for any AI')} prompt=${w.prompt} />`}
       <${Actions}><${Loud} control disabled=${busy} onClick=${() => send({ text: text || undefined })}>${g('didIt', 'I did this')}<//><//>`;
   } else if (w.human_kind === 'provide') {
     body = html`
@@ -156,7 +158,7 @@ export function NobodyCard({ item, navigate }) {
       <${Note} kind="quiet">${w.wants?.length
         ? g('nobodyWants', 'None of your agents that know {skills} took it. Choose how it gets done:').replace('{skills}', w.wants.join(', '))
         : g('nobodyAny', 'No agent took it. Choose how it gets done:')}<//>
-      <${PromptCard} label=${g('nobodyOwnAi', 'Your own AI does it now')} prompt=${prompt} copyLabel=${g('copyPrompt', 'Copy the prompt')} />
+      <${PromptCard} label=${g('nobodyOwnAi', 'Your own AI does it now')} prompt=${prompt} />
       <${Actions}>
         <${Action} control onClick=${() => navigate?.('/v1/home?new-agent=1&say=' + encodeURIComponent(sentence))}>${g('nobodyMake', 'Make an agent for it')}<//>
       <//>

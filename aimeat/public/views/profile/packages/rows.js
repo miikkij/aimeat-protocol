@@ -12,6 +12,8 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.24.1 — 2026-11-28 — An offer's and a package's text for the agent copy under common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.24.0 — 2026-10-31 — A package its author sells: the offer row says its price and its door is Buy
  *     until this account owns it, the opened row has the price and Buy (sale.js) in place of the install
  *     field and the download; one of the owner's own has the price they set and its sales, and its
@@ -234,7 +236,7 @@ function offerOpen(ctx, o, key) {
   const locked = !!o.sale && !o.owned && o.author !== ctx.ownerName;
   const doors = html`
     ${o.group && !locked ? html`<${Action} small soft onClick=${() => ctx.download(o.group, o.name)}>${x('downloadZip')}<//>` : null}
-    <${Action} small soft copy=${agentTextFor(o)} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    <${Action} small soft copy=${agentTextFor(o)} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>
     <${Action} small soft onClick=${close}>${x('close')}<//>`;
   return html`
     <${Panel} doors=${doors}>
@@ -290,7 +292,7 @@ function ownOpen(ctx, p, key, listing, state, installed) {
   const close = () => ctx.toggle(key, p);
   const doors = html`
     <${Action} small soft onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}<//>
-    <${Action} small soft copy=${agentTextFor({ title: p.name, group: p.packageGroupId, description: p.description || '', components: p.components || [] })} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    <${Action} small soft copy=${agentTextFor({ title: p.name, group: p.packageGroupId, description: p.description || '', components: p.components || [] })} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>
     <${Action} small soft tone="danger" onClick=${() => ctx.archive(p)}>${x('archive')}<//>
     <${Action} small soft onClick=${close}>${x('close')}<//>`;
   // Private or public: the chosen one is on and cannot be pressed again, as main's doors were.

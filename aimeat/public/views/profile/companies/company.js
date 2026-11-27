@@ -11,6 +11,8 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.17.2 -- 2026-11-28 -- The head's prompt copy and each chat road's copy read common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.17.1 -- 2026-11-27 -- The strip's invoice and e-mail words agree with their number (tn).
  *   v1.17.0 -- 2026-11-27 -- Who may act counts the linked shared place's members (member_count from
  *     the organisms the page already read) where it said "team"; the words for the link say shared
@@ -113,7 +115,7 @@ export function renderCompany(ctx) {
       actions=${html`
         ${co.address ? html`<${Loud} href=${co.address} newTab>${c('openAddress')}<//>` : null}
         <${Actions}>
-          <${Action} small onClick=${() => ctx.copyPrompt('settings')}>${c('promptToChat')}<//>
+          <${Action} small onClick=${() => ctx.copyPrompt('settings')}>${t('common.copyForAi')}<//>
           <${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removeCompany()}>${c('deleteCompany')}<//>
         <//>`}
       strip=${strip}
@@ -262,7 +264,7 @@ function smtpFold(ctx) {
 function chatFold(ctx) {
   const road = (k, promptKind) => html`
     <${Road} key=${k} kicker=${c('road.' + k + 'K')} name=${c('road.' + k + 'T')} text=${c('road.' + k + 'D')}
-      doors=${html`<${Action} small onClick=${() => ctx.copyPrompt(promptKind)}>${c('copyPrompt')}<//>`} />`;
+      doors=${html`<${Action} small onClick=${() => ctx.copyPrompt(promptKind)}>${t('common.copyForAi')}<//>`} />`;
   return html`
     <${Roads} cols="three">
       ${road('fill', 'settings')}

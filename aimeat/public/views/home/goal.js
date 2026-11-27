@@ -17,6 +17,8 @@
  * @structure default GoalView({ navigate })
  * @usage routed at /v1/home?goal=<id> by spa.html
  * @version-history
+ *   v1.1.1 — 2026-11-28 — The own-AI prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read home.goal.copyPrompt.
  *   v1.1.0 — 2026-11-20 — "What it gave" (goal-value.js): the baseline, what the results became, the
  *     cost and the saving counted from the baseline.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -311,7 +313,7 @@ export default function GoalView({ navigate }) {
       ${goal.status === 'proposed' && actionError && html`<${ErrorNote} text=${actionError} />`}
       ${goal.status !== 'proposed' && html`
       <${PageSection} group ends title=${g('controlTitle', 'Manage the goal')}>
-      <${PromptCard} label=${g('ownAi', 'Manage it from your own AI')} prompt=${goalPrompt(goal)} copyLabel=${g('copyPrompt', 'Copy the prompt')} />
+      <${PromptCard} label=${g('ownAi', 'Manage it from your own AI')} prompt=${goalPrompt(goal)} />
       ${actionError && html`<${ErrorNote} text=${actionError} />`}
       <${Actions}>
         ${goal.status === 'active' && html`<${Action} control disabled=${busy} onClick=${() => act('pause')}>${g('pause', 'Pause')}<//>`}

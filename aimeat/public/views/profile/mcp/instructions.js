@@ -9,6 +9,8 @@
  * @structure secInstructions · orgPromptBlock
  * @usage import { secInstructions } from './instructions.js';
  * @version-history
+ *   v2.2.1 — 2026-11-28 — The organism prompt copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v2.2.0 — 2026-11-27 — One fold row numbered by the page, whose line names the organism the
  *     instructions are made from (or says there is none yet), opening in place; drawn only once an AI
  *     is connected. The contents are unchanged; mcppage.secInstructionsSub is no longer read.
@@ -89,7 +91,7 @@ function orgPromptBlock(ctx) {
     <${TextField} label=${m('orgPurposeLabel')} value=${ctx.purpose} placeholder=${m('orgPurposePh')} onInput=${ctx.setPurpose} />
     <${Code} block tall>${ctx.orgPrompt}<//>
     <${Actions}>
-      <${Action} small copy=${ctx.orgPrompt} copiedLabel=${t('common.copied')}>${t('helloMcp.org.copy')}<//>
+      <${Action} small copy=${ctx.orgPrompt} copiedLabel=${t('common.copied')}>${t('common.copyForAi')}<//>
       <${Action} small disabled=${ctx.orgBusy} onClick=${ctx.refreshOrgs}>${ctx.orgBusy ? t('helloMcp.org.refreshing') : t('helloMcp.org.refresh')}<//>
     <//>
     ${f ? html`<${Note} kind="message" error=${!f.ok}>

@@ -11,6 +11,8 @@
  * @structure addBody · roads · roadName · personForm · roadChat
  * @usage import { addBody, personForm } from './add.js';
  * @version-history
+ *   v1.11.1 — 2026-11-28 — The chat road's prompt copy reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.11.0 — 2026-10-27 — The person form shows a refused save's message under each field (Fields `errors`, ctx.formErrors) and stops each field at the server's limit (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.10.0 — 2026-09-26 — Every part is a kit component (Roads with the chosen road; the person form as Fields of TextField, Choice, TagInput and TextArea, their labels over the fields; FormActions; Beside for the picker and its Add; Label; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.9.0 — 2026-09-26 — A tag that takes itself off is the removable tag (.tag-removable) and its ✗ the Tag's remove mark (.poster-chip-x): grey, coral while the pointer is on the tag (a unification: Jouni's decision "Remove mark").
@@ -61,7 +63,7 @@ export function addBody(ctx) {
     <${Roads} cols="three">
       ${road('name', c('roadNameK'), c('roadNameTitle'), c('roadNameBody'), html`<${Action} small onClick=${() => ctx.setRoad('name')}>${c('roadNameDoor')}<//>`)}
       ${road('person', c('roadPersonK'), c('roadPersonTitle'), c('roadPersonBody'), html`<${Action} small onClick=${() => ctx.setRoad('person')}>${c('roadPersonDoor')}<//>`)}
-      ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<${Action} small onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}<//>`)}
+      ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<${Action} small onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//>`)}
     <//>
     ${ctx.road === 'name' ? roadName(ctx) : ctx.road === 'person' ? part(c('writeDown'), personForm(ctx, { withInvite: true })) : roadChat(ctx)}`;
 }
@@ -133,5 +135,5 @@ export function personForm(ctx, { withInvite = false, editing = false } = {}) {
 function roadChat(ctx) {
   return part(c('roadChatTitle'), html`
     <${Note} kind="lead">${c('chatBody')}<//>
-    <${Actions}><${Loud} onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}<//><//>`);
+    <${Actions}><${Loud} onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//><//>`);
 }

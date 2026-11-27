@@ -23,6 +23,8 @@
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>, and from a
  *   goal's proposal tag=<skill>&goal=<id>)
  * @version-history
+ *   v1.12.1 — 2026-11-28 — The own-AI prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read common.copyPrompt.
  *   v1.12.0 — 2026-10-31 — A proposal that names its clock (`schedule`) opens on "On a clock" at that
  *     time, so the one press creates the agent and its schedule (v31 K47).
  *   v1.11.0 — 2026-10-31 — Signed out, "Sign in" opens the dialog on this page, so the person returns
@@ -459,7 +461,7 @@ export default function AgentNewView({ navigate }) {
         <${PageIntro} title=${n('ownAiTitle', 'Ask your own AI to make it')}
           sub=${n('ownAiSub', 'No AI model answers on this AIMEAT right now, so the agent is written by the AI you already use. Copy this to it. Its proposal arrives on your home, and you approve it there.')} />
         <${PromptCard} label=${n('ownAiLabel', 'What to say to your AI')} prompt=${ownAiRequest(sentence.trim(), chosen && machines.length > 1 ? machineName(chosen) : '')}
-          loud copyLabel=${tr('common.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('common.copied', 'Copied')} />
+          loud copiedLabel=${tr('common.copied', 'Copied')} />
         <${FormActions}>
           <${Action} onClick=${() => setPhase('ask')}>${tOr('home.ideas.startExample', 'Or start from an example')}<//>
         <//>

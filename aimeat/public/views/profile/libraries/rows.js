@@ -10,6 +10,8 @@
  * @structure packRow · packOpen
  * @usage import { packRow } from './rows.js';
  * @version-history
+ *   v1.16.1 -- 2026-11-28 -- A library's text for the person's AI copies under common.copyForAi ("Copy
+ *     the prompt for your AI"), the one name of a prompt copy.
  *   v1.16.0 -- 2026-11-27 -- A deprecated library that the reader's own apps still load names them in
  *     the row's coral note line (usability pass of the Settings pages: what needs the person is said
  *     where it is).
@@ -74,7 +76,7 @@ export function packRow(ctx, p) {
       <${Cell} code sub=${usesWords(p)} subQuiet=${!(p.used_by?.apps || 0)}>${p.apiSurface || p.id}<//>
       <${Doors}>
         <${Action} small row onClick=${() => ctx.toggle(p)}>${open ? x('close') : x('open')}<//>
-        <${Action} small row soft onClick=${() => ctx.copyForAi(p)}>${x('copyAi')}<//>
+        <${Action} small row soft onClick=${() => ctx.copyForAi(p)}>${t('common.copyForAi')}<//>
       <//>
       ${open ? packOpen(ctx, p) : null}
     <//>`;
@@ -95,7 +97,7 @@ const link = (href, words, key) => html`<${Action} tone="link" key=${key} href=$
 function forAiValue(ctx, p, d, aiText) {
   const docOpen = ctx.docShown === p.id;
   const toggleDoc = () => ctx.toggleDoc(p);
-  const copyDoor = html`<${Action} tone="link" copy=${aiText} copiedLabel=${x('copied')}>${x('copyAi')}<//>`;
+  const copyDoor = html`<${Action} tone="link" copy=${aiText} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`;
   const showDoor = html`<${Action} tone="more" onClick=${toggleDoc}>${docOpen ? x('hide') : x('show')}<//>`;
   const doors = html`${x('forAiSub', { id: p.id })} · ${copyDoor} · ${showDoor}`;
   const words = d.ai_doc ? x('forAiBody', { n: num(d.ai_doc.length) }) : x('forAiNone');
@@ -125,7 +127,7 @@ function packOpen(ctx, p) {
   const aiText = aiTextFor(p, d);
   return html`
     <${Panel} doors=${html`
-        <${Action} small copy=${aiText} copiedLabel=${x('copied')}>${x('copyAi')}<//>
+        <${Action} small copy=${aiText} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>
         <${Action} small soft onClick=${() => ctx.toggle(p)}>${x('close')}<//>`}>
       <${Note} kind="lead">${p.description || ''}<//>
       <${Facts} rows=${[

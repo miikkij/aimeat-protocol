@@ -11,6 +11,8 @@
  * @structure DirectivePanel({ org, directives, summary, canEdit })
  * @usage html`<${DirectivePanel} org=${org} directives=${d} summary=${s} canEdit=${canEdit} />`
  * @version-history
+ *   v1.1.1 — 2026-11-28 — The prompt copies under PromptCard's default words, common.copyForAi ("Copy the
+ *     prompt for your AI"); it read organisms.directive.copy ("Copy").
  *   v1.1.0 — 2026-11-20 — The panel says how the directive is changed: by the creators' own AI in chat
  *     (a lead line, the prompt that changes it, the question mark concept.organismDirective), and a
  *     member reads how to change their answer. A member's own answer is worded in the second person.
@@ -55,6 +57,6 @@ export function DirectivePanel({ org, directives, summary, canEdit }) {
         ]} />
         <${Note}>${x('countsOnly')}<//>
         ${summary.review_due ? html`<${Note} kind="aside">${x('reviewDue')}<//>` : null}` : null}
-      ${canEdit ? html`<${PromptCard} label=${x('promptLabel')} prompt=${prompt} copyLabel=${x('copy')} />` : null}
+      ${canEdit ? html`<${PromptCard} label=${x('promptLabel')} prompt=${prompt} />` : null}
     <//>`;
 }

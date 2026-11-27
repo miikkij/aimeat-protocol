@@ -18,6 +18,8 @@
  * @structure DesignSpecBlock({ ctx, app, path, owner, heading })
  * @usage html`<${DesignSpecBlock} key=${path} ctx=${ctx} app=${app} path=${path} owner=${owner} />`
  * @version-history
+ *   v1.3.1 — 2026-11-28 — Both prompts copy under PromptCard's default words, common.copyForAi ("Copy
+ *     the prompt for your AI"); they read specCopy.
  *   v1.3.0 — 2026-10-05 — The spec shows whole, without a scroll box of its own: in a 60vh box its
  *     last line sat below the box's edge on the app's page (Jouni). A step of air under it before the actions.
  *   v1.2.0 — 2026-10-04 — Settings > Apps no longer shows it; the App Catalog's app page is its place.
@@ -142,10 +144,10 @@ export function DesignSpecBlock({ ctx, app, path, owner, heading = true }) {
       <//>` : null}
       ${asking ? html`<${Space} above="medium">
         <${PromptCard} loud label=${a('specMcpLabel')} prompt=${mcpPrompt} showPrompt=${false}
-          copyLabel=${a('specCopy')} copiedLabel=${a('specCopied')} />
+          copiedLabel=${a('specCopied')} />
         <${Note}>${a('specMcpHint')}<//>
         <${PromptCard} quiet label=${a('specPasteLabel')} prompt=${pastePrompt} showPrompt=${false}
-          copyLabel=${a('specCopy')} copiedLabel=${a('specCopied')} />
+          copiedLabel=${a('specCopied')} />
         <${Note}>${a('specPasteHint')}<//>
         <${PasteBox} id=${`ap-spec-paste-${app.owner}-${app.filename}`} label=${a('specPasteBox')} placeholder=${a('specPastePh')}
           value=${paste} onInput=${(e) => setPaste(e.target.value)} />

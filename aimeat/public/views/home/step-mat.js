@@ -14,6 +14,8 @@
  * @structure StepMat({ state, onDone }) — the open step.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-11-28: The prompt copies under PromptCard's default words, common.copyForAi ("Copy the prompt
+ *     for your AI"); it read home.mat.copy.
  *   2026-10-03: The prompt is asked for in the page's language (it is the profile interview now, in en,
  *     fi and es), and the step's words name the profile and business card (home.mat.*).
  *   2026-09-27: The step writes no class: "Here is my welcome mat" is Loud, `quiet` until something
@@ -119,7 +121,6 @@ export function StepMat({ onDone }) {
         label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
         prompt=${shown}
         loud=${!hasPaste} quiet=${hasPaste}
-        copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
       <${PasteBox} id="koti-paste" boxRef=${boxRef}

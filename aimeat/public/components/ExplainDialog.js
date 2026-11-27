@@ -24,6 +24,8 @@
  * @structure ExplainDialog({ term, label, open, onClose, mine }) · explainOf(term, part)
  * @usage html`<${ExplainDialog} term="ai.temperature" open=${open} onClose=${() => setOpen(false)} />`
  * @version-history
+ *   v1.3.1 — 2026-11-28 — "Ask your AI more" copies under PromptCard's default words, common.copyForAi;
+ *     it read explain.askCopy ("Copy").
  *   v1.3.0 — 2026-11-19 — `src1` … `src6` ("Label | https://address"): the official sources a concept
  *     names, listed as "Read more and ask" links and carried into the "Ask your AI more" prompt. They
  *     add to the explanation and never replace it (rules/page-guidance.md; the AML concepts first).
@@ -152,7 +154,7 @@ export function ExplainDialog({ term, label, open, onClose, mine }) {
       <aside class="poster-aside poster-aside--small explain-ask">
         <span class="poster-label poster-label--block">${t('explain.ask')}</span>
         <p class="explain-ask-why">${t('explain.askWhy')}</p>
-        <${PromptCard} label=${t('explain.askLabel')} prompt=${prompt} copyLabel=${t('explain.askCopy')} showPrompt=${false} />
+        <${PromptCard} label=${t('explain.askLabel')} prompt=${prompt} showPrompt=${false} />
       </aside>
       <a class="poster-action explain-glossary" href="/v1/glossary">${t('explain.glossary')}</a>
     <//>`;

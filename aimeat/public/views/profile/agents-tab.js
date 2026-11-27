@@ -7,6 +7,10 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.30.2 -- 2026-11-28 -- The pasted connect prompt's copy reads common.copyForAi as well.
+ *   v4.30.1 -- 2026-11-28 -- The agent instruction and the CrewAI prompt copy under common.copyForAi
+ *     ("Copy the prompt for your AI"), the one name of a prompt copy. The connect prompt keeps
+ *     common.copyPrompt, which test/playwright/profile-agents.spec.ts finds by name.
  *   v4.30.0 -- 2026-11-27 -- Usability round 3: section 02 (Add an agent, with 02.1-02.4) and 03 (Allow
  *     always) are closed FoldSection rows that state their state (how many proposals wait; how many
  *     permissions are on); the list stays open. The head no longer repeats the strip (the title count and
@@ -785,7 +789,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                     <${SubHeading}>${t('profile.agents.agentInstructionTitle')}<//>
                     <${Note}>${t('profile.agents.agentInstructionDesc')}<//>
                     <${Code} block>${helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading'))}<//>
-                    <${Actions}><${Loud} copy=${helloPrompt}>${t('profile.agents.copyAgentInstruction')}<//><//>
+                    <${Actions}><${Loud} copy=${helloPrompt}>${t('common.copyForAi')}<//><//>
                   <//>
 
                   ${takesComputers !== false && html`<${Split} above="large" pad="large">
@@ -805,7 +809,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   <${Stack} gap="small">
                     <${Note}>${t('profile.agents.pasteDesc')}<//>
                     <${Code} block>${buildAgentPrompt(session, modelRec)}<//>
-                    <${Actions}><${Loud} copy=${buildAgentPrompt(session, modelRec)}>${t('common.copyPrompt')}<//><//>
+                    <${Actions}><${Loud} copy=${buildAgentPrompt(session, modelRec)}>${t('common.copyForAi')}<//><//>
                   <//>
                 <//>
 
@@ -823,7 +827,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                     <${TextField} id="pf-task-runner-name" label=${t('profile.agents.taskRunner.nameLabel')}
                       size="medium" placeholder="marketing-crew" value=${taskRunnerName} onInput=${setTaskRunnerName} />
                     <${Code} block>${buildTaskRunnerPrompt(session, taskRunnerName)}<//>
-                    <${Actions}><${Loud} copy=${buildTaskRunnerPrompt(session, taskRunnerName)}>${t('profile.agents.taskRunner.copyButton')}<//><//>
+                    <${Actions}><${Loud} copy=${buildTaskRunnerPrompt(session, taskRunnerName)}>${t('common.copyForAi')}<//><//>
                   <//>
                 <//>
               <//>

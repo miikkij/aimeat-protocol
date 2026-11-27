@@ -14,6 +14,8 @@
  * @structure useFill · fillPart · promptOf · cleanAnswer · changesOf
  * @usage const fill = useFill({ org, id, card, reload }); ... fillPart(fill)
  * @version-history
+ *   v1.0.2 — 2026-11-28 — The card's prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read common.copyPrompt.
  *   v1.0.1 — 2026-11-27 — "Save to the card" is an ordinary action in the control size: the page has
  *     one loud action, "Open a customer". It is still enabled only after "Check" found changes.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
@@ -184,7 +186,7 @@ export function fillPart(f) {
   return html`
     <${SubHeading} level=${3} rule>${x('fill.title')}<//>
     <${Note} kind="lead">${x('fill.lead')}<//>
-    <${PromptCard} quiet label=${x('fill.promptLabel')} prompt=${promptOf(card)} copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
+    <${PromptCard} quiet label=${x('fill.promptLabel')} prompt=${promptOf(card)} copiedLabel=${t('common.copied')} />
     <${PasteBox} id="kyc-fill-paste" label=${x('fill.pasteLabel')} rows="6" value=${f.text} placeholder=${x('fill.pastePlaceholder')}
       onInput=${(e) => f.setText(e.currentTarget.value)} />
     <${Actions} apart>

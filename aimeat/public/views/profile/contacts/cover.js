@@ -14,6 +14,8 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.16.1 -- 2026-11-28 -- The head's prompt copy reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.16.0 -- 2026-11-27 -- Where the book stands is a figure strip with hideZeros (everyone in it, first messages that
  *     wait for the person's answer in the notice tone, open invitations, who was messaged last), from the list the page
  *     already reads; the head keeps only the blocked mark. A pending first message comes first among the people and the
@@ -136,7 +138,7 @@ function renderCover(ctx) {
       actions=${html`
         ${/* While the add row is open its own button is the loud one, so the head's is drawn quiet. */''}
         <${Loud} quiet=${ctx.folds.add} onClick=${() => ctx.openAdd('name')}>${c('add')}<//>
-        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//><//>`}
+        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${t('common.copyForAi')}<//><//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
       sections=${shown}

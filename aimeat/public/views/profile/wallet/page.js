@@ -13,6 +13,8 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.25.2 — 2026-11-28 — The request copies under common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy.
  *   v1.25.1 — 2026-11-28 — The words say what each number is: the daily accrual stops at the cap,
  *     and the balance may be above it ("1000 morsels" against "up to 500"); stripAtCap names the
  *     cap. The head's words lead with what morsels do for the person, then the money.
@@ -326,7 +328,7 @@ function secRoads(ctx, n) {
       <${Note} kind="lead">${x('roadsIntro')}<//>
       <${Roads} wide>
         <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${request}
-          doors=${html`<${Action} small copy=${request}>${x('copyRequest')}<//>`} />
+          doors=${html`<${Action} small copy=${request}>${t('common.copyForAi')}<//>`} />
         <${Road} name=${x('roadAgent')} text=${x('roadAgentBody')} meta=${x('roadAgentSub', { n: ctx.counts.agent, total: ctx.rowsTotal })} />
       <//>
     <//>`;

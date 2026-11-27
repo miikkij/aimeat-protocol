@@ -27,6 +27,8 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.38.1 -- 2026-11-28 -- The new key's instruction and the chat road's request copy under
+ *     common.copyForAi ("Copy the prompt for your AI"), the one name of a prompt copy.
  *   v1.38.0 -- 2026-11-27 -- Usability round 3: how you sign in stays open; every other section is a
  *     closed row whose words say its state (foldOf, `ctx.folds`), and the doors, the page's start and
  *     the rail open a row before they scroll. Each figure is said once: the head's tags went and the
@@ -379,7 +381,7 @@ function tokenFold(ctx) {
           <${Code} block>${created.token}<//>
           <${Actions}><${Action} small copy=${created.token} onCopied=${() => ctx.showToast(x('created.copied'))}>${x('copy')}<//><//>
           <${List} cols="name-state">
-            <${Row}><${Name} meta=${x('created.promptSub')}>${x('created.prompt')}<//><${Doors}><${Action} small row copy=${created.prompt} onCopied=${() => ctx.showToast(x('created.promptCopied'))}>${x('created.copyPrompt')}<//><//><//>
+            <${Row}><${Name} meta=${x('created.promptSub')}>${x('created.prompt')}<//><${Doors}><${Action} small row copy=${created.prompt} onCopied=${() => ctx.showToast(x('created.promptCopied'))}>${t('common.copyForAi')}<//><//><//>
           <//>
           <${Actions}><${Action} small soft onClick=${() => ctx.clearCreated()}>${x('created.done')}<//><//>
         <//>` : null}
@@ -543,7 +545,7 @@ function secRoads(ctx) {
     <${Section} ...${foldOf(ctx, 'ac-roads')} id="ac-roads" num="05.1" title=${x('secRoads')} sub=${x('secRoadsSub')}>
       <${Roads} wide>
         <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
-          doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
+          doors=${html`<${Action} small soft copy=${ask}>${t('common.copyForAi')}<//>`} />
         <${Road} name=${x('roadAgentTitle')} text=${x('roadAgentBody')}
           meta=${`aimeat_access_list · aimeat_connection_list · aimeat_group_list · aimeat_consent_list · ${x('roadAgentScope')}`} />
       <//>

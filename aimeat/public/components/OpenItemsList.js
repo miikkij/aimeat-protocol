@@ -26,6 +26,8 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.4.2 — 2026-11-28 — The prompt copy in the head reads common.copyForAi ("Copy the prompt for your
+ *     AI"), the one name of a prompt copy; it read openItems.copyPrompt.
  *   v1.4.1 — 2026-10-25 — A decision row's two answers wait while one is on its way (no second press).
  *   v1.4.0 — 2026-10-25 — The heading carries a question mark that explains the list
  *     (explain.home.openItems.*).
@@ -140,7 +142,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
         <${CopyButton}
           text=${prompt}
           className="poster-action"
-          label=${tr('openItems.copyPrompt', 'Take these into your AI chat')}
+          label=${t('common.copyForAi')}
           copiedLabel=${tr('openItems.copied', 'Copied. Paste it in your chat')} />
       </div>
 

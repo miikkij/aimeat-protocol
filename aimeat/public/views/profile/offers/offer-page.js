@@ -13,6 +13,8 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   v2.3.1 — 2026-11-28 — An offer that travels as a prompt asks with common.copyForAi ("Copy the prompt
+ *     for your AI"), the one name of a prompt copy; it read profile.offers.copyPrompt.
  *   v2.3.0 — 2026-11-08 — The selling editor's Visibility opens its explanation (help offers.visibility): what private, unlisted and public let another account do.
  *   v2.2.1 — 2026-10-11 — The strip's selling figure carries the money price with its currency (or Free), and the line under it is the pacing amount alone; the visibility and the currency in that line cut it with an ellipsis at every width.
  *   v2.2.0 — 2026-10-11 — The selling editor asks for the offer's two values: the money price (empty = free) and the pacing amount (tollMorsels, empty = the node's default, question mark commerce.pacing_toll); the morsel price field is gone and the strip says Free and the pacing (ruling "morseli on tahdistus, ei hinta").
@@ -85,7 +87,7 @@ const conseqWord = (type) => t('profile.offers.consequence.' + type) || type;
 export function askWord(it) {
   if (it.offer?.availability?.scheduleBorn) return { btn: t('profile.offers.runNow').replace(/^[^\p{L}]+/u, ''), mode: c('modeSchedule'), sub: c('modeScheduleSub') };
   if (dispatchMode(it.entry) === 'task') return { btn: c('ask'), mode: c('modeTask'), sub: c('modeTaskSub') };
-  return { btn: t('profile.offers.copyPrompt').replace(/^[^\p{L}]+/u, ''), mode: c('modePrompt'), sub: c('modePromptSub') };
+  return { btn: t('common.copyForAi'), mode: c('modePrompt'), sub: c('modePromptSub') };
 }
 
 /**

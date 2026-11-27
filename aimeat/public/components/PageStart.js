@@ -41,6 +41,8 @@
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
+ *   v1.4.1 — 2026-11-28 — Both prompt copies read PromptCard's default, common.copyForAi ("Copy the
+ *     prompt for your AI"); they read pageStart.copy ("Copy").
  *   v1.4.0 — 2026-11-27 — Closed, the start is one light row on every page (a chevron and its words,
  *     .page-start-open, about 32 px); it was a framed block of 76 px with a label and a button. Props
  *     unchanged.
@@ -130,7 +132,7 @@ function ExplainPrompt({ id, title, desc, concept, forWords, nextWords }) {
   return html`
     <div class="page-start-explain">
       <${PromptCard} quiet showPrompt=${false} label=${t('pageStart.explainLabel')} prompt=${prompt}
-        copyLabel=${t('pageStart.copy')} copiedLabel=${t('common.copied')} />
+        copiedLabel=${t('common.copied')} />
       <${Note} kind="hint">${about ? t('pageStart.explainWhyRole') : t('pageStart.explainWhy')}<//>
     </div>`;
 }
@@ -184,7 +186,7 @@ export function PageStart({ id, vars, purpose, prompt, next, action, link, title
           <div class="page-start-part">
             <${Label} block>${t('pageStart.first')}<//>
             ${promptText ? html`<${PromptCard} quiet label=${t('pageStart.promptLabel')} prompt=${promptText}
-              copyLabel=${t('pageStart.copy')} copiedLabel=${t('common.copied')} />` : null}
+              copiedLabel=${t('common.copied')} />` : null}
             ${action && actionLabel ? html`
               <${Actions}>
                 <${Action} small href=${action.href} copy=${action.copy} copiedLabel=${action.copy ? t('common.copied') : undefined}

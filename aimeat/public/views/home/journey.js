@@ -6,6 +6,8 @@
  *   work for their AI: the profile first (an interview that becomes their business card), then a
  *   shared place, an agent, a schedule or an app, with the result shown at home.
  * @version-history
+ *   v1.7.1 — 2026-11-28 — The step's prompt copies under PromptCard's default words, common.copyForAi
+ *     ("Copy the prompt for your AI"); it read common.copyPrompt.
  *   v1.7.0 — 2026-10-31 — On a node the store sold, the block is the four getting-started steps with
  *     one "Next" button (buyer-steps.js) until the four are done; then it is "Muuta, mitä voit tehdä"
  *     with the tasks as before, without the seven-stage path (Jouni, v31 K27).
@@ -155,14 +157,14 @@ export function HomeJourney() {
               <p>${t('homeJourney.copyHint')}</p>
               <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
                 quiet
-                copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+                copiedLabel=${t('common.copied')}
                 onCopied=${() => setCopied(true)} />
             <//>`
           : html`
             <p>${t('homeJourney.copyHint')}</p>
             <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
               quiet
-              copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+              copiedLabel=${t('common.copied')}
               onCopied=${() => setCopied(true)} />`}
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
         <${ChooserLinks}>

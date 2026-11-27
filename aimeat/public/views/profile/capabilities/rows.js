@@ -13,6 +13,8 @@
  * @structure providerRow · providerOpen
  * @usage import { providerRow } from './rows.js';
  * @version-history
+ *   v1.19.1 -- 2026-11-28 -- A group's text for the agent copies under common.copyForAi ("Copy the
+ *     prompt for your AI"), the one name of a prompt copy.
  *   v1.19.0 -- 2026-11-27 -- A rejected entry of the person's own has the warn rail and says so on its
  *     coral line. The opened row's "For the agent" shows the id the agent calls, not an MCP tool call,
  *     and a discovery-only entry says how it is used in the page's words (capspage.usageWords.*): the
@@ -87,7 +89,7 @@ export function providerRow(ctx, g) {
       <${Cell} meta>${idForm(g)}<br />${callLine}<//>
       <${Doors}>
         <${Action} small row onClick=${() => ctx.toggle(g)}>${open ? x('close') : x('open')}<//>
-        <${Action} small row soft onClick=${() => ctx.copyForAgent(g)}>${x('copyAgent')}<//>
+        <${Action} small row soft onClick=${() => ctx.copyForAgent(g)}>${t('common.copyForAi')}<//>
       <//>
       ${open ? providerOpen(ctx, g) : null}
     <//>`;
@@ -101,10 +103,10 @@ function providerOpen(ctx, g) {
   // AI (it names MCP tools), so it goes in the text copied for the agent and not on the page.
   const usageWords = tOr('capspage.usageWords.' + g.shelf, x('usageWords.other'));
   const agentText = agentTextFor(g, ctx.details);
-  const copyAgent = html`<${Action} tone="link" copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>`;
+  const copyAgent = html`<${Action} tone="link" copy=${agentText} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>`;
   const toggleVouch = () => ctx.vouch(g);
   const doors = html`
-    <${Action} small copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    <${Action} small copy=${agentText} copiedLabel=${x('copied')}>${t('common.copyForAi')}<//>
     ${g.own ? html`<${Action} small soft onClick=${() => ctx.setVisibility(g, shownToAgents(g) ? 'private' : 'public')}>${shownToAgents(g) ? x('hideFromAgents') : x('showToAgents')}<//>` : null}
     ${g.own && g.type === 'manual' ? html`<${Action} small soft onClick=${() => ctx.remove(g)}>${x('remove')}<//>` : null}
     <${Action} small soft onClick=${() => ctx.toggle(g)}>${x('close')}<//>`;
