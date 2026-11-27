@@ -12,6 +12,8 @@
  *   stepReflect · proposalList · stepSynthesize · output · pasteBox
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- Settings usability pass: making the next version from an option is a quiet
+ *     action (Action), so New run in the calibration's head stays the page's one loud action.
  *   v2.1.0 -- 2026-11-08 -- The checkpoints' Weight column head opens the explanation of how a checkpoint's weight makes the score (term calibrator.weight; .claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the row is the List's Row with its Panel, a score the Figure, what opens the Run view (components/RunView.js: the steps as folds, the model blocks, the checkpoints, the proposals, a folded output, the paste box), the options the boxed Choice with its radio dots, the lines Note (component plan, page group G4).
  *   v1.18.0 -- 2026-09-26 -- A folded output is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
@@ -48,7 +50,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Row, Name, Desc, Cell, Doors } from '/components/List.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { HelpLabel } from '/components/HelpTip.js';
@@ -261,7 +263,7 @@ function stepSynthesize(ctx, run, detail) {
     ${s.analysis && props.length ? output(x('viewAnalysis'), text(s.analysis)) : null}
     ${options ? html`
       <${RunApply} note=${applying ? x('applyingHint') : x('applyHint')}>
-        <${Loud} control disabled=${applying || !ctx.keyed || !optionProposals(s, key).length} onClick=${() => ctx.applyOption(run.batchId, key)}>${applying ? x('applying') : x('applyOption', { option: key, v: (ctx.project.currentVersion || 0) + 1 })}<//>
+        <${Action} small disabled=${applying || !ctx.keyed || !optionProposals(s, key).length} onClick=${() => ctx.applyOption(run.batchId, key)}>${applying ? x('applying') : x('applyOption', { option: key, v: (ctx.project.currentVersion || 0) + 1 })}<//>
         <${Action} small soft copy=${ctx.applyText(detail, key)}>${x('copyApplyPrompt')}<//>
       <//>` : null}`;
 }

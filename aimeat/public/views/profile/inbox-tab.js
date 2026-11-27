@@ -18,6 +18,9 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.17.0 -- 2026-11-27 -- The head says how many conversations wait for the person's answer (the
+ *     threads the home's waiting list counts as "reply"), and the broadcast is a soft action: the head
+ *     had one main action and two more of the same weight beside it.
  *   v2.16.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart and the title's question mark concept.message on the messenger; listsKnown says when
  *     the lists have been read once, so the start folds only for a person who has conversations.
@@ -693,6 +696,9 @@ export default function InboxTab({ showToast }) {
   const threads = (rows) => rows.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
   const listed = conversations.filter(c => c.section !== 'archive');
   const unreadTotal = listed.reduce((n, c) => n + (c.unread || 0), 0);
+  // The threads where the other side wrote last, outside the agents' own mailboxes: the same threads
+  // the home's waiting list counts as "reply" (services/home/waiting.ts), so the two numbers agree.
+  const answerTotal = listed.filter(c => c.lastDirection === 'inbound' && !c.viaAgent).length;
   const convTotal = threads(listed);
   const archivedTotal = threads(conversations) - convTotal;
   const openOrganize = () => { setMode('organize'); setActiveConv(null); };
@@ -729,6 +735,7 @@ export default function InboxTab({ showToast }) {
         action=${{ onClick: startCompose }} />`}
       sub=${isPage ? null : html`
         <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
+        ${answerTotal ? html`<${Mark} kind="status" tone="attention">${t('inbox.cover.figAnswer', { n: String(answerTotal) })}<//>` : null}
         ${unreadTotal ? html`<${Mark} tone="sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}<//>` : null}
         ${requests.length ? html`<${Mark}>${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}<//>` : null}
         ${archivedTotal ? html`<${Mark}>${t('inbox.org.figArchived', { n: String(archivedTotal) })}<//>` : null}`}
@@ -736,7 +743,7 @@ export default function InboxTab({ showToast }) {
       actions=${isPage ? null : html`<${Actions}>
           <${Loud} onClick=${startCompose}>${t('inbox.new')}<//>
           <${Action} small onClick=${startGroup}>${t('inbox.group.new')}<//>
-          <${Action} small onClick=${startBroadcast}>${t('inbox.broadcast')}<//>
+          <${Action} small soft onClick=${startBroadcast}>${t('inbox.broadcast')}<//>
           <${Action} small soft=${!awaitingCount} onClick=${showTracked} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}<//>
           ${recentBroadcasts.length ? html`<${Action} small soft onClick=${openResultsList}>${t('inbox.results')}<//>` : null}
           <${Action} small soft onClick=${openOrganize}>${t('inbox.org.door')}<//>

@@ -9,6 +9,15 @@
  *   page's start (PageStart id "security") opens the account's own list as its action and folds once
  *   the account has a list of its own.
  * @version-history
+ *   v1.26.0 -- 2026-11-27 -- Settings usability pass: the account's own list is section 01 (sec-own),
+ *     open, with its current value; the agent overrides are section 02 (sec-agents), one row that
+ *     says how many agents have a list of their own and opens in place. A figure strip under the head
+ *     says whether the account's list is its own or the default, how many origins are allowed, and
+ *     how many agents have their own list, all from the security overview the page already reads.
+ *     The contents rail names both sections and links the Access page, where sign-in now lives. The
+ *     account list's Save is the one loud action; an agent row's Save is a quiet action. Second pass,
+ *     same day: an account with no agent shows neither section 02 nor its figure nor the contents
+ *     rail, so the page is the account's own list; the strip keeps its two value figures there.
  *   v1.25.0 -- 2026-11-08 -- The Allowed Origins card's title opens its explanation
  *     (security.allowedOrigins): what one entry may be, how the list is split, and what an empty list does.
  *   v1.24.1 -- 2026-11-08 -- The origin lists open for editing one origin per line: they were joined
@@ -90,7 +99,8 @@ import { PageStart } from '/components/PageStart.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { Action, Loud } from '/components/Action.js';
 import { TextArea } from '/components/TextField.js';
-import { SubHeading } from '/components/SubHeading.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
 
@@ -102,6 +112,7 @@ export default function SecurityTab({ session, showToast }) {
   const [loading, setLoading] = useState(false);
   const [corsEditGhii, setCorsEditGhii] = useState(null);
   const [corsEditAgent, setCorsEditAgent] = useState(null);
+  const [agentsOpen, setAgentsOpen] = useState(false);
 
   // No setLoading(true) here, on purpose. The render guard below already shows the spinner while
   // there is no data, which covers the first read; raising the flag again on a RE-read replaced the
@@ -194,7 +205,7 @@ export default function SecurityTab({ session, showToast }) {
         : html`<${Mark}>${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}<//>`}<//>
       <${Doors}>${isEditing
         ? html`
-            <${Loud} control onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}<//>
+            <${Action} small row onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}<//>
             <${Action} small row tone="danger" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}<//>
             <${Action} small row onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}<//>`
         : html`<${Action} small row onClick=${() => setCorsEditAgent({ name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\n') : '' })}>${t('profile.security.edit')}<//>`}<//>
@@ -206,6 +217,31 @@ export default function SecurityTab({ session, showToast }) {
   const editGhii = () => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\n') : '');
   const start = html`<${PageStart} id="security" done=${!isInherited} action=${{ onClick: editGhii }} />`;
 
+  // Where the lists stand, from the overview already read: whose list decides for the account, how
+  // many origins it allows (* is every address, the default of a new server), and how many agents
+  // keep a list of their own.
+  const wildcard = effectiveOrigins.includes('*');
+  const ownAgents = agentsCors.filter((ac) => ac.allowed_origins !== null && ac.allowed_origins !== undefined).length;
+  const strip = html`<${FigureStrip} wrap items=${[
+    { key: 'own', n: isInherited ? t('profile.security.inherited') : t('profile.security.custom'), tone: 'word', label: t('profile.security.stripList'),
+      sub: isInherited ? t('profile.security.stripListInherited') : t('profile.security.stripListOwn') },
+    { key: 'allowed', n: wildcard ? '*' : effectiveOrigins.length, tone: wildcard ? 'word' : undefined, label: t('profile.security.stripAllowed'),
+      sub: wildcard ? t('profile.security.wildcard') : undefined },
+    agentsCors.length ? { key: 'agents', n: ownAgents, of: `/${agentsCors.length}`, label: t('profile.security.stripAgents') } : null,
+  ]} />`;
+  // An account with no agent has no overrides to show: section 02, its figure and the contents rail
+  // (which would then name one section) are drawn only once there is an agent.
+  const hasAgents = agentsCors.length > 0;
+  const agentsSub = t('profile.security.agentsSub', { n: ownAgents, m: agentsCors.length });
+  const sections = hasAgents ? [
+    { id: 'sec-own', num: '01', label: t('profile.security.ghiiTitle'), count: isInherited ? t('profile.security.inherited') : t('profile.security.custom') },
+    { id: 'sec-agents', num: '02', label: t('profile.security.agentsTitle'), count: `${ownAgents}/${agentsCors.length}`, open: () => setAgentsOpen(true) },
+  ] : undefined;
+  const rail = hasAgents ? {
+    railTitle: t('profile.landing.railTitle'), sections,
+    pagesLabel: t('profile.landing.railPages'), pages: [{ tab: 'access', label: t('profile.tabs.access'), key: 'access' }],
+  } : {};
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.security')]}
@@ -213,6 +249,8 @@ export default function SecurityTab({ session, showToast }) {
       help="concept.cors"
       desc=${t('profile.security.desc')}
       start=${start}
+      strip=${strip}
+      ...${rail}
       after=${html`<${ConfirmUI} />`}>
 
       ${securityData.managedBy && html`
@@ -225,7 +263,7 @@ export default function SecurityTab({ session, showToast }) {
 
       <${Space} below="large"><${Note}>${t('profile.security.signInMoved')}<//><//>
 
-      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.ghiiTitle')}<//><//>
+      <${Section} id="sec-own" num="01" title=${t('profile.security.ghiiTitle')} first>
       <${Space} below="large"><${Note}>${t('profile.security.ghiiDesc')}<//><//>
       <${Card} tone="section"
         title=${html`<${HelpLabel} term="security.allowedOrigins" label=${t('profile.security.allowedOrigins')}>${t('profile.security.allowedOrigins')}<//>`}
@@ -250,18 +288,19 @@ export default function SecurityTab({ session, showToast }) {
           `}
         <//>
       <//>
+      <//>
 
-      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.agentsTitle')}<//><//>
+      ${hasAgents ? html`
+      <${Section} fold id="sec-agents" num="02" title=${t('profile.security.agentsTitle')} sub=${agentsSub}
+        open=${agentsOpen} onToggle=${() => setAgentsOpen(!agentsOpen)}>
       <${Space} below="large"><${Note}>${t('profile.security.agentsDesc')}<//><//>
-      ${agentsCors.length === 0
-        ? html`<${Note} kind="quiet">${t('profile.security.noAgents')}<//>`
-        : html`<${Card} tone="section">
-            <${List} cols="name-desc-state-doors"
-              head=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}>
-              ${agentsCors.map(agentRow)}
-            <//>
-          <//>`
-      }
+      <${Card} tone="section">
+        <${List} cols="name-desc-state-doors"
+          head=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}>
+          ${agentsCors.map(agentRow)}
+        <//>
+      <//>
+      <//>` : null}
     <//>
   `;
 }

@@ -11,6 +11,14 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- Settings usability pass: 04 the instruction prompts is one row that says how
+ *     many prompts and characters the calibration sends and opens in place (the rail opens it too),
+ *     since they are rarely changed; 01 to 03 and 05 stay open. Its explanation (HelpTip
+ *     calibrator.instructionPrompts) moves from the title into the opened body's lead, since the
+ *     fold's row is a button. 05 is headed with a noun phrase
+ *     (secRoadsName) in the rail and the section. New run in the head is the one loud action: Save as
+ *     version is a quiet action beside the changelog field. Second pass, same day: the strip takes
+ *     hideZeros, so a calibration with no run, no model and no prompt opens on 01's empty line.
  *   v2.2.0 -- 2026-11-08 -- The title of section 04 opens one explanation for the four instruction prompts (term calibrator.instructionPrompts; .claude/rules/page-guidance.md).
  *   v2.1.0 -- 2026-11-08 -- The title's question mark concept.calibration, the same explanation as on the list (.claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head with its rename field, strip, rail as data), the sections Section (the four instruction prompts still fold), the runs and the versions the List, the editors Field and Text area with the count beside the label, the roads Roads, the lines Note (component plan, page group G4).
@@ -57,7 +65,7 @@ import { Note } from '/components/Note.js';
 import { Field, Fields } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Roads, Road } from '/components/Roads.js';
-import { HelpLabel } from '/components/HelpTip.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { Stack } from '/components/Layout.js';
 import { x, dateWord, timeWord, isEmptyRun, runAverage, runsInOrder, judgeOf, candidatesOf, crumb, pageLinks } from './frame.js';
 import { ScoreChart } from './chart.js';
@@ -82,8 +90,8 @@ export function renderPage(ctx) {
     { num: '01', id: 'cal-runs', label: x('secRuns'), count: runs.length ? x('railRuns', { n: runs.length }) : '0' },
     { num: '02', id: 'cal-prompt', label: x('secPrompt'), count: p.currentVersion ? 'v' + p.currentVersion : '' },
     { num: '03', id: 'cal-models', label: x('secModels'), count: x('railModels', { n: candidatesOf(p).length }) },
-    { num: '04', id: 'cal-templates', label: x('secTemplates'), count: '4' },
-    { num: '05', id: 'cal-roads', label: x('secRoads'), count: '' },
+    { num: '04', id: 'cal-templates', label: x('secTemplates'), count: '4', open: () => ctx.setTemplatesFold(true) },
+    { num: '05', id: 'cal-roads', label: x('secRoadsName'), count: '' },
   ];
   const rail = {
     title: x('railTitle'),
@@ -142,7 +150,9 @@ function strip(ctx, runs, latest) {
   const avg = latest ? runAverage(latest) : null;
   const first = runs.length >= 2 ? runAverage(runs[0]) : null;
   const cur = ctx.current;
-  return html`<${FigureStrip} items=${[
+  // hideZeros: a calibration just named (no run, no model, no prompt) draws no band of empty marks;
+  // 01's empty line and 02's empty line say what to do first.
+  return html`<${FigureStrip} hideZeros items=${[
     avg != null
       ? { key: 'latest', n: `${avg} %`, label: x('stripLatest'), sub: x('stripLatestSub', { date: dateWord(latest.createdAt), v: latest.promptVersion, n: (latest.scores || []).length }) }
       : { key: 'latest', n: '·', tone: 'dim', label: x('stripLatest'), sub: x('stripNoRuns') },
@@ -198,7 +208,7 @@ function secPrompt(ctx) {
       ${!readOnly ? html`
         <${Stack} above="large">
           <${TextField} value=${ctx.changelog} placeholder=${x('changelogPlaceholder')} ariaLabel=${x('changelog')} onInput=${(v) => ctx.setChangelog(v)}
-            actions=${html`<${Loud} control disabled=${ctx.busy === 'version' || !ctx.promptDraft.trim() || !ctx.dirty} onClick=${() => ctx.saveVersion()}>${p.currentVersion ? x('saveVersion', { n: p.currentVersion + 1 }) : x('saveFirstVersion')}<//>`} />
+            actions=${html`<${Action} small disabled=${ctx.busy === 'version' || !ctx.promptDraft.trim() || !ctx.dirty} onClick=${() => ctx.saveVersion()}>${p.currentVersion ? x('saveVersion', { n: p.currentVersion + 1 }) : x('saveFirstVersion')}<//>`} />
           <${Note}>${p.currentVersion ? x('saveVersionHint') : x('saveFirstVersionHint')}<//>
         <//>` : null}
       ${msg(ctx.promptMsg)}
@@ -222,9 +232,14 @@ function versionRow(ctx, v, viewing) {
 /* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secTemplates(ctx) {
+  // One row while shut, saying what the calibration sends: the four prompts and their length. The
+  // fold's row is a button, so the explanation's question mark stands in the opened body's lead
+  // (a help button inside the row's button would be nested interactive content).
+  const chars = TEMPLATES.reduce((n, tp) => n + (ctx.project[tp.field] || '').length, 0);
   return html`
-    <${Section} id="cal-templates" num="04" title=${html`<${HelpLabel} term="calibrator.instructionPrompts" label=${x('secTemplates')}>${x('secTemplates')}<//>`} count=${null}>
-      <${Note} kind="lead">${x('templatesIntro')}<//>
+    <${Section} fold id="cal-templates" num="04" title=${x('secTemplates')}
+      sub=${x('tplSub', { n: TEMPLATES.length, chars })} open=${ctx.templatesFold} onToggle=${() => ctx.setTemplatesFold(!ctx.templatesFold)}>
+      <${Note} kind="lead">${x('templatesIntro')} <${HelpTip} term="calibrator.instructionPrompts" label=${x('secTemplates')} /><//>
       <${Folds}>
         ${TEMPLATES.map((tp, i) => {
           const open = ctx.templatesOpen.has(tp.key);
@@ -252,7 +267,7 @@ function secTemplates(ctx) {
 function secRoads(ctx) {
   const request = ctx.leadRequest();
   return html`
-    <${Section} id="cal-roads" num="05" title=${x('secRoads')} count=${null}>
+    <${Section} id="cal-roads" num="05" title=${x('secRoadsName')} count=${null}>
       <${Note} kind="lead">${x('roadsIntro')}<//>
       <${Roads}>
         <${Road} lead name=${x('roadLead')} text=${x('roadLeadBody', { name: ctx.project.name })} code=${request}

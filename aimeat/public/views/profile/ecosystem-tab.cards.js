@@ -8,6 +8,7 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.20.0 -- 2026-11-27 -- The sample prompt's copy is a quiet Action, so the page keeps one loud action (approving a waiting request); the emoji before the MCP box name and the technical details fold go (no emoji in the interface).
  *   v1.19.0 -- 2026-11-08 -- The event subscriptions' heading opens what each event in the picker sends and when (ecosystem.events; .claude/rules/page-guidance.md).
  *   v1.18.1 -- 2026-09-26 -- The sample prompt's copy button stands beside the prompt again (Beside;
  *     main's .pf-eco-mcp-sample-row), and the technical details are on the grey ground again (Box
@@ -55,7 +56,7 @@ import { JsonValue } from '/components/JsonView.js';
 import { FoldRow } from '/components/Folds.js';
 import { Box } from '/components/Box.js';
 import { Facts } from '/components/Facts.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action } from '/components/Action.js';
 import { Mark, Marks, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Select } from '/components/Select.js';
@@ -151,14 +152,14 @@ export function EcoAskInClaude({ app }) {
 
   return html`
     <${EcoSection} title=${t('profile.ecosystem.askClaudeTitle')}>
-      <${Box} packed name=${`💬 ${t('profile.ecosystem.mcpTitle')}`}>
+      <${Box} packed name=${t('profile.ecosystem.mcpTitle')}>
         <${Stack}>
           <${Note}>${t('profile.ecosystem.mcpSub')}<//>
           <${Note}>${t('profile.ecosystem.mcpConnect')}<//>
           ${organismName
             ? html`
               <${Label} block>${t('profile.ecosystem.mcpSampleLabel')}<//>
-              <${Beside} side=${html`<${Loud} copy=${samplePrompt}>${t('common.copy')}<//>`}>
+              <${Beside} side=${html`<${Action} small control copy=${samplePrompt}>${t('common.copy')}<//>`}>
                 <${Code} block>${samplePrompt}<//>
               <//>
               <${Hint}>${t('profile.ecosystem.mcpAccessNote')}<//>`
@@ -188,7 +189,7 @@ export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, subFo
   return html`
     <${Box} tone="dim" packed>
       <div><${Tab} tone="fold" on=${open} expanded=${open} onClick=${() => setOpen(o => !o)}>
-        🔧 ${t('profile.ecosystem.techDetailsTitle')}
+        ${t('profile.ecosystem.techDetailsTitle')}
       <//></div>
       ${open && html`
         <${Stack} above="small">

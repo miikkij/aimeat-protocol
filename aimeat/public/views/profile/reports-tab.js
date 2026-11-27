@@ -16,6 +16,12 @@
  * @structure x · subOf · whenWords · scopeWords · stateOf · ReportsTab (default)
  * @usage registered in profile.js TABS as id 'reports', listed in the Business group of SIDEBAR_GROUPS.
  * @version-history
+ *   v1.2.0 — 2026-11-27 — With no report the strip is not drawn (FigureStrip hideZeros) and the list's
+ *     empty line is the page; a report that did not go out comes first in the list, the paused ones
+ *     last; the one-entry contents rail goes.
+ *   v1.1.0 — 2026-11-27 — The page leads with where things stand: a figure strip (reports and how many
+ *     are paused, how many did not go out last time, when one last went out) from the list it already
+ *     reads, then the list as section 01 (rp-list) with the contents rail. No control was removed.
  *   v1.0.0 — 2026-11-20 — Initial (wish-ai-n-hy-ty-n-kyy-kulu-hy-ty-ja-k-yt-n-rytmi, phase 4).
  */
 import { h } from 'preact';
@@ -30,6 +36,8 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { PageSection } from '/components/PageSection.js';
 import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
 import { Action } from '/components/Action.js';
@@ -81,6 +89,9 @@ function stateOf(v) {
   return { tone: 'fine', word: x('state.on') };
 }
 
+/** The list order of the states: not sent first, then on, then paused. */
+const STATE_RANK = { attention: 0, fine: 1, off: 2 };
+
 function lastWords(v) {
   if (typeof v.lastSkip === 'string' && SKIPS.includes(v.lastSkip)) {
     return x('skip.' + v.lastSkip, { detail: typeof v.lastSkipDetail === 'string' ? v.lastSkipDetail : '' });
@@ -99,7 +110,10 @@ export default function ReportsTab({ showToast }) {
   const load = useCallback(async () => {
     try {
       const rows = (await apiGet(`/v1/memory?prefix=${enc(PREFIX)}&limit=200`))?.data?.items || [];
-      setItems(rows.map(subOf).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name)));
+      // A report that did not go out comes first (it needs a look), then the ones on, the paused
+      // ones last; by name within each.
+      setItems(rows.map(subOf).filter(Boolean).sort((a, b) =>
+        (STATE_RANK[stateOf(a.value).tone] - STATE_RANK[stateOf(b.value).tone]) || a.name.localeCompare(b.name)));
       setFailed(false);
     } catch (e) { swallowed('reports-tab: list', e); setFailed(true); }
   }, []);
@@ -152,17 +166,36 @@ export default function ReportsTab({ showToast }) {
       <//>`;
   };
 
+  // The figures under the head, from the list the page already read: how many reports there are (and
+  // how many are paused), how many did not go out last time, and when one last went out.
+  const all = items || [];
+  const paused = all.filter((s) => s.value.paused === true).length;
+  const skipped = all.filter((s) => stateOf(s.value).tone === 'attention').length;
+  const lastSent = all.map((s) => s.value.lastSentAt).filter((d) => typeof d === 'string' && d).sort().pop();
+  const strip = failed ? null : !items ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'subs', n: all.length, label: x('stripSubs'), sub: paused ? x('stripPaused', { n: paused }) : undefined },
+    { key: 'skipped', n: skipped, tone: skipped ? 'notice' : undefined, label: x('stripSkipped'), sub: skipped ? x('stripSkippedSub') : undefined },
+    lastSent
+      ? { key: 'last', n: date(lastSent), tone: 'coral', label: x('stripLast') }
+      : { key: 'last', n: '·', tone: 'dim', label: x('stripLast'), sub: x('never') },
+  ]} />`;
+
   return html`
     <${SettingsPage} name="reports"
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.reports')]}
       title=${t('profile.tabs.reports')} help="concept.reportSubscription" desc=${x('desc')}
+      strip=${strip}
       start=${html`<${PageStart} id="reports" done=${items ? items.length > 0 : null} />`}
       after=${html`<${ConfirmUI} />`}>
+      ${/* The subscriptions are the page: the AI makes them in chat, and here a person sees each one's
+            state and pauses or removes it. */''}
+      <${PageSection} id="rp-list" num="01" first title=${x('secList')} count=${items ? all.length : undefined}>
       ${failed ? html`<${Note} kind="quiet">${x('failed')}<//>` : null}
       <${List} cols="name-desc-state-doors" loading=${!items && !failed ? x('loading') : false}
         head=${[x('col.name'), x('col.when'), x('col.state'), '']}
         empty=${html`<${Note} kind="quiet"><b>${x('emptyLead')}</b> ${x('emptyBody')}<//>`}>
         ${(items || []).map(row)}
+      <//>
       <//>
     <//>`;
 }

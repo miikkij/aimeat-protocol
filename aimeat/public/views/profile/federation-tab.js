@@ -8,6 +8,12 @@
  *   AI read where this server stands, with a link to the admin Federation page where peers are
  *   approved and changed.
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- Settings usability pass: the peer list is section 01 (fd-peers), always
+ *     drawn, with its loading and empty lines inside it (List loading/empty); a figure strip under the
+ *     head counts the peers (members in its sub line), the online ones and the offline ones (attention
+ *     tone when any), all from the one listPeers() read the page already made. The strip takes
+ *     hideZeros, so a server with no peer opens on the empty line; the peers that do not answer are
+ *     listed first. No contents rail: the page has one section.
  *   v1.12.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "federation" (its link opens the admin Federation page) and the title's question
  *     mark concept.peer; the head's line is two sentences and the empty line says how the list fills.
@@ -42,7 +48,7 @@ import { StatusDot } from '/components/StatusDot.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
-import { Note } from '/components/Note.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { PageStart } from '/components/PageStart.js';
 import { listPeers } from '/js/services/federation.js';
 import { swallowed } from '/js/swallowed.js';
@@ -75,19 +81,37 @@ export default function FederationTab() {
   // changed on the admin Federation page, which the link opens.
   const start = html`<${PageStart} id="federation" link=${{ href: '/v1/admin?tab=federation' }} />`;
 
+  // Where the peers stand, from the same list the section shows: how many, how many answer, and how
+  // many do not (the one a person looks at, so it takes the attention tone when there is any).
+  const isAlive = (p) => p.status === 'active' || !!p.alive;
+  const peers = federation || [];
+  const offline = peers.filter((p) => !isAlive(p)).length;
+  const members = peers.filter((p) => (p.tier || 'member') === 'member').length;
+  // The peers that do not answer come first in the list: they are what a person acts on. The sort is
+  // stable, so the server's order holds within each group.
+  const ordered = peers.slice().sort((a, b) => Number(isAlive(a)) - Number(isAlive(b)));
+  // hideZeros: with no peer, the strip is not drawn and the section's empty line says how one joins.
+  const strip = !federation ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'peers', n: peers.length, label: t('profile.federation.stripPeers'), sub: t('profile.federation.stripPeersSub', { n: members }) },
+    { key: 'online', n: peers.length - offline, label: t('profile.federation.stripOnline') },
+    { key: 'offline', n: offline, tone: offline ? 'notice' : undefined, label: t('profile.federation.stripOffline'),
+      sub: offline ? t('profile.federation.stripOfflineSub') : undefined },
+  ]} />`;
+  const count = federation ? peers.length : undefined;
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.federation')]}
       title=${t('profile.federation.title')}
       help="concept.peer"
       desc=${t('profile.federation.desc')}
-      start=${start}>
-    ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />`
-      : federation.length === 0 ? html`<${Note} kind="quiet">${t('profile.federation.empty')}<//>`
-      : html`<${PageSection} band title=${t('profile.federation.peers')}>
-          <${List} cols="name-desc-doors">
-          ${federation.map(p => {
-            const alive = p.status === 'active' || p.alive;
+      start=${start}
+      strip=${strip}>
+      <${PageSection} id="fd-peers" num="01" title=${t('profile.federation.peers')} count=${count} first>
+        ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />` : html`
+          <${List} cols="name-desc-doors" empty=${t('profile.federation.empty')}>
+          ${ordered.map(p => {
+            const alive = isAlive(p);
             const tier = p.tier || 'member';
             return html`
               <${Row} key=${p.node_id || p.nodeId || p.url}>
@@ -101,7 +125,7 @@ export default function FederationTab() {
                 <//>
               <//>`;
           })}
-          <//><//>`
-    }
+          <//>`}
+      <//>
     <//>`;
 }

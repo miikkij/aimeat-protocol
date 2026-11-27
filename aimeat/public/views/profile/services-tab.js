@@ -6,6 +6,17 @@
  *   explains itself the designed way (.claude/rules/page-guidance.md): the page's start (PageStart
  *   "actions") and the title's question mark (concept.service).
  * @version-history
+ *   v1.23.0 -- 2026-11-27 -- Settings usability pass: the two view tabs become sections beside the
+ *     contents rail. 01 My services (svc-mine) is open and first, with the publish form opening in
+ *     place over the list; 02 Catalogue (svc-catalogue) is one row that says what it holds and reads
+ *     the catalogue when it opens (the same browse() call the tab made). A figure strip under the head
+ *     counts the services published, those that take a pacing amount, and the catalogue once it was
+ *     read; it reads only the lists the page already loads. Publish service is the one loud action
+ *     and stands only while the form is shut, since the form carries its own Publish. Second pass,
+ *     same day: the strip takes hideZeros, so an account with nothing published opens on 01's empty
+ *     line (emptyMine: what fills the list and the button that does it); the catalogue's empty line
+ *     says whether a category filter or the server's catalogue itself is empty. The catalogue row
+ *     stays drawn when empty, since it is where a person begins.
  *   v1.22.0 -- 2026-11-08 -- The publish form's Category, Unit and Webhook URL open their explanations
  *     (help services.category, services.unit, services.webhook), written from what the catalogue route
  *     does with each: a filter word, a label beside the pacing, an address only a hook calls.
@@ -66,7 +77,9 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Tabs, TabPanel } from '/components/Tabs.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { scrollToSection } from '/components/Rail.js';
 import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
@@ -82,7 +95,7 @@ import { listMyServices, browse, publish, unpublish } from '/js/services/catalog
 import { apiGet } from '/js/api.js';
 import { getNodeId } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
-import { dateTime as fmtDateTime, priceAndPacing } from '/js/format.js';
+import { dateTime as fmtDateTime, priceAndPacing, pacingOf } from '/js/format.js';
 
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
 
@@ -183,7 +196,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [myServices, setMyServices] = useState(null);
   const [catalogue, setCatalogue] = useState(null);
-  const [svcSubTab, setSvcSubTab] = useState('mine');
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const [catFilter, setCatFilter] = useState('');
   const [showPubForm, setShowPubForm] = useState(false);
   const [expandedMine, setExpandedMine] = useState({});
@@ -250,9 +263,10 @@ export default function ServicesTab({ session, showToast, onStats }) {
   const renderMyServices = () => {
     if (!myServices) return html`<${List} loading=${t('profile.services.loading')} />`;
     return html`
-      <${Space} below="large"><${Loud} onClick=${() => setShowPubForm(!showPubForm)}>${t('profile.services.publishBtn')}<//><//>
-      ${showPubForm && html`<${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} />`}
-      <${List} cols="name-desc-doors" empty=${t('profile.services.empty')}>
+      ${showPubForm
+        ? html`<${Space} below="large"><${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} /><//>`
+        : html`<${Space} below="large"><${Loud} onClick=${() => setShowPubForm(true)}>${t('profile.services.publishBtn')}<//><//>`}
+      <${List} cols="name-desc-doors" empty=${t('profile.services.emptyMine')}>
         ${myServices.map(s => {
           const svcId = s.id || s.action_id;
           return html`<${ServiceCard}
@@ -273,7 +287,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
         placeholder=${t('profile.services.allCategories')} options=${SERVICE_CATEGORIES} />
     <//>
     ${!catalogue ? html`<${List} loading=${t('profile.services.loading')} />`
-      : html`<${List} cols="name-desc-doors" empty=${t('profile.services.catalogueEmpty')}>
+      : html`<${List} cols="name-desc-doors" empty=${catFilter ? t('profile.services.catalogueEmptyCategory') : t('profile.services.catalogueEmptyAll')}>
           ${catalogue.map(s => {
             const svcId = s.id || s.action_id;
             return html`<${ServiceCard}
@@ -286,6 +300,31 @@ export default function ServicesTab({ session, showToast, onStats }) {
         <//>`
     }`;
 
+  // The catalogue is read when its section opens, as the tab of the same name read it when chosen.
+  const openCatalogue = () => { setCatalogueOpen(true); if (!catalogue) loadCatalogueData(catFilter); };
+  const toggleCatalogue = () => { if (catalogueOpen) setCatalogueOpen(false); else openCatalogue(); };
+
+  // Where things stand, from the lists the page already holds: what the person published, how many of
+  // those take a pacing amount, and how many services the catalogue lists once it has been read.
+  const mine = myServices || [];
+  const paced = mine.filter((s) => pacingOf(s) > 0).length;
+  const categories = new Set(mine.map((s) => s.category).filter(Boolean)).size;
+  const catalogueWords = catalogue ? t('profile.services.catalogueSub', { n: catalogue.length }) : t('profile.services.catalogueSubClosed');
+  // hideZeros: with nothing published and the catalogue unread, the strip is not drawn and 01's
+  // empty line says how the page fills.
+  const strip = !myServices ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'mine', n: mine.length, label: t('profile.services.stripPublished'),
+      sub: categories ? t('profile.services.stripPublishedSub', { n: categories }) : undefined },
+    { key: 'paced', n: paced, label: t('profile.services.stripPaced'), sub: t('profile.services.stripPacedSub') },
+    { key: 'catalogue', n: catalogue ? catalogue.length : '·', tone: catalogue ? undefined : 'dim', label: t('profile.services.stripCatalogue'),
+      sub: catalogue ? (catFilter || undefined) : t('profile.services.stripCatalogueSub'),
+      onClick: () => { openCatalogue(); scrollToSection('svc-catalogue'); } },
+  ]} />`;
+  const sections = [
+    { id: 'svc-mine', num: '01', label: t('profile.services.mine'), count: myServices ? String(mine.length) : undefined },
+    { id: 'svc-catalogue', num: '02', label: t('profile.services.catalogue'), count: catalogue ? String(catalogue.length) : '', open: openCatalogue },
+  ];
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.services')]}
@@ -293,15 +332,18 @@ export default function ServicesTab({ session, showToast, onStats }) {
       help="concept.service"
       desc=${t('profile.services.desc')}
       start=${html`<${PageStart} id="actions"
-        action=${{ onClick: () => { setSvcSubTab('catalogue'); if (!catalogue) loadCatalogueData(catFilter); } }} />`}
+        action=${{ onClick: () => { openCatalogue(); scrollToSection('svc-catalogue'); } }} />`}
+      strip=${strip}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${sections}
       after=${html`<${ConfirmUI} />`}>
-      <${Tabs} bar kind="view" value=${svcSubTab}
-        onSelect=${(v) => { setSvcSubTab(v); if (v === 'catalogue' && !catalogue) loadCatalogueData(catFilter); }}
-        items=${[
-          { value: 'mine', label: t('profile.services.mine') },
-          { value: 'catalogue', label: t('profile.services.catalogue') },
-        ]} />
-      <${TabPanel} value=${svcSubTab}>${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}<//>
+      <${Section} id="svc-mine" num="01" title=${t('profile.services.mine')} count=${myServices ? mine.length : undefined} first>
+        ${renderMyServices()}
+      <//>
+      <${Section} fold id="svc-catalogue" num="02" title=${t('profile.services.catalogue')} sub=${catalogueWords}
+        open=${catalogueOpen} onToggle=${toggleCatalogue}>
+        ${catalogueOpen ? renderCatalogue() : null}
+      <//>
     <//>
   `;
 }

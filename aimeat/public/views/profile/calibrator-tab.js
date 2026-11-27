@@ -13,6 +13,9 @@
  * @structure CalibratorTab() — state + handlers → renderList(ctx) | renderPage(ctx)
  * @usage registered in profile.js TABS as id 'calibrator'
  * @version-history
+ *   v3.3.0 — 2026-11-27 — Settings usability pass: templatesFold holds whether section 04 (the
+ *     instruction prompts) is open, now that it is one row while shut (calibrator/page.js); it shuts
+ *     again when another calibration opens.
  *   v3.2.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
  *     legacyOr): on 3.x the connection and the model list come from /v1/openrouter/settings and
  *     /v1/openrouter/models as before v3.1.0, so the judge's default is the reasoning model again and
@@ -85,6 +88,7 @@ export default function CalibratorTab({ showToast }) {
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [templatesOpen, setTemplatesOpen] = useState(new Set());
+  const [templatesFold, setTemplatesFold] = useState(false);
   const [templateDrafts, setTemplateDrafts] = useState({});
   const [busy, setBusy] = useState(false);
   const [projectMsg, setProjectMsg] = useState(null);
@@ -164,7 +168,7 @@ export default function CalibratorTab({ showToast }) {
 
   const openProject = async (id) => {
     setProjectId(id); setDetail(null); setDetails({}); setOpenRun(null); setOpenStep(null); setPaste(null); setPickState(null); setRenaming(false);
-    setTemplatesOpen(new Set()); setTemplateDrafts({});
+    setTemplatesOpen(new Set()); setTemplatesFold(false); setTemplateDrafts({});
     try { await loadProject(id); } catch (e) { toast(errText(e), true); setProjectId(null); }
   };
   const back = () => { setProjectId(null); setDetail(null); loadList(); };
@@ -393,7 +397,7 @@ export default function CalibratorTab({ showToast }) {
     toggleRun, setOpenStep, runStep, runRest, newRun, setOption, applyOption, applyText, openPaste, setPasteText, savePaste, deleteRun, deleteEmpties, engineFor,
     pick, query, showAll, setPick, setQuery, setShowAll, setJudge, addCandidate, removeCandidate, modelsMsg,
     renaming, nameDraft, setRenaming: (v) => { setRenaming(v); if (v) setNameDraft(project?.name || ''); }, setNameDraft, saveName, setArchived, deleteProject, projectMsg,
-    templatesOpen, templateDrafts, toggleTemplate, setTemplateDraft, saveTemplate, resetTemplate, templateMsg, promptMsg,
+    templatesOpen, templatesFold, setTemplatesFold, templateDrafts, toggleTemplate, setTemplateDraft, saveTemplate, resetTemplate, templateMsg, promptMsg,
     leadRequest, back,
   };
   if (projectId && project) return renderPage(ctx);

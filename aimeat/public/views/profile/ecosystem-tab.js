@@ -12,6 +12,8 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.29.0 -- 2026-11-27 -- With nothing connected and nothing waiting the strip is not drawn (FigureStrip hideZeros) and the list says in one empty line how an app gets here (it replaces the two empty notes); an app that waits comes first in the list and a disconnected one last; the one-entry contents rail goes.
+ *   v3.28.0 -- 2026-11-27 -- The page leads with where things stand: a figure strip (connected apps, requests that wait, when an app was last here) from the lists it already reads, then the apps as section 01 (eco-apps) with the contents rail. Approving a waiting request is the page's one loud action; the emoji before an app's name goes (no emoji in the interface). No control was removed.
  *   v3.27.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: a waiting request's access level (ecosystem.grantLevel), and on the app's card the publish cadence, the guidance delivery, the trigger key (ecosystem-tab.automation.js) and the event picker (ecosystem-tab.cards.js) (.claude/rules/page-guidance.md).
  *   v3.26.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once an app is connected) and the title's question mark concept.outside_app, which now holds what the automation's "How this works" fold said.
  *   v3.25.0 -- 2026-11-08 -- A waiting request lists the words no access level carries, unticked, and the approval adds only the ones the owner ticked to the access level's scopes (ecosystem-tab.pending.js; secaudit2026nov08 round 14, older item O5).
@@ -167,6 +169,8 @@ import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { PageSection } from '/components/PageSection.js';
 import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Folds } from '/components/Folds.js';
@@ -181,6 +185,14 @@ import { MakerReceivers } from './receivers/maker-receivers.js';
 
 /** An app's state as a Status tone: approved is fine, waiting needs a look, revoked is danger. */
 const appStatusTone = (s) => (['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off');
+/**
+ * The apps in list order: one that waits (pending, validating) first, then the working ones, a
+ * disconnected one last; the server's order holds within each group.
+ */
+const STATUS_RANK = { attention: 0, fine: 1, off: 2, danger: 3 };
+const byAttention = (apps) => apps.map((a, i) => [a, i])
+  .sort(([a, i], [b, j]) => (STATUS_RANK[appStatusTone(a.status)] - STATUS_RANK[appStatusTone(b.status)]) || i - j)
+  .map(([a]) => a);
 /** A validation's result as a Status tone: passed is fine, failed is danger, the rest is off. */
 const validationTone = (v) => (v === 'validated' ? 'fine' : v === 'failed' ? 'danger' : 'off');
 
@@ -288,10 +300,26 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   if (loading) return html`<${LoadingLine} />`;
 
+  // The figures under the head, from the three lists the page already read: how many apps are
+  // connected (and disconnected), how many requests wait for the person, and when an app was last here.
+  const x = (key, vars) => t('profile.ecosystem.' + key, vars);
+  const connectedN = apps.filter(a => a.status !== 'revoked').length;
+  const revokedN = apps.length - connectedN;
+  const latest = apps.reduce((best, a) => (a.last_seen && (!best || String(a.last_seen) > String(best.last_seen)) ? a : best), null);
+  const strip = [
+    { key: 'apps', n: connectedN, label: x('stripApps'), sub: revokedN ? x('stripAppsSub', { n: revokedN }) : undefined },
+    { key: 'waiting', n: pending.length, tone: pending.length ? 'notice' : undefined, label: x('stripWaiting'),
+      sub: pending.length ? x('stripWaitingSub') : undefined },
+    latest
+      ? { key: 'seen', n: timeAgo(latest.last_seen), tone: 'coral', label: x('stripSeen'), sub: latest.display_name || latest.app }
+      : { key: 'seen', n: '·', tone: 'dim', label: x('stripSeen'), sub: x('stripSeenNone') },
+  ];
+
   // The start folds once an app is connected; connecting happens in the app, so it has no button here.
   return html`<${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.ecosystem')]}
     title=${t('profile.ecosystem.title')} help="concept.outside_app" sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
     desc=${t('profile.ecosystem.desc')}
+    strip=${html`<${FigureStrip} wrap hideZeros items=${strip} />`}
     start=${html`<${PageStart} id="ecosystem" done=${apps.length > 0} />`}
     after=${html`
       <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
@@ -338,19 +366,19 @@ export default function EcosystemTab({ onStats, showToast }) {
                   <${Select} fit ariaLabel=${t('profile.ecosystem.grantLevel')} value=${presetByCode[r.user_code] || 'standard'}
                     onChange=${v => setPresetByCode(p => ({ ...p, [r.user_code]: v }))}
                     options=${[['standard', t('profile.ecosystem.presetStandard')], ['readonly', t('profile.ecosystem.presetReadonly')], ['full', t('profile.ecosystem.presetFull')]]} />
-                  <${Action} small row disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}<//>
+                  <${Loud} control disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}<//>
                   <${Action} small row onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}<//>
                 <//>
               <//>`)}<//>
           <//>
         <//>`}
 
-      ${apps.length === 0
-        ? html`<${Stack}>
-            <${Note} kind="quiet">${t('profile.ecosystem.empty')}<//>
-            <${Note}>${t('profile.ecosystem.connectNote')}<//>
-          <//>`
-        : html`<${List} cols="name-desc-doors">${apps.map(app => {
+      ${/* The connected apps are what the page is opened for: section 01, always open. A waiting
+            request stays above it, as the one note that asks the person to act. With nothing yet,
+            the list's one empty line says how an app gets here. The page has one section, so no
+            contents rail. */''}
+      <${PageSection} id="eco-apps" num="01" first title=${x('secApps')} count=${apps.length}>
+      <${List} cols="name-desc-doors" empty=${x('emptyLine')}>${byAttention(apps).map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
@@ -389,7 +417,7 @@ export default function EcosystemTab({ onStats, showToast }) {
                   <${EcoTechDetails} app=${app} appSubs=${appSubs}
                     onUnsubscribe=${onUnsubscribe} onSubscribe=${onSubscribe}
                     subForm=${subForm} setSubForm=${setSubForm} />`}>
-              <${Name} before=${'🔌'}>${app.display_name || app.app}<//>
+              <${Name}>${app.display_name || app.app}<//>
               <${Desc}>${app.owner ? t('profile.ecosystem.connectedAsYou', { owner: app.owner }) : ''}<//>
               <${Doors}>
                 <${Mark} kind="status" tone=${appStatusTone(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}<//>
@@ -397,6 +425,7 @@ export default function EcosystemTab({ onStats, showToast }) {
                 <${Icon} small>${isOpen ? '▼' : '▶'}<//>
               <//>
             <//>`;
-        })}<//>`}
+        })}<//>
+      <//>
   <//>`;
 }

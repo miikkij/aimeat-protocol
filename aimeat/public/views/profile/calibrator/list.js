@@ -10,6 +10,15 @@
  * @structure renderList · listRow
  * @usage import { renderList } from './list.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- Settings usability pass: the calibrations are section 01 (cal-list) beside
+ *     the contents rail, with Show archived as the section's quiet action. A figure strip under the
+ *     head says how many calibrations are in use, the mean of their latest scores, how many runs
+ *     they hold and how many have not run yet (attention tone), all from the list the page already
+ *     reads; it replaces the head's tags, which said the first two. New calibration stays the one loud
+ *     action. Only the Calibrator page imports this file. Second pass, same day: the strip takes
+ *     hideZeros, so an account with no calibration opens on the list's empty line; calibrations that
+ *     have not run yet are listed first; the rail no longer names the page's one section (its page
+ *     links stay); the comment that said the calibrator has no MCP tool is corrected.
  *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "calibrator" (folded once there is a calibration) and the title's question mark concept.calibration, which now holds how a calibration works; the head's paragraph is two sentences.
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head, rail as data), the rows the List, the score the Figure, the new name the Text field with its Loud action, the lines the Note (component plan, page group G4).
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -37,8 +46,10 @@ import { t } from '/js/i18n.js';
 import { x, dateWord, judgeOf, crumb, pageLinks } from './frame.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { Figure } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
 import { PageStart } from '/components/PageStart.js';
@@ -52,30 +63,60 @@ export function renderList(ctx) {
   const archived = all.filter((p) => p.status === 'archived');
   const shown = ctx.showArchived ? all : live;
   const scored = live.filter((p) => p.latestAvgScore != null);
-  const marks = [
-    ctx.projects ? { label: x('chipCalibrations', { n: live.length }), tone: 'sun' } : null,
-    scored.length ? { label: x('chipScored', { n: scored.length }) } : null,
-    archived.length ? { label: x('chipArchived', { n: archived.length }) } : null,
-  ];
   const actions = html`
     <${TextField} value=${ctx.newName} placeholder=${x('newPlaceholder')} ariaLabel=${x('newName')} onInput=${(v) => ctx.setNewName(v)} onEnter=${() => ctx.createProject()}
-      actions=${html`<${Loud} control disabled=${ctx.busy === 'create' || !ctx.newName.trim()} onClick=${() => ctx.createProject()}>${x('newCalibration')}<//>`} />
-    <${Actions}>
-      ${archived.length ? html`<${Action} tone="more" onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}<//>` : null}
-    <//>`;
-  // The start: folded once there is a calibration. Its first step is in the person's own AI: the
-  // calibrator has no MCP tool, so the AI helps write the prompt and the target output.
+      actions=${html`<${Loud} control disabled=${ctx.busy === 'create' || !ctx.newName.trim()} onClick=${() => ctx.createProject()}>${x('newCalibration')}<//>`} />`;
+  // The start: folded once there is a calibration. Its first step is in the person's own AI, which
+  // helps write the prompt and the target output; over MCP it also has the aimeat_calibrator tool
+  // (src/tool-catalog/definitions/calibrator.ts) to read and change calibrations, but not to run models.
   const start = html`<${PageStart} id="calibrator" done=${ctx.projects ? all.length > 0 : null} />`;
   return html`
-    <${SettingsPage} crumb=${crumb()} title=${t('profile.calibrator.tabLabel')} sub=${x('titleSub')} help="concept.calibration" marks=${marks} desc=${x('listDesc')}
-      actions=${actions} start=${start} railTitle=${x('railTitle')} pagesLabel=${x('pages')} pages=${pageLinks()}>
-      <${List} cols="name-score-desc-doors" loading=${!ctx.projects ? x('loading') : false}
-        head=${[x('colCalibration'), x('colScore'), x('colState'), '']}
-        empty=${html`<${Note} kind="quiet"><b>${x('emptyLead')}</b> ${x('emptyBody')}<//>`}>
-        ${shown.map((p) => listRow(ctx, p))}
+    <${SettingsPage} crumb=${crumb()} title=${t('profile.calibrator.tabLabel')} sub=${x('titleSub')} help="concept.calibration" desc=${x('listDesc')}
+      actions=${actions} start=${start} strip=${listStrip(ctx.projects, live, archived, scored)}
+      railTitle=${x('railTitle')} pagesLabel=${x('pages')} pages=${pageLinks()}>
+      <${Section} id="cal-list" num="01" title=${x('secList')} count=${ctx.projects ? shown.length : undefined} first
+        doors=${archived.length ? html`<${Action} tone="more" onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}<//>` : null}>
+        <${List} cols="name-score-desc-doors" loading=${!ctx.projects ? x('loading') : false}
+          head=${[x('colCalibration'), x('colScore'), x('colState'), '']}
+          empty=${html`<${Note} kind="quiet"><b>${x('emptyLead')}</b> ${x('emptyBody')}<//>`}>
+          ${firstNeeded(shown).map((p) => listRow(ctx, p))}
+        <//>
+        <${Note}>${x('listHint')}<//>
       <//>
-      <${Note}>${x('listHint')}<//>
     <//>`;
+}
+
+/**
+ * The rows in the order a person acts on them: a calibration in use that has not run yet first (the
+ * strip's attention figure), then the others in use, archived ones last. The sort is stable, so the
+ * list's own order (newest first) holds within each group.
+ */
+function firstNeeded(rows) {
+  const rank = (p) => (p.status === 'archived' ? 2 : Number(p.batchCount) > 0 ? 1 : 0);
+  return rows.slice().sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Where the calibrations stand, from the list already read (GET /v1/calibrator): how many are in use,
+ * the mean of their latest scores, how many runs they hold, and how many have not run yet (the one
+ * that needs the person, so it takes the attention tone). The head's tags said the first two before.
+ */
+function listStrip(projects, live, archived, scored) {
+  if (!projects) return html`<${FigureStrip} loading=${4} />`;
+  const mean = scored.length ? Math.round(scored.reduce((n, p) => n + p.latestAvgScore, 0) / scored.length) : null;
+  const runs = live.reduce((n, p) => n + (Number(p.batchCount) || 0), 0);
+  const notRun = live.filter((p) => !(Number(p.batchCount) > 0)).length;
+  const noPrompt = live.filter((p) => !p.currentVersion).length;
+  // hideZeros: with no calibration the strip is not drawn and the list's empty line says how to begin.
+  return html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'live', n: live.length, label: x('stripCalibrations'), sub: archived.length ? x('chipArchived', { n: archived.length }) : undefined },
+    mean != null
+      ? { key: 'score', n: `${mean} %`, label: x('stripScore'), sub: x('chipScored', { n: scored.length }) }
+      : { key: 'score', n: '·', tone: 'dim', label: x('stripScore'), sub: x('stripNoRuns') },
+    { key: 'runs', n: runs, label: x('stripRuns') },
+    { key: 'notRun', n: notRun, tone: notRun ? 'notice' : undefined, label: x('stripNotRun'),
+      sub: noPrompt ? x('stripNoPromptSub', { n: noPrompt }) : undefined },
+  ]} />`;
 }
 
 function listRow(ctx, p) {

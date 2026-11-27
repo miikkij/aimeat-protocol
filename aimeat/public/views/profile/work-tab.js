@@ -8,6 +8,8 @@
  *   (.claude/rules/page-guidance.md): PageStart "work" under the head and the title's question mark
  *   concept.work_request.
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- With no work in either direction the strip is not drawn (FigureStrip hideZeros, its first figure now counts every work item) and the page is section 01 with one line that says how a request gets here; the sent requests and the delivered record are drawn once they hold something, the numbers and the rail follow what is drawn, and one section has no rail. A request that waits for an answer, then work to deliver, comes first in the inbox; a delivery that waits for a rating first in the sent list.
+ *   v1.21.0 -- 2026-11-27 -- The page leads with where things stand: a figure strip (requests that wait for an answer, work to deliver, deliveries that wait for a rating, work delivered) from the overview it already reads. The three lists are sections with the contents rail instead of view tabs: 01 requests to the person (wk-inbox), 02 requests they sent (wk-sent), 03 work they delivered (wk-delivered) as a FoldSection row that says how many. Accept is the one loud action; Deliver on a row is a quiet Action that opens the same dialog. No list or control was removed.
  *   v1.20.0 -- 2026-11-15 -- Accept and Decline say what they do (the past-tense "Work accepted" was the label and the error toast); accept, decline and deliver have their own error toasts; the Deliver dialog's placeholder goes through t(). A Delivered view lists the work the person delivered as a provider (GET /v1/work/overview `delivered`), with what was sent and the rating, so a delivered item no longer leaves no record. Decline and Rate are the control-tall action (Action `control`), the touch target Accept has.
  *   v1.19.0 -- 2026-11-15 -- A row reads its tracking code from `tracking_code`, the name the work routes answer with, so accept, decline, deliver and rate reach the right item, and names the row by its `action_id` when it has no description. A sent item shows what was delivered, "Delivered with no text" for an empty one; an empty text area delivers { text: "" }.
  *   v1.18.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a work item is listed) and the title's question mark concept.work_request; the head's paragraph is two sentences.
@@ -53,13 +55,15 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { timeAgo } from '/js/utils.js';
 import { pacingOf } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { PageStart } from '/components/PageStart.js';
-import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
 import { Action, Loud } from '/components/Action.js';
@@ -79,13 +83,28 @@ import { deliveredText } from './work-delivered.js';
 const num = (v) => (typeof v === 'number' ? v : undefined);
 const workToll = (w) => num(w.cost?.toll) ?? num(w.cost?.base_price) ?? num(w.cost?.basePrice) ?? num(w.toll) ?? num(w.base_price) ?? pacingOf(w);
 
+/**
+ * A list in the order a person acts on it: in the inbox a request that waits for an answer first,
+ * then accepted work still to deliver; in the sent list a delivery that waits for a rating first.
+ * The server's order holds within each group.
+ */
+const ATTENTION = {
+  inbox: (w) => (['pending', 'offered'].includes(w.status) ? 0 : ['accepted', 'in_progress'].includes(w.status) ? 1 : 2),
+  sent: (w) => (w.status === 'delivered' ? 0 : 1),
+};
+function byAttention(items, type) {
+  const rank = ATTENTION[type];
+  if (!rank) return items;
+  return items.map((w, i) => [w, i]).sort(([a, i], [b, j]) => (rank(a) - rank(b)) || i - j).map(([w]) => w);
+}
+
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
   const [workSent, setWorkSent] = useState(null);
   // The work this person (or their agents) delivered as a provider: it left the inbox, and this is
   // where it stays on record. Only the overview carries it, so the fallback reads leave it empty.
   const [workDelivered, setWorkDelivered] = useState(null);
-  const [workSubTab, setWorkSubTab] = useState('inbox');
+  const [deliveredOpen, setDeliveredOpen] = useState(false);
   const [rateModal, setRateModal] = useState(null);
   const [deliverModal, setDeliverModal] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
@@ -202,10 +221,18 @@ export default function WorkTab({ session, showToast, onStats }) {
     }
   }
 
-  function renderList(items, type) {
+  // A request's state in the person's language; a state this page has no word for is shown as the
+  // node sent it. The row showed the raw value ("pending", "accepted") in every language.
+  function statusWord(status) {
+    const key = `profile.work.status.${status}`;
+    const word = t(key);
+    return word && word !== key ? word : status;
+  }
+
+  function renderList(items, type, emptyKey) {
     if (!items) return html`<${List} loading=${t('profile.work.loading')} />`;
-    const empty = { sent: 'profile.work.sentEmpty', delivered: 'profile.work.deliveredListEmpty' }[type] || 'profile.work.empty';
-    return html`<${List} cols="name-desc-doors" empty=${t(empty)}>${items.map(w => {
+    const empty = emptyKey || { sent: 'profile.work.sentEmpty', delivered: 'profile.work.deliveredListEmpty' }[type] || 'profile.work.empty';
+    return html`<${List} cols="name-desc-doors" empty=${t(empty)}>${byAttention(items, type).map(w => {
       // The work routes name the item `tracking_code`; the other names are older shapes.
       const tc = w.tracking_code || w.tc || w.id || w.work_id;
       const said = type === 'sent' || type === 'delivered' ? deliveredText(w.output) : null;
@@ -228,7 +255,7 @@ export default function WorkTab({ session, showToast, onStats }) {
             ${type === 'delivered' && score !== null ? ' \u2502 ' + t(score >= 4 ? 'profile.work.ratedPositive' : 'profile.work.ratedNegative') : ''}
           <//>
           <${Doors}>
-          <${Mark} kind="status" tone=${statusTone(status)}>${status}<//>
+          <${Mark} kind="status" tone=${statusTone(status)}>${statusWord(status)}<//>
           ${type === 'inbox' && isPending && html`
               <${Loud} control disabled=${isLoading} onClick=${() => handleAccept(tc)}>
                 ${isLoading ? '...' : t('profile.work.acceptBtn')}
@@ -239,7 +266,7 @@ export default function WorkTab({ session, showToast, onStats }) {
           `}
 
           ${type === 'inbox' && isActive && html`
-              <${Loud} control disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name || w.action_id })}>
+              <${Action} small row control disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name || w.action_id })}>
                 ${t('profile.work.deliver')}
               <//>
           `}
@@ -253,20 +280,58 @@ export default function WorkTab({ session, showToast, onStats }) {
     })}<//>`;
   }
 
+  // The figures under the head, from the overview the page already read: every work item the page
+  // holds (to the person and from them), what waits for their answer, what was delivered to them and
+  // waits for a rating, and what they accepted and still deliver. With nothing at all the strip is
+  // not drawn (hideZeros).
+  const loaded = workInbox !== null && workSent !== null && workDelivered !== null;
+  const toYou = (workInbox?.length ?? 0) + (workDelivered?.length ?? 0);
+  const fromYou = workSent?.length ?? 0;
+  const answerN = (workInbox || []).filter(w => ['pending', 'offered'].includes(w.status)).length;
+  const deliverN = (workInbox || []).filter(w => ['accepted', 'in_progress'].includes(w.status)).length;
+  const rateN = (workSent || []).filter(w => w.status === 'delivered').length;
+  const strip = !loaded ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'all', n: toYou + fromYou, label: t('profile.work.stripAll'), sub: t('profile.work.stripAllSub', { in: toYou, out: fromYou }) },
+    { key: 'answer', n: answerN, tone: answerN ? 'notice' : undefined, label: t('profile.work.stripAnswer'), sub: answerN ? t('profile.work.stripAnswerSub') : undefined },
+    { key: 'rate', n: rateN, tone: rateN ? 'notice' : undefined, label: t('profile.work.stripRate') },
+    { key: 'deliver', n: deliverN, label: t('profile.work.stripDeliver') },
+  ]} />`;
+  const deliveredSub = workDelivered === null ? '…' : tn('profile.work.foldDelivered', workDelivered.length);
+
+  // What is drawn: the requests to the person always (with nothing anywhere, its one line is the
+  // page's empty line); the sent requests and the delivered record only once they hold something.
+  // The numbers and the rail follow what is drawn, and one section has no rail.
+  const nothing = loaded && toYou + fromYou === 0;
+  const shown = [
+    { id: 'wk-inbox', label: t('profile.work.secInbox'), count: workInbox?.length },
+    workSent?.length ? { id: 'wk-sent', label: t('profile.work.secSent'), count: workSent.length } : null,
+    workDelivered?.length ? { id: 'wk-delivered', label: t('profile.work.secDelivered'), count: workDelivered.length } : null,
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map(s => [s.id, s.num]));
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.work')]}
       title=${t('profile.work.title')} help="concept.work_request"
       desc=${t('profile.work.desc')}
+      strip=${strip}
       start=${/* Folded once either list has a work item; a request is sent by one's own AI, so no button. */
-        html`<${PageStart} id="work" done=${workInbox === null || workSent === null ? null : (workInbox.length + workSent.length + (workDelivered?.length ?? 0)) > 0} />`}>
-      <${Tabs} bar kind="view" value=${workSubTab} onSelect=${setWorkSubTab} items=${[
-        { value: 'inbox', label: t('profile.work.inbox') },
-        { value: 'sent', label: t('profile.work.sent') },
-        { value: 'delivered', label: t('profile.work.deliveredTab') },
-      ]} />
-      <${TabPanel} value=${workSubTab}>${workSubTab === 'inbox' ? renderList(workInbox, 'inbox')
-        : workSubTab === 'delivered' ? renderList(workDelivered, 'delivered') : renderList(workSent, 'sent')}<//>
+        html`<${PageStart} id="work" done=${workInbox === null || workSent === null ? null : (workInbox.length + workSent.length + (workDelivered?.length ?? 0)) > 0} />`}
+      railTitle=${shown.length > 1 ? t('profile.landing.railTitle') : undefined}
+      sections=${shown.length > 1 ? shown : undefined}>
+      ${/* What came to the person is section 01: it is what waits for their answer. What they sent
+            follows, open, since a delivery to them waits for their rating there. What they delivered is
+            the record, a row that says how many and opens in place. The three lists were tabs. */''}
+      <${PageSection} id="wk-inbox" num=${numOf['wk-inbox']} first title=${t('profile.work.secInbox')} count=${workInbox?.length}>
+        ${renderList(workInbox, 'inbox', nothing ? 'profile.work.emptyAll' : undefined)}
+      <//>
+      ${numOf['wk-sent'] && html`<${PageSection} id="wk-sent" num=${numOf['wk-sent']} title=${t('profile.work.secSent')} count=${workSent.length}>
+        ${renderList(workSent, 'sent')}
+      <//>`}
+      ${numOf['wk-delivered'] && html`<${FoldSection} id="wk-delivered" num=${numOf['wk-delivered']} title=${t('profile.work.secDelivered')} sub=${deliveredSub}
+        open=${deliveredOpen} onToggle=${() => setDeliveredOpen(o => !o)}>
+        ${renderList(workDelivered, 'delivered')}
+      <//>`}
 
       ${rateModal && html`<${RateModal} desc=${rateModal.desc}
         onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}

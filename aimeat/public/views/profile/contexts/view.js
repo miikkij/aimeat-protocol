@@ -7,17 +7,26 @@
  *   can read it and its marks (not shaped in months, large), the archived ones in a folded group at
  *   the end; beside it the chosen context: its summary, kind and dates, who can read it (a choice
  *   with its explanation, explain.context.readers), the one loud action that copies the sentence to
- *   go on with it in chat, archive or bring back, delete; then its core, its concepts, its
- *   references, the contexts it includes or keeps out, and the views its AI keeps. One column under
+ *   go on with it in chat, archive or bring back, delete; then its fingerprint, its core and the
+ *   views its AI keeps, and as rows that open in place its concepts, its references and the
+ *   contexts it includes or keeps out. The figure strip under the head says where they stand. One column under
  *   1100px, the list first. The guidance is the standard parts of .claude/rules/page-guidance.md:
  *   the head's paragraph, the title's question mark (explain.concept.context), PageStart
  *   (pageStart.contexts.*) and the list's own empty line; nothing else on the page explains.
  *   Pure render over the ctx bag of contexts-tab.js; every part is a library component, and the
  *   file writes no class.
- * @structure renderContextsView · listPart · tagPick · markWords · contextRow · deletedNote · detailPart · headPart ·
- *   fingerprintPart · corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
+ * @structure renderContextsView · stripPart · listPart · tagPick · markWords · contextRow · deletedNote · detailPart · headPart ·
+ *   fingerprintPart · corePart · foldPart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.6.1 — 2026-11-27 — With no context the strip is not drawn (FigureStrip hideZeros), so the
+ *     list's one empty line is the page; the not-updated figure has no attention tone (a context to
+ *     archive does not wait for the person, and the list keeps the newest first).
+ *   v1.6.0 — 2026-11-27 — The page leads with where things stand: a figure strip (contexts in use and
+ *     archived, how many were not updated in CONTEXT_STALE_DAYS, when one was last updated) from the list
+ *     it already reads. The chosen context keeps its fingerprint and core open and its kept views follow
+ *     them; concepts, references and other contexts are FoldSection rows that say how many there are and
+ *     open in place (their ids stay). No control was removed.
  *   v1.5.0 — 2026-11-09 — Tags: a drop-down over the list shows the contexts of one tag (only when some
  *     context has a tag), a row names up to three of its tags, and the chosen context's facts name all
  *     of them with the line that the person's AI sets them.
@@ -45,6 +54,8 @@ import { ago, date, num } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { ConversationList, ConversationRows, ConversationSection, ConversationRow } from '/components/ConversationList.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
@@ -57,7 +68,7 @@ import { Markdown } from '/components/Markdown.js';
 import { Peek, nextPeek } from '/components/Peek.js';
 import { Beside, Stack, Touch } from '/components/Layout.js';
 import { Fingerprint } from '/components/TextPrint.js';
-import { x, xn, marksOf, readersWords, OWN_READERS, chatSentence, crumb, CONTEXT_PREFIX } from './frame.js';
+import { x, xn, marksOf, readersWords, OWN_READERS, chatSentence, crumb, CONTEXT_PREFIX, CONTEXT_STALE_DAYS } from './frame.js';
 
 const html = htm.bind(h);
 /** A core longer than this shows its top under a fade until the person asks for all of it. */
@@ -80,9 +91,33 @@ export function renderContextsView(ctx) {
   const start = html`<${PageStart} id="contexts" done=${ctx.items ? all.length > 0 : null} />`;
   return html`
     <${SettingsPage} name="ctx" crumb=${crumb()} title=${t('profile.tabs.contexts')} help="concept.context" marks=${marks}
-      desc=${x('lede')} start=${start} after=${html`<${ctx.ConfirmUI} />`}>
+      desc=${x('lede')} strip=${stripPart(ctx)} start=${start} after=${html`<${ctx.ConfirmUI} />`}>
       ${body}
     <//>`;
+}
+
+/**
+ * The figures under the head, from the list the page already read (every context, whatever tag the
+ * list shows): how many are in use (and archived), how many nobody updated in CONTEXT_STALE_DAYS,
+ * the ones to archive when they no longer matter, and when one was last updated.
+ */
+function stripPart(ctx) {
+  if (ctx.failed) return null;
+  if (!ctx.items) return html`<${FigureStrip} loading=${3} />`;
+  const inUse = ctx.items.filter((c) => !c.archivedAt);
+  const archivedN = ctx.items.length - inUse.length;
+  const stale = inUse.filter((c) => marksOf(c).staleMonths > 0).length;
+  const latest = ctx.items.reduce((best, c) => (c.shapedAt && (!best || String(c.shapedAt) > String(best.shapedAt)) ? c : best), null);
+  // A context nobody updated is a candidate to archive, not something that waits for the person, so
+  // its figure has no attention tone and the list keeps the newest first.
+  return html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'inUse', n: inUse.length, label: x('stripInUse'), sub: archivedN ? x('stripArchived', { n: num(archivedN) }) : undefined },
+    { key: 'stale', n: stale, label: x('stripStale', { days: CONTEXT_STALE_DAYS }),
+      sub: stale ? x('stripStaleSub') : undefined },
+    latest
+      ? { key: 'shaped', n: ago(latest.shapedAt), tone: 'coral', label: x('stripShaped'), sub: latest.name }
+      : { key: 'shaped', n: '·', tone: 'dim', label: x('stripShaped'), sub: x('never') },
+  ]} />`;
 }
 
 /* ── The list ─────────────────────────────────────────────────────────────────────────────────── */
@@ -152,7 +187,10 @@ function deletedNote(ctx) {
 
 function detailPart(ctx, c) {
   if (!c) return null;
-  const parts = [fingerprintPart, corePart, conceptsPart, referencesPart, linksPart, viewsPart];
+  // What a person reads every time stays open (what it is made of, its core, the views its AI keeps);
+  // the lists an AI reads more than a person (concepts, references, other contexts) are rows that say
+  // how many there are and open in place.
+  const parts = [fingerprintPart, corePart, viewsPart, conceptsPart, referencesPart, linksPart];
   let n = 0;
   const numbered = parts.map((part) => part(ctx, c, () => String(++n).padStart(2, '0')));
   return html`
@@ -253,29 +291,36 @@ function corePart(ctx, c, nextNum) {
     <//>`;
 }
 
+/** A part that is one row until it is opened; whether it is open is kept per part in ctx.viewsOpen. */
+function foldPart(ctx, id, partNum, title, sub, body) {
+  const key = 'fold:' + id;
+  const open = ctx.viewsOpen[key] === 'open';
+  return html`
+    <${FoldSection} id=${id} num=${partNum} title=${title} sub=${sub} open=${open}
+      onToggle=${() => ctx.setViewOpen(key, open ? '' : 'open')}>
+      ${body}
+    <//>`;
+}
+
 function conceptsPart(ctx, c, nextNum) {
   if (!c.concepts.length) return null;
-  return html`
-    <${PageSection} id="ctx-concepts" num=${nextNum()} title=${x('concepts')}>
+  return foldPart(ctx, 'ctx-concepts', nextNum(), x('concepts'), xn('foldConcepts', c.concepts.length), html`
       <${Facts} wide rows=${c.concepts.map((k, i) => ({
         key: 'c' + i, k: k.term, v: k.means || x('noMeaning'), missing: !k.means,
         sub: [k.broader ? x('broader', { term: k.broader }) : '', k.replacedBy ? x('replacedBy', { term: k.replacedBy }) : '']
           .filter(Boolean).join(' · ') || undefined,
         subTone: k.replacedBy ? 'notice' : undefined,
-      }))} />
-    <//>`;
+      }))} />`);
 }
 
 function referencesPart(ctx, c, nextNum) {
   if (!c.references.length) return null;
-  return html`
-    <${PageSection} id="ctx-refs" num=${nextNum()} title=${x('references')}>
+  return foldPart(ctx, 'ctx-refs', nextNum(), x('references'), xn('foldReferences', c.references.length), html`
       <${Facts} wide rows=${c.references.map((r, i) => ({
         key: 'r' + i, k: r.what || r.ref,
         v: r.openWhen ? x('openWhen', { when: r.openWhen }) : x('openAny'),
         sub: r.ref || undefined,
-      }))} />
-    <//>`;
+      }))} />`);
 }
 
 /** One included or kept-out context: a way to it when the person has it, its name as text when not. */
@@ -289,13 +334,12 @@ function linkTo(ctx, ref) {
 
 function linksPart(ctx, c, nextNum) {
   if (!c.includes.length && !c.excludes.length) return null;
-  return html`
-    <${PageSection} id="ctx-links" num=${nextNum()} title=${x('links')}>
+  const sub = x('foldLinks', { in: num(c.includes.length), out: num(c.excludes.length) });
+  return foldPart(ctx, 'ctx-links', nextNum(), x('links'), sub, html`
       <${Facts} wide rows=${[
         c.includes.length ? { key: 'in', k: x('includes'), v: c.includes.map((r) => linkTo(ctx, r)), sub: x('includesSub') } : null,
         c.excludes.length ? { key: 'out', k: x('excludes'), v: c.excludes.map((r) => linkTo(ctx, r)), sub: x('excludesSub') } : null,
-      ]} />
-    <//>`;
+      ]} />`);
 }
 
 /** The first line of a view's last text, for its folded look. */
