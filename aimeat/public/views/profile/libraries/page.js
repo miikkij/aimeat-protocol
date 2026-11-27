@@ -5,14 +5,21 @@
  * @description The Libraries page in the poster face: the builder's shelf. The mast and the strip;
  *   three shelves as rows (the base the app signs in and stores with, the ready-made UI a cortex
  *   gives, the third-party libraries served from this node at a fixed version), each with a filter
- *   row and a search; the faces with their licences; and the section with the rule an AI copies
- *   and the facts of how a library is chosen, proven and used. The page explains itself the
+ *   row and a search; as rows that open in place, the faces with their licences and the rule an AI
+ *   copies with the facts of how a library is chosen, proven and used. The page explains itself the
  *   designed way (.claude/rules/page-guidance.md): the start (PageStart "libraries") and the
  *   title's question mark (concept.library). What opens under a row is rows.js. Pure render over
  *   the ctx bag.
  * @structure renderPage · shelf · secFaces · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- Usability pass of the Settings pages: the three shelves stay open; the
+ *     faces and the AI rule with its facts are rows that say their state and open in place. A
+ *     deprecated library one of the reader's own apps still loads leads its shelf, its count leads
+ *     the strip in the notice tone, and its row names the apps. The strip is the whole shelf (its
+ *     three parts under it) and the apps that load a library, instead of one figure per shelf that
+ *     repeated the rail's counts; the head's marks that repeated the strip are gone (the proven and
+ *     deprecated marks stay). The AI row's heading is a noun phrase.
  *   v1.21.0 -- 2026-11-08 -- A shelf's filter row names its two groups whose words a person cannot read, and each group label opens its explanation: Model (third-party shelf, term libraries.modelTier) and Status (every shelf, term libraries.status) (.claude/rules/page-guidance.md).
  *   v1.20.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "libraries" and the title's question mark concept.library; the lead of section 05 explained the concept, so its words moved into the concept; the head's paragraph is two sentences.
  *   v1.19.0 -- 2026-10-03 -- Section 04, Faces: every face this server serves with its licence, an added face marked as added and one with no licence data as a warning (the font manager); the AI section is 05.
@@ -48,6 +55,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Facts } from '/components/Facts.js';
@@ -69,6 +77,8 @@ const groupLabel = (term, words) => html`<${Label} key=${'k-' + term}><${HelpLab
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 const used = (p) => p.used_by?.apps || 0;
 const proven = (p) => (p.proofs || []).length > 0;
+/** Deprecated, and loaded by one of the reader's own apps (libraries-tab.js `appsUsing.mine`). */
+const isStale = (ctx, p) => p.status === 'deprecated' && (ctx.appsUsing?.mine?.[p.id] || []).length > 0;
 
 export function renderPage(ctx) {
   const packs = ctx.packs;   // null while loading
@@ -79,19 +89,29 @@ export function renderPage(ctx) {
   const inUse = all.filter((p) => used(p) > 0).length;
   const provenN = all.filter(proven).length;
   const deprecatedN = all.filter((p) => p.status === 'deprecated').length;
-  const appsUsing = ctx.appsUsing;   // { using, total } or null
+  const appsUsing = ctx.appsUsing;   // { using, total, mine } or null
   const top = all.slice().sort((a, b) => used(b) - used(a)).slice(0, 3).filter((p) => used(p) > 0).map((p) => `${p.id} ${used(p)}`).join(' · ');
+  // A deprecated library that one of the reader's own apps still loads: the one thing here that
+  // asks something of them (move the app to the named replacement).
+  const stale = all.filter((p) => isStale(ctx, p));
 
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'base', n: packs ? base.length : '…', label: x('stripBase'),
-      sub: `${x('stripBaseSub')}${deprecatedN && base.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: base.filter((p) => p.status === 'deprecated').length })}` : ''}` },
-    { key: 'ui', n: packs ? ui.length : '…', label: x('stripUi'),
-      sub: packs ? x('stripUiSub', { node: ui.filter((p) => !isCommunity(p)).length, community: ui.filter(isCommunity).length }) : '' },
-    { key: 'third', n: packs ? third.length : '…', label: x('stripThird'),
-      sub: `${x('stripThirdSub')}${third.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: third.filter((p) => p.status === 'deprecated').length })}` : ''}` },
-    { key: 'apps', n: appsUsing ? appsUsing.using : (packs ? inUse : '…'), label: appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse'),
+  // The figures, from what the page already read: the deprecated libraries the reader's apps still
+  // load (only when there are any, first and in the notice tone), the whole shelf with its three
+  // parts, and how many apps load a library. The shelf is the node's, never empty, so the strip
+  // has no empty case.
+  const strip = !packs ? html`<${FigureStrip} loading=${2} />` : html`<${FigureStrip} items=${[
+    stale.length ? { key: 'stale', n: stale.length, tone: 'notice', label: x('stripStale'), sub: x('stripStaleSub', { list: stale.map((p) => p.id).join(', ') }) } : null,
+    { key: 'all', n: all.length, label: x('stripAll'), sub: x('stripAllSub', { base: base.length, ui: ui.length, third: third.length }) },
+    { key: 'apps', n: appsUsing ? appsUsing.using : inUse, label: appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse'),
       sub: top ? x('stripTop', { list: top }) : '' },
   ]} />`;
+  const sections = [
+    { id: 'lb-base', label: x('secBase'), count: packs ? base.length : '' },
+    { id: 'lb-ui', label: x('secUi'), count: packs ? ui.length : '' },
+    { id: 'lb-third', label: x('secThird'), count: packs ? third.length : '' },
+    { id: 'lb-faces', label: x('secFaces'), count: ctx.fonts ? ctx.fonts.base.length + ctx.fonts.added.length : '' },
+    { id: 'lb-ai', label: x('secAi'), count: '' },
+  ].map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
 
   return html`
     <${SettingsPage} name="libs"
@@ -100,8 +120,6 @@ export function renderPage(ctx) {
       sub=${x('titleSub')}
       help="concept.library"
       marks=${packs ? [
-        { label: x('chipAll', { n: all.length }), tone: 'sun' },
-        { label: x('chipInUse', { n: inUse }) },
         { label: x('chipProven', { n: provenN }) },
         deprecatedN ? { label: x('chipDeprecated', { n: deprecatedN }) } : null,
       ] : []}
@@ -112,13 +130,7 @@ export function renderPage(ctx) {
       start=${html`<${PageStart} id="libraries" />`}
       strip=${strip}
       railTitle=${x('railTitle')}
-      sections=${[
-        { id: 'lb-base', num: '01', label: x('secBase'), count: packs ? base.length : '' },
-        { id: 'lb-ui', num: '02', label: x('secUi'), count: packs ? ui.length : '' },
-        { id: 'lb-third', num: '03', label: x('secThird'), count: packs ? third.length : '' },
-        { id: 'lb-faces', num: '04', label: x('secFaces'), count: ctx.fonts ? ctx.fonts.base.length + ctx.fonts.added.length : '' },
-        { id: 'lb-ai', num: '05', label: x('secAi'), count: '' },
-      ]}
+      sections=${sections}
       pagesLabel=${x('pages')}
       pages=${pageLinks()}>
       ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
@@ -144,7 +156,9 @@ function shelf(ctx, key, num, title, sub, list, first) {
   if (F.who === 'node') rows = rows.filter((p) => !isCommunity(p));
   if (F.who === 'community') rows = rows.filter(isCommunity);
   if (q) rows = rows.filter((p) => matches(q, p.id, p.title, p.description, p.apiSurface, (p.interviewTriggers || []).join(' ')));
-  rows = rows.slice().sort((a, b) => used(b) - used(a) || String(a.title || a.id).localeCompare(String(b.title || b.id)));
+  // A deprecated library one of the reader's apps still loads comes first; then the most used.
+  const staleRank = (p) => (isStale(ctx, p) ? 0 : 1);
+  rows = rows.slice().sort((a, b) => staleRank(a) - staleRank(b) || used(b) - used(a) || String(a.title || a.id).localeCompare(String(b.title || b.id)));
   const shown = rows.slice(0, ctx.shown[key]);
   const set = (patch) => ctx.setFilter(key, patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
@@ -203,8 +217,11 @@ function secFaces(ctx, num) {
       sub: unknown ? x('facesUnknown') : (face.copyright || ''), subTone: unknown ? 'notice' : undefined,
     };
   };
+  // One row that says how many faces there are, and how many nobody stated a licence for.
+  const unknown = f ? [...f.added, ...f.base].filter((face) => face.licenceStatus === 'unknown').length : 0;
+  const sub = f ? `${x('facesCount', { base: f.base.length, added: f.added.length })}${unknown ? ` · ${x('facesUnknownN', { n: unknown })}` : ''}` : null;
   return html`
-    <${PageSection} id="lb-faces" num=${num} title=${x('secFaces')} count=${f ? x('facesCount', { base: f.base.length, added: f.added.length }) : null}>
+    <${FoldSection} id="lb-faces" num=${num} title=${x('secFaces')} sub=${sub} open=${!!ctx.folds?.faces} onToggle=${() => ctx.setFold('faces', !ctx.folds?.faces)}>
       ${!f ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
         <${Note} kind="lead">${x('facesIntro')}<//>
         <${Facts} wide rows=${[...f.added.map(row), ...f.base.map(row)]} />`}
@@ -219,7 +236,7 @@ function secAI(ctx, num, all) {
   const inUse = all.filter((p) => used(p) > 0).length;
   const appsUsing = ctx.appsUsing;
   return html`
-    <${PageSection} id="lb-ai" num=${num} title=${x('secAi')} count=${null}>
+    <${FoldSection} id="lb-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${!!ctx.folds?.ai} onToggle=${() => ctx.setFold('ai', !ctx.folds?.ai)}>
       <${Box} doors=${html`<${Action} small copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>

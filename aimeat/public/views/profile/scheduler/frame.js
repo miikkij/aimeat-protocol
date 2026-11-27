@@ -8,6 +8,8 @@
  * @structure c · hhmm · whoRuns · resultWord · resultTone · resultMark · lastRun · crumb · pageLinks · renderPage
  * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
+ *   v1.7.0 -- 2026-11-27 -- resultWord shows the node's own result when the page has no word for it, instead of the
+ *     locale key that t() answers for a missing key.
  *   v1.6.0 -- 2026-09-26 -- The page frame is the SettingsPage (components/SettingsPage.js): the crumb and the rail's page links are data, a run's result is the Status Mark, "never" the faint tint (page group G5: a page writes no class).
  *   v1.5.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
  *   v1.4.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
@@ -53,7 +55,8 @@ export function whoRuns(s) {
   if (k === 'secretary') return t('profile.scheduler.kind.secretary');
   return t('profile.scheduler.kind.core');
 }
-export const resultWord = (r) => (r ? c('result.' + r) : '');
+/** How a run went, in the reader's words; a result the page has no word for shows as the node sent it. */
+export const resultWord = (r) => { if (!r) return ''; const w = c('result.' + r); return w === `profile.scheduler.cover.result.${r}` ? r : w; };
 /** How a run went, as a Status tone: an error is danger, a skipped run is off, the rest is fine. */
 export const resultTone = (r) => (r === 'error' ? 'danger' : r === 'skipped' ? 'off' : 'fine');
 /** How a run went, as the Status Mark. */

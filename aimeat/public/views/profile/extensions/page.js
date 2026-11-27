@@ -13,6 +13,14 @@
  * @structure renderPage · secExtensions · secCortexes · secNew
  * @usage import { renderPage } from './extensions/page.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- Usability pass. 01 is always the person's own server extensions; an own
+ *     extension that needs them (stopped while an app calls it, or its last scheduled run failed)
+ *     comes first in the list with its reason, and the strip counts it in the notice tone. The strip
+ *     counts what is the person's own and what others made ready to use, and is not drawn before the
+ *     person has anything of their own (the list's one line says how to begin); the head's tags, which
+ *     repeated the strip, go. The cortexes are a fold that says "0 own · n platform" while the person
+ *     has none of their own, and "A new extension or cortex" is always a fold, opened by "Add from
+ *     files". Numbered after the filter; nothing was removed.
  *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "extensions" (folded once the person has an extension or a cortex of their own; its
  *     button copies the extension guide) and the title's question mark concept.extension, which now
@@ -68,7 +76,7 @@ import { TextField, TextArea } from '/components/TextField.js';
 import { Space } from '/components/Layout.js';
 import { scrollToSection } from '/components/Rail.js';
 import { PageStart } from '/components/PageStart.js';
-import { x, kindOf, crumb, pageLinks } from './frame.js';
+import { x, kindOf, attentionOf, crumb, pageLinks } from './frame.js';
 import { extRow, cortexRow } from './rows.js';
 // Aliased: `num` is already the name of this page's section-number parameter.
 import { num as fmtNum } from '/js/format.js';
@@ -86,38 +94,44 @@ export function renderPage(ctx) {
   const platformCx = otherCx.filter((c) => String(c.installed_by || '').startsWith('system'));
   const none = exts && cxs && mine.length === 0 && myCx.length === 0;
   const actions = mine.reduce((s, e) => s + (e.actionCount || 0), 0);
+  // What of the person's own needs them: stopped while an app calls it, or its last scheduled run failed.
+  const needs = (exts ? mine : []).filter((e) => attentionOf(e, ctx.jobs)).length;
 
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'ext', n: exts ? mine.length : '…', label: x('stripExt'), sub: exts ? (mine.length ? x('stripExtSub', { actions, active: mine.filter((e) => e.status === 'active').length }) : x('stripNone')) : '' },
-    { key: 'cx', n: cxs ? myCx.length : '…', label: x('stripCortex'), sub: cxs ? (myCx.length ? x('stripCortexSub', { pub: myCx.filter((c) => c.visibility === 'public').length }) : x('stripNone')) : '' },
-    { key: 'oext', n: exts ? others.length : '…', label: x('stripOthersExt'), sub: x('stripOthersExtSub') },
-    { key: 'ocx', n: cxs ? otherCx.length : '…', label: x('stripOthersCortex'), sub: cxs ? x('stripOthersCortexSub', { platform: platformCx.length, pub: otherCx.length - platformCx.length }) : '' },
+  // The figures, from the two lists the page already read: what is the person's own, what needs
+  // them (only when something does), and what others made ready to use. Before the person has
+  // anything of their own there is no strip: the list's one line says how to begin.
+  const strip = !exts || !cxs ? html`<${FigureStrip} loading=${3} />` : none ? null : html`<${FigureStrip} items=${[
+    { key: 'ext', n: mine.length, label: x('stripExt'), sub: mine.length ? x('stripExtSub', { actions, active: mine.filter((e) => e.status === 'active').length }) : x('stripNone') },
+    { key: 'cx', n: myCx.length, label: x('stripCortex'), sub: myCx.length ? x('stripCortexSub', { pub: myCx.filter((c) => c.visibility === 'public').length }) : x('stripNone') },
+    needs ? { key: 'needs', n: needs, tone: 'notice', label: x('stripAttention'), sub: x('stripAttentionSub') } : null,
+    { key: 'others', n: others.length + otherCx.length, label: x('stripOthers'), sub: x('stripOthersSub', { ext: others.length, cx: otherCx.length }) },
   ]} />`;
 
-  const marks = [
-    none ? { label: x('chipNone'), tone: 'coral' } : exts ? { label: x('chipExt', { n: mine.length }) } : null,
-    !none && cxs ? { label: x('chipCortex', { n: myCx.length }) } : null,
-    exts ? { label: x('chipOthers', { n: others.length }), tone: 'dim' } : null,
-  ];
-
+  const openForm = () => { ctx.setFormOpen(true); scrollToSection('ex-new'); };
   const mast = html`
     <${Loud} control copy=${ctx.extPrompt} copiedLabel=${x('copied')} disabled=${!ctx.extPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${x('createSlab')}<//>
-    <${Actions}><${Action} small onClick=${() => { ctx.setFormOpen(true); scrollToSection('ex-new'); }}>${x('addFromFiles')}<//><//>`;
+    <${Actions}><${Action} small onClick=${openForm}>${x('addFromFiles')}<//><//>`;
 
-  const sections = none
-    ? [{ id: 'ex-new', num: '01', label: x('secNew'), count: '' }, { id: 'ex-ext', num: '02', label: x('secExt'), count: 0 }, { id: 'ex-cortex', num: '03', label: x('secCortex'), count: platformCx.length }]
-    : [{ id: 'ex-ext', num: '01', label: x('secExt'), count: exts ? mine.length : '' }, { id: 'ex-cortex', num: '02', label: x('secCortex'), count: cxs ? myCx.length : '' }, { id: 'ex-new', num: '03', label: x('secNew'), count: '' }];
+  // The cortexes are open once the person has one of their own; until then they are a fold that says
+  // so. "A new extension or cortex" is always a fold. Every section is drawn, so the numbers are fixed.
+  const cxFold = !!cxs && myCx.length === 0;
+  const sections = [
+    { id: 'ex-ext', num: '01', label: x('secExt'), count: exts ? mine.length : '' },
+    { id: 'ex-cortex', num: '02', label: x('secCortex'), count: cxs ? myCx.length : '' },
+    { id: 'ex-new', num: '03', label: x('secNew'), count: '' },
+  ];
   // The start: folded once the person has an extension or a cortex of their own; its button copies the guide.
   const start = html`<${PageStart} id="extensions" done=${exts && cxs ? mine.length + myCx.length > 0 : null}
     action=${ctx.extPrompt ? { copy: ctx.extPrompt } : undefined} />`;
 
   return html`
-    <${SettingsPage} name="ext" crumb=${crumb()} title=${t('profile.tabs.extensions')} sub=${x('titleSub')} help="concept.extension" marks=${marks}
+    <${SettingsPage} name="ext" crumb=${crumb()} title=${t('profile.tabs.extensions')} sub=${x('titleSub')} help="concept.extension"
       desc=${none ? x('descEmpty') : x('desc')} actions=${mast} start=${start} strip=${strip}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${none ? html`${secNew(ctx, '01', true)}${secExtensions(ctx, mine, others, '02')}${secCortexes(ctx, myCx, otherCx, platformCx, '03')}`
-        : html`${secExtensions(ctx, mine, others, '01')}${secCortexes(ctx, myCx, otherCx, platformCx, '02')}${secNew(ctx, '03', false)}`}
+      ${secExtensions(ctx, mine, others, '01')}
+      ${secCortexes(ctx, myCx, otherCx, platformCx, '02', cxFold)}
+      ${secNew(ctx, '03')}
     <//>`;
 }
 
@@ -136,13 +150,15 @@ function secExtensions(ctx, mine, others, num) {
   if (F.kind) rows = rows.filter((e) => kindOf(e) === F.kind);
   if (F.instances) rows = rows.filter((e) => e.instances?.supported);
   if (q) rows = rows.filter((e) => matches(q, e.name, e.description, (e.actions || []).map((a) => a.id).join(' ')));
-  rows = [...rows].sort((a, b) => String(b.installedAt || '').localeCompare(String(a.installedAt || '')));
+  // What needs the person first, then the newest. Only the person's own can need them.
+  const needs = (e) => (F.who !== 'others' && attentionOf(e, ctx.jobs) ? 0 : 1);
+  rows = [...rows].sort((a, b) => (needs(a) - needs(b)) || String(b.installedAt || '').localeCompare(String(a.installedAt || '')));
   const shown = rows.slice(0, ctx.extShown);
   const count = (f) => mine.filter(f).length;
   return html`
     <${Section} id="ex-ext" num=${num} title=${x('secExt')} count=${ctx.extensions ? mine.length : null} first=${num === '01'}>
       ${!ctx.extensions ? html`<${List} loading=${t('common.loading')} />` : !mine.length && F.who !== 'others' ? html`
-        <${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${x('extEmptyHead')}</b> ${x('extEmptyBody', { n: others.length })}<//>`} />
+        <${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${x('extEmptyHead')}</b> ${x('extEmptyBody')}<//>`} />
         <${Filters}>${facet(false, x('facetOthers'), others.length, () => ctx.setExtFilter({ who: 'others' }), 'others')}<//>` : html`
         <${Filters}>
           ${facet(F.who !== 'others', x('facetMine'), mine.length, () => ctx.setExtFilter({ who: 'mine' }), 'mine')}
@@ -166,7 +182,7 @@ function secExtensions(ctx, mine, others, num) {
 
 /* ── Cortexes ─────────────────────────────────────────────────────────────────────────────────── */
 
-function secCortexes(ctx, myCx, otherCx, platformCx, num) {
+function secCortexes(ctx, myCx, otherCx, platformCx, num, fold) {
   const F = ctx.cxFilter;
   const q = (ctx.cxQuery || '').trim().toLowerCase();
   const publicOthers = otherCx.filter((c) => !String(c.installed_by || '').startsWith('system'));
@@ -179,9 +195,15 @@ function secCortexes(ctx, myCx, otherCx, platformCx, num) {
   const shown = rows.slice(0, ctx.cxShown);
   const parts = ['lib', 'prompt', 'schema', 'seed-data'];
   const partCount = (p) => pool.filter((c) => (c.component_types || []).includes(p)).length;
-  const doors = html`<${Action} small soft copy=${ctx.cortexPrompt} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${x('copyCortexPrompt')}<//>`;
+  const copyGuide = html`<${Action} small soft copy=${ctx.cortexPrompt} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} onCopied=${() => ctx.showToast?.(x('promptCopiedToast'))}>${x('copyCortexPrompt')}<//>`;
+  // A fold while the person has no cortex of their own: its row says so and how many the platform
+  // offers. The guide's copy, which stands at the head of the open section, opens with the fold.
+  const props = fold
+    ? { fold: true, sub: x('cortexCountEmpty', { n: platformCx.length }), open: ctx.cxOpen, onToggle: ctx.toggleCxOpen }
+    : { count: ctx.cortexes ? myCx.length : null, doors: copyGuide };
   return html`
-    <${Section} id="ex-cortex" num=${num} title=${x('secCortex')} count=${ctx.cortexes ? (myCx.length ? myCx.length : x('cortexCountEmpty', { n: platformCx.length })) : null} doors=${doors}>
+    <${Section} id="ex-cortex" num=${num} title=${x('secCortex')} ...${props}>
+      ${fold ? html`<${Actions}>${copyGuide}<//>` : null}
       ${!ctx.cortexes ? html`<${List} loading=${t('common.loading')} />` : html`
         <${Filters}>
           ${facet(F.who === 'mine', x('facetMine'), myCx.length, () => ctx.setCxFilter({ who: 'mine' }), 'mine')}
@@ -202,11 +224,12 @@ function secCortexes(ctx, myCx, otherCx, platformCx, num) {
 
 /* ── A new extension or cortex ────────────────────────────────────────────────────────────────── */
 
-function secNew(ctx, num, first) {
+/** How a new one starts: a fold whose row names the two ways; "Add from files" in the head opens it with the form. */
+function secNew(ctx, num) {
   const f = ctx.form;
   const copyLink = (text, label) => html`<${Action} tone="link" copy=${text} copiedLabel=${x('copied')} disabled=${!text}>${label}<//>`;
   return html`
-    <${Section} id="ex-new" num=${num} title=${x('secNew')} count=${null} first=${first}>
+    <${Section} fold id="ex-new" num=${num} title=${x('secNew')} sub=${x('newFoldSub')} open=${ctx.newOpen} onToggle=${ctx.toggleNewOpen}>
       <${Facts} wide flush rows=${[
         {
           k: x('newAi'),

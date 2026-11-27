@@ -14,6 +14,16 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.5.0 -- 2026-11-27 -- The strip says where things stand and draws nothing with no offer and no delivery
+ *     (hideZeros): the offers with the agents online, what is under way, failed or stalled deliveries and finished
+ *     ones that wait for a rating, the last two in the notice tone and each a way to its inbox filter; the seven head
+ *     tags go, except what is for sale. The deliveries (op-back) are drawn once something came back, a failed and
+ *     then an unrated one first; the offers (op-ask) follow as 02 and are always drawn, without the search and the
+ *     grouping while there is nothing to ask, and with one line that says how offers come and a way to the Agents
+ *     page; what runs on its own (op-auto) is a row that says its lines or its failed steps and opens in place, with
+ *     the scheduler and workflows links inside; the offline and selling rows are drawn once they hold something.
+ *     Sections are numbered after the filter; the rail is drawn with two or more. The head's Ask is quiet while there
+ *     is nothing to ask or a search is typed. No control was removed.
  *   v2.4.0 -- 2026-11-08 -- The cover explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "offers" in the start slot (folded once a delivery has come back; its button goes to
  *     section 03) and the title's question mark concept.offer, so a first-time reader learns what an
@@ -84,7 +94,8 @@ import { renderInbox, renderDeliverable } from './inbox.js';
 import { MapPage } from './map-page.js';
 
 const BACK_ROWS = 6;
-const needLabel = (k) => t('profile.offers.need.' + k) || k;
+// t() answers the key itself when there is no word, so the need's own name shows then.
+const needLabel = (k) => { const w = t('profile.offers.need.' + k); return w === 'profile.offers.need.' + k ? k : w; };
 const openOffer = (ctx, it) => ctx.pickView({ kind: 'offer', key: it.key });
 
 export function renderOffersView(ctx) {
@@ -103,19 +114,26 @@ export function renderOffersView(ctx) {
 function renderCover(ctx) {
   const m = ctx.model;
   const chip = (n, key, tone) => ({ label: c(key, { n }), tone });
-  const last = m.latest[0];
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'today', n: m.todayN, label: c('stripToday'), sub: last ? c('stripTodaySub', { a: last.agent, t: rel(last.updated_at), s: statusWord(last.status) }) : c('noneBack') },
-    { key: 'waiting', n: m.waiting.length, label: c('stripWaiting'), sub: c('stripWaitingSub', { q: m.waiting.filter(d => d.status === 'queued').length, s: m.waiting.filter(d => d.status === 'stalled').length, f: m.failed7 }) },
-    { key: 'auto', n: m.autoN, label: c('stripAuto'), sub: c('stripAutoSub', { c: m.chains.length, s: m.autoSingles.length }) },
-    { key: 'rated', n: m.rated, tone: m.rated ? undefined : 'coral', label: c('stripRated'), sub: c('stripRatedSub', { n: m.unrated.length }) },
+  const inProgress = m.waiting.filter(d => d.status !== 'stalled').length;
+  const toInbox = (filter) => () => ctx.pickView({ kind: 'page', id: 'inbox', filter });
+  // Where things stand, from the feed and the deliveries the page already read: the offers there are
+  // (and how many agents are online), what is under way, and the two that need the person: failed or
+  // stalled deliveries and finished ones that wait for a rating, each a way to its inbox filter. With
+  // no offer and no delivery every figure is zero and the strip is not drawn (hideZeros).
+  const strip = html`<${FigureStrip} hideZeros items=${[
+    { key: 'offers', n: m.items.length, label: c('stripOffers'), sub: m.agents ? c('stripOffersSub', { a: m.agents, o: m.onlineAgents }) : undefined },
+    { key: 'progress', n: inProgress, label: c('stripInProgress') },
+    { key: 'failed', n: m.failed.length, tone: m.failed.length ? 'notice' : undefined, label: c('stripFailed'),
+      onClick: m.failed.length ? toInbox('failed') : undefined },
+    { key: 'unrated', n: m.unrated.length, tone: m.unrated.length ? 'notice' : undefined, label: c('stripUnrated'),
+      onClick: m.unrated.length ? toInbox('unrated') : undefined },
   ]} />`;
-  const marks = [
-    chip(m.items.length, 'chipOffers'), chip(m.agents, 'chipAgents'), chip(m.onlineAgents, 'chipOnline'), chip(m.autoN, 'chipAuto'), chip(m.stepsN, 'chipSteps'),
-    chip(m.selling.length, 'chipSelling', m.selling.length ? undefined : 'dim'), chip(m.latest.length, 'chipDeliveries', 'coral'),
-  ];
+  // The counts the strip says are not repeated as tags; only what is for sale stays, once something is.
+  const marks = [m.selling.length ? chip(m.selling.length, 'chipSelling') : null];
   const actions = html`
-    <${Loud} onClick=${() => scrollToSection('op-ask')}>${c('ask')}<//>
+    ${/* With no offer to ask for, the head's Ask has nothing to lead to and is drawn quiet; while a
+          search is typed, the section's own "Build for this need" may be the loud one. */''}
+    <${Loud} quiet=${!m.askable.length || !!ctx.q.trim()} onClick=${() => scrollToSection('op-ask')}>${c('ask')}<//>
     <${Actions}>
       <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
       <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>
@@ -123,33 +141,47 @@ function renderCover(ctx) {
   // The start: folded once something has come back from an agent; its button goes to the catalogue.
   const start = html`<${PageStart} id="offers" done=${ctx.loadingDeliveries ? null : m.latest.length > 0}
     action=${{ onClick: () => scrollToSection('op-ask') }} />`;
+  // What is drawn: the deliveries once something came back, the offers always (with none, its one
+  // line is the page's empty line and says how offers come), and three rows that open in place once
+  // they hold something: what runs on its own, the offline agents, and selling. Numbered after the
+  // filter, so a hidden section leaves no gap.
+  const shown = [
+    m.latest.length ? { id: 'op-back', label: c('secBack'), count: m.latest.length } : null,
+    { id: 'op-ask', label: c('secAsk'), count: m.askable.length },
+    m.chains.length + m.autoSingles.length ? { id: 'op-auto', label: c('secAuto'), count: m.chains.length + m.autoSingles.length } : null,
+    m.offlineAgents.size ? { id: 'op-offline', label: c('secOffline'), count: m.offlineAgents.size } : null,
+    m.items.length ? { id: 'op-selling', label: c('secSelling'), count: m.selling.length } : null,
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
   return html`
     <${SettingsPage} name="op" crumb=${crumb(ctx, [])} title=${t('profile.tabs.offers')} help="concept.offer" marks=${marks} desc=${c('desc')}
       actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')}
-      sections=${[
-        { id: 'op-back', num: '01', label: c('secBack'), count: m.latest.length },
-        { id: 'op-auto', num: '02', label: c('secAuto'), count: m.chains.length + m.autoSingles.length },
-        { id: 'op-ask', num: '03', label: c('secAsk'), count: m.askable.length },
-        { id: 'op-offline', num: '04', label: c('secOffline'), count: m.offlineAgents.size },
-        { id: 'op-selling', num: '05', label: c('secSelling'), count: m.selling.length },
-      ]}
+      sections=${shown.length > 1 ? shown : undefined}
       pagesLabel=${c('pages')} pages=${pageLinks(ctx, null)}>
-      ${secBack(ctx)}
-      ${secAuto(ctx)}
-      ${secAsk(ctx)}
-      ${secOffline(ctx)}
-      ${secSelling(ctx)}
+      ${numOf['op-back'] ? secBack(ctx, numOf['op-back']) : null}
+      ${secAsk(ctx, numOf['op-ask'])}
+      ${numOf['op-auto'] ? secAuto(ctx, numOf['op-auto']) : null}
+      ${numOf['op-offline'] ? secOffline(ctx, numOf['op-offline']) : null}
+      ${numOf['op-selling'] ? secSelling(ctx, numOf['op-selling']) : null}
     <//>`;
 }
 
+/** The deliveries that need the person first (failed or stalled, then finished and unrated), then the newest. */
+function attentionFirst(m) {
+  const rank = (d) => (d.status === 'failed' || d.status === 'stalled' ? 0 : d.status === 'done' && !d.rating ? 1 : 2);
+  return m.latest.map((d, i) => [d, i]).sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[1] - b[1])).map(([d]) => d);
+}
+
 /* ── 01 What came back ─────────────────────────────────────────────────────────────────────── */
-function secBack(ctx) {
+/** Drawn once something came back (renderCover); a delivery that needs the person comes first. */
+function secBack(ctx, n) {
   const m = ctx.model;
   const doors = html`
     <${Action} tone="more" onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'all' })}>${c('allN', { n: m.latest.length })}<//>
     <${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'unrated' })}>${c('unratedN', { n: m.unrated.length })}<//>`;
-  return html`<${Section} id="op-back" num="01" title=${c('secBack')} count=${c('secBackSub')} doors=${doors} first=${true}>
-    ${m.latest.length ? deliveryRows(ctx, m.latest.slice(0, BACK_ROWS), { head: true }) : html`<${Note} kind="quiet">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}<//>`}
+  const needsYou = m.failed.length + m.unrated.length > 0;
+  return html`<${Section} id="op-back" num=${n} title=${c('secBack')} count=${needsYou ? c('secBackSubAttention') : c('secBackSub')} doors=${doors} first=${true}>
+    ${m.latest.length ? deliveryRows(ctx, attentionFirst(m).slice(0, BACK_ROWS), { head: true }) : html`<${Note} kind="quiet">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}<//>`}
   <//>`;
 }
 
@@ -160,12 +192,20 @@ function stepOf(ctx, it) {
   const state = last ? (last.status === 'done' ? 'done' : (['failed', 'stalled'].includes(last.status) ? 'failed' : undefined)) : undefined;
   return { key: it.key, name: it.offer.title, sub: `${it.agent}${last ? ` · ${statusWord(last.status)}` : ''}`, state, onOpen: () => openOffer(ctx, it) };
 }
-function secAuto(ctx) {
+/**
+ * Drawn once an offer runs on its own (renderCover): one row that says how many lines and single
+ * offers there are, or that steps failed, and opens in place. The scheduler and the workflows, which
+ * were the section's doors, stand at the top of the opened part.
+ */
+function secAuto(ctx, n) {
   const m = ctx.model;
-  const doors = html`
-    <${Action} small soft onClick=${() => ctx.openTab('scheduler')}>${c('scheduler')}<//>
-    <${Action} small soft onClick=${() => ctx.openTab('workflows')}>${c('workflows')}<//>`;
-  return html`<${Section} id="op-auto" num="02" title=${c('secAuto')} count=${c('secAutoSub', { c: m.chains.length, s: m.autoSingles.length })} doors=${doors}>
+  const failedSteps = m.chains.reduce((s, ch) => s + (ch.failed || 0), 0);
+  const sub = failedSteps ? c('stepsFailed', { n: failedSteps }) : c('secAutoSub', { c: m.chains.length, s: m.autoSingles.length });
+  return html`<${Section} fold wrap id="op-auto" num=${n} title=${c('secAuto')} sub=${sub} open=${ctx.autoOpen} onToggle=${() => ctx.setAutoOpen(v => !v)}>
+    <${Actions}>
+      <${Action} small soft onClick=${() => ctx.openTab('scheduler')}>${c('scheduler')}<//>
+      <${Action} small soft onClick=${() => ctx.openTab('workflows')}>${c('workflows')}<//>
+    <//>
     <${List} cols="name-doors" keepCols empty=${c('noneAuto')}>
       ${m.chains.map(ch => html`<${Row} key=${ch.id} below=${html`<${StepStrip} chain steps=${ch.steps.map(s => stepOf(ctx, s))} />`}>
         <${Name} meta=${html`${c('stepsN', { n: ch.steps.length })}${ch.last ? ` · ${c('lastRun', { t: rel(ch.last.updated_at) })}` : ''}${ch.failed ? html` · <${Tinted} tone="notice">${c('stepsFailed', { n: ch.failed })}<//>` : ''}`}>${ch.title}<//>
@@ -218,19 +258,23 @@ function aiResults(ctx) {
         <//>`; })}
     <//>` : null}`;
 }
-function secAsk(ctx) {
+function secAsk(ctx, n) {
   const m = ctx.model;
   const needle = ctx.q.trim().toLowerCase();
   const list = needle ? m.askable.filter(it => (it.offer.title + ' ' + it.offer.ask + ' ' + (it.offer.tags || []).join(' ') + ' ' + it.agent).toLowerCase().includes(needle)) : m.askable;
-  const doors = html`<${Tabs} tone="fold" kind="view" value=${ctx.axis} onSelect=${ctx.setAxis}
-    items=${[{ value: 'need', label: c('byNeed') }, { value: 'agent', label: c('byAgent') }, { value: 'name', label: c('byName') }]} />`;
-  return html`<${Section} id="op-ask" num="03" title=${c('secAsk')} count=${c('secAskSub', { n: m.askable.length })} doors=${doors}>
-    <${SearchLine} value=${ctx.q} placeholder=${t('profile.offers.searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)}
+  const any = m.askable.length > 0;
+  // With nothing to ask yet, the grouping and the search have nothing to work on and are not drawn;
+  // they come with the first offer. The one line says where offers come from and the way there.
+  const doors = any ? html`<${Tabs} tone="fold" kind="view" value=${ctx.axis} onSelect=${ctx.setAxis}
+    items=${[{ value: 'need', label: c('byNeed') }, { value: 'agent', label: c('byAgent') }, { value: 'name', label: c('byName') }]} />` : null;
+  return html`<${Section} id="op-ask" num=${n} title=${c('secAsk')} count=${c('secAskSub', { n: m.askable.length })} doors=${doors} first=${n === '01'}>
+    ${any ? html`<${SearchLine} value=${ctx.q} placeholder=${t('profile.offers.searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)}
       onEnter=${ctx.aiOn ? () => ctx.runNeedSearch() : undefined}>
       ${ctx.aiOn ? html`<${Action} small disabled=${!ctx.q.trim() || ctx.aiResult === 'loading'} onClick=${ctx.runNeedSearch}>${t('profile.offers.aiSearch')}<//><${Note} inline>${c('aiHint')}<//>` : null}
-    <//>
+    <//>` : null}
     ${ctx.aiResult ? aiResults(ctx) : (list.length ? catalogue(ctx, list, ctx.axis) : html`<${Stack} gap="medium">
-      <${Note} kind="quiet">${m.askable.length ? t('profile.offers.noMatch') : t('profile.offers.empty')}<//>
+      <${Note} kind="quiet">${any ? t('profile.offers.noMatch')
+        : html`${t('profile.offers.empty')} <${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>`}<//>
       ${ctx.builder && needle ? html`<${Actions}><${Loud} control disabled=${ctx.busy} onClick=${() => ctx.buildForNeed()}>${t('profile.offers.buildForNeed')}<//><//>` : null}
     <//>`)}
     ${!ctx.aiResult && list.length ? html`<${Note}>${c('groupHint')}<//>` : null}
@@ -238,16 +282,16 @@ function secAsk(ctx) {
 }
 
 /* ── 04 Away, 05 Selling ───────────────────────────────────────────────────────────────────── */
-function secOffline(ctx) {
+function secOffline(ctx, n) {
   const m = ctx.model;
-  return html`<${Section} fold wrap id="op-offline" num="04" title=${c('secOffline')} sub=${c('secOfflineSub', { n: m.offlineAgents.size })} open=${ctx.offlineOpen} onToggle=${() => ctx.setOfflineOpen(v => !v)}>
+  return html`<${Section} fold wrap id="op-offline" num=${n} title=${c('secOffline')} sub=${c('secOfflineSub', { n: m.offlineAgents.size })} open=${ctx.offlineOpen} onToggle=${() => ctx.setOfflineOpen(v => !v)}>
     <${Note}>${c('offlineNote')}<//>
     <${List} cols="name-get-cost-trust-doors" keepCols empty=${c('noneOffline')}>${m.offline.map(it => catalogueRow(ctx, it))}<//>
   <//>`;
 }
-function secSelling(ctx) {
+function secSelling(ctx, n) {
   const m = ctx.model;
-  return html`<${Section} fold wrap id="op-selling" num="05" title=${c('secSelling')} sub=${m.selling.length ? c('sellingSub', { n: m.selling.length }) : c('sellingNone')} open=${ctx.sellOpen} onToggle=${() => ctx.setSellOpen(v => !v)}>
+  return html`<${Section} fold wrap id="op-selling" num=${n} title=${c('secSelling')} sub=${m.selling.length ? c('sellingSub', { n: m.selling.length }) : c('sellingNone')} open=${ctx.sellOpen} onToggle=${() => ctx.setSellOpen(v => !v)}>
     <${Note}>${c('sellingHint')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'sell' })}>${c('sell')}<//><//>
   <//>`;

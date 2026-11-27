@@ -12,6 +12,9 @@
  * @structure CapabilitiesTab() — state (caps, policy, details, filters, queries, expanded, test, form) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'capabilities'.
  * @version-history
+ *   v3.2.0 -- 2026-11-27 -- Usability pass: the open state of the two folds ("Hand-added and other"
+ *     while empty, and the rule for one's AI) lives here, and a refusal is said by its code in the
+ *     page's words (refusalText) instead of the server's sentence, which was written for an AI.
  *   v3.1.0 -- 2026-11-08 -- "Visible to agents" ticked publishes the entry: the form sent no status,
  *     so a ticked entry was stored as a public draft that no other account could open or call and
  *     nothing on the page made active. The add body asks for status 'active' when ticked (draft when
@@ -28,7 +31,6 @@
  *   v1.0.0 — 2026-05-02 — Initial capability tab (CRUD form)
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { getNodeUrl, getNodeId, getSession } from '/js/services/auth.js';
@@ -36,7 +38,7 @@ import { copyToClipboard } from '/js/utils.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { renderPage } from './capabilities/page.js';
-import { x, groupCapabilities, agentTextFor, schemaProps } from './capabilities/frame.js';
+import { x, groupCapabilities, agentTextFor, schemaProps, refusalText } from './capabilities/frame.js';
 import { manualCreateBody, visibilityPatch, waitsForReview } from './capabilities/publish.js';
 
 const emptyFilter = () => ({ who: '', use: '', priced: false, vouched: false });
@@ -58,8 +60,11 @@ export default function CapabilitiesTab({ session, showToast }) {
   const [queries, setQueries] = useState({ ext: '', app: '', agent: '' });
   const [shown, setShownState] = useState({ ext: 20, app: 20, agent: 20 });
   const [form, setFormState] = useState(emptyForm());
+  // The two folds: "Hand-added and other" while nothing is in it, and the rule for one's AI.
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
-  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+  const fail = (e, fallback) => showToast?.(refusalText(e, fallback), true);
   // The session's own GHII, or the owner name on this node's id when the session carries none.
   const ownerGhii = sess?.ghii || (sess?.owner ? `${sess.owner}@${getNodeId()}` : '');
 
@@ -183,7 +188,8 @@ export default function CapabilitiesTab({ session, showToast }) {
   const groups = caps ? groupCapabilities(caps, ownerGhii) : null;
   const ctx = {
     nodeUrl: getNodeUrl(), showToast, ConfirmUI,
-    groups, policy, details, expanded, test, vouched, busy, filters, queries, shown, form,
+    groups, policy, details, expanded, test, vouched, busy, filters, queries, shown, form, otherOpen, aiOpen,
+    toggleOtherOpen: () => setOtherOpen((o) => !o), toggleAiOpen: () => setAiOpen((o) => !o),
     setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),

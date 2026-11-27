@@ -10,6 +10,10 @@
  * @structure c · words · pkgId · statsOf · groupOf · packageHead · packageRow · crumb · pageLinks · renderPage · entryText
  * @usage import { renderPage, packageRow, packageHead, statsOf } from './frame.js';
  * @version-history
+ *   v1.12.1 -- 2026-11-27 -- ctWord shows a kind with no word as the node sent it; t() answers the
+ *     key for a missing word, so a row showed "knowledge.contentTypes.appdev".
+ *   v1.12.0 -- 2026-11-27 -- pageLinks names the Organisms page too: the cover's organisms section, which
+ *     held the only link there, is now drawn only when an organism holds a package (usability pass).
  *   v1.11.0 -- 2026-10-18 -- A package's row says who can read it, with the AudienceBadge beside its name (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.10.0 -- 2026-09-26 -- On the component kit (page group G7): a packages row is the List's Row
  *     (Name that opens the package, Desc, When, Doors with the Action); the crumb returns its steps
@@ -47,7 +51,14 @@ export const num = (n) => fmtNum(Number(n || 0));
 export const day = (iso) => (iso ? fmtDate(iso) : '');
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? day(iso) : formatRelativeTime(iso); };
 
-export const ctWord = (ct) => (ct ? (t('knowledge.contentTypes.' + ct) || ct) : '');
+// t() answers the key itself for a word it does not have, so a kind with no word is shown as the
+// node sent it, never as the key ("knowledge.contentTypes.appdev" stood on a package row).
+export const ctWord = (ct) => {
+  if (!ct) return '';
+  const key = 'knowledge.contentTypes.' + ct;
+  const word = t(key);
+  return word && word !== key ? word : ct;
+};
 export const maturityWord = (m) => t('knowledge.maturity.' + (m || 'draft')) || m;
 export const synthWord = (s) => t('knowledge.synthesis.' + (s || 'original')) || s;
 export const visWord = (v) => t('knowledge.visibility.' + (v === 'shared' ? 'owner' : (v || 'private'))) || v;
@@ -128,11 +139,16 @@ export function crumb(ctx, parts) {
     ...parts.map((p) => ({ label: p, here: true }))];
 }
 
-/** The rail's sibling pages, as data: the public library (a new window, ↗) and Discover. */
+/**
+ * The rail's sibling pages, as data: the public library (a new window, ↗), Discover and Organisms.
+ * Organisms stands here because the cover draws its organisms' section (and that section's link to
+ * the Organisms page) only when an organism holds a package.
+ */
 export function pageLinks() {
   return [
     { onClick: () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener'), label: c('library'), count: '↗' },
     { tab: 'discover', label: t('discover.title') },
+    { tab: 'organisms', label: t('profile.tabs.organisms') },
   ];
 }
 

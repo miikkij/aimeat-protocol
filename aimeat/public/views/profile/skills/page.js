@@ -10,9 +10,19 @@
  *   "skills": what a skill gives, the prompt for one's own AI, the editor as the page's own button)
  *   and the title's question mark (concept.skill). What opens under a row is rows.js. Pure render
  *   over the ctx bag.
- * @structure renderPage · shelf · secNew · secAgent
+ * @structure renderPage · isStale · shelfFold · shelf · shelfBody · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.27.0 -- 2026-11-27 -- Usability pass: "Your skills" stays first and open; workspace skills are
+ *     drawn only when there are some; "A new skill", this server's library and "How an agent loads a
+ *     skill" are rows that open in place (the first open while the person has no skill or a draft is
+ *     open, the library open when one of its skills an agent holds was replaced), numbered after the
+ *     filter. A replaced skill an agent still holds needs the person: its figure leads the strip in the
+ *     notice tone and its rows come first on their shelf. No strip with no skill of one's own (the
+ *     head's paragraph says what the library holds); no zero figure; the agents figure lost its notice
+ *     tone, since an agent without a skill is not a fault. The marks that repeated the strip are gone.
+ *     One loud action: "New skill" in the head (quiet while the editor is open), the editor's Publish
+ *     while it is; the rule for one's AI is an ordinary copy.
  *   v1.26.0 -- 2026-11-08 -- The visibility choice in the editor and the AI section's visibility row open the setting's explanation (HelpLabel, term skills.visibility; .claude/rules/page-guidance.md); the editor's hint left, because the explanation's tip carries its words.
  *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "skills" (folded once the person has a skill of their own; its button opens the editor) and the title's question mark concept.skill; the lead that explained refs in section 05 moved into the concept, and the head's paragraph is two sentences.
  *   v1.24.0 -- 2026-09-26 -- On the component kit (page group G7): the empty lines and leads are the Note, the editor is the TextArea with the Tabs for who may see it and the Action doors, the rule an AI gets is the Box with its copy door; the workspace tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
@@ -54,6 +64,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { scrollToSection } from '/components/Rail.js';
 import { x, crumb, pageLinks, agentRule, agentRequest, bindingFile, daysAgo, visibilityWord } from './frame.js';
@@ -85,51 +96,81 @@ export function renderPage(ctx) {
   const linked = [...own, ...node, ...ws].filter((s) => (s.linkedBy || []).length);
   const agentsLinking = new Set(linked.flatMap((s) => s.linkedBy.map((l) => l.agent)));
   const none = lib && own.length === 0;
+  // What needs the person: a skill that has been replaced by a newer one while an agent of theirs
+  // still holds it. Such rows come first on their shelf (shelf below), and the figure leads the strip.
+  const stale = linked.filter(isStale);
 
-  const strip = html`<${FigureStrip} items=${[
-    { n: lib ? own.length : '…', label: x('stripOwn'), sub: lib ? (own.length ? x('stripOwnSub', { bound: bound.length, mine: own.filter((s) => s.visibility === 'owner').length }) : x('stripOwnNone')) : '' },
-    { n: lib ? node.length : '…', label: x('stripNode'), sub: lib ? x('stripNodeSub', { pub: node.filter((s) => s.visibility === 'public').length, members: node.filter((s) => s.visibility !== 'public').length }) : '' },
-    { n: lib ? ws.length : '…', label: x('stripWs'), sub: lib ? (ws.length ? x('stripWsSub', { n: new Set(ws.map((s) => s.org)).size }) : x('stripWsNone')) : '' },
-    { n: lib ? agentsLinking.size : '…', tone: agentsLinking.size ? undefined : 'notice', label: x('stripAgents'), sub: lib ? x('stripAgentsSub', { total: ctx.agentCount ?? '?', apps: new Set(bound.map(bindingFile)).size }) : '' },
+  // With no skill of their own the strip is not drawn: the head's paragraph already says how many
+  // the library holds, and the empty line under "Your skills" says how the first one is made. A
+  // figure that would only say zero (workspace skills, agents with a skill) is left out.
+  const strip = !lib ? html`<${FigureStrip} loading=${3} />` : none && !stale.length ? null : html`<${FigureStrip} items=${[
+    stale.length ? { key: 'stale', n: stale.length, tone: 'notice', label: x('stripStale'), sub: x('stripStaleSub') } : null,
+    own.length ? { key: 'own', n: own.length, label: x('stripOwn'), sub: x('stripOwnSub', { bound: bound.length, mine: own.filter((s) => s.visibility === 'owner').length }) } : null,
+    { key: 'node', n: node.length, label: x('stripNode'), sub: x('stripNodeSub', { pub: node.filter((s) => s.visibility === 'public').length, members: node.filter((s) => s.visibility !== 'public').length }) },
+    ws.length ? { key: 'ws', n: ws.length, label: x('stripWs'), sub: x('stripWsSub', { n: new Set(ws.map((s) => s.org)).size }) } : null,
+    !stale.length && ctx.agentCount ? { key: 'agents', n: agentsLinking.size, label: x('stripAgents'), sub: x('stripAgentsSub', { total: ctx.agentCount, apps: new Set(bound.map(bindingFile)).size }) } : null,
   ]} />`;
 
-  const marks = lib ? [
-    { label: none ? x('chipNone') : x('chipOwn', { n: own.length }), tone: none ? 'coral' : 'sun' },
-    { label: x('chipNode', { n: node.length }) },
-    { label: x('chipWs', { n: ws.length }), tone: ws.length ? undefined : 'dim' },
-    bound.length ? { label: x('chipBound', { n: bound.length }) } : null,
-    { label: x('chipLinked', { n: linked.length }), tone: linked.length ? undefined : 'coral' },
-  ] : [];
+  // The head's marks repeated the strip, so they are gone. The one loud action is "New skill" (it
+  // opens the two ways to a new skill); the rule for one's AI is copied once, so it is an ordinary
+  // action here and in the last section. While the editor is open its Publish is the loud one.
+  const openNew = () => { ctx.setFold('new', true); scrollToSection('sk-new'); };
   const actions = html`
-    <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
-    <${Actions}><${Action} small onClick=${() => { ctx.openEditor(); scrollToSection('sk-new'); }}>${x('newSkill')}<//><//>`;
-  const sections = [
-    { id: 'sk-own', num: '01', label: x('secOwn'), count: lib ? own.length : '' },
-    { id: 'sk-node', num: '02', label: x('secNode'), count: lib ? node.length : '' },
-    { id: 'sk-ws', num: '03', label: x('secWs'), count: lib ? ws.length : '' },
-    { id: 'sk-new', num: '04', label: x('secNew') },
-    { id: 'sk-ai', num: '05', label: x('secAi') },
-  ];
-  // The start: folded once the person has a skill of their own; its button is the page's own editor.
+    <${Loud} quiet=${ctx.editor.open} onClick=${openNew}>${x('newSkill')}<//>
+    <${Actions}><${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//><//>`;
+
+  // The library is read rarely, so it is a row that says how many it holds; it opens by itself
+  // when one of its skills an agent holds has been replaced. A new skill is a row too, open while
+  // the person has none (it is how one begins) or while the editor is open.
+  const nodeStale = stale.filter((s) => node.includes(s)).length;
+  const nodeOpen = ctx.folds.node ?? nodeStale > 0;
+  const newOpen = ctx.folds.new ?? (ctx.editor.open || !!none);
+  const aiOpen = !!ctx.folds.ai;
+  const parts = [
+    { id: 'sk-own', label: x('secOwn'), count: lib ? own.length : '',
+      draw: (nr) => shelf(ctx, 'own', nr, x('secOwn'), lib ? (own.length ? x('secOwnSub', { n: own.length, bound: bound.length }) : x('secOwnNone')) : null, own, true) },
+    ws.length ? { id: 'sk-ws', label: x('secWs'), count: ws.length,
+      draw: (nr) => shelf(ctx, 'ws', nr, x('secWs'), x('secWsSub', { n: ws.length, orgs: new Set(ws.map((s) => s.org)).size }), ws, false) } : null,
+    { id: 'sk-new', label: x('secNew'), count: '', open: () => ctx.setFold('new', true), draw: (nr) => secNew(ctx, nr, newOpen) },
+    lib ? { id: 'sk-node', label: x('secNode'), count: node.length, open: () => ctx.setFold('node', true),
+      draw: (nr) => shelfFold(ctx, nr, nodeOpen, nodeStale ? x('secNodeStale', { n: nodeStale }) : x('secNodeSub', { n: node.length }), node) } : null,
+    { id: 'sk-ai', label: x('secAi'), count: '', open: () => ctx.setFold('ai', true), draw: (nr) => secAgent(ctx, nr, node, aiOpen) },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  // The start: its button opens the two ways to a new skill.
   const start = html`<${PageStart} id="skills" done=${lib ? own.length > 0 : null}
     action=${{ onClick: () => { ctx.openEditor(); scrollToSection('sk-new'); } }} />`;
 
   return html`
-    <${SettingsPage} name="skills" crumb=${crumb()} title=${t('skills.tabLabel')} sub=${x('titleSub')} help="concept.skill" marks=${marks}
+    <${SettingsPage} name="skills" crumb=${crumb()} title=${t('skills.tabLabel')} sub=${x('titleSub')} help="concept.skill"
       desc=${none ? x('descEmpty', { n: node.length }) : x('desc')} actions=${actions} start=${start} strip=${strip}
-      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      railTitle=${x('railTitle')} sections=${parts.map(({ id, num, label, count, open }) => ({ id, num, label, count, open }))}
+      pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${shelf(ctx, 'own', '01', x('secOwn'), lib ? (own.length ? x('secOwnSub', { n: own.length, bound: bound.length }) : x('secOwnNone')) : null, own, true)}
-      ${shelf(ctx, 'node', '02', x('secNode'), lib ? x('secNodeSub', { n: node.length }) : null, node, false)}
-      ${shelf(ctx, 'ws', '03', x('secWs'), lib ? (ws.length ? x('secWsSub', { n: ws.length, orgs: new Set(ws.map((s) => s.org)).size }) : x('secWsNone')) : null, ws, false)}
-      ${secNew(ctx, '04')}
-      ${secAgent(ctx, '05', node)}
+      ${parts.map((s) => s.draw(s.num))}
+    <//>`;
+}
+
+/** A skill replaced by a newer one (its frontmatter names the one that replaces it). */
+const isStale = (s) => !!s.supersededBy;
+
+/** The library as one row that says how many it holds; opened, the shelf with its filters. */
+function shelfFold(ctx, nr, open, sub, list) {
+  return html`
+    <${Section} fold clip id="sk-node" num=${nr} title=${x('secNode')} sub=${sub} open=${open} onToggle=${() => ctx.setFold('node', !open)}>
+      ${shelfBody(ctx, 'node', list)}
     <//>`;
 }
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
 
 function shelf(ctx, key, num, title, sub, list, first) {
+  return html`
+    <${PageSection} id=${key === 'own' ? 'sk-own' : 'sk-ws'} num=${num} title=${title} count=${sub} first=${first}>
+      ${shelfBody(ctx, key, list)}
+    <//>`;
+}
+
+function shelfBody(ctx, key, list) {
   const F = ctx.filters[key];
   const q = (ctx.queries[key] || '').trim().toLowerCase();
   const count = (f) => list.filter(f).length;
@@ -143,15 +184,15 @@ function shelf(ctx, key, num, title, sub, list, first) {
   if (F.replaced) rows = rows.filter((s) => s.supersededBy);
   if (F.builtin) rows = rows.filter((s) => s.builtin);
   if (q) rows = rows.filter((s) => matches(q, s.name, s.description, bindingFile(s), ctx.apps?.[bindingFile(s)], (s.linkedBy || []).map((l) => l.agent).join(' ')));
-  rows = rows.slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  // Newest first, except that a replaced skill an agent still holds comes before the rest: it needs the person.
+  const needs = (s) => ((s.linkedBy || []).length && isStale(s) ? 0 : 1);
+  rows = rows.slice().sort((a, b) => (needs(a) - needs(b)) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   const shown = rows.slice(0, ctx.shown[key]);
   const set = (patch) => ctx.setFilter(key, patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
-  const ids = { own: 'sk-own', node: 'sk-node', ws: 'sk-ws' };
   const isAll = !F.who && !F.vis && !F.recent && !F.replaced && !F.builtin;
   const clear = () => set({ who: '', vis: '', recent: false, replaced: false, builtin: false });
   return html`
-    <${PageSection} id=${ids[key]} num=${num} title=${title} count=${sub} first=${first}>
       ${!ctx.library ? loadingRow() : !list.length ? (key === 'own' ? null : html`<${Note} kind="quiet">${x(key === 'node' ? 'emptyNode' : 'emptyWs')}<//>`) : html`
         <${Filters}>
           ${facet(isAll, x('facetAll'), list.length, clear, 'all')}
@@ -173,16 +214,17 @@ function shelf(ctx, key, num, title, sub, list, first) {
           label=${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
           onMore=${shown.length < rows.length ? () => ctx.setShown(key, ctx.shown[key] + PAGE) : null} />`}
       ${ctx.library && key === 'own' && !list.length ? html`<${Note} kind="quiet"><b>${x('emptyOwn')}</b> ${x('emptyOwnSub')}<//>` : null}
-      ${ctx.library && list.length ? html`<${Hint}>${x('hint.' + key)}<//>` : null}
-    <//>`;
+      ${ctx.library && list.length ? html`<${Hint}>${x('hint.' + key)}<//>` : null}`;
 }
 
-/* ── A new skill: ask your AI, or write it yourself ───────────────────────────────────────────── */
+/* ── A new skill: ask your AI, or write it yourself; one row that opens in place ──────────────── */
 
-function secNew(ctx, num) {
+function secNew(ctx, num, open) {
   const e = ctx.editor;
+  // Shut, the row keeps an open draft as it is and says so in its line.
   return html`
-    <${PageSection} id="sk-new" num=${num} title=${x('secNew')} count=${null}>
+    <${Section} fold id="sk-new" num=${num} title=${x('secNew')} sub=${e.open ? (e.editing ? x('roadEdit', { name: e.editing }) : x('roadWrite')) : x('newSub')}
+      open=${open} onToggle=${() => ctx.setFold('new', !open)}>
       <${Note} kind="lead">${x('newIntro')}<//>
       <${Roads}>
         <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${agentRequest(ctx.ownerName)}
@@ -195,7 +237,7 @@ function secNew(ctx, num) {
               <${Label}><${HelpLabel} term="skills.visibility" label=${x('vis.k')}>${x('vis.k')}<//><//>
               <${Tabs} label=${x('vis.k')} value=${e.visibility} onSelect=${(v) => ctx.setEditor({ visibility: v })}
                 items=${['owner', 'members', 'public'].map((v) => ({ value: v, label: visibilityWord(v) }))} />
-              <${Action} small disabled=${e.publishing || !e.md.trim()} onClick=${() => ctx.publish()}>${e.publishing ? x('publishing') : x('publish')}<//>
+              <${Loud} control disabled=${e.publishing || !e.md.trim()} onClick=${() => ctx.publish()}>${e.publishing ? x('publishing') : x('publish')}<//>
               <${Action} small soft onClick=${() => ctx.closeEditor()}>${x('cancel')}<//>
             <//>` : null}
         <//>
@@ -205,10 +247,11 @@ function secNew(ctx, num) {
 
 /* ── How an agent loads a skill: the rule to copy and the facts (what a ref is: concept.skill) ─── */
 
-function secAgent(ctx, num, node) {
+/** Rarely needed after the first day, so a row that opens in place. */
+function secAgent(ctx, num, node, open) {
   const pub = node.filter((s) => s.visibility === 'public').length;
   return html`
-    <${PageSection} id="sk-ai" num=${num} title=${x('secAi')} count=${null}>
+    <${Section} fold id="sk-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${open} onToggle=${() => ctx.setFold('ai', !open)}>
       <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>

@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: MIT
  * @description The Packages page in the poster face: ready-made wholes that install as the owner's
  *   own. The mast and the strip; installed packages first, then what is on offer (template listings
- *   and public packages joined, with facets and a search), then the owner's own publications; the two
- *   roads to a new package (ask your AI with the package-builder request, or import a zip); and the
- *   section that says how an agent installs. What opens under a row is rows.js. Pure render over the
- *   ctx bag.
+ *   and public packages joined, with facets and a search), then the owner's own publications once
+ *   there are any; as rows that open in place, the three roads to a new package (your own apps, ask
+ *   your AI with the package-builder request, or import a zip) and how an agent installs. What opens
+ *   under a row is rows.js. Pure render over the ctx bag.
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.24.0 -- 2026-11-27 -- Usability pass of the Settings pages: what is installed stays 01 and what is
+ *     on offer stays open (it is how one begins); an installed copy whose package has a newer version
+ *     leads its list, then one that is not running, and their count leads the strip in the notice
+ *     tone; a draft of one's own leads its list and turns its figure to the notice tone. The strip
+ *     drops the other-servers figure (the offers' facet counts them) and is not drawn with nothing
+ *     installed and nothing of one's own (the head's paragraph says what is on offer); the head's
+ *     marks that repeated it are gone. Your publications are drawn once there are any; a new package
+ *     and how an agent installs are rows that open in place. Sections are numbered after the filter.
  *   v1.23.1 — 2026-10-16 — The operator's "Fetch from other servers" shows when package federation is on
  *     (`ctx.remoteEnabled`), not only when a remote listing is already there: the listings come from that
  *     fetch, so the old condition could never become true (QA audit F1-04).
@@ -58,6 +66,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { scrollToSection } from '/components/Rail.js';
@@ -79,55 +88,67 @@ const PAGE = 20;
 const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 
+/** An installed copy whose package has a newer version than the one it runs (the row says so too). */
+const newerOf = (ctx, i) => {
+  const source = ctx.offerByGroup[i.packageGroupId] || ctx.ownByGroup[i.packageGroupId] || null;
+  return !!(source?.version && source.version !== i.packageVersion);
+};
+/** Stable sort by a rank: within a rank the order the node gave stays. */
+const byRank = (list, rank) => list.map((v, i) => [v, i]).sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[1] - b[1])).map(([v]) => v);
+
 export function renderPage(ctx) {
   const d = ctx.data;   // null while loading
   const instances = d ? ctx.instances : [];
   const offers = d ? ctx.offers : [];
   const own = d ? ctx.own : [];
-  const remote = offers.filter((o) => o.remote);
   const parts = instances.reduce((s, i) => s + (i.installedComponents || []).length, 0);
   const none = d && instances.length === 0;
+  const newer = instances.filter((i) => newerOf(ctx, i)).length;
+  const drafts = own.filter((p) => p.status === 'draft').length;
 
-  const strip = html`<${FigureStrip} items=${[
-    { n: d ? instances.length : '…', label: x('stripInstalled'), sub: d ? (instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone')) : '' },
-    { n: d ? offers.length : '…', label: x('stripOffers'), sub: d ? x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) : '' },
-    { n: d ? own.length : '…', label: x('stripOwn'), sub: d ? (own.length ? x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) : x('stripOwnNone')) : '' },
-    { n: d ? remote.length : '…', label: x('stripRemote'), sub: d ? (remote.length ? x('stripRemoteSub', { n: new Set(remote.map((r) => r.sourceNode)).size }) : x('stripRemoteNone')) : '' },
+  // The figures, from the one read the page makes: what is installed and whether it runs, how many
+  // copies have a newer version (only when some have, in the notice tone), what is on offer, and the
+  // owner's own publications once there are any (notice while one is a draft nobody can install).
+  // With nothing installed and nothing of one's own there is no strip: the head's paragraph already
+  // says how many are on offer.
+  const strip = !d ? html`<${FigureStrip} loading=${3} />` : none && !own.length ? null : html`<${FigureStrip} items=${[
+    { key: 'installed', n: instances.length, label: x('stripInstalled'), sub: instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone') },
+    newer ? { key: 'updates', n: newer, tone: 'notice', label: x('stripUpdates'), sub: x('stripUpdatesSub') } : null,
+    { key: 'offers', n: offers.length, label: x('stripOffers'), sub: x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) },
+    own.length ? { key: 'own', n: own.length, tone: drafts ? 'notice' : undefined, label: x('stripOwn'),
+      sub: drafts ? x('stripOwnDrafts', { n: drafts }) : x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) } : null,
   ]} />`;
 
-  // A tag that counts nothing yet is dim, as main drew it (og-chip--dim).
-  const marks = d ? [
-    { label: none ? x('chipNone') : x('chipInstalled', { n: instances.length }), tone: none ? 'coral' : 'sun' },
-    { label: x('chipOffers', { n: offers.length }) },
-    { label: x('chipOwn', { n: own.length }), tone: own.length ? undefined : 'dim' },
-    { label: x('chipRemote', { n: remote.length }), tone: remote.length ? undefined : 'dim' },
-  ] : [];
   const actions = html`
     <${Loud} control disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.pickZip()}>${x('importZip')}<//><//>`;
-  const sections = [
-    { id: 'pk-installed', num: '01', label: x('secInstalled'), count: d ? instances.length : '' },
-    { id: 'pk-offers', num: '02', label: x('secOffers'), count: d ? offers.length : '' },
-    { id: 'pk-own', num: '03', label: x('secOwn'), count: d ? own.length : '' },
-    { id: 'pk-new', num: '04', label: x('secNew'), count: '' },
-    { id: 'pk-ai', num: '05', label: x('secAi'), count: '' },
-  ];
+  // What is installed and what is on offer stay open (what is on offer is how one begins); the
+  // owner's own publications are drawn once there are any; how a new package is made and how an
+  // agent installs are rows. Numbered after the filter.
+  const shown = [
+    { id: 'pk-installed', label: x('secInstalled'), count: d ? instances.length : '' },
+    { id: 'pk-offers', label: x('secOffers'), count: d ? offers.length : '' },
+    own.length ? { id: 'pk-own', label: x('secOwn'), count: own.length } : null,
+    { id: 'pk-new', label: x('secNew'), count: '' },
+    { id: 'pk-ai', label: x('secAi'), count: '' },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
   // The zip field is hidden; the mast's door and the third road open it (ctx.pickZip).
   const after = html`
     <${FileDrop} hidden accept=".zip" inputRef=${ctx.fileRef} onChange=${(e) => ctx.importZip(e)} />
     <${ctx.ConfirmUI} />`;
 
   return html`
-    <${SettingsPage} name="packages" crumb=${crumb()} title=${t('profile.tabs.packages')} sub=${x('titleSub')} help="concept.package" marks=${marks}
+    <${SettingsPage} name="packages" crumb=${crumb()} title=${t('profile.tabs.packages')} sub=${x('titleSub')} help="concept.package"
       desc=${none ? x('descEmpty', { n: offers.length }) : x('desc')} actions=${actions} strip=${strip}
       start=${html`<${PageStart} id="packages" done=${d ? instances.length > 0 : null} action=${{ onClick: () => scrollToSection('pk-offers') }} />`}
-      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      railTitle=${x('railTitle')} sections=${shown} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${after}>
-      ${secInstalled(ctx, instances)}
-      ${secOffers(ctx, offers)}
-      ${secOwn(ctx, own)}
-      ${secNew(ctx)}
-      ${secAgent(ctx)}
+      ${secInstalled(ctx, byRank(instances, (i) => (newerOf(ctx, i) ? 0 : i.status !== 'installed' ? 1 : 2)))}
+      ${secOffers(ctx, offers, numOf['pk-offers'])}
+      ${numOf['pk-own'] ? secOwn(ctx, byRank(own, (p) => (p.status === 'draft' ? 0 : 1)), numOf['pk-own']) : null}
+      ${secNew(ctx, numOf['pk-new'])}
+      ${secAgent(ctx, numOf['pk-ai'])}
     <//>`;
 }
 
@@ -143,7 +164,7 @@ function secInstalled(ctx, instances) {
     <//>`;
 }
 
-function secOffers(ctx, offers) {
+function secOffers(ctx, offers, num) {
   const F = ctx.filter;
   const q = (ctx.query || '').trim().toLowerCase();
   const cats = [...new Set(offers.map((o) => o.category).filter(Boolean))];
@@ -161,7 +182,7 @@ function secOffers(ctx, offers) {
     ? html`<${Action} small soft disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}<//>`
     : null;
   return html`
-    <${PageSection} id="pk-offers" num="02" title=${x('secOffers')} count=${ctx.data ? x('secOffersSub', { n: offers.length, system: offers.filter((o) => o.system).length }) : null}>
+    <${PageSection} id="pk-offers" num=${num} title=${x('secOffers')} count=${ctx.data ? x('secOffersSub', { n: offers.length, system: offers.filter((o) => o.system).length }) : null}>
       ${!ctx.data ? loadingRow() : !offers.length ? html`<${Note} kind="quiet">${x('emptyOffers')}<//>` : html`
         <${Filters}>
           ${facet(!F.who && !F.cat, x('facetAll'), offers.length, () => set({ who: '', cat: '' }), 'all')}
@@ -181,9 +202,9 @@ function secOffers(ctx, offers) {
     <//>`;
 }
 
-function secOwn(ctx, own) {
+function secOwn(ctx, own, num) {
   return html`
-    <${PageSection} id="pk-own" num="03" title=${x('secOwn')} count=${ctx.data ? (own.length ? x('secOwnSub', { n: own.length, pub: own.filter((p) => p.visibility === 'public').length }) : x('secNone')) : null}>
+    <${PageSection} id="pk-own" num=${num} title=${x('secOwn')} count=${ctx.data ? (own.length ? x('secOwnSub', { n: own.length, pub: own.filter((p) => p.visibility === 'public').length }) : x('secNone')) : null}>
       ${!ctx.data ? loadingRow() : html`
         <${List} cols="name-desc-who-doors" head=${[x('colPackage'), x('colDoes'), x('vis.k'), '']} empty=${x('emptyOwn')}>
           ${own.map((p) => ownRow(ctx, p))}
@@ -192,10 +213,13 @@ function secOwn(ctx, own) {
     <//>`;
 }
 
-function secNew(ctx) {
+/** How a new package is made: one row (three ways inside it), open while the compose form is. */
+function secNew(ctx, num) {
   const open = ctx.compose.open;
+  const shown = open || !!ctx.folds.new;
+  const toggle = () => { if (shown && open) ctx.closeCompose(); ctx.setFold('new', !shown); };
   return html`
-    <${PageSection} id="pk-new" num="04" title=${x('secNew')} count=${null}>
+    <${FoldSection} id="pk-new" num=${num} title=${x('secNew')} sub=${x('newSub')} open=${shown} onToggle=${toggle}>
       <${Note} kind="lead">${x('newIntro')}<//>
       <${Roads}>
         <${Road} lead name=${x('roadApps')} text=${x('roadAppsBody')}
@@ -254,9 +278,10 @@ function composeForm(ctx) {
     <//>`;
 }
 
-function secAgent(ctx) {
+/** How an agent installs: the rule to copy and the facts, one row until it is opened. */
+function secAgent(ctx, num) {
   return html`
-    <${PageSection} id="pk-ai" num="05" title=${x('secAi')} count=${null}>
+    <${FoldSection} id="pk-ai" num=${num} title=${x('secAi')} sub=${x('aiSub')} open=${!!ctx.folds.ai} onToggle=${() => ctx.setFold('ai', !ctx.folds.ai)}>
       <${Note} kind="lead">${x('aiIntro')}<//>
       <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>

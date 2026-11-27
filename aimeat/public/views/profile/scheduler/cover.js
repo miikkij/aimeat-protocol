@@ -15,6 +15,14 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.25.0 -- 2026-11-27 -- The person's schedules (sc-all, the register) are section 01, a schedule whose last run
+ *     failed at its top; what fires next, the week's rhythm and the rest follow, numbered after the filter. The
+ *     continuous and the rarer schedules are FoldSection rows that say how many (or how many failed, or when the next
+ *     runs) and open in place, numbered as parts of the rhythm ("03.1", "03.2") while it is drawn. The failed figure is
+ *     in the notice tone and opens the failed list; the strip has hideZeros for a page with only the agents' reported
+ *     times; the head keeps only the paused and agent-made tags. The register's search and filter wait for a first
+ *     schedule; a search that finds nothing says so. An agent's reported job state is in the reader's words where the
+ *     page has one. The empty cover (no schedule, no reported time) is unchanged. No control was removed.
  *   v1.24.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a schedule exists, its button the new-schedule form) and the title's question mark concept.schedule, on the empty cover as on the full one.
  *   v1.23.0 -- 2026-11-01 -- With no schedule at all the page is one sentence (cover.descEmpty) and the two ways on, without the "Seuraavaksi 01" section that repeated it (Jouni's review of v33, K53).
  *   v1.22.0 -- 2026-10-31 -- With no schedule at all the cover is the explanation, "Tee ensimmäinen agentti →" (to the Home's new-agent page) with "tai tee ajastus itse", and the one empty line: no strip, tags, filters or side panel (Jouni's review of v31, K53-K55). "Ei vielä hallinnoituja ajastuksia" reads "Sinulla ei ole vielä ajastuksia".
@@ -112,7 +120,10 @@ function renderCover(ctx) {
     agents: ctx.internal.length > 0,
   };
   const latest = m.latest ? (m.latest.lastRunResult || 'success') : null;
-  const strip = html`<${FigureStrip} items=${[
+  // hideZeros: with only the agents' own reported times and no schedule here, every figure is zero
+  // or "·", and the strip is not drawn. A failed schedule is the figure that needs the person: it is
+  // in the notice tone and opens the list of failed schedules.
+  const strip = html`<${FigureStrip} hideZeros items=${[
     m.next
       ? { key: 'next', n: hhmm(m.next.at), label: c('stripNext'), sub: `${nameOf(m.next.s)} · ${dayLabel(m.next.at)} · ${formatUntil(m.next.at.toISOString())}` }
       : { key: 'next', n: '·', label: c('stripNext'), sub: c('stripNextNone') },
@@ -120,7 +131,8 @@ function renderCover(ctx) {
     m.latest
       ? { key: 'latest', n: resultWord(latest), tone: resultStripTone(latest), label: c('stripLatest'), sub: `${nameOf(m.latest)} · ${formatRelativeTime(m.latest.lastRunAt)}` }
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.scheduler.never') },
-    { key: 'failed', n: m.failed.length, label: c('stripFailed'), sub: c('stripFailedSub') },
+    { key: 'failed', n: m.failed.length, tone: m.failed.length ? 'notice' : undefined, label: c('stripFailed'), sub: c('stripFailedSub'),
+      onClick: m.failed.length ? () => ctx.pickView({ kind: 'page', id: 'failed' }) : undefined },
   ]} />`;
 
   // The start (page-guidance.md): folded once a schedule exists; its button is this page's own form.
@@ -139,12 +151,32 @@ function renderCover(ctx) {
       strip=${ctx.error ? html`<${Note} kind="message" error>${ctx.error}<//>` : null} />`;
   }
 
+  // What is drawn, in this order: the person's schedules first (the register, a failed one at its
+  // top), then what fires next once there is a schedule, the week's rhythm, and as rows that open in
+  // place the continuous and the rarer schedules (parts of the rhythm, "03.1" and "03.2", while it is
+  // drawn) and the times the agents report. Numbered after the filter, so a hidden section leaves no gap.
+  const parts = [
+    { id: 'sc-all', label: c('secAll'), count: m.all.length },
+    (ctx.occLoading || m.all.length > 0) && { id: 'sc-next', label: c('secNext'), count: m.agenda.length },
+    shown.rhythm && { id: 'sc-rhythm', label: c('secRhythm'), count: m.rhythm.length },
+    shown.cont && { id: 'sc-cont', label: c('secCont'), count: m.continuous.length, part: shown.rhythm },
+    shown.rare && { id: 'sc-rare', label: c('secRare'), count: m.rare.length, part: shown.rhythm },
+    shown.agents && { id: 'sc-agents', label: c('secAgents'), count: ctx.internal.length },
+  ].filter(Boolean);
+  let whole = 0, sub = 0;
+  const sections = parts.map(({ part, ...s }) => {
+    if (part) { sub += 1; return { ...s, num: `${String(whole).padStart(2, '0')}.${sub}` }; }
+    whole += 1; sub = 0;
+    return { ...s, num: String(whole).padStart(2, '0') };
+  });
+  const numOf = Object.fromEntries(sections.map((s) => [s.id, s.num]));
+
   return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')} help="concept.schedule"
     start=${start}
     marks=${[
-      tag(m.all.length, 'chipAll'), tag(m.rhythm.length, 'chipWeekly'), tag(m.continuous.length, 'chipCont'), tag(m.rare.length, 'chipRare'),
-      tag(m.paused.length, 'chipPaused', 'dim'), tag(m.failed.length, 'chipFailed', m.failed.length ? 'coral' : 'dim'),
-      m.agentMade ? tag(m.agentMade, 'chipAgent', 'coral') : null,
+      // The counts the strip and the sections say are not repeated as tags; paused and agent-made stay.
+      m.paused.length ? tag(m.paused.length, 'chipPaused', 'dim') : null,
+      m.agentMade ? tag(m.agentMade, 'chipAgent') : null,
     ]}
     desc=${c('desc')}
     actions=${html`
@@ -152,21 +184,14 @@ function renderCover(ctx) {
       <${Actions}><${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'calendar' })}>${c('calendar')}<//><//>`}
     strip=${html`${ctx.error ? html`<${Note} kind="message" error>${ctx.error}<//>` : null}${strip}`}
     railTitle=${c('railTitle')}
-    sections=${[
-      { id: 'sc-next', num: '01', label: c('secNext'), count: m.agenda.length },
-      shown.rhythm && { id: 'sc-rhythm', num: '02', label: c('secRhythm'), count: m.rhythm.length },
-      shown.cont && { id: 'sc-cont', num: '03', label: c('secCont'), count: m.continuous.length },
-      shown.rare && { id: 'sc-rare', num: '04', label: c('secRare'), count: m.rare.length },
-      { id: 'sc-all', num: '05', label: c('secAll'), count: m.all.length },
-      shown.agents && { id: 'sc-agents', num: '06', label: c('secAgents'), count: ctx.internal.length },
-    ].filter(Boolean)}
+    sections=${sections.length > 1 ? sections : undefined}
     pagesLabel=${c('pages')} pages=${pageLinks(ctx, null)}>
-      ${secNext(ctx)}
-      ${shown.rhythm && secRhythm(ctx)}
-      ${shown.cont && secContinuous(ctx)}
-      ${shown.rare && secRare(ctx)}
-      ${secAll(ctx)}
-      ${shown.agents && secAgents(ctx)}
+      ${secAll(ctx, numOf['sc-all'])}
+      ${numOf['sc-next'] ? secNext(ctx, numOf['sc-next']) : null}
+      ${numOf['sc-rhythm'] ? secRhythm(ctx, numOf['sc-rhythm']) : null}
+      ${numOf['sc-cont'] ? secContinuous(ctx, numOf['sc-cont']) : null}
+      ${numOf['sc-rare'] ? secRare(ctx, numOf['sc-rare']) : null}
+      ${numOf['sc-agents'] ? secAgents(ctx, numOf['sc-agents']) : null}
   <//>`;
 }
 
@@ -183,17 +208,17 @@ function agendaRows(ctx, list) {
       <//>`)}
   <//>`;
 }
-function secNext(ctx) {
+function secNext(ctx, n) {
   const list = ctx.nextOpen ? ctx.model.agenda : ctx.model.agenda.slice(0, AGENDA_ROWS);
   const doors = ctx.model.agenda.length > AGENDA_ROWS
     ? html`<${Action} tone="more" onClick=${() => ctx.setNextOpen(v => !v)}>${ctx.nextOpen ? c('showFewer') : c('showAllComing', { n: ctx.model.agenda.length })}<//>` : null;
-  return html`<${PageSection} id="sc-next" num="01" title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at) : null} doors=${doors} first=${true}>
+  return html`<${PageSection} id="sc-next" num=${n} title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at) : null} doors=${doors}>
     ${list.length ? agendaRows(ctx, list) : emptyOr(ctx.occLoading, ctx.model.all.length ? c('noneNext') : c('emptyAll'))}
   <//>`;
 }
 
 /* ── 02 The week's rhythm ──────────────────────────────────────────────────────────────────── */
-function secRhythm(ctx) {
+function secRhythm(ctx, n) {
   const m = ctx.model;
   const rows = ctx.rhythmSort === 'name' ? [...m.rhythm].sort((a, b) => nameOf(a.s).localeCompare(nameOf(b.s))) : m.rhythm;
   const doors = html`
@@ -207,7 +232,7 @@ function secRhythm(ctx) {
   const clockOf = (mins) => fmtTime(wall(mins), { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
   const hourOf = (mins) => fmtTime(wall(mins), { hour: '2-digit', timeZone: 'UTC' });
   const timeLabel = (r) => (r.times.length === 1 ? clockOf(r.times[0]) : r.times.length <= 3 ? r.times.map(hourOf).join(' · ') : c('timesN', { n: r.times.length }));
-  return html`<${PageSection} id="sc-rhythm" num="02" title=${c('secRhythm')} count=${c('secRhythmSub', { n: m.rhythm.length })} doors=${doors}>
+  return html`<${PageSection} id="sc-rhythm" num=${n} title=${c('secRhythm')} count=${c('secRhythmSub', { n: m.rhythm.length })} doors=${doors}>
     ${rows.length ? html`
       <${WeekRhythm} heads=${{ time: c('colTime'), name: c('colSchedule'), last: c('colLast') }}
         days=${m.days.map((d, i) => ({ key: i, label: calendar(d, { weekday: 'short' }), sub: d.getDate(), today: i === 0 }))}
@@ -227,9 +252,12 @@ function cadence(f) {
   if (min % 60 === 0) return t('profile.scheduler.cal.everyHour', { n: min / 60 });
   return t('profile.scheduler.cal.everyMin', { n: min });
 }
-function secContinuous(ctx) {
+/** One row that says how many run continuously, or how many of them failed, and opens in place. */
+function secContinuous(ctx, n) {
   const list = ctx.model.continuous;
-  return html`<${PageSection} id="sc-cont" num="03" title=${c('secCont')} count=${c('secContSub', { n: list.length })}>
+  const failed = list.filter(f => f.s.lastRunResult === 'error').length;
+  const sub = ctx.occLoading ? t('profile.scheduler.cal.loading') : failed ? c('chipFailed', { n: failed }) : c('secContSub', { n: list.length });
+  return html`<${FoldSection} id="sc-cont" num=${n} title=${c('secCont')} sub=${sub} open=${ctx.contOpen} onToggle=${() => ctx.setContOpen(v => !v)}>
     ${list.length ? html`<${JobChips} items=${list.map(f => ({
       key: f.scheduleId, name: nameOf(f.s), warn: f.s.lastRunResult === 'error', onOpen: open(ctx, f.s),
       note: `${cadence(f)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}${f.s.runCount ? ` · ${c('runsN', { n: fmtNum(Number(f.s.runCount)) })}` : ''}`,
@@ -238,9 +266,12 @@ function secContinuous(ctx) {
 }
 
 /* ── 04 Less often ─────────────────────────────────────────────────────────────────────────── */
-function secRare(ctx) {
+/** One row that says how many run less often than weekly and when the next of them runs; opens in place. */
+function secRare(ctx, n) {
   const list = ctx.model.rare;
-  return html`<${PageSection} id="sc-rare" num="04" title=${c('secRare')} count=${c('secRareSub')}>
+  const sub = ctx.occLoading ? t('profile.scheduler.cal.loading')
+    : list.length ? c('rareSub', { n: list.length, d: fmtDate(new Date(list[0].nextRunAt), { day: 'numeric', month: 'numeric' }) }) : c('secRareSub');
+  return html`<${FoldSection} id="sc-rare" num=${n} title=${c('secRare')} sub=${sub} open=${ctx.rareOpen} onToggle=${() => ctx.setRareOpen(v => !v)}>
     <${List} cols="when-name-who-in" keepCols empty=${c('noneRare')}>
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
         <${Row} key=${s.id}>
@@ -272,25 +303,34 @@ export function registerTable(ctx, list, { id = 'reg', head = true } = {}) {
     <//>
     ${list.length > TABLE_ROWS ? html`<${More} label=${isOpen ? c('showFewer') : c('showRest', { n: list.length - TABLE_ROWS })} onMore=${() => ctx.toggleMore(id)} />` : null}`;
 }
-function secAll(ctx) {
+/**
+ * The person's schedules, section 01: every schedule with its rhythm, who runs it and how its last
+ * run went. A schedule whose last run failed comes first (then by name), so the row that needs the
+ * person is the first one they meet.
+ */
+function secAll(ctx, n) {
   const m = ctx.model;
   const q = ctx.regQuery.trim().toLowerCase();
-  let list = [...m.all].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const failedFirst = (a, b) => ((a.lastRunResult === 'error' ? 0 : 1) - (b.lastRunResult === 'error' ? 0 : 1)) || nameOf(a).localeCompare(nameOf(b));
+  let list = [...m.all].sort(failedFirst);
   if (ctx.regFilter === 'agents') list = list.filter(s => s.createdByAgent || kindOf(s) === 'agent');
   if (q) list = list.filter(s => nameOf(s).toLowerCase().includes(q) || (s.agentName || '').toLowerCase().includes(q));
-  const doors = html`
+  // With no schedule here the search and the agents' filter have nothing to work on and are not drawn.
+  const doors = m.all.length ? html`
     <${Tab} tone="fold" on=${ctx.showSearch} pressed=${ctx.showSearch} onClick=${() => ctx.setShowSearch(v => !v)}>${c('searchName')}<//>
-    <${Tab} tone="fold" on=${ctx.regFilter === 'agents'} onClick=${() => ctx.setRegFilter(f => (f === 'agents' ? 'all' : 'agents'))}>${c('agentsOnly')}<//>`;
-  return html`<${PageSection} id="sc-all" num="05" title=${c('secAll')} count=${list.length} doors=${doors}>
-    ${ctx.showSearch ? html`<${SearchLine} value=${ctx.regQuery} onInput=${e => ctx.setRegQuery(e.target.value)} placeholder=${c('searchName')} />` : null}
-    ${list.length ? registerTable(ctx, list) : html`<${Note} kind="quiet">${t('profile.scheduler.noManaged')}<//>`}
+    <${Tab} tone="fold" on=${ctx.regFilter === 'agents'} onClick=${() => ctx.setRegFilter(f => (f === 'agents' ? 'all' : 'agents'))}>${c('agentsOnly')}<//>` : null;
+  return html`<${PageSection} id="sc-all" num=${n} title=${c('secAll')} count=${list.length} doors=${doors} first=${true}>
+    ${ctx.showSearch && m.all.length ? html`<${SearchLine} value=${ctx.regQuery} onInput=${e => ctx.setRegQuery(e.target.value)} placeholder=${c('searchName')} />` : null}
+    ${list.length ? registerTable(ctx, list) : html`<${Note} kind="quiet">${m.all.length ? c('noneMatch') : t('profile.scheduler.noManaged')}<//>`}
   <//>`;
 }
 
 /* ── 06 The agents' own ────────────────────────────────────────────────────────────────────── */
-function secAgents(ctx) {
+/** An agent's own word for a job's state, in the reader's words where the page has one, else as the agent wrote it. */
+const agentState = (s) => { const v = s || 'active'; const k = `profile.scheduler.cover.agentState.${v}`; const w = t(k); return w === k ? v : w; };
+function secAgents(ctx, n) {
   const groups = ctx.internal;
-  return html`<${FoldSection} id="sc-agents" num="06" title=${c('secAgents')} sub=${c('secAgentsSub', { n: groups.length })} open=${ctx.agentsOpen} onToggle=${() => ctx.setAgentsOpen(v => !v)}>
+  return html`<${FoldSection} id="sc-agents" num=${n} title=${c('secAgents')} sub=${c('secAgentsSub', { n: groups.length })} open=${ctx.agentsOpen} onToggle=${() => ctx.setAgentsOpen(v => !v)}>
     <${Hint}>${t('profile.scheduler.internalNote')}<//>
     ${groups.length ? groups.map(grp => html`<${Group} key=${grp.gaii} title=${grp.agentName}>
       <${List} cols="name-when-state" keepCols>
@@ -298,7 +338,7 @@ function secAgents(ctx) {
           <${Row} key=${i}>
             <${Name} clip meta=${e.purpose || null}>${e.name}<//>
             <${Desc} clip>${cronWords(e.cron || e.schedule || '')}${e.timezone ? ` · ${e.timezone}` : ''}<//>
-            <${Desc} clip>${e.status || 'active'}<//>
+            <${Desc} clip>${agentState(e.status)}<//>
           <//>`)}
       <//>
     <//>`) : html`<${Note} kind="quiet">${t('profile.scheduler.noInternal')}<//>`}

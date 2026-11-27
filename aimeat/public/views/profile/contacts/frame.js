@@ -10,6 +10,8 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- A person's or an agent's row whose first message waits for the owner's answer (state
+ *     'pending') says so in the coral line under the name (state.pending), so the row that needs the person reads as one.
  *   v1.12.0 -- 2026-10-26 -- A row of origin 'colleague' (a person of a company server, members see each other on) says "colleague" where a saved row says "saved".
  *   v1.11.0 -- 2026-10-19 -- An agent's row shows the agent's own avatar when it has one (leadProps); the initials stay its mark otherwise.
  *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (List with its Lead, Name, Cell, Desc, Who, When and Doors; Mark; Action; SettingsPage with the crumb and the rail as data): the page passes data and writes no class. The people table's heading row is the List's head, as main drew it over the rows (page group G8).
@@ -81,6 +83,9 @@ export function sortPeople(rows) {
   });
 }
 
+/** The coral line under a name whose first message waits for the owner's answer; nothing otherwise. */
+const waitNote = (r) => (r.state === 'pending' ? c('state.pending') : undefined);
+
 /** The relation (yours: the ink tag) and the tags a person carries. */
 const tags = (r) => html`<${Marks}>${r.relation ? html`<${Mark} tone="ink">${r.relation}<//>` : null}${(r.tags || []).map(x => html`<${Mark} key=${x}>${x}<//>`)}<//>`;
 /** The last message: when, and its first words cut to one line; or that there is none yet. */
@@ -96,7 +101,7 @@ export function peopleRows(ctx, rows) {
       <${Row} key=${r.contact_id}>
         <${Lead} text=${initials(r)} />
         <${Name} onOpen=${() => ctx.openPerson(r.contact_id)} after=${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}
-          meta=${`${parts(r.contact_id).owner} · ${originWords(r)}`}>${nameOf(r)}<//>
+          meta=${`${parts(r.contact_id).owner} · ${originWords(r)}`} note=${waitNote(r)}>${nameOf(r)}<//>
         <${Cell}>${tags(r)}<//>
         <${Cell} meta>${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}<//>
         ${lastMsg(r)}
@@ -137,7 +142,7 @@ export function agentRows(ctx, rows) {
       return html`
       <${Row} key=${r.contact_id}>
         <${Lead} ...${leadProps(r, initials(r))} />
-        <${Name} meta=${r.contact_id}>${nameOf(r)}<//>
+        <${Name} meta=${r.contact_id} note=${waitNote(r)}>${nameOf(r)}<//>
         <${Who} sub=${kindWord(r.kind)}>${whose}<//>
         ${lastMsg(r)}
         <${Doors}>

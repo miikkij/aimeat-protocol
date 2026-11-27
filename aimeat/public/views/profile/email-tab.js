@@ -11,6 +11,8 @@
  * @structure EmailTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'email'.
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- The fold state covers the address, which the cover draws as a row once it is
+ *     confirmed (usability pass of the Settings pages); `chat` is gone, its fold was removed on 2026-11-08.
  *   v2.2.0 — 2026-10-18 — saveLanguage: the letters' language choice sets the account language
  *     (PUT /v1/ghii locale), which decides the language of every email the node sends the owner.
  *   v2.1.0 — 2026-09-13 — The letters' switches save nothing while the notification settings are not
@@ -56,7 +58,7 @@ export default function EmailTab({ showToast }) {
   const [form, setForm] = useState({ email: '', code: '', codeSent: false });
   const [sentFilter, setSentFilter] = useState('all');
   const [showAll, setShowAll] = useState(false);
-  const [folds, setFolds] = useState({ letters: false, chat: false });
+  const [folds, setFolds] = useState({ address: false, letters: false });
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
 

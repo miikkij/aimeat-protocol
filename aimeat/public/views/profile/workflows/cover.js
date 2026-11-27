@@ -14,6 +14,15 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.18.0 -- 2026-11-27 -- Usability pass on the person's three situations. The strip's first figure
+ *     counts every workflow (its line how many run on a schedule) and the strip takes hideZeros, so an
+ *     empty page has no band of zeros; "done in their last run" is gone and "waiting" and "stopped short"
+ *     take the notice tone. A question that waits is section 01 and the list follows; the list puts a
+ *     waiting workflow first, then one that stopped short. One Loud: the first question's answer while
+ *     one waits, otherwise "New workflow" in the head; every other answer and the paste box's button are
+ *     ordinary actions. "New workflow" (wp-new) is a fold row, open while there is no workflow. The head
+ *     marks repeated the strip and are gone; the filter and the hint are drawn once there is a workflow.
+ *     Sections are numbered after the filter. No control was removed.
  *   v1.17.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a workflow exists, its button the form) and the title's question mark concept.workflow. Section 04 "How to read this" (a fold of eight word explanations, howToRead) goes; what it said is in the concept.
  *   v1.16.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of "no
  *     workflows" (ctx.itemsFailed) (QA audit F6-05).
@@ -46,6 +55,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { scrollToSection } from '/components/Rail.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
@@ -72,72 +82,92 @@ export function renderWorkflowsView(ctx) {
   return renderCover(ctx);
 }
 
+/** A last run that stopped short: the strip's figure and the list's order read the same test. */
+const stoppedShort = (i) => !!i.lastRun && (i.lastRun.status === 'partial' || i.lastRun.status === 'red');
+/** The list order: a workflow that waits for the person, then one whose last run stopped short, then the rest. */
+const rankOf = (i) => (i.waiting ? 0 : stoppedShort(i) ? 1 : 2);
+
 function renderCover(ctx) {
-  const items = ctx.items;
+  // Stable: within a rank the server's order stays.
+  const items = ctx.items.map((i, n) => [i, n]).sort((a, z) => (rankOf(a[0]) - rankOf(z[0])) || (a[1] - z[1])).map(([i]) => i);
   const scheduled = items.filter(i => i.def.trigger?.kind === 'schedule').length;
   const waiting = ctx.pending.length;
-  const partial = items.filter(i => i.lastRun && (i.lastRun.status === 'partial' || i.lastRun.status === 'red')).length;
-  const done = items.filter(i => i.lastRun?.status === 'done').length;
+  const partial = items.filter(stoppedShort).length;
   const latest = items.filter(i => i.lastRun).sort((a, z) => new Date(z.lastRun.startedAt).getTime() - new Date(a.lastRun.startedAt).getTime())[0];
-  const tag = (n, key, tone) => ({ label: c(key, { n }), tone });
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'waiting', n: waiting, tone: waiting ? 'coral' : undefined, label: c('stripWaiting'), sub: waiting ? ctx.pending.map(p => loc(p.workflowTitle) || p.workflowId).join(' · ') : c('stripWaitingNone') },
-    { key: 'partial', n: partial, tone: partial ? 'coral' : undefined, label: c('stripPartial'), sub: partial ? items.filter(i => i.lastRun && (i.lastRun.status === 'partial' || i.lastRun.status === 'red')).map(i => loc(i.def.title) || i.def.id).join(' · ') : c('stripPartialNone') },
-    { key: 'done', n: done, label: c('stripDone'), sub: c('stripDoneSub') },
+  // The figures, from what the page already read: every workflow (and how many run on a schedule),
+  // the questions that wait for the person and the workflows that stopped short (both in the notice
+  // tone when there are any), and the latest run. With no workflow at all the strip is not drawn.
+  const strip = ctx.loading && !items.length ? html`<${FigureStrip} loading=${4} />` : ctx.itemsFailed ? null : html`<${FigureStrip} hideZeros items=${[
+    { key: 'all', n: items.length, label: c('stripAll'), sub: scheduled ? c('chipScheduled', { n: scheduled }) : undefined },
+    { key: 'waiting', n: waiting, tone: waiting ? 'notice' : undefined, label: c('stripWaiting'), sub: waiting ? ctx.pending.map(p => loc(p.workflowTitle) || p.workflowId).join(' · ') : c('stripWaitingNone') },
+    { key: 'partial', n: partial, tone: partial ? 'notice' : undefined, label: c('stripPartial'), sub: partial ? items.filter(stoppedShort).map(i => loc(i.def.title) || i.def.id).join(' · ') : c('stripPartialNone') },
     latest
       ? { key: 'latest', n: rel(latest.lastRun.startedAt), label: c('stripLatest'), sub: loc(latest.def.title) || latest.def.id }
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: c('noRunsYet') },
   ]} />`;
-  // The start (page-guidance.md): folded once a workflow exists; its button is this page's own form.
+  // The start (page-guidance.md): its button is this page's own form.
   const start = html`<${PageStart} id="workflows" done=${ctx.loading && !items.length ? null : items.length > 0}
     action=${{ onClick: () => ctx.pickView({ kind: 'create' }) }} />`;
+  const openNew = () => { ctx.setFold('new', true); scrollToSection('wp-new'); };
+  // One loud action: while a question waits, its answer (in the first question box); otherwise the
+  // page's own form.
+  const actions = html`
+    ${waiting
+      ? html`<${Action} small onClick=${() => ctx.pickView({ kind: 'create' })}>${c('newWorkflow')}<//>`
+      : html`<${Loud} onClick=${() => ctx.pickView({ kind: 'create' })}>${c('newWorkflow')}<//>`}
+    <${Actions}><${Action} small onClick=${openNew}>${c('promptToChat')}<//><//>`;
+  // What is drawn, numbered after the filter: a question that waits comes first, then the list
+  // (always: with no workflow its one line is the page's empty line), then the three ways to make a
+  // new one as a row.
+  const shown = [
+    waiting ? { id: 'wp-waiting', label: c('secWaiting'), count: waiting } : null,
+    { id: 'wp-list', label: t('profile.workflows.title'), count: items.length },
+    { id: 'wp-new', label: c('secNew') },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
   return html`<${SettingsPage} name="wp" crumb=${crumb(ctx, [])} title=${t('profile.workflows.title')} help="concept.workflow"
     start=${start}
-    marks=${[tag(items.length, 'chipWorkflows'), scheduled ? tag(scheduled, 'chipScheduled') : null,
-      waiting ? tag(waiting, 'chipWaiting', 'coral') : null, partial ? tag(partial, 'chipPartial', 'coral') : null]}
     desc=${c('desc')}
-    actions=${html`
-      <${Loud} onClick=${() => ctx.pickView({ kind: 'create' })}>${c('newWorkflow')}<//>
-      <${Actions}><${Action} small onClick=${() => scrollToSection('wp-new')}>${c('promptToChat')}<//><//>`}
+    actions=${actions}
     strip=${strip}
     railTitle=${c('railTitle')}
-    sections=${[
-      { id: 'wp-list', num: '01', label: t('profile.workflows.title'), count: items.length },
-      { id: 'wp-waiting', num: '02', label: c('secWaiting'), count: waiting },
-      { id: 'wp-new', num: '03', label: c('secNew'), count: '' },
-    ]}
+    sections=${shown}
     pagesLabel=${c('pages')} pages=${pageLinks()}
     after=${html`<${ctx.ConfirmUI} />`}>
-      ${secWorkflows(ctx)}
-      ${secWaiting(ctx)}
-      ${secNew(ctx)}
+      ${numOf['wp-waiting'] ? secWaiting(ctx, numOf['wp-waiting']) : null}
+      ${secWorkflows(ctx, items, numOf['wp-list'], !waiting)}
+      ${secNew(ctx, numOf['wp-new'], items.length === 0)}
   <//>`;
 }
 
-function secWorkflows(ctx) {
-  const list = ctx.onlyProblems ? ctx.items.filter(i => i.waiting || (i.lastRun && i.lastRun.status !== 'done')) : ctx.items;
-  const doors = html`<${Tab} tone="fold" on=${!ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(false)}>${c('all')}<//><${Tab} tone="fold" on=${ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(true)}>${c('onlyProblems')}<//>`;
+function secWorkflows(ctx, items, n, first) {
+  const list = ctx.onlyProblems ? items.filter(i => i.waiting || (i.lastRun && i.lastRun.status !== 'done')) : items;
+  // The filter is drawn once there is something to filter.
+  const doors = items.length ? html`<${Tab} tone="fold" on=${!ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(false)}>${c('all')}<//><${Tab} tone="fold" on=${ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(true)}>${c('onlyProblems')}<//>` : null;
   return html`
-    <${PageSection} id="wp-list" num="01" title=${t('profile.workflows.title')} count=${`${ctx.items.length} · ${c('secListSub')}`} doors=${doors} first>
+    <${PageSection} id="wp-list" num=${n} title=${t('profile.workflows.title')} count=${items.length ? `${items.length} · ${c('secListSub')}` : ''} doors=${doors} first=${first}>
       ${ctx.itemsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
-        : ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
-        : !list.length ? html`<${Note} kind="quiet">${ctx.items.length ? c('emptyProblems') : c('empty')}<//>`
+        : ctx.loading && !items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !list.length ? html`<${Note} kind="quiet">${items.length ? c('emptyProblems') : c('empty')}<//>`
         : workflowRows(ctx, list, { head: true })}
       ${ctx.checkNote ? html`<${Box} name=${ctx.checkNote.title}
         end=${html`<${Action} small soft onClick=${() => ctx.setCheckNote(null)}>${c('close')}<//>`}>${ctx.checkNote.text}<//>` : null}
-      <${Hint}>${c('listHint')}<//>
+      ${items.length ? html`<${Hint}>${c('listHint')}<//>` : null}
     <//>`;
 }
 
-function secWaiting(ctx) {
+function secWaiting(ctx, n) {
   return html`
-    <${PageSection} id="wp-waiting" num="02" title=${c('secWaiting')} count=${ctx.pending.length}>
-      ${!ctx.pending.length ? html`<${Note} kind="quiet">${c('waitingNone')}<//>` : ctx.pending.map(p => questionBlock(ctx, p, true))}
+    <${PageSection} id="wp-waiting" num=${n} title=${c('secWaiting')} count=${ctx.pending.length} first>
+      ${ctx.pending.map((p, i) => questionBlock(ctx, p, true, i === 0))}
     <//>`;
 }
 
-/** A question a run put to the person, with the answer right there. */
-export function questionBlock(ctx, p, withTitle) {
+/**
+ * A question a run put to the person, with the answer right there. `loud`: this is the page's one
+ * main action (the first question that waits); every other answer is an ordinary action.
+ */
+export function questionBlock(ctx, p, withTitle, loud = true) {
   const q = p.question || {};
   const key = `${p.runId}:${p.stepId}`;
   const a = ctx.answers[key] || { picks: [], other: '' };
@@ -149,7 +179,9 @@ export function questionBlock(ctx, p, withTitle) {
   return html`
     <${Box} key=${key} name=${`${wf ? `${wf} · ` : ''}${q.header || p.stepId}: ${q.prompt || ''}`}
       doors=${html`
-        <${Loud} control disabled=${ctx.answering || (!a.picks.length && !a.other.trim())} onClick=${() => ctx.handleAnswer(p, a)}>${c('answerAndGo')}<//>
+        ${loud
+          ? html`<${Loud} control disabled=${ctx.answering || (!a.picks.length && !a.other.trim())} onClick=${() => ctx.handleAnswer(p, a)}>${c('answerAndGo')}<//>`
+          : html`<${Action} small disabled=${ctx.answering || (!a.picks.length && !a.other.trim())} onClick=${() => ctx.handleAnswer(p, a)}>${c('answerAndGo')}<//>`}
         <${Action} small onClick=${() => ctx.pickView({ kind: 'run', id: p.workflowId, runId: p.runId })}>${c('openRun')}<//>
         <${Action} small soft onClick=${() => ctx.handleCancel(p.workflowId, p.runId)}>${t('profile.workflows.cancelRun')}<//>`}>
       <${Stack}>
@@ -161,10 +193,15 @@ export function questionBlock(ctx, p, withTitle) {
     <//>`;
 }
 
-function secNew(ctx) {
+/**
+ * The three ways to make a workflow, as one row that opens in place. With no workflow yet it is open
+ * until the person closes it, since it is how one begins.
+ */
+function secNew(ctx, n, none) {
   const road = (key, k, title, body, doors) => html`<${Road} key=${key} chosen=${ctx.road === key} onPick=${() => ctx.setRoad(key)} kicker=${k} name=${title} text=${body} doors=${doors} />`;
+  const open = ctx.folds.new ?? none;
   return html`
-    <${PageSection} id="wp-new" num="03" title=${c('secNew')} count=${c('threeRoads')}>
+    <${FoldSection} id="wp-new" num=${n} title=${c('secNew')} sub=${c('threeRoads')} open=${open} onToggle=${() => ctx.setFold('new', !open)}>
       <${Roads} cols="three">
         ${road('mcp', c('roadMcpK'), c('roadMcpTitle'), c('roadMcpBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-mcp'); }}>${c('copyPrompt')}<//>`)}
         ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<${Action} small onClick=${e => { e.stopPropagation(); ctx.copyPrompt('create-chat'); }}>${c('copyPrompt')}<//>
@@ -182,7 +219,7 @@ function pasteBlock(ctx) {
       <${TextArea} id="wp-paste" label=${c('pasteLabel')} rows=${6} value=${ctx.pasteText} onInput=${v => ctx.setPasteText(v)} placeholder=${c('pastePlaceholder')}
         message=${ctx.pasteError || null} error />
       <${Actions}>
-        <${Loud} control disabled=${!ctx.pasteText.trim()} onClick=${() => ctx.handlePaste()}>${c('pasteOpenInForm')}<//>
+        <${Action} control disabled=${!ctx.pasteText.trim()} onClick=${() => ctx.handlePaste()}>${c('pasteOpenInForm')}<//>
         <${Action} small soft onClick=${() => ctx.setPasteOpen(false)}>${t('profile.cancel')}<//>
       <//>
     <//>`;

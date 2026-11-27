@@ -12,6 +12,10 @@
  * @structure LibrariesTab() — state (packs, details, filters, queries, expanded) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'libraries'.
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- The dependency map it already reads is also narrowed to the reader's own
+ *     apps (`appsUsing.mine`: pack id → filenames), so the page can say which deprecated library an
+ *     app of theirs still loads; and the fold state of the faces and the AI rows (usability pass of
+ *     the Settings pages).
  *   v2.1.0 — 2026-10-03 — Reads GET /v1/themes/fonts for the Faces section (the font manager).
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Kirjastot-sivu", direction A): rows
  *     on three shelves instead of a card wall, the styling bundle shown, deprecated packs name their
@@ -24,7 +28,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t, getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
-import { getNodeUrl } from '/js/services/auth.js';
+import { getNodeUrl, getSession } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
@@ -43,6 +47,8 @@ export default function LibrariesTab({ showToast }) {
   const [filters, setFilters] = useState({ base: emptyFilter(), ui: emptyFilter(), third: emptyFilter() });
   const [queries, setQueries] = useState({ base: '', ui: '', third: '' });
   const [shown, setShownState] = useState({ base: 20, ui: 20, third: 20 });
+  // The page's two rows that open in place: the faces, and the rule and facts for an AI.
+  const [folds, setFolds] = useState({ faces: false, ai: false });
 
   // The list is fetched in the reader's language, so a language switch fetches it again.
   const locale = getLocale();
@@ -58,7 +64,17 @@ export default function LibrariesTab({ showToast }) {
       const m = await apiGet('/v1/dependencies');
       const apps = m?.data?.apps || [];
       const using = apps.filter((a) => (a.requires?.packs || []).length || (a.requires?.cortex || []).length).length;
-      setAppsUsing({ using, total: apps.length });
+      // The same map, narrowed to the reader's own apps ("owner/filename" refs): pack id → the
+      // filenames that load it. A cortex-kind pack's id is its cortex name. It is what lets the page
+      // say that one of the reader's apps still loads a deprecated library.
+      const owner = getSession()?.owner || '';
+      const mine = {};
+      for (const a of apps) {
+        const [who, ...rest] = String(a.app || '').split('/');
+        if (!owner || who !== owner) continue;
+        for (const r of [...(a.requires?.packs || []), ...(a.requires?.cortex || [])]) (mine[r.name] ||= []).push(rest.join('/'));
+      }
+      setAppsUsing({ using, total: apps.length, mine });
     } catch (e) { swallowed('libraries: map', e); }
     // Every face this server serves, with its licence (the font manager): a public read.
     try {
@@ -99,7 +115,8 @@ export default function LibrariesTab({ showToast }) {
 
   const ctx = {
     nodeUrl: getNodeUrl(), showToast,
-    packs, appsUsing, fonts, details, expanded, docShown, filters, queries, shown,
+    packs, appsUsing, fonts, details, expanded, docShown, filters, queries, shown, folds,
+    setFold: (k, open) => setFolds((f) => ({ ...f, [k]: open })),
     setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),

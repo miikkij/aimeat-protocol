@@ -9,6 +9,8 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.12.1 -- 2026-11-27 -- kindName and kindSub show a kind with no word as the node sent it: a
+ *     data package's row showed "discover.type.dataset" and "discover.cover.kindSub.dataset".
  *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (QuestionDesk, List with its Row, Cell, Name, Desc and Doors, Figure, Found, SettingsPage with its crumb and rail as data): the page passes data and writes no class (page group G8).
  *   v1.11.0 -- 2026-09-26 -- The rows of entries are the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.10.0 -- 2026-09-26 -- The line under an entry's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -52,8 +54,11 @@ export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); retu
 
 /** The kinds a person reads; `memory` is the raw store and is shown on its own terms. */
 export const HUMAN_TYPES = ['document', 'knowledge', 'decision', 'skill', 'app', 'offering', 'workflow', 'company', 'template', 'designbook', 'material', 'capability', 'research', 'organism'];
-export const kindName = (type) => t('discover.type.' + type) || type;
-export const kindSub = (type) => c('kindSub.' + type);
+// t() answers the key itself for a word it does not have: a kind with no word is shown as the node
+// sent it, and has no line under it, never the key ("discover.type.dataset" stood on a row).
+const has = (key) => { const v = t(key); return v && v !== key ? v : ''; };
+export const kindName = (type) => has('discover.type.' + type) || type;
+export const kindSub = (type) => has('discover.cover.kindSub.' + type);
 export const SCOPES = ['own', 'public', 'shared'];
 
 /** Split a text at the query words and mark them (the List's Found); plain strings when there is no query. */

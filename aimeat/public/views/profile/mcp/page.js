@@ -7,9 +7,21 @@
  *   it, disconnect it), the connect and instructions sections from their own files, the
  *   suggestions switch, and the rail. Pure render over the ctx bag, made of the component kit: the
  *   page passes data and never a class.
+ *   Since 2026-11-27 what is drawn follows the person's situation: with no AI connected the page is
+ *   the one way to connect (the connect section, open, numbered 01) and nothing else, no strip and no
+ *   head actions; with one connected, 01 is the list of connected AIs (which AI, what it may do, when
+ *   it last spoke) under a strip of three figures, and connecting another AI, the instructions and
+ *   the suggestions switch are rows that say their state and open in place. A row whose agent was
+ *   deleted needs the person: it is counted in the notice tone and comes first in the list.
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- Usability pass on the person's three situations: nothing connected draws only
+ *     the connect section (no strip of "0 / Not yet / On", no head marks, no competing actions); connected
+ *     draws the list first, the strip without the suggestions figure (its state is the suggestions row) and
+ *     with a notice figure for rows left behind, which lead the list; mcp-connect (when proven), mcp-instr
+ *     and mcp-suggest are fold rows that say their state; sections are numbered after the filter. The head
+ *     marks repeated the strip and are gone. No control was removed.
  *   v2.2.0 -- 2026-11-02 -- Connected is Home's rule: the proof, or an AI of the person's own that spoke over
  *     MCP; the place's chat and the basic agents are not listed (crew64 first-timer round, 2.11).
  *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt names this server's MCP address, its button opens the connect steps) and the title's question mark, concept.connect (guidance part B).
@@ -70,52 +82,69 @@ export function renderPage(ctx) {
   const outside = rows.find((r) => r.kind === 'agent') || null;
   const proven = !!ctx.proof?.passed || !!outside;
   const provenAt = ctx.proof?.passed ? ctx.proof.at : outside?.since;
-  const latest = rows[0] || null;
   const on = ctx.proactive ? ctx.proactive.enabled !== false : true;
-  const p = ctx.proactive;
+  const loading = ctx.agents === null;
+  // A row whose agent was deleted needs the person (remove it), so it leads the list and has its own
+  // figure; the AIs that work are the rest. Stable: within each group the newest-first order stays.
+  const gone = rows.filter((r) => r.gone);
+  const live = rows.filter((r) => !r.gone);
+  const listed = [...gone, ...live];
+  const latest = live[0] || null;
+  // Connected is the proof or a row: then the page is about what is connected. Before that the page
+  // is the one way to connect, and nothing else is drawn beside it.
+  const connected = proven || rows.length > 0;
 
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'ais', n: rows.length, label: m('stripAis'), sub: rows.length ? rows.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
+  // No strip while nothing is connected: "0 / Not yet / –" said nothing the connect section does not.
+  // The suggestions figure is gone: its state is the suggestions row's own line.
+  const strip = loading ? html`<${FigureStrip} loading=${3} />` : !connected ? null : html`<${FigureStrip} items=${[
+    { key: 'ais', n: live.length, label: m('stripAis'), sub: live.length ? live.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
     { key: 'proof', n: proven ? m('stripProven') : m('stripNotYet'), tone: 'coral', label: proven ? m('stripProofOk') : m('stripProofPending'), sub: proven ? m('stripProvenSub', { date: day(provenAt) }) : m('stripNotYetSub') },
     { key: 'last', n: latest ? rel(latest.when) : '–', label: m('stripLast'), sub: latest ? `${latest.tool} · ${latest.name}` : m('stripLastNone') },
-    { key: 'suggest', n: on ? m('on') : m('off'), tone: 'coral', label: m('stripSuggest'), sub: p?.available_here === false ? m('stripSuggestOperator') : p?.set_by === 'ai' ? m('stripSuggestByAi') : p?.set_by === 'person' ? m('stripSuggestByYou') : m('stripSuggestDefault') },
+    gone.length ? { key: 'gone', n: gone.length, tone: 'notice', label: m('stripGone'), sub: m('stripGoneSub') } : null,
   ]} />`;
 
-  const marks = [
-    rows.length ? { label: m('chipCount', { n: rows.length }) } : { label: m('chipNone'), tone: 'coral' },
-    proven ? { label: m('chipProven', { date: day(provenAt) }), tone: 'sun' } : { label: m('chipUnproven'), tone: 'coral' },
-    { label: on ? m('chipSuggestOn') : m('chipSuggestOff') },
-  ];
-
-  // One loud action per page: while the connection is unproven, that action is the proof's copy button in section 02.
-  const actions = html`
-    ${proven ? html`<${Loud} onClick=${() => scrollToSection('mcp-connect')}>${m('connectDoor')}<//>` : null}
+  const openConnect = (guide) => {
+    if (proven) { ctx.setFold('connect', true); if (guide) ctx.setFold('guide', true); }
+    scrollToSection('mcp-connect');
+  };
+  // One loud action per page: while the connection is unproven, that action is the proof's copy
+  // button in the connect section; once proven, connecting another AI. With nothing connected the
+  // head carries no action, so nothing competes with the one way in (the Agents page stays in the rail).
+  const actions = !connected ? null : html`
+    ${proven ? html`<${Loud} onClick=${() => openConnect(false)}>${m('connectDoor')}<//>` : null}
     <${Actions}><${Action} small onClick=${() => goTab('agents')}>${m('agentsDoor')}<//><//>`;
 
+  // What is drawn, numbered after the filter: while loading only the list's place; with nothing
+  // connected only the connect section; connected, the list first and the rest as rows.
+  const shown = (loading
+    ? [{ id: 'mcp-rows', label: m('secRows') }]
+    : [
+      connected ? { id: 'mcp-rows', label: m('secRows'), count: live.length } : null,
+      { id: 'mcp-connect', label: proven ? m('secConnect') : m('secConnectFirst') },
+      connected ? { id: 'mcp-instr', label: m('secInstructions') } : null,
+      connected ? { id: 'mcp-suggest', label: m('secSuggest'), count: on ? m('on') : m('off') } : null,
+    ]).filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
+
   return html`
-    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} help="concept.connect" marks=${marks}
+    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} help="concept.connect"
       desc=${`${m('desc')} ${proven ? m('descProven') : m('descNew')}`} actions=${actions} strip=${strip}
       start=${html`<${PageStart} id="mcp" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${ctx.proof || outside ? proven : null}
-        action=${{ onClick: () => { if (proven) ctx.setFold('guide', true); scrollToSection('mcp-connect'); } }} />`}
+        action=${{ onClick: () => openConnect(true) }} />`}
       railTitle=${m('railTitle')}
-      sections=${[
-        { id: 'mcp-rows', num: '01', label: m('secRows'), count: rows.length },
-        { id: 'mcp-connect', num: '02', label: m('secConnect'), count: '' },
-        { id: 'mcp-instr', num: '03', label: m('secInstructions'), count: '' },
-        { id: 'mcp-suggest', num: '04', label: m('secSuggest'), count: on ? m('on') : m('off') },
-      ]}
+      sections=${shown.length > 1 ? shown : undefined}
       pagesLabel=${m('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${secRows(ctx, rows)}
-      ${secConnect(ctx, proven, provenAt)}
-      ${secInstructions(ctx)}
-      ${secSuggest(ctx, on)}
+      ${numOf['mcp-rows'] ? secRows(ctx, listed, live.length, numOf['mcp-rows']) : null}
+      ${numOf['mcp-connect'] ? secConnect(ctx, proven, provenAt, numOf['mcp-connect'], !numOf['mcp-rows']) : null}
+      ${numOf['mcp-instr'] ? secInstructions(ctx, numOf['mcp-instr']) : null}
+      ${numOf['mcp-suggest'] ? secSuggest(ctx, on, numOf['mcp-suggest']) : null}
     <//>`;
 }
 
-function secRows(ctx, rows) {
+function secRows(ctx, rows, count, n) {
   return html`
-    <${Section} id="mcp-rows" num="01" title=${m('secRows')} count=${rows.length} first
+    <${Section} id="mcp-rows" num=${n} title=${m('secRows')} count=${ctx.agents === null ? '' : count} first
       doors=${html`<${Action} small soft onClick=${() => goTab('agents')}>${m('allAgents')}<//>`}>
       <${List} cols="mark-name-who-when-doors" keepCols loading=${ctx.agents === null ? t('common.loading') : false}
         head=${['', m('colAi'), m('colMay'), m('colWhen'), '']}
@@ -125,7 +154,7 @@ function secRows(ctx, rows) {
           return html`
             <${Row} key=${r.id}>
               <${Lead} text=${r.gone ? '?' : initials(r.tool)} agent=${r.kind === 'tool' && r.gone} />
-              <${Name} meta=${r.name || m('agentNone')}>${r.tool}<//>
+              <${Name} attention=${!!r.gone} meta=${r.name || m('agentNone')}>${r.tool}<//>
               ${may
                 ? html`<${Who} sub=${may.note}>${may.full ? html`<${Tinted} strong tone="notice">${may.word}<//>` : html`<b>${may.word}</b>`}<//>`
                 : html`<${Who} sub=${m('agentGoneNote')}><b>${m('agentGone')}</b><//>`}
@@ -136,15 +165,17 @@ function secRows(ctx, rows) {
               <//>
             <//>`;
         }} />
-      <${Note}>${m('rowsHint')}<//>
+      ${rows.length ? html`<${Note}>${m('rowsHint')}<//>` : null}
     <//>`;
 }
 
-function secSuggest(ctx, on) {
+/** The suggestions switch: one row that says On or Off, the switch and its words inside. */
+function secSuggest(ctx, on, n) {
   const p = ctx.proactive;
   const operatorOff = p?.available_here === false;
   return html`
-    <${Section} id="mcp-suggest" num="04" title=${m('secSuggest')} count=${null}>
+    <${Section} fold id="mcp-suggest" num=${n} title=${m('secSuggest')} sub=${operatorOff || !on ? m('off') : m('on')}
+      open=${ctx.folds.suggest} onToggle=${() => ctx.setFold('suggest', !ctx.folds.suggest)}>
       <${Line} gap="section" align="start" justify="between" wrap>
         <${Stack} gap="none">
           <${SubHeading}>${m('suggestTitle')}<//>

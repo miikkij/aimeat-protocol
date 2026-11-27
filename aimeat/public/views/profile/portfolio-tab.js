@@ -12,6 +12,8 @@
  * @structure PortfolioTab() — state (data, members, ai, pageHtml, previewOpen, paste, matPrompt, busy) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'portfolio'
  * @version-history
+ *   v3.1.0 — 2026-11-27 — The open state of the two rows that open in place (changeOpen, aiOpen) and their toggles
+ *     are in the ctx bag for portfolio/page.js.
  *   v3.0.1 — 2026-10-17 — The preview reads the stored page with the owner's session (apiGetText):
  *     the file is the owner's now, not public (plan doc-mvcn6c7e4e5q, V0.3).
  *   v3.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Portfolio-sivu", direction A): one page
@@ -54,6 +56,9 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   const [paste, setPaste] = useState('');
   const [matPrompt, setMatPrompt] = useState('');
   const [busy, setBusy] = useState(false);
+  // The two rows that open in place: the ways to change the page, and the AI's rule.
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const toast = (msg, isErr) => showToast?.(msg, !!isErr);
   const fail = (e, fallback) => toast(e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error'), true);
@@ -161,6 +166,7 @@ export default function PortfolioTab({ session, navigate, showToast }) {
 
   const ctx = {
     data, members, ai, pageHtml, previewOpen, paste, matPrompt, busy, maxKb, ownerName,
+    changeOpen, aiOpen, toggleChange: () => setChangeOpen((v) => !v), toggleAi: () => setAiOpen((v) => !v),
     standaloneUrl: data?.standalone_url || null,
     title: titleOf(pageHtml),
     navigate, toast, fileRef, ConfirmUI,

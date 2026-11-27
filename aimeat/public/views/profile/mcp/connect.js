@@ -7,9 +7,13 @@
  *   double-click script, a file), the two things to know before starting, and the proof: one
  *   prompt, one button, one answer. Open for a person who has not proved a connection yet; folded
  *   to its status line once the proof is in, and re-openable at any time.
- * @structure secConnect · quickWays · proofBlock · failList
+ * @structure secConnect · connectBody · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- Its number comes from the page (numbered after the filter); unproven it is
+ *     the open section and, with nothing connected, the first on the page; proven it is one fold row
+ *     whose line says when the connection was verified (mcppage.chipProven), the short ways in and the
+ *     guide and proof folds inside it. The contents are unchanged.
  *   v2.2.0 -- 2026-11-01 -- The guide drops its own question under the section's lead, which asked
  *     the same; on a node the store sold the short ways in (developer tools) are left out
  *     (commercial's crew52 check).
@@ -71,11 +75,26 @@ import { customerNode } from '/js/site.js';
  */
 const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows lead=${false} />`;
 
-export function secConnect(ctx, proven, provenAt) {
+export function secConnect(ctx, proven, provenAt, n, first) {
   // A buyer's guide shows the chat AIs first, so a count of every tool would not match the tabs.
   const toolCount = Array.isArray(ctx.tools) && !customerNode() ? ctx.tools.length : null;
+  // Proven: connecting another AI is a row that says when the connection was verified, and opens
+  // in place. Unproven: the section is the way in, open, and the first thing on the page.
+  if (proven) {
+    return html`
+      <${Section} fold id="mcp-connect" num=${n} title=${m('secConnect')} sub=${m('chipProven', { date: day(provenAt ?? ctx.proof?.at) })}
+        open=${ctx.folds.connect} onToggle=${() => ctx.setFold('connect', !ctx.folds.connect)}>
+        ${connectBody(ctx, true, provenAt)}
+      <//>`;
+  }
   return html`
-    <${Section} id="mcp-connect" num="02" title=${proven ? m('secConnect') : m('secConnectFirst')} count=${toolCount ? m('toolCount', { n: toolCount }) : null}>
+    <${Section} id="mcp-connect" num=${n} first=${!!first} title=${m('secConnectFirst')} count=${toolCount ? m('toolCount', { n: toolCount }) : null}>
+      ${connectBody(ctx, false, provenAt)}
+    <//>`;
+}
+
+function connectBody(ctx, proven, provenAt) {
+  return html`
       ${proven ? html`
         <${Note} kind="lead">${m('connectLeadProven')}<//>
         ${quickWays(ctx)}
@@ -100,8 +119,7 @@ export function secConnect(ctx, proven, provenAt) {
           <//>
         <//>
         ${quickWays(ctx)}
-        ${proofBlock(ctx, false)}`}
-    <//>`;
+        ${proofBlock(ctx, false)}`}`;
 }
 
 /**

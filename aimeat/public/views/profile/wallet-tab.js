@@ -12,6 +12,8 @@
  * @structure WalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'wallet'
  * @version-history
+ *   v2.1.0 — 2026-11-27 — The fold state of the page's two rows (rails, roads), which wallet/page.js
+ *     draws as rows that open in place; nothing else changes.
  *   v2.0.0 — 2026-09-04 — The poster face (design canvas "AIMEAT Lompakko-sivu", direction A): the
  *     lifetime from every row kind, the pace that credits without a row said as a figure, the rows
  *     in words with who made the call, the shares owed to you on the page, a stale checkout no
@@ -52,6 +54,8 @@ export default function WalletTab({ session, showToast, onStats }) {
   const [openTx, setOpenTx] = useState(null);
   const [openRail, setOpenRail] = useState(null);
   const [openShares, setOpenShares] = useState(false);
+  // The page's two rows that open in place (wallet/page.js): the ways to get paid, how your AI uses it.
+  const [folds, setFolds] = useState({ rails: false, roads: false });
   const [keyDraft, setKeyDraft] = useState('');
   const [addrDraft, setAddrDraft] = useState('');
   const [railMsg, setRailMsg] = useState(null);
@@ -148,6 +152,8 @@ export default function WalletTab({ session, showToast, onStats }) {
   const toggleTx = (id) => setOpenTx((cur) => (cur === id ? null : id));
   const toggleRail = (id) => { setOpenRail((cur) => (cur === id ? null : id)); setKeyDraft(''); setAddrDraft(''); setRailMsg(null); };
   const toggleShares = () => setOpenShares((v) => !v);
+  const toggleFold = (k) => setFolds((f) => ({ ...f, [k]: !f[k] }));
+  const openFold = (k) => setFolds((f) => ({ ...f, [k]: true }));
 
   const requestToday = async () => {
     const cap = Number(wallet?.daily_allowance?.accumulation_cap) || 0;
@@ -187,8 +193,8 @@ export default function WalletTab({ session, showToast, onStats }) {
 
   const ctx = {
     session, federated, wallet, rows, rowsTotal, rowsPartial: rows.length < rowsTotal, sessions, orders, payout, earnings, agents, self,
-    filter, shown, filtered, counts, first, last, shares, railsOn, openTx, openRail, openShares, keyDraft, addrDraft, railMsg, requestMsg, busy, ConfirmUI,
-    setFilter, showMore, toggleTx, toggleRail, toggleShares, setKeyDraft, setAddrDraft, saveStripe, saveX402, removeStripe, removeX402, requestToday,
+    filter, shown, filtered, counts, first, last, shares, railsOn, openTx, openRail, openShares, folds, keyDraft, addrDraft, railMsg, requestMsg, busy, ConfirmUI,
+    setFilter, showMore, toggleTx, toggleRail, toggleShares, toggleFold, openFold, setKeyDraft, setAddrDraft, saveStripe, saveX402, removeStripe, removeX402, requestToday,
     openAgents: () => openTab('agents'),
   };
   return renderPage(ctx);

@@ -13,6 +13,8 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.8.0 -- 2026-11-27 -- The fold state of the page's two rows (a new package, how an agent installs),
+ *     which were open sections (usability pass of the Settings pages).
  *   v2.7.0 — 2026-10-31 — A package its author sells to accounts: Buy (a checkout paid on Stripe's card
  *     page, finished when the page comes back, or with test money where the node runs it), and on the
  *     owner's own package the price, pause, end, the sales and a refund (packages/sale.js).
@@ -80,6 +82,8 @@ export default function PackagesTab({ session, showToast }) {
   const [shown, setShown] = useState(20);
   const [busy, setBusy] = useState(false);
   const [compose, setCompose] = useState({ open: false, name: '', picked: [] });
+  // The page's two rows that open in place: a new package, and how an agent installs.
+  const [folds, setFolds] = useState({ new: false, ai: false });
   const [myApps, setMyApps] = useState(null);   // null until the compose road is opened
   // group → the price typed on an own package's row; group → its sales (GET /v1/packages/:group/sales).
   const [priceForm, setPriceForm] = useState({});
@@ -440,7 +444,8 @@ export default function PackagesTab({ session, showToast }) {
     nodeUrl: getNodeUrl(), ownerName, isOperator, remoteEnabled, showToast, ConfirmUI, fileRef,
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
-    compose, myApps, sheets, installConfig, grantApps,
+    compose, myApps, sheets, installConfig, grantApps, folds,
+    setFold: (k, open) => setFolds((f) => ({ ...f, [k]: open })),
     selling, sales, priceForm, testMoney: !!data?.checkout?.test_money,
     setPriceForm: (group, form) => setPriceForm((m) => ({ ...m, [group]: form })),
     buy, setPrice, setSaleState, refund,

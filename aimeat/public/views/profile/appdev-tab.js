@@ -12,6 +12,9 @@
  * @structure AppDevTab — state, loads, handlers, the ctx bag, render
  * @usage registered in views/profile.js TABS as id 'appdev'.
  * @version-history
+ *   v2.2.0 — 2026-11-27 — The filed pitfalls are read most severe first (sort=severity, which the
+ *     route already takes), so a critical one leads the list; the page's rows that open in place
+ *     (start, curated) keep their state here (usability pass, appdev/page.js v2.2.0).
  *   v2.1.0 — 2026-11-08 — The description follows the page: how it accrues is the concept
  *     concept.appdev behind the title's question mark, no longer a section (appdev/page.js v2.1.0).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -60,6 +63,9 @@ export default function AppDevTab({ showToast }) {
   const [overview, setOverview] = useState({ templates: 0, packs: 0, packsProven: 0 });
   const [expanded, setExpanded] = useState(null);
   const [busy, setBusy] = useState(null);
+  // The page's rows that open in place (start, curated); undefined means the page's own default.
+  const [folds, setFolds] = useState({});
+  const setFold = (key, open) => setFolds((f) => ({ ...f, [key]: open }));
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
 
@@ -73,7 +79,8 @@ export default function AppDevTab({ showToast }) {
   const loadLearned = useCallback(async (offset = 0, append = false) => {
     try {
       const { includeShared, ...F } = filtersRef.current;
-      const res = await queryLearnedPitfalls({ ...F, include_shared: includeShared || undefined, q: qRef.current, limit: PAGE, offset });
+      // Most severe first, then newest: a critical pitfall is the one to look at, so it leads the list.
+      const res = await queryLearnedPitfalls({ ...F, include_shared: includeShared || undefined, q: qRef.current, sort: 'severity', limit: PAGE, offset });
       setLearned((prev) => (append && prev ? { ...res, pitfalls: [...prev.pitfalls, ...res.pitfalls] } : res));
     } catch (err) { swallowed('appdev-tab: learned', err); setLearned((prev) => prev || { pitfalls: [], total: 0, limit: PAGE, offset: 0, facets: {}, filtered_facets: {}, community: 0 }); }
   }, []);
@@ -247,7 +254,7 @@ export default function AppDevTab({ showToast }) {
 
   const ctx = {
     flow, buildLength, shown, openItems, learned, critical, filters, q, allAreas, proposals,
-    curatedSummary, curated, curatedFilter, expanded, busy, ConfirmUI, showToast, goTab,
+    curatedSummary, curated, curatedFilter, expanded, busy, ConfirmUI, showToast, goTab, folds, setFold,
     templates: overview.templates, packs: overview.packs, packsProven: overview.packsProven,
     appsTaught: countApps(learned), noApp: learned ? countNoApp(learned) : 0,
     setFilters, setQ, setAllAreas, loadMore, toggleRow, toggleShare, toggleOutdated, removeLearned,

@@ -11,6 +11,14 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- Usability pass on the person's three situations. The strip takes hideZeros
+ *     (no band of zeros before the first company) and holds its place while the list loads; a company
+ *     whose address does not answer or whose invoice details are missing comes first in the list, its
+ *     name in the attention colour when the address does not answer. "Register a company" (co-create)
+ *     is a fold row, open while there is no company; its Register button is the page's one Loud, and
+ *     the head's way to the form is an ordinary action. The head marks repeated the strip and are gone;
+ *     the hint under the list is drawn once there is a company. The empty line says the one way to get
+ *     a company here. No control was removed.
  *   v1.12.0 -- 2026-11-08 -- The cover explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "companies" in the start slot (folded once a company exists; its button goes to the
  *     register form) and the title's question mark concept.company.
@@ -39,6 +47,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { scrollToSection } from '/components/Rail.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -51,14 +60,22 @@ import { c, crumb, pageLinks, factsOf, kindWord, initials } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { PageStart } from '/components/PageStart.js';
 
+/**
+ * The list order: a company whose address does not answer or whose invoice details are missing needs
+ * the person, so it comes first (the invoice gap before a plain gap), then the rest.
+ */
+const rankOf = (r, addr) => (addr[r.co.id] === false || r.facts.blocksInvoice ? 0 : r.facts.done < r.facts.total ? 1 : 2);
+
 export function renderCover(ctx) {
-  const rows = ctx.companies.map((co) => ({ co, facts: factsOf(co), x: ctx.extras[co.id] || {} }));
-  const incomplete = rows.filter((r) => r.facts.done < r.facts.total);
+  // Stable: within a rank the server's order stays.
+  const rows = ctx.companies.map((co, i) => ({ co, i, facts: factsOf(co), x: ctx.extras[co.id] || {} }))
+    .sort((a, b) => (rankOf(a, ctx.addr) - rankOf(b, ctx.addr)) || (a.i - b.i));
   const inv = rows.reduce((n, r) => n + (r.x.inv || 0), 0);
   const sent = rows.reduce((n, r) => n + (r.x.sent || 0), 0);
   const worst = rows.length ? rows.reduce((a, b) => (a.facts.done <= b.facts.done ? a : b)) : null;
 
-  const strip = html`<${FigureStrip} items=${[
+  // hideZeros: with no company the strip is not drawn, and the list's one line says what fills it.
+  const strip = !ctx.loaded ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} hideZeros items=${[
     { key: 'companies', n: rows.length, label: c('stripCompanies'), sub: rows.length ? rows.map((r) => r.co.name).join(' · ') : c('stripNone') },
     worst
       ? { key: 'facts', n: `${worst.facts.done}/${worst.facts.total}`, tone: worst.facts.done < worst.facts.total ? 'notice' : undefined, label: c('stripFacts'),
@@ -68,24 +85,27 @@ export function renderCover(ctx) {
     { key: 'sent', n: sent, label: c('stripSent'), sub: c('stripSentSub') },
   ]} />`;
 
-  // The start: folded once a company exists; its button goes to the register form (section 02).
+  // The register form opens in place: it is open while there is no company, a row after that.
+  const createOpen = ctx.folds.create ?? !rows.length;
+  const openCreate = () => { ctx.setFold('create', true); scrollToSection('co-create'); };
+  // Its button goes to the register form.
   const start = html`<${PageStart} id="companies" done=${ctx.loaded ? rows.length > 0 : null}
-    action=${{ onClick: () => scrollToSection('co-create') }} />`;
+    action=${{ onClick: openCreate }} />`;
+  // The head's marks repeated the strip (how many, whose details are unfinished) and are gone. The
+  // one loud action is the form's own Register; the head's way to the form is an ordinary action,
+  // since a company is registered once and a person mostly comes to open one.
   return html`
     <${SettingsPage} name="co"
       crumb=${crumb(null)}
       title=${c('title')}
       help="concept.company"
       start=${start}
-      marks=${[
-        // No company yet counts nothing: main's dim tag.
-        { label: c('chipCompanies', { n: rows.length }), tone: rows.length ? undefined : 'dim' },
-        incomplete.length ? { label: c('chipIncomplete', { name: incomplete[0].co.name }), tone: 'coral' } : rows.length ? { label: c('chipAllSet') } : null,
-      ]}
       desc=${c('desc')}
       actions=${html`
-        <${Loud} onClick=${() => scrollToSection('co-create')}>${c('createDoor')}<//>
-        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt('list')}>${c('promptToChat')}<//><//>`}
+        <${Actions}>
+          <${Action} small onClick=${openCreate}>${c('createDoor')}<//>
+          <${Action} small onClick=${() => ctx.copyPrompt('list')}>${c('promptToChat')}<//>
+        <//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
       sections=${[
@@ -96,7 +116,7 @@ export function renderCover(ctx) {
       pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${secRows(ctx, rows)}
-      ${secCreate(ctx)}
+      ${secCreate(ctx, createOpen)}
     <//>`;
 }
 
@@ -104,12 +124,12 @@ function secRows(ctx, rows) {
   const host = (u) => u.replace(/^https?:\/\//, '');
   return html`
     <${PageSection} id="co-rows" num="01" title=${c('secRows')} count=${rows.length} first>
-      <${List} cols="mark-name-kind-state-doors" keepCols empty=${c('emptyRows')}
+      <${List} cols="mark-name-kind-state-doors" keepCols empty=${c('emptyRows')} loading=${ctx.loaded ? false : t('common.loading')}
         head=${rows.length ? ['', c('colCompany'), c('colFront'), c('colState'), ''] : null}>
           ${rows.map(({ co, facts, x }) => html`
             <${Row} key=${co.id}>
               <${Lead} text=${initials(co.name)} />
-              <${Name} meta=${co.address ? host(co.address) : co.slug}>${co.name}<//>
+              <${Name} attention=${ctx.addr[co.id] === false} meta=${co.address ? host(co.address) : co.slug}>${co.name}<//>
               <${Who} sub=${ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : ''}>
                 <b>${kindWord(co.frontPage?.kind)}</b>${co.frontPage?.kind === 'redirect' && co.frontPage.target ? html`<small>${host(co.frontPage.target)}</small>` : null}
               <//>
@@ -119,15 +139,19 @@ function secRows(ctx, rows) {
               <${Doors}><${Action} small row onClick=${() => ctx.open(co.id)}>${c('open')}<//><//>
             <//>`)}
       <//>
-      <${Hint}>${c('rowsHint')}<//>
+      ${rows.length ? html`<${Hint}>${c('rowsHint')}<//>` : null}
     <//>`;
 }
 
-function secCreate(ctx) {
+/**
+ * The register form as one row that opens in place: open while there is no company (it is how one
+ * begins), a row after that, since a company is registered once.
+ */
+function secCreate(ctx, open) {
   const slug = ctx.create.slug;
   const avail = ctx.create.availability;
   return html`
-    <${PageSection} id="co-create" num="02" title=${c('secCreate')} count=${null}>
+    <${FoldSection} id="co-create" num="02" title=${c('secCreate')} sub=${c('createSub')} open=${open} onToggle=${() => ctx.setFold('create', !open)}>
       <${TextField} label=${t('profile.companies.name')} value=${ctx.create.name} placeholder=${c('createPlaceholder')} onInput=${(v) => ctx.setCreateName(v)}
         actions=${html`<${Loud} control disabled=${ctx.busy || slug.length < 2 || avail?.available === false} onClick=${() => ctx.doCreate()}>${c('create')}<//>`} />
       ${slug.length >= 2 ? html`<${AddressPreview} label=${c('addressPreview')} address=${avail?.address || slug}

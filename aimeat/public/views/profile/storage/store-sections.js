@@ -12,9 +12,15 @@
  *   with the reason said). The page owns the calls; these sections get data and callbacks. Every part
  *   is a library component; the sections pass data and write no class.
  * @structure PlacesSection · StoresSection (StoreBox) · MoveForm · MoveProgress · byWords · checkWords ·
- *   notTakingWords · destinations
+ *   notTakingWords · storeNeedsLook · newFilesNeedPerson · destinations
  * @usage html`<${PlacesSection} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} />`
  * @version-history
+ *   v1.2.1 — 2026-11-27 — With no store and no file the line says so; it said "your 0 files (0 B)".
+ *   v1.2.0 — 2026-11-27 — Usability pass: a store whose last test failed stands first under "Your
+ *     stores" (storeNeedsLook), and newFilesNeedPerson says when new files miss the person's stores for
+ *     a reason they can fix, for the page's strip. notTakingWords no longer says "an operator has not
+ *     approved" to a person an operator approved; the reason is then the default or the keys. Both
+ *     sections take `first`.
  *   v1.1.0 — 2026-10-31 — A store box says whether a browser may send files straight to the store, shows
  *     the CORS rule to add while it may not (browser-access.js), and has Test again.
  *   v1.0.0 — 2026-10-30 — Initial: the one-store section of storage-tab.js became these two, for named
@@ -49,12 +55,28 @@ export function byWords(principal) {
 }
 
 /** Why new files do not go to the person's default store now, in the person's words. */
-export function notTakingWords(v) {
-  if (v.mode === 'off') return S('store.notTakingOff');
-  if (v.approval && v.approval.state === 'declined') return S('store.notTakingDeclined');
-  if (v.mode === 'operator') return S('store.notTakingWaiting');
-  if (!v.default_store) return S('store.notTakingNoDefault');
-  return S('store.notTakingOther');
+export const notTakingWords = (v) => S('store.' + notTakingReason(v));
+
+/** The reason as its locale key under `profile.storage.store.`. */
+function notTakingReason(v) {
+  if (v.mode === 'off') return 'notTakingOff';
+  if (v.approval && v.approval.state === 'declined') return 'notTakingDeclined';
+  // An approved person waits for nobody: the reason is then the default or the keys, below.
+  if (v.mode === 'operator' && !(v.approval && v.approval.state === 'approved')) return 'notTakingWaiting';
+  if (!v.default_store) return 'notTakingNoDefault';
+  return 'notTakingOther';
+}
+
+/** Whether a store needs the person: its last connection test failed, so its keys or its bucket need a look. */
+export const storeNeedsLook = (s) => !!(s.last_check && !s.last_check.ok);
+
+/**
+ * Whether new files fail to reach the person's stores for a reason the person can fix (a decline, no
+ * default, keys that stopped working, own storage turned off): never while an operator has yet to decide.
+ */
+export function newFilesNeedPerson(v) {
+  if (!(v.stores || []).length || v.taking_new_files) return false;
+  return notTakingReason(v) !== 'notTakingWaiting';
 }
 
 /** The last connection test in one line. */
@@ -119,7 +141,7 @@ function MoveForm({ v, fixedFrom, except, running, onMove, onStop }) {
  * "Where your files are": where a new file goes now and why, the files per place, the stores of this
  * service the person may choose, and the move between places.
  */
-export function PlacesSection({ number, v, moving, onMove, onStop }) {
+export function PlacesSection({ number, first, v, moving, onMove, onStop }) {
   const ownStores = v.stores || [];
   const nodeChoices = (v.choices || []).filter((c) => c.store.startsWith('node:'));
   const places = (v.files.by_store || []).slice().sort((a, b) => b.count - a.count);
@@ -128,7 +150,7 @@ export function PlacesSection({ number, v, moving, onMove, onStop }) {
     : goesOwn ? S('store.takingSub') : (v.choices || []).length ? S('places.newSubChoose') : undefined;
   const running = moving && moving.running;
   return html`
-    <${Section} id="fs-places" num=${number} title=${S('places.title')}>
+    <${Section} id="fs-places" num=${number} first=${first} title=${S('places.title')}>
       <${Facts} rows=${[
         { key: 'new', k: S('store.newFiles'), v: storeWords(v.new_files_go_to), sub: newSub, warn: !!(ownStores.length && !v.taking_new_files) },
         nodeChoices.length && {
@@ -195,13 +217,15 @@ function StoreBox({ v, s, moving, onMove, onStop, onDefault, onTest, onDisconnec
 }
 
 /** "Your stores": a box per store of the person's own, or a line saying there is none. */
-export function StoresSection({ number, v, moving, onMove, onStop, onDefault, onTest, onDisconnect }) {
-  const stores = v.stores || [];
+export function StoresSection({ number, first, v, moving, onMove, onStop, onDefault, onTest, onDisconnect }) {
+  // A store whose last test failed comes first; otherwise the server's order stays.
+  const stores = (v.stores || []).map((s, i) => [s, i])
+    .sort((a, b) => (Number(storeNeedsLook(b[0])) - Number(storeNeedsLook(a[0]))) || (a[1] - b[1])).map(([s]) => s);
   const away = v.files.elsewhere;
   return html`
-    <${Section} id="fs-store" num=${number} title=${S('store.title')} count=${stores.length ? num(stores.length) : undefined}>
+    <${Section} id="fs-store" num=${number} first=${first} title=${S('store.title')} count=${stores.length ? num(stores.length) : undefined}>
       ${stores.length === 0
-        ? html`<${Note} kind="quiet">${S('store.none', { n: num(away.count), size: fileSize(away.bytes) })}<//>`
+        ? html`<${Note} kind="quiet">${away.count ? S('store.none', { n: num(away.count), size: fileSize(away.bytes) }) : S('store.noneEmpty')}<//>`
         : html`<${Stack} gap="medium">${stores.map((s) => html`
             <${StoreBox} key=${s.name} v=${v} s=${s} moving=${moving} onMove=${onMove} onStop=${onStop}
               onDefault=${onDefault} onTest=${onTest} onDisconnect=${onDisconnect} />`)}<//>`}

@@ -10,6 +10,9 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.7.0 -- 2026-11-27 -- autoOpen and setAutoOpen in the ctx bag: "what runs on its own" is a row that opens in
+ *     place on the cover (offers/cover.js). An effect the confirm names without a word for it shows its own
+ *     name, not the locale key.
  *   v2.6.0 -- 2026-11-02 -- The data products moved to "Data you share" (shared-data-tab.js); this tab keeps
  *     the agents' offers, and an old ?product=<name> link opens the product there (WP11).
  *   v2.5.0 -- 2026-11-01 -- The data products: read with the offers and again on every live update
@@ -57,6 +60,7 @@ export default function OffersTab({ session, showToast }) {
   const [aiOn, setAiOn] = useState(false);
   const [aiResult, setAiResult] = useState(null);  // null | 'loading' | { ranked, noMatch, brief }
   const [offlineOpen, setOfflineOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
   const [sellFoldOpen, setSellFoldOpen] = useState(false);
   const [inboxFilter, setInboxFilter] = useState('all');
@@ -151,7 +155,9 @@ export default function OffersTab({ session, showToast }) {
   const ask = (it) => {
     const consequences = it.offer.consequences || [];
     const gated = consequences.some(x => x.persistent || x.requiresApproval || ['external-send', 'mutates-host', 'publishes-public'].includes(x.type));
-    if (gated) confirm(t('profile.offers.confirmAsk').replace('{effects}', consequences.map(x => t('profile.offers.consequence.' + x.type) || x.type).join(', ')), () => doAsk(it), { danger: true });
+    // t() answers the key itself when there is no word for an effect, so the effect's own name shows then.
+    const effect = (type) => { const k = 'profile.offers.consequence.' + type; const w = t(k); return w === k ? type : w; };
+    if (gated) confirm(t('profile.offers.confirmAsk').replace('{effects}', consequences.map(x => effect(x.type)).join(', ')), () => doAsk(it), { danger: true });
     else doAsk(it);
   };
   const buildForNeed = async (brief) => {
@@ -196,7 +202,7 @@ export default function OffersTab({ session, showToast }) {
   const ctx = {
     showToast, model, builder, busy, loadingDeliveries: deliverables === null,
     view, pickView, q, setQ: (v) => { setQ(v); if (aiResult) setAiResult(null); }, axis, setAxis, aiOn, aiResult, runNeedSearch, clearAi, buildForNeed,
-    offlineOpen, setOfflineOpen, sellOpen, setSellOpen, sellFoldOpen, setSellFoldOpen, inboxFilter, setInboxFilter, moreOpen, toggleMore,
+    offlineOpen, setOfflineOpen, autoOpen, setAutoOpen, sellOpen, setSellOpen, sellFoldOpen, setSellFoldOpen, inboxFilter, setInboxFilter, moreOpen, toggleMore,
     askInput, setAskInput, askResult, ask, saveBilling, rate, contentOf, openTab, confirm, session,
   };
   return html`${renderOffersView(ctx)}<${ConfirmUI} />`;

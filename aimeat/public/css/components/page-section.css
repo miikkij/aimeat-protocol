@@ -9,6 +9,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-11-27 — A section's headline may shrink and break a long word: "Postilaatikkosi" in a
+ *     wide headline face ran 13px past a 360px page (Tiilitaivas).
  *   2026-11-26 — .og-sec--sub: a section whose number has a part (02.1) continues the section before
  *     it, with less air above and a smaller headline (PageSection marks it).
  *   2026-11-01 — .og-sec--step, .og-step-h, .og-step-n, .og-step-body (PageSection `step`): a numbered
@@ -58,6 +60,9 @@
 .og-main > .og-sec--sub { margin-top: -.8rem; }
 .og-sec--sub > .og-sec-h > .poster-section-title { font-size: calc(var(--poster-section-size, 1.9rem) * .7); }
 .og-sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; flex-wrap: wrap; }
+/* A headline may shrink below its longest word and break it, so a long word in a wide headline face
+   never runs past a phone's page. */
+.og-sec-h > .poster-section-title { min-width: 0; overflow-wrap: anywhere; }
 /* The band cut (PageSection/Section `band`): the headline's dark band spans the column, as the classic
    pages drew their section titles on main (a block .poster-section-title). */
 .og-sec-h--band > .poster-section-title { flex: 1 1 100%; }

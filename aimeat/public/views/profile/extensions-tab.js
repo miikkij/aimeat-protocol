@@ -13,6 +13,10 @@
  * @structure ExtensionsTab
  * @usage <ExtensionsTab session={session} showToast={showToast} />
  * @version-history
+ *   v2.2.0 — 2026-11-27 — Usability pass: the cortexes and "A new extension or cortex" are folds
+ *     whose open state lives here (cxOpen, newOpen); "Add from files" and the menu find open the fold
+ *     they need. A refusal is said by its code in the page's words (refusalText) instead of the
+ *     server's English sentence.
  *   v2.1.0 — 2026-10-20 — An opened extension of your own shows who wrote its code and what it reads
  *     when it runs on its own, with the control that changes it (readers, setReader).
  *   2026-10-16 — The menu find opens one extension or cortex here (useOpenItem, js/open-item.js).
@@ -36,7 +40,7 @@ import { fetchServerExtensionPrompt, fetchCortexPrompt } from './extensions-tab.
 import { swallowed } from '/js/swallowed.js';
 import { useOpenItem } from '/js/open-item.js';
 import { renderPage } from './extensions/page.js';
-import { x, appName } from './extensions/frame.js';
+import { x, appName, refusalText } from './extensions/frame.js';
 
 const emptyForm = () => ({ open: false, kind: 'extension', manifest: '', files: [{ name: '', code: '' }] });
 
@@ -64,8 +68,11 @@ export default function ExtensionsTab({ session, showToast }) {
   const [newInstanceId, setNewInstanceId] = useState('');
   const [form, setFormState] = useState(emptyForm());
   const [shown, setShown] = useState(null);
+  // The two folds: the cortex list (a fold while the person has none of their own) and the way to a new one.
+  const [cxOpen, setCxOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
 
-  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+  const fail = (e, fallback) => showToast?.(refusalText(e, fallback), true);
 
   const load = useCallback(async () => {
     const [extRes, cxRes] = await Promise.all([
@@ -123,7 +130,7 @@ export default function ExtensionsTab({ session, showToast }) {
     if (expanded === key) return;
     const name = key.slice(key.indexOf(':') + 1);
     if (key.startsWith('ext:')) { const ext = (extensions || []).find((e) => e.name === name); if (ext) toggleExt(ext); }
-    else if (key.startsWith('cx:')) { const cx = (cortexes || []).find((c) => c.name === name); if (cx) toggleCortex(cx); }
+    else if (key.startsWith('cx:')) { const cx = (cortexes || []).find((c) => c.name === name); if (cx) { setCxOpen(true); toggleCortex(cx); } }
   }, extensions !== null && cortexes !== null);
 
   /* ── Doors on a server extension ─────────────────────────────────────────────────────────── */
@@ -227,7 +234,8 @@ export default function ExtensionsTab({ session, showToast }) {
   /* ── The install form: a manifest and its files, as an extension or as a cortex ─────────── */
 
   const setForm = (patch) => setFormState((f) => ({ ...f, ...patch }));
-  const setFormOpen = (open) => setFormState((f) => ({ ...f, open }));
+  // The form stands inside the fold "A new extension or cortex": opening the form opens the fold too.
+  const setFormOpen = (open) => { setFormState((f) => ({ ...f, open })); if (open) setNewOpen(true); };
   const setFormFile = (i, patch) => setFormState((f) => ({ ...f, files: f.files.map((file, j) => (j === i ? { ...file, ...patch } : file)) }));
   const addFormFile = () => setFormState((f) => ({ ...f, files: [...f.files, { name: '', code: '' }] }));
   const installFromForm = async () => {
@@ -254,7 +262,8 @@ export default function ExtensionsTab({ session, showToast }) {
   const ctx = {
     session: sess, nodeUrl: getNodeUrl(), showToast, ConfirmUI,
     extensions, cortexes, extPrompt, cortexPrompt, jobs,
-    expanded, details, instances, readers, busy, test, newInstanceId, form, shown,
+    expanded, details, instances, readers, busy, test, newInstanceId, form, shown, cxOpen, newOpen,
+    toggleCxOpen: () => setCxOpen((o) => !o), toggleNewOpen: () => setNewOpen((o) => !o),
     extFilter, cxFilter, extQuery, cxQuery, extShown, cxShown,
     setExtFilter: (patch) => { setExtFilterState((f) => ({ ...f, ...patch })); setExtShown(20); },
     setCxFilter: (patch) => { setCxFilterState((f) => ({ ...f, ...patch })); setCxShown(20); },

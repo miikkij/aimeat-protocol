@@ -10,6 +10,9 @@
  *   reads 4.5:1 or better in both themes and is not the coral of a destructive action.
  * @structure .audience-badge · --open (anyone with the link, the code or the password) · .audience-badge-eye
  * @version-history
+ *   v1.1.2 — 2026-11-27 — The badge is as wide as its words where there is room and narrower where there
+ *     is not (fit-content). At max-content a badge with a long organism name set the width of its
+ *     listing column, and the page ran 40px past a 360px phone.
  *   v1.1.1 — 2026-11-25 — The badge is measured with its frame, so its max-width of 100% is the cell's
  *     width. Without it a long badge in a listing cell was wider than the cell by its padding and
  *     frame (16px), and its frame stood on the next column's text.
@@ -24,7 +27,7 @@
   justify-self: start;
   align-self: center;
   box-sizing: border-box;
-  width: max-content;
+  width: fit-content;
   max-width: 100%;
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);

@@ -15,16 +15,25 @@
  *   `file-store`. In order: the title's question mark (concept.own_storage: what one's own storage
  *   is, what the test does, where files go, when to use something else), the page's start
  *   (PageStart: what the page is for, the prompt for one's own AI, whose button goes to the connect
- *   form, and what happens next), the figure strip (files in your stores, files on this service), the
- *   rule here, where your files are (where new files go, files per place, the service's stores you
- *   may choose, and the move between places), your stores (store-sections.js) and the connect form
- *   (connect-form.js). Every part is a library component; the page passes data and writes no class.
+ *   form, and what happens next), the figure strip (your stores, what needs a look, files in your
+ *   stores, files on this service), your stores (store-sections.js), where your files are (where new
+ *   files go, files per place, the service's stores you may choose, and the move between places), the
+ *   connect form (connect-form.js) and the rule here; the rule comes first when it is what the person
+ *   must know. Every part is a library component; the page passes data and writes no class.
  *   How the page explains itself: .claude/rules/page-guidance.md.
  * @structure StorageTab({ showToast }) — load · RuleSection · PlacesSection · StoresSection
  *   (storage/store-sections.js) · moveAll · makeDefault · testAgain · disconnect · ConnectForm
  * @usage Registered in views/profile.js TABS as { id: 'storage', key: 'profile.tabs.storage' }; menu
  *   entry in landing-page.cards.js (the Account group, after Data Wallet).
  * @version-history
+ *   v1.5.0 — 2026-11-27 — Usability pass. The person's stores come first (a store whose last test
+ *     failed first among them), then where the files are, then the connect form and the rule here as
+ *     folds whose rows say their state; the rule stands first and open when own storage is off here or
+ *     an operator declined the person. The connect form is open of itself while the person has no
+ *     store and stays open after a connect, so the test's steps and the CORS rule stay in sight; the
+ *     head's one loud action "Connect a store" and the start's button open it. The strip is drawn once
+ *     a store is connected: the stores and the default, what needs a look (notice tone, only then),
+ *     and the files in the stores and on this service. Headings are noun phrases. Nothing was removed.
  *   v1.4.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head (folded once a store is connected; its button goes to the connect form,
  *     on a service that lets people connect one) and the title's question mark, concept.own_storage.
@@ -62,7 +71,8 @@ import { scrollToSection } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { S, ConnectForm, placeWords } from './storage/connect-form.js';
-import { PlacesSection, StoresSection } from './storage/store-sections.js';
+import { PlacesSection, StoresSection, storeNeedsLook, newFilesNeedPerson } from './storage/store-sections.js';
+import { Loud } from '/components/Action.js';
 import { refusalWords, RefusalNote } from './storage/store-words.js';
 
 const html = htm.bind(h);
@@ -74,16 +84,23 @@ const MOVE_ROUNDS_MAX = 1000;
 /** The most failures the page lists; the count says how many there were. */
 const FAILURES_SHOWN = 20;
 
-/** The rule here in one status and one sentence, with the person's own approval where an operator approves. */
-function RuleSection({ v }) {
+/**
+ * The rule here in one status and one sentence, with the person's own approval where an operator
+ * approves. Open and first when it is what the person must know (own storage is off here, or an
+ * operator declined them); otherwise a fold whose row says the rule and the approval in short.
+ */
+function RuleSection({ v, number, open, first, folded, onToggle }) {
   const a = v.approval;
+  const state = v.mode === 'operator' ? S('rule.state.' + (a ? a.state : 'none')) : '';
   const approvalRow = v.mode === 'operator' && {
     key: 'approval', k: S('rule.approval'),
-    v: html`<${Mark} kind="status" tone=${!a ? 'off' : a.state === 'approved' ? 'fine' : a.state === 'requested' ? 'attention' : 'danger'}>${S('rule.state.' + (a ? a.state : 'none'))}<//>`,
+    v: html`<${Mark} kind="status" tone=${!a ? 'off' : a.state === 'approved' ? 'fine' : a.state === 'requested' ? 'attention' : 'danger'}>${state}<//>`,
     sub: a ? [a.at ? date(a.at) : '', a.note ? `“${a.note}”` : ''].filter(Boolean).join(' · ') : S('rule.noneSub'),
   };
+  const sub = v.mode === 'operator' ? S('rule.short.operator', { state }) : S('rule.short.' + v.mode);
   return html`
-    <${Section} id="fs-rule" num="01" title=${S('rule.title')}>
+    <${Section} id="fs-rule" num=${number} first=${first} title=${S('rule.title')}
+      ...${folded ? { fold: true, sub, open, onToggle } : {}}>
       <${Note} kind="lead">${S('rule.mode.' + v.mode)}<//>
       ${approvalRow ? html`<${Facts} rows=${[approvalRow]} />` : null}
     <//>`;
@@ -95,6 +112,10 @@ export default function StorageTab({ showToast }) {
   const [refusal, setRefusal] = useState(null);
   const [moving, setMoving] = useState(null);
   const [clearSignal, setClearSignal] = useState(0);
+  // The two folds: the connect form (open of itself while the person has no store, null = that
+  // default) and the rule here.
+  const [connectOpen, setConnectOpen] = useState(null);
+  const [ruleOpen, setRuleOpen] = useState(false);
   const stopRef = useRef(false);
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -191,21 +212,56 @@ export default function StorageTab({ showToast }) {
   const off = v && v.mode === 'off';
   const stores = (v && v.stores) || [];
   const approved = !!(v && v.approval && v.approval.state === 'approved');
-  const strip = v && (v.may_connect || stores.length) ? html`<${FigureStrip} items=${[
+  // What needs the person: a store whose last test failed, and new files that miss their stores for
+  // a reason they can fix (never while an operator has yet to decide).
+  const failing = stores.filter(storeNeedsLook).length;
+  const newFilesStuck = !!v && newFilesNeedPerson(v);
+  const needs = failing + (newFilesStuck ? 1 : 0);
+  const defaultStore = stores.find((s) => s.default);
+  // The figures, from the one read the page makes: the stores and the default, what needs a look
+  // (only then), and the files in the person's stores and on this service. Before the person has a
+  // store there is no strip: the list's one line says how many files are on this service and how to begin.
+  const strip = v && stores.length ? html`<${FigureStrip} items=${[
+    { key: 'stores', n: num(stores.length), label: S('strip.stores'), sub: defaultStore ? S('strip.storesDefault', { name: defaultStore.name }) : S('strip.storesNoDefault') },
+    needs ? { key: 'needs', n: num(needs), tone: 'notice', label: S('strip.attention'), sub: newFilesStuck ? S('strip.newFilesStuck') : S('strip.attentionSub') } : null,
     { key: 'own', n: num(v.files.in_own_store.count), label: S('strip.own'), sub: fileSize(v.files.in_own_store.bytes) },
     { key: 'away', n: num(v.files.elsewhere.count), label: S('strip.elsewhere'), sub: fileSize(v.files.elsewhere.bytes) },
   ]} />` : null;
   const showPlaces = !!v && (stores.length > 0 || (v.choices || []).length > 0);
   const showStores = !!v && !(off && stores.length === 0);
-  // The sections number themselves in the order they show: a section left out leaves no gap.
-  let shown = 1;
-  const next = () => String(++shown).padStart(2, '0');
-  const placesNum = showPlaces ? next() : '';
-  const storesNum = showStores ? next() : '';
-  const connectNum = next();
+  // The rule is the page's first word when it is what the person must know: own storage is off here
+  // (then often the only section), or an operator declined them. Otherwise it is the last row.
+  const ruleFirst = !!v && (off || (v.mode === 'operator' && v.approval && v.approval.state === 'declined'));
+  // In this order, numbered as they show, so a section left out leaves no gap.
+  const order = [
+    ruleFirst ? 'fs-rule' : null,
+    showStores ? 'fs-store' : null,
+    showPlaces ? 'fs-places' : null,
+    off ? null : 'fs-connect',
+    ruleFirst ? null : 'fs-rule',
+  ].filter(Boolean);
+  const numOf = (id) => String(order.indexOf(id) + 1).padStart(2, '0');
+  const first = order[0];
+  // The connect form is open of itself while the person has no store, since it is how one begins.
+  const connectShown = connectOpen ?? stores.length === 0;
+  const openConnect = () => { setConnectOpen(true); scrollToSection('fs-connect'); };
+  const actions = v && !off ? html`<${Loud} onClick=${openConnect}>${S('connect.loud')}<//>` : null;
   // The start: folded once a store is connected; its button goes to the connect form where there is one.
   const start = html`<${PageStart} id="storage" done=${v ? stores.length > 0 : null}
-    action=${v && !off ? { onClick: () => scrollToSection('fs-connect') } : undefined} />`;
+    action=${v && !off ? { onClick: openConnect } : undefined} />`;
+  const parts = {
+    'fs-rule': () => html`<${RuleSection} v=${v} number=${numOf('fs-rule')} first=${first === 'fs-rule'} folded=${!ruleFirst}
+      open=${ruleOpen} onToggle=${() => setRuleOpen((o) => !o)} />`,
+    'fs-store': () => html`<${StoresSection} number=${numOf('fs-store')} first=${first === 'fs-store'} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop}
+      onDefault=${makeDefault} onTest=${testAgain} onDisconnect=${disconnect} />`,
+    'fs-places': () => html`<${PlacesSection} number=${numOf('fs-places')} first=${first === 'fs-places'} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} />`,
+    'fs-connect': () => html`
+      <${Section} fold id="fs-connect" num=${numOf('fs-connect')} title=${stores.length ? S('connect.titleMore') : S('connect.title')}
+        sub=${S('connect.sub')} open=${connectShown} onToggle=${() => setConnectOpen(!connectShown)}>
+        <${ConnectForm} mode=${v.mode} approved=${approved} names=${stores.map((s) => s.name)}
+          onConnected=${() => { setConnectOpen(true); load(); }} clearSignal=${clearSignal} />
+      <//>`,
+  };
 
   return html`
     <${SettingsPage}
@@ -213,19 +269,12 @@ export default function StorageTab({ showToast }) {
       title=${S('title')}
       help="concept.own_storage"
       desc=${S('desc')}
+      actions=${actions}
       start=${start}
       strip=${strip}
       after=${html`<${ConfirmUI} />`}>
       <${RefusalNote} refusal=${refusal} />
       ${!v && !refusal ? html`<${Note} kind="loading">${S('loading')}<//>` : null}
-      ${v ? html`
-        <${RuleSection} v=${v} />
-        ${showPlaces ? html`<${PlacesSection} number=${placesNum} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} />` : null}
-        ${showStores ? html`
-          <${StoresSection} number=${storesNum} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} onDefault=${makeDefault} onTest=${testAgain} onDisconnect=${disconnect} />` : null}
-        ${off ? null : html`
-          <${Section} id="fs-connect" num=${connectNum} title=${stores.length ? S('connect.titleMore') : S('connect.title')}>
-            <${ConnectForm} mode=${v.mode} approved=${approved} names=${stores.map((s) => s.name)} onConnected=${() => load()} clearSignal=${clearSignal} />
-          <//>`}` : null}
+      ${v ? order.map((id) => parts[id]()) : null}
     <//>`;
 }

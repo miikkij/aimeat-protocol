@@ -10,6 +10,9 @@
  * @structure NotificationsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'notifications'.
  * @version-history
+ *   v2.5.0 -- 2026-11-27 -- The fold state covers the senders and the devices, which the cover now draws
+ *     as rows that say their state (usability pass of the Settings pages); `how` is gone, its fold was
+ *     removed on 2026-11-08.
  *   v2.4.0 — 2026-10-25 — An answered button marks its notice answered (notif.markAnswered), so the row
  *     shows who decided what and when instead of its buttons (secaudit2026oct22).
  *   v2.3.0 — 2026-10-16 — A failed load of the inbox is drawn as one (itemsFailed: the could-not-load note
@@ -62,7 +65,7 @@ export default function NotificationsTab({ session, showToast }) {
   const [filter, setFilter] = useState('all');
   const [showAll, setShowAll] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
-  const [folds, setFolds] = useState({ quiet: false, how: false });
+  const [folds, setFolds] = useState({ senders: false, devices: false, quiet: false });
   const [quietForm, setQuietForm] = useState({ enabled: false, start: '22:00', end: '07:00', tz: (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'), breakthrough: ['organisms', 'messages'], throttleMinutes: 10 });
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);

@@ -44,6 +44,15 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.8.0 — 2026-11-27 — Usability pass. With nothing open at any level the strip is not drawn
+ *     (hideZeros, except while a place could not be read). Conflicts are drawn only when there is a
+ *     conflict or an exception to say. The Data row is drawn once something is shared as data or the
+ *     report counts a data item, and stands before the list when the list is empty, whose line then
+ *     says that the rest is under Data: an empty list said "everything is private" while a public data
+ *     package was counted. "What this list does not count" is an open section named "Limits of this
+ *     list": it was a fold with no way to open it, and a limit of a safety list is a safety fact. The
+ *     list's heading is a noun phrase. A failed read, close or lowering is said in the page's words.
+ *     Numbered after the filter.
  *   v1.7.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head and the title's question mark, concept.audience. The head's second
  *     sentence about one's own AI and the hint under the list with the question to ask it go: the
@@ -90,7 +99,7 @@ import { openTab } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
 import { PageStart } from '/components/PageStart.js';
 import * as dp from '/js/services/dataproducts.js';
-import { secData, NAMED_KINDS } from './exposure/named.js';
+import { secData, dataShown, NAMED_KINDS } from './exposure/named.js';
 import { closeText, titleOf, noteTexts } from './exposure/words.js';
 
 const html = htm.bind(h);
@@ -223,11 +232,19 @@ function WhoCell({ item }) {
   <//><//>`;
 }
 
+/** How many items of the kinds the Data row stands for the report counted, at every level (counts.by_kind). */
+function namedCounted(report) {
+  const byKind = report?.counts?.by_kind || {};
+  return NAMED_KINDS.reduce((sum, kind) => sum + Object.values(byKind[kind] || {}).reduce((s, n) => s + (Number(n) || 0), 0), 0);
+}
+
 function Strip({ report }) {
   const failed = report.failed.length > 0;
   // The named shares and the outside parties are counted on the Data row and on "Data you share"
-  // (WP11), so the strip counts the four levels only.
-  return html`<${FigureStrip} lead wrap stacked items=${[
+  // (WP11), so the strip counts the four levels only. With nothing open at any level the strip is
+  // not drawn (the list's one line says everything is private); while a place could not be read its
+  // zeros are not known to be zeros, so the strip stays and says so.
+  return html`<${FigureStrip} lead wrap stacked hideZeros=${!failed} items=${[
     ...CAP_LEVELS.map((lv) => ({
       key: lv,
       n: report.counts.by_level[lv] ?? 0,
@@ -307,7 +324,8 @@ export default function ExposureTab({ showToast }) {
       setError('');
     } catch (err) {
       swallowed('exposure-tab: load failed', err);
-      setError(err?.message || x('loadFailed'));
+      // The page's own words: the server's sentence is English and names the route.
+      setError(x('loadFailed'));
     }
     // What the person shares as data, for the one Data row (the view "Data you share" reads; WP11).
     dp.sharedData().then((r) => setShared(r || { packages: [], counts: {} })).catch((err) => swallowed('exposure-tab: shared data', err));
@@ -333,7 +351,7 @@ export default function ExposureTab({ showToast }) {
       await load();
     } catch (err) {
       swallowed('exposure-tab: close failed', err);
-      setError(err?.message || x('closeFailed'));
+      setError(x('closeFailed'));
     } finally {
       setBusy('');
     }
@@ -357,7 +375,7 @@ export default function ExposureTab({ showToast }) {
       await load();
     } catch (err) {
       swallowed('exposure-tab: lower failed', err);
-      setError(err?.message || x('cls.lowerFailed'));
+      setError(x('cls.lowerFailed'));
     } finally {
       setBusy('');
     }
@@ -367,14 +385,59 @@ export default function ExposureTab({ showToast }) {
   const copied = () => showToast?.(x('copiedForAi'));
 
   const all = report?.items ?? [];
-  // The named shares, the parties and the data packages are the one Data row above the rest; each is
-  // listed and closed on "Data you share" (WP11).
+  // The named shares, the parties and the data packages are the one Data row; each is listed and
+  // closed on "Data you share" (WP11).
   const items = all.filter((i) => !NAMED_KINDS.includes(i.kind));
+  const namedCount = Math.max(namedCounted(report), all.length - items.length);
   const total = (report?.counts?.total ?? 0) - (all.length - items.length);
-  // Where classification is on, the conflicts come first, in a section of their own.
   const cls = report?.classification ?? null;
   const conflicts = all.filter((i) => i.classification?.conflict);
-  const num = (n) => String(n + (cls ? 1 : 0)).padStart(2, '0');
+  // What is drawn, in this order: the conflicts when there are any (or an exception to say), the
+  // list of what is open, the Data row once something is shared as data (before the list when the
+  // list itself is empty, so what is open stands first), and the limits of the list, open: a limit
+  // of a safety list is a safety fact. The Data row is drawn whenever the report counts a data item,
+  // even before "Data you share" answers, so an empty list never reads as "nothing is open".
+  const showConflicts = !!cls && ((cls.conflicts || 0) > 0 || (cls.excepted || 0) > 0);
+  const showData = dataShown(shared) || namedCount > 0;
+  const notes = report ? noteTexts(report).filter(Boolean) : [];
+  const order = [
+    showConflicts ? 'ex-conflicts' : null,
+    showData && items.length === 0 ? 'ex-data' : null,
+    'ex-items',
+    showData && items.length > 0 ? 'ex-data' : null,
+    notes.length ? 'ex-notes' : null,
+  ].filter(Boolean);
+  const num = (id) => String(order.indexOf(id) + 1).padStart(2, '0');
+  const first = order[0];
+  const parts = {
+    'ex-conflicts': () => html`
+      <${Section} id="ex-conflicts" num=${num('ex-conflicts')} title=${x('cls.conflictsTitle')} count=${cls.conflicts} first=${first === 'ex-conflicts'}>
+        <${List} cols="item-kind-state-doors" keepCols
+          head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
+          empty=${x('cls.conflictsEmpty')}
+          rows=${conflicts}
+          render=${(item) => html`<${ConflictRow} key=${`c|${item.kind}|${item.id}|${item.level}`} item=${item}
+            busy=${busy === `${item.kind}|${item.id}`} onLower=${onLower} onCopied=${copied} />`} />
+        ${conflicts.length < cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsHidden', { n: cls.conflicts - conflicts.length })}<//>` : null}
+        ${cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsWhy')}<//>` : null}
+        ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
+      <//>`,
+    'ex-data': () => secData({ shared, num: num('ex-data'), first: first === 'ex-data' }),
+    'ex-items': () => html`
+      <${Section} id="ex-items" num=${num('ex-items')} title=${x('itemsTitle')} count=${total} first=${first === 'ex-items'}>
+        <${List} cols="item-kind-state-doors" keepCols
+          head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
+          empty=${report.failed.length ? x('emptyPartial') : showData ? x('emptyButData') : x('empty')}
+          rows=${items}
+          render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
+            busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
+        ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
+      <//>`,
+    'ex-notes': () => html`
+      <${Section} id="ex-notes" num=${num('ex-notes')} title=${x('notesTitle')}>
+        ${notes.map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
+      <//>`,
+  };
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
@@ -389,30 +452,6 @@ export default function ExposureTab({ showToast }) {
       ${!report && !error ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
       ${report ? html`
         <${Edges} report=${report} />
-        ${cls ? html`
-          <${Section} id="ex-conflicts" num="01" title=${x('cls.conflictsTitle')} count=${cls.conflicts} sub=${x('cls.conflictsSub')}>
-            <${List} cols="item-kind-state-doors" keepCols
-              head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
-              empty=${x('cls.conflictsEmpty')}
-              rows=${conflicts}
-              render=${(item) => html`<${ConflictRow} key=${`c|${item.kind}|${item.id}|${item.level}`} item=${item}
-                busy=${busy === `${item.kind}|${item.id}`} onLower=${onLower} onCopied=${copied} />`} />
-            ${conflicts.length < cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsHidden', { n: cls.conflicts - conflicts.length })}<//>` : null}
-            ${cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsWhy')}<//>` : null}
-            ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
-          <//>` : null}
-        ${secData({ shared, num: num(1) })}
-        <${Section} id="ex-items" num=${num(2)} title=${x('itemsTitle')} count=${total}>
-          <${List} cols="item-kind-state-doors" keepCols
-            head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
-            empty=${report.failed.length ? x('emptyPartial') : x('empty')}
-            rows=${items}
-            render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
-              busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
-          ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
-        <//>
-        <${Section} fold id="ex-notes" num=${num(3)} title=${x('notesTitle')} sub=${x('notesSub')}>
-          ${noteTexts(report).map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
-        <//>` : null}
+        ${order.map((id) => parts[id]())}` : null}
     <//>`;
 }

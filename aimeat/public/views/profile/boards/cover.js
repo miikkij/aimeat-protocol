@@ -12,9 +12,17 @@
  *   stale). A board opens as its own page (board.js) and a notice as its own (notice.js). Pure
  *   render functions over the ctx bag boards-tab.js assembles. How the page explains itself:
  *   .claude/rules/page-guidance.md.
- * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
+ * @structure renderBoardsView · expiresSoon · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.18.0 -- 2026-11-27 -- Usability pass: the followed boards stay first and open; the newest notices
+ *     are drawn only when the followed boards have some; others' public boards are a row that says how
+ *     many and opens in place (open while the person follows none); every section is numbered after
+ *     the filter. The strip's first figure counts the followed boards, so with none it is not drawn
+ *     (hideZeros); "latest" left the strip. A notice of the person's own that expires within two days
+ *     needs them: its figure takes the notice tone and its rows come first in the newest notices. The
+ *     head's marks repeated the strip and are gone; the head's loud action turns quiet while the board
+ *     form is open. A row's Open and Follow are the row cut of the action.
  *   v1.17.0 -- 2026-11-08 -- The own-board form's settings explain themselves: boards.whoSees,
  *     boards.whoPublishes and boards.noticeLifetime on their Choices; the grey hints under them are
  *     gone, their words are in the explanations (.claude/rules/page-guidance.md).
@@ -52,12 +60,12 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, tn } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { scrollToSection } from '/components/Rail.js';
-import { c, rel, who, bid, isAgentPost, crumb, boardRows, noticeRow, pageLinks } from './frame.js';
+import { c, who, bid, isAgentPost, crumb, boardRows, noticeRow, pageLinks } from './frame.js';
 import { renderBoard } from './board.js';
 import { renderNotice } from './notice.js';
 import { Hint } from '/components/Hint.js';
@@ -98,93 +106,101 @@ export function recentOf(ctx) {
   return out.sort((a, z) => new Date(z.post.created_at).getTime() - new Date(a.post.created_at).getTime());
 }
 
+/** A notice expires within two days: past that, its row says hours instead of days (frame.js leftWords). */
+const SOON_MS = 48 * 3600e3;
+const expiresSoon = (p) => { const left = new Date(p.ttl_expires_at || 0).getTime() - Date.now(); return !!p.ttl_expires_at && left > 0 && left <= SOON_MS; };
+
 function renderCover(ctx) {
-  const recent = recentOf(ctx);
+  const me = ctx.session?.owner || '';
+  const mine = (r) => who(r.post.author_gaii).owner === me;
+  // What needs the person: a notice of their own that expires within two days (they may extend it
+  // on its page). Those come first in the newest notices, then the rest newest first.
+  const soon = (r) => (mine(r) && expiresSoon(r.post) ? 0 : 1);
+  const recent = recentOf(ctx).map((r, i) => ({ r, i })).sort((a, z) => (soon(a.r) - soon(z.r)) || (a.i - z.i)).map(({ r }) => r);
   const dayAgo = Date.now() - 864e5;
   const fresh = recent.filter(r => new Date(r.post.created_at).getTime() > dayAgo).length;
-  const me = ctx.session?.owner || '';
-  const own = recent.filter(r => who(r.post.author_gaii).owner === me);
+  const own = recent.filter(mine);
+  const ownSoon = own.filter(r => expiresSoon(r.post)).length;
   const myStanding = recent.map(r => r.authors?.[ctx.session?.ghii]).find(Boolean);
-  const latest = recent[0];
   const ownBoards = ctx.boards.filter(b => ctx.isMine(b)).length;
-  const chip = (n, key, tone) => ({ label: tn('profile.boards.cover.' + key, n), tone });
-  const strip = html`<${FigureStrip} items=${[
-    { n: fresh, tone: fresh ? 'coral' : undefined, label: c('stripNew'), sub: c('stripNewSub') },
-    latest
-      ? { n: rel(latest.post.created_at), label: c('stripLatest'), sub: `${ctx.boardById(latest.boardId)?.name} · ${who(latest.post.author_gaii).label} · "${latest.post.title}"` }
-      : { n: '·', label: c('stripLatest'), sub: c('noneYet') },
-    { n: own.length, label: c('stripOwn'), sub: own[0] ? `${own[0].post.title}` : c('stripOwnSub') },
+  // The first figure counts the boards the person follows, so with none the strip is not drawn
+  // (hideZeros) and the list's one line says how to begin. "Latest" left: the newest notices are
+  // the second section, newest first. The head's marks repeated the strip and are gone.
+  const strip = ctx.loading && !ctx.boards.length ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} hideZeros items=${[
+    { key: 'followed', n: ctx.followed.length, label: c('stripFollowed'), sub: ownBoards ? c('chipOwn', { n: ownBoards }) : undefined },
+    { key: 'new', n: fresh, tone: fresh ? 'coral' : undefined, label: c('stripNew'), sub: c('stripNewSub') },
+    { key: 'own', n: own.length, tone: ownSoon ? 'notice' : undefined, label: c('stripOwn'), sub: ownSoon ? c('stripOwnSoon', { n: ownSoon }) : own[0] ? `${own[0].post.title}` : c('stripOwnSub') },
     myStanding
-      ? { n: myStanding.thanks || 0, tone: 'coral', label: c('stripThanks'), sub: c('stripThanksSub', { n: myStanding.posts || 0 }) }
-      : { n: '·', label: c('stripThanks'), sub: c('noneYet') },
+      ? { key: 'thanks', n: myStanding.thanks || 0, tone: 'coral', label: c('stripThanks'), sub: c('stripThanksSub', { n: myStanding.posts || 0 }) }
+      : { key: 'thanks', n: '·', label: c('stripThanks'), sub: c('noneYet') },
   ]} />`;
-  const marks = [
-    chip(ctx.followed.length, 'chipFollowed'),
-    fresh ? chip(fresh, 'chipNew', 'coral') : null,
-    // Every public board here, the person's own and the followed ones too: the chip counted only the
-    // public boards of others (section 03), and read "0 public boards" over a list with a public one.
-    chip(ctx.boards.filter(b => b.visibility === 'public' || b.visibility === 'system').length, 'chipPublic'),
-    ownBoards ? chip(ownBoards, 'chipOwn') : null,
-  ];
   const openOwn = () => { ctx.setFold('own', true); scrollToSection('bp-own'); };
+  const toPublic = () => { ctx.setFold('public', true); scrollToSection('bp-public'); };
+  // One loud action: "Publish a notice"; it turns quiet while the board form, whose Create is then
+  // the thing to do, is open.
   const actions = html`
-    <${Loud} onClick=${() => ctx.startNotice()}>${c('post')}<//>
+    <${Loud} quiet=${!!ctx.folds.own} onClick=${() => ctx.startNotice()}>${c('post')}<//>
     <${Actions}><${Action} small onClick=${openOwn}>${c('ownBoard')}<//><//>`;
-  const sections = [
-    { id: 'bp-followed', num: '01', label: c('secFollowed'), count: ctx.followed.length },
-    { id: 'bp-recent', num: '02', label: c('secRecent'), count: recent.length },
-    { id: 'bp-public', num: '03', label: c('secPublic'), count: ctx.others.length },
-    { id: 'bp-own', num: '04', label: c('secOwn') },
-    { id: 'bp-app', num: '05', label: c('secApp') },
-  ];
-  // The start: folded once the person follows a board; its button goes to the public boards.
+  // The public boards are a row that says how many there are: open while the person follows no
+  // board (following one is how one begins), shut after that. The newest notices are drawn only
+  // when the followed boards have some, the public boards only when there are any.
+  const publicOpen = ctx.folds.public ?? !ctx.followed.length;
+  const parts = [
+    { id: 'bp-followed', label: c('secFollowed'), count: ctx.followed.length, draw: (nr) => secFollowed(ctx, nr) },
+    recent.length ? { id: 'bp-recent', label: c('secRecent'), count: recent.length, draw: (nr) => secRecent(ctx, nr, recent) } : null,
+    ctx.others.length ? { id: 'bp-public', label: c('secPublic'), count: ctx.others.length, open: () => ctx.setFold('public', true), draw: (nr) => secPublic(ctx, nr, publicOpen) } : null,
+    { id: 'bp-own', label: c('secOwn'), count: '', open: () => ctx.setFold('own', true),
+      draw: (nr) => html`<${Section} fold clip id="bp-own" num=${nr} title=${c('secOwn')} sub=${c('ownSub')} open=${ctx.folds.own} onToggle=${() => ctx.setFold('own', !ctx.folds.own)}>${ownBoardForm(ctx)}<//>` },
+    { id: 'bp-app', label: c('secApp'), count: '', open: () => ctx.setFold('app', true),
+      draw: (nr) => html`<${Section} fold clip id="bp-app" num=${nr} title=${c('secApp')} sub=${c('appSub')} open=${ctx.folds.app} onToggle=${() => ctx.setFold('app', !ctx.folds.app)}>${secApp(ctx)}<//>` },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  // The start: its button opens the public boards (or the board form, when there is no public board).
   const start = html`<${PageStart} id="boards" done=${ctx.loading && !ctx.boards.length ? null : ctx.followed.length > 0}
-    action=${{ onClick: () => scrollToSection('bp-public') }} />`;
+    action=${{ onClick: ctx.others.length ? toPublic : openOwn }} />`;
   return html`
-    <${SettingsPage} name="bp" crumb=${crumb(ctx, [])} title=${t('profile.tabs.boards')} help="concept.board" marks=${marks} desc=${c('desc')}
-      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}
+    <${SettingsPage} name="bp" crumb=${crumb(ctx, [])} title=${t('profile.tabs.boards')} help="concept.board" desc=${c('desc')}
+      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')}
+      sections=${parts.map(({ id, num, label, count, open }) => ({ id, num, label, count, open }))} pagesLabel=${c('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${secFollowed(ctx)}
-      ${secRecent(ctx, recent)}
-      ${secPublic(ctx)}
-      <${Section} fold clip id="bp-own" num="04" title=${c('secOwn')} sub=${c('ownSub')} open=${ctx.folds.own} onToggle=${() => ctx.setFold('own', !ctx.folds.own)}>${ownBoardForm(ctx)}<//>
-      <${Section} fold clip id="bp-app" num="05" title=${c('secApp')} sub=${c('appSub')} open=${ctx.folds.app} onToggle=${() => ctx.setFold('app', !ctx.folds.app)}>${secApp(ctx)}<//>
+      ${parts.map((s) => s.draw(s.num))}
     <//>`;
 }
 
-function secFollowed(ctx) {
+function secFollowed(ctx, nr) {
   const list = ctx.onlyNew ? ctx.followed.filter(b => (ctx.pages[bid(b)]?.posts || []).some(p => new Date(p.created_at).getTime() > Date.now() - 864e5)) : ctx.followed;
-  const doors = html`<${Tab} tone="fold" on=${ctx.onlyNew} pressed=${!!ctx.onlyNew} onClick=${() => ctx.setOnlyNew(!ctx.onlyNew)}>${c('onlyNew')}<//>`;
-  const openDoor = (b) => html`<${Action} small onClick=${() => ctx.pickView({ kind: 'board', id: bid(b) })}>${c('open')}<//>`;
+  // With no followed board there is nothing to narrow: the filter and the hint wait for one.
+  const doors = ctx.followed.length ? html`<${Tab} tone="fold" on=${ctx.onlyNew} pressed=${!!ctx.onlyNew} onClick=${() => ctx.setOnlyNew(!ctx.onlyNew)}>${c('onlyNew')}<//>` : null;
+  const openDoor = (b) => html`<${Action} small row onClick=${() => ctx.pickView({ kind: 'board', id: bid(b) })}>${c('open')}<//>`;
   return html`
-    <${PageSection} id="bp-followed" num="01" title=${c('secFollowed')} count=${`${ctx.followed.length} · ${c('secFollowedSub')}`} doors=${doors} first>
+    <${PageSection} id="bp-followed" num=${nr} title=${c('secFollowed')} count=${ctx.followed.length ? `${ctx.followed.length} · ${c('secFollowedSub')}` : ''} doors=${doors} first>
       ${ctx.loading && !ctx.boards.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
         : !list.length ? html`<${Note} kind="quiet">${ctx.followed.length ? c('emptyNew') : c('empty')}<//>`
         : boardRows(ctx, list, openDoor, { head: true })}
-      <${Hint}>${c('followedHint')}<//>
+      ${ctx.followed.length ? html`<${Hint}>${c('followedHint')}<//>` : null}
     <//>`;
 }
 
-function secRecent(ctx, recent) {
+function secRecent(ctx, nr, recent) {
   const shown = recent.filter(r => ctx.recentFilter === 'all' || (ctx.recentFilter === 'agents') === isAgentPost(r.post));
   const doors = html`<${Tabs} tone="fold" value=${ctx.recentFilter} onSelect=${(f) => ctx.setRecentFilter(f)}
     items=${['all', 'humans', 'agents'].map((f) => ({ value: f, label: c(f) }))} />`;
   const limit = ctx.recentAll ? shown.length : 8;
   const showRest = () => ctx.setRecentAll(true);
   return html`
-    <${PageSection} id="bp-recent" num="02" title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
+    <${PageSection} id="bp-recent" num=${nr} title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
       ${!shown.length ? html`<${Note} kind="quiet">${c('emptyRecent')}<//>` : shown.slice(0, limit).map(r => noticeRow(ctx, r.boardId, r.post, r.authors, true))}
       ${shown.length > limit ? html`<${More} label=${c('showRest', { n: shown.length - limit })} onMore=${showRest} />` : null}
     <//>`;
 }
 
-function secPublic(ctx) {
+/** Others' public boards, as one row that says how many and opens in place. */
+function secPublic(ctx, nr, open) {
   const list = ctx.publicAll ? ctx.others : ctx.others.slice(0, 8);
-  const doors = ctx.others.length > 8 && !ctx.publicAll ? html`<${Action} tone="more" onClick=${() => ctx.setPublicAll(true)}>${c('showAll', { n: ctx.others.length })}<//>` : null;
-  const followDoor = (b) => html`<${Action} small onClick=${() => ctx.handleFollow(bid(b))}>${c('follow')}<//>`;
+  const followDoor = (b) => html`<${Action} small row onClick=${() => ctx.handleFollow(bid(b))}>${c('follow')}<//>`;
   return html`
-    <${PageSection} id="bp-public" num="03" title=${c('secPublic')} count=${`${ctx.others.length} · ${c('secPublicSub')}`} doors=${doors}>
-      ${!list.length ? html`<${Note} kind="quiet">${c('emptyPublic')}<//>` : boardRows(ctx, list, followDoor)}
+    <${Section} fold clip id="bp-public" num=${nr} title=${c('secPublic')} sub=${`${ctx.others.length} · ${c('secPublicSub')}`} open=${open} onToggle=${() => ctx.setFold('public', !open)}>
+      ${boardRows(ctx, list, followDoor)}
+      ${ctx.others.length > 8 && !ctx.publicAll ? html`<${More} label=${c('showAll', { n: ctx.others.length })} onMore=${() => ctx.setPublicAll(true)} />` : null}
     <//>`;
 }
 

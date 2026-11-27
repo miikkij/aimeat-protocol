@@ -9,9 +9,12 @@
  *   are GET /v1/datapackages/shared, the view that page reads; the exposure report itself (GET
  *   /v1/exposure/mine, aimeat_exposure_report) keeps every item, only this page groups them.
  *   Made of the component kit.
- * @structure secData · NAMED_KINDS
- * @usage ${secData({ shared, num })}
+ * @structure secData · dataShown · NAMED_KINDS
+ * @usage ${dataShown(shared) ? secData({ shared, num }) : null}
  * @version-history
+ *   v2.1.0 — 2026-11-27 — dataShown: the page draws the Data row only once the view answered and
+ *     something is shared or was read (an empty box said "You share no data" on a page with nothing
+ *     open); `first` when it opens the page.
  *   v2.0.0 — 2026-11-02 — The three sections (named shares, outside parties, data products) are one Data
  *     row with a way to "Data you share" (WP11, board Mita-muut-nakevat).
  *   v1.1.0 — 2026-11-01 — "Manage" and "Change" open the Data Wallet party and the product in the
@@ -39,10 +42,22 @@ const inProfile = (e) => {
 /** The kinds the Data row stands for, which the list of everything else then leaves out. */
 export const NAMED_KINDS = ['named_share', 'outside_party', 'datapackage'];
 
-export function secData({ shared, num }) {
+/** Shared: a package someone other than the person can read (an audience, a named share, a sale). */
+const sharedOut = (shared) => (shared?.packages || []).filter((p) => p.audience !== 'private' || (p.shares || []).length || p.sale);
+
+/**
+ * Whether the Data row has anything to say: a package shared out, a named share, a count the view
+ * gives, or a read in 30 days. Before the view answers, and when nothing is shared, it is not drawn.
+ */
+export function dataShown(shared) {
+  if (!shared) return false;
+  const c = shared.counts || {};
+  return sharedOut(shared).length > 0 || !!(c.public || c.named || c.sale || c.space) || (shared.reads_30d || 0) > 0;
+}
+
+export function secData({ shared, num, first }) {
   const pkgs = shared?.packages || [];
-  // Shared: a package someone other than the person can read (an audience, a named share, a sale).
-  const out = pkgs.filter((p) => p.audience !== 'private' || (p.shares || []).length || p.sale);
+  const out = sharedOut(shared);
   const c = shared?.counts || {};
   const members = pkgs.filter((p) => p.audience === 'members' || String(p.audience).startsWith('organism:')).length;
   const parts = [
@@ -52,7 +67,7 @@ export function secData({ shared, num }) {
     c.sale ? x('data.sale', { n: c.sale }) : null,
     c.space ? x('data.space', { n: c.space }) : null,
   ].filter(Boolean);
-  return html`<${Section} id="ex-data" num=${num} title=${x('data.title')}>
+  return html`<${Section} id="ex-data" num=${num} title=${x('data.title')} first=${first}>
     <${Box} name=${shared ? x('data.shared', { n: out.length }) : x('loading')}
       doors=${html`<${Action} small href="/v1/profile?tab=sharedData" onClick=${inProfile}>${t('profile.tabs.sharedData')}<//>`}>
       ${parts.length ? html`<${Note}>${parts.join(' · ')}<//>` : html`<${Note} kind="quiet">${x('data.none')}<//>`}

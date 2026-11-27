@@ -11,9 +11,15 @@
  *   goes to "Make a package", and what happens next) and the title's question mark (concept.knowledge).
  *   A package opens as its own page (package.js). Pure render functions over the ctx bag
  *   knowledge-tab.js assembles. How the page explains itself: .claude/rules/page-guidance.md.
- * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
+ * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · libraryList · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- Usability pass: the packages stay first and open; the organisms' packages
+ *     are drawn only when an organism holds one; "Make a package" and the public library are rows that
+ *     open in place (the first open while there is no package or a pasted one waits), numbered after
+ *     the filter. The strip counts the packages first and is not drawn with none (hideZeros); a source
+ *     count of zero says no sources are named. The head's marks, which repeated the strip, are gone, and
+ *     the head's loud action turns quiet while a pasted package's import is the thing to do.
  *   v1.21.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head (folded once the person has a package; its button goes to "Make a
  *     package") and the title's question mark, concept.knowledge.
@@ -98,47 +104,48 @@ function renderCover(ctx) {
   const pkgs = ctx.packages;
   const totals = pkgs.reduce((a, p) => { const s = statsOf(manifestOf(p)); a.entries += s.entries; a.refs += s.refs; a.verified += s.verified; return a; }, { entries: 0, refs: 0, verified: 0 });
   const listed = pkgs.filter(p => manifestOf(p).sharing?.catalog_listed).length;
-  const clonable = pkgs.filter(p => manifestOf(p).sharing?.allow_clone).length;
   const federated = pkgs.filter(p => ctx.fedConsents[pkgId(p)]).length;
-  const drafts = pkgs.filter(p => groupOf(manifestOf(p)) === 'draft').length;
-  const datasets = pkgs.filter(p => groupOf(manifestOf(p)) === 'dataset').length;
-  const latest = [...pkgs].sort((a, b) => new Date(manifestOf(b).updated || b.updated_at || 0).getTime() - new Date(manifestOf(a).updated || a.updated_at || 0).getTime())[0];
-  const chip = (n, key, tone) => ({ label: c(key, { n }), tone });
-  // Drafts are dim (they count nothing yet), datasets coral, as main drew them.
-  const marks = [
-    chip(pkgs.length, 'chipPackages'), chip(totals.entries, 'chipEntries'), chip(listed, 'chipListed'), chip(clonable, 'chipClonable'),
-    federated ? chip(federated, 'chipFederated') : null, drafts ? chip(drafts, 'chipDrafts', 'dim') : null, datasets ? chip(datasets, 'chipDatasets', 'coral') : null,
-  ];
-  const strip = html`<${FigureStrip} items=${[
-    latest ? { n: rel(manifestOf(latest).updated || latest.updated_at), label: c('stripLatest'), sub: manifestOf(latest).name || '' } : { n: '·', label: c('stripLatest'), sub: c('noneYet') },
-    { n: listed, of: '/' + pkgs.length, label: c('stripListed'), sub: c('stripListedSub') },
-    { n: totals.verified, of: '/' + totals.refs, label: c('stripRefs'), sub: totals.refs - totals.verified ? c('stripRefsSub', { n: totals.refs - totals.verified }) : c('stripRefsAll') },
-    { n: federated, tone: federated ? 'coral' : undefined, label: c('stripFederated'), sub: c('stripFederatedSub') },
+  const unchecked = totals.refs - totals.verified;
+  // The head's marks repeated the strip (packages, entries, listed, federated) or the list's own
+  // group headings (drafts, datasets) and the sharing column (clonable), so they are gone.
+  // hideZeros: with no package the strip is not drawn; the list's one line says what fills it.
+  const strip = ctx.loading && !pkgs.length ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} hideZeros items=${[
+    { key: 'packages', n: pkgs.length, label: c('stripPackages'), sub: c('entriesN', { n: totals.entries }) },
+    { key: 'listed', n: listed, of: '/' + pkgs.length, label: c('stripListed'), sub: c('stripListedSub') },
+    { key: 'refs', n: totals.verified, of: '/' + totals.refs, label: c('stripRefs'), sub: !totals.refs ? c('noRefs') : unchecked ? c('stripRefsSub', { n: unchecked }) : c('stripRefsAll') },
+    { key: 'federated', n: federated, tone: federated ? 'coral' : undefined, label: c('stripFederated'), sub: c('stripFederatedSub') },
   ]} />`;
-  const toMake = () => scrollToSection('kp-make');
+
+  // The three ways to make a package are one row that opens in place: open while there is no
+  // package (it is how one begins) or while a pasted package waits for its import.
+  const makeOpen = ctx.folds.make ?? (!!ctx.importText || (!ctx.loading && !ctx.packagesFailed && !pkgs.length));
+  const toMake = () => { ctx.setFold('make', true); scrollToSection('kp-make'); };
+  const library = libraryList(ctx);
+  const libraryOpen = !!ctx.folds.library;
+  // One loud action: "Make a package", except while a pasted package waits, when its own import is it.
   const actions = html`
-    <${Loud} onClick=${toMake}>${c('make')}<//>
+    <${Loud} quiet=${!!ctx.importPreview} onClick=${toMake}>${c('make')}<//>
     <${Actions}><${Action} small onClick=${openLibraryPage}>${c('library')} ↗<//><//>`;
-  const sections = [
-    { id: 'kp-packages', num: '01', label: c('secPackages'), count: pkgs.length },
-    { id: 'kp-make', num: '02', label: c('make'), count: '' },
-    { id: 'kp-orgs', num: '03', label: c('secOrganisms'), count: ctx.organismPackages.length },
-    { id: 'kp-library', num: '04', label: c('secLibrary'), count: ctx.discovered.length },
-  ];
-  // The start: folded once the person has a package; its button goes to the three ways of making one.
+  // A section with nothing in it is not drawn; the numbers are given after the filter, so a hidden
+  // section leaves no gap.
+  const parts = [
+    { id: 'kp-packages', label: c('secPackages'), count: pkgs.length, draw: (num) => secPackages(ctx, num) },
+    ctx.organismPackages.length ? { id: 'kp-orgs', label: c('secOrganisms'), count: ctx.organismPackages.length, draw: (num) => secOrganisms(ctx, num) } : null,
+    { id: 'kp-make', label: c('make'), count: '', open: () => ctx.setFold('make', true), draw: (num) => secMake(ctx, num, makeOpen) },
+    library.length ? { id: 'kp-library', label: c('secLibrary'), count: library.length, open: () => ctx.setFold('library', true), draw: (num) => secLibrary(ctx, num, library, libraryOpen) } : null,
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  // The start: its button opens the three ways of making a package.
   const start = html`<${PageStart} id="knowledge" done=${ctx.loading ? null : pkgs.length > 0} action=${{ onClick: toMake }} />`;
   return html`
-    <${SettingsPage} name="kp" crumb=${crumb(ctx, [])} title=${t('knowledge.tabLabel')} help="concept.knowledge" marks=${marks} desc=${c('desc')}
-      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}>
-      ${secPackages(ctx)}
-      ${secMake(ctx)}
-      ${secOrganisms(ctx)}
-      ${secLibrary(ctx)}
+    <${SettingsPage} name="kp" crumb=${crumb(ctx, [])} title=${t('knowledge.tabLabel')} help="concept.knowledge" desc=${c('desc')}
+      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')}
+      sections=${parts.map(({ id, num, label, count, open }) => ({ id, num, label, count, open }))} pagesLabel=${c('pages')} pages=${pageLinks()}>
+      ${parts.map((s) => s.draw(s.num))}
     <//>`;
 }
 
 /* ── 01 My packages ────────────────────────────────────────────────────────────────────────── */
-function secPackages(ctx) {
+function secPackages(ctx, num) {
   const pkgs = ctx.packages;
   const byUpdated = (a, b) => new Date(manifestOf(b).updated || b.updated_at || 0).getTime() - new Date(manifestOf(a).updated || a.updated_at || 0).getTime();
   const byName = (a, b) => String(manifestOf(a).name || '').localeCompare(String(manifestOf(b).name || ''));
@@ -151,20 +158,21 @@ function secPackages(ctx) {
   } else {
     body = [...pkgs].sort(ctx.sort === 'name' ? byName : byUpdated).map(pkg => packageRow(ctx, pkg));
   }
-  return html`<${Section} id="kp-packages" num="01" title=${c('secPackages')} count=${pkgs.length} doors=${doors} first=${true}>
+  // With no package there is nothing to sort, and the head row heads nothing.
+  return html`<${Section} id="kp-packages" num=${num} title=${c('secPackages')} count=${pkgs.length} doors=${pkgs.length > 1 ? doors : null} first=${true}>
     ${ctx.packagesFailed ? html`<${LoadFailed} onRetry=${ctx.reloadPackages} />`
-      : html`<${List} cols="name-count-words-when-doors" keepCols head=${packageHead()} loading=${ctx.loading && t('common.loading')} empty=${c('nonePackages')}>${body}<//>`}
+      : html`<${List} cols="name-count-words-when-doors" keepCols head=${pkgs.length ? packageHead() : null} loading=${ctx.loading && t('common.loading')} empty=${c('nonePackages')}>${body}<//>`}
   <//>`;
 }
 
-/* ── 02 Make a package: three roads ────────────────────────────────────────────────────────── */
-function secMake(ctx) {
+/* ── Make a package: three ways, one row that opens in place ───────────────────────────────── */
+function secMake(ctx, num, open) {
   // A road is chosen by its door (no onPick): the tile keeps the plain pointer.
   const road = (id, title, step, body, doorLabel, onClick) => html`
     <${Road} key=${id} chosen=${ctx.road === id} name=${title} sub=${step} text=${body}
       doors=${html`<${Action} small onClick=${onClick}>${doorLabel}<//>`} />`;
   const paste = (v) => ctx.handleImportPaste(v);
-  return html`<${Section} id="kp-make" num="02" title=${c('make')} count=${c('makeSub')}>
+  return html`<${Section} fold id="kp-make" num=${num} title=${c('make')} sub=${c('makeSub')} open=${open} onToggle=${() => ctx.setFold('make', !open)}>
     <${Roads} cols="three">
       ${road('mcp', c('roadMcp'), c('roadMcpStep'), c('roadMcpBody'), c('roadMcpDoor'), () => { ctx.setRoad('mcp'); ctx.copyPrompt('mcp'); })}
       ${road('chat', c('roadChat'), c('roadChatStep'), c('roadChatBody'), c('roadChatDoor'), () => { ctx.setRoad('chat'); ctx.copyPrompt('human'); })}
@@ -211,11 +219,11 @@ function importPreview(ctx) {
     <//>`;
 }
 
-/* ── 03 The organisms' packages ────────────────────────────────────────────────────────────── */
-function secOrganisms(ctx) {
+/* ── The organisms' packages: drawn only when an organism holds one ────────────────────────── */
+function secOrganisms(ctx, num) {
   const list = ctx.organismPackages;
   const toOrganisms = () => openTab('organisms');
-  return html`<${Section} id="kp-orgs" num="03" title=${c('secOrganisms')} count=${c('secOrganismsSub', { n: new Set(list.map(p => p.organismName)).size })} doors=${html`<${Action} small soft onClick=${toOrganisms}>${t('profile.tabs.organisms')}<//>`}>
+  return html`<${Section} id="kp-orgs" num=${num} title=${c('secOrganisms')} count=${c('secOrganismsSub', { n: new Set(list.map(p => p.organismName)).size })} doors=${html`<${Action} small soft onClick=${toOrganisms}>${t('profile.tabs.organisms')}<//>`}>
     <${List} cols="name-count-when" keepCols loading=${ctx.organismLoading && t('common.loading')} empty=${t('knowledge.organisms.empty')}>
       ${list.map((p, i) => html`
         <${Row} key=${i}>
@@ -224,16 +232,20 @@ function secOrganisms(ctx) {
           <${Desc}>${p.contributed_at ? c('contributedOn', { d: rel(p.contributed_at) }) : ''}<//>
         <//>`)}
     <//>
-    <${Hint}>${c('sharedNote')}<//>
   <//>`;
 }
 
-/* ── 04 From the public library ────────────────────────────────────────────────────────────── */
-function secLibrary(ctx) {
+/** The public library's packages that are not the person's own. */
+function libraryList(ctx) {
   const mine = new Set(ctx.packages.map(p => pkgId(p)));
-  const list = ctx.discovered.filter(p => !mine.has(p.package_id) && authorName(p.author) !== authorName(ctx.ghii));
+  return ctx.discovered.filter(p => !mine.has(p.package_id) && authorName(p.author) !== authorName(ctx.ghii));
+}
+
+/* ── From the public library: one row that says how many, opened in place ──────────────────── */
+function secLibrary(ctx, num, list, open) {
   const clonable = list.filter(p => p.sharing?.allow_clone !== false);
-  return html`<${Section} id="kp-library" num="04" title=${c('secLibrary')} count=${c('secLibrarySub', { n: ctx.discovered.length, k: clonable.length })} doors=${html`<${Action} small onClick=${openLibraryPage}>${c('openLibrary')} ↗<//>`}>
+  return html`<${Section} fold id="kp-library" num=${num} title=${c('secLibrary')} sub=${c('secLibrarySub', { n: list.length, k: clonable.length })} open=${open} onToggle=${() => ctx.setFold('library', !open)}>
+    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('openLibrary')} ↗<//><//>
     <${List} cols="name-kind-count-state-doors" keepCols loading=${ctx.discoverLoading && t('common.loading')} empty=${c('noneLibrary')}>
       ${list.slice(0, 8).map(p => {
         const cl = p.sharing?.allow_clone !== false;

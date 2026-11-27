@@ -40,8 +40,8 @@
         ] },
         { "id": "knowledge", "labelKey": "knowledge.tabLabel", "sections": [
           { "id": "kp-packages", "num": "01", "labelKey": "knowledge.cover.secPackages" },
-          { "id": "kp-make", "num": "02", "labelKey": "knowledge.cover.make" },
-          { "id": "kp-orgs", "num": "03", "labelKey": "knowledge.cover.secOrganisms" },
+          { "id": "kp-orgs", "num": "02", "labelKey": "knowledge.cover.secOrganisms" },
+          { "id": "kp-make", "num": "03", "labelKey": "knowledge.cover.make" },
           { "id": "kp-library", "num": "04", "labelKey": "knowledge.cover.secLibrary" }
         ] },
         { "id": "boards", "labelKey": "profile.tabs.boards", "sections": [
@@ -69,22 +69,22 @@
         ] },
         { "id": "offers", "labelKey": "profile.tabs.offers", "sections": [
           { "id": "op-back", "num": "01", "labelKey": "profile.offers.cover.secBack" },
-          { "id": "op-auto", "num": "02", "labelKey": "profile.offers.cover.secAuto" },
-          { "id": "op-ask", "num": "03", "labelKey": "profile.offers.cover.secAsk" },
+          { "id": "op-ask", "num": "02", "labelKey": "profile.offers.cover.secAsk" },
+          { "id": "op-auto", "num": "03", "labelKey": "profile.offers.cover.secAuto" },
           { "id": "op-offline", "num": "04", "labelKey": "profile.offers.cover.secOffline" },
           { "id": "op-selling", "num": "05", "labelKey": "profile.offers.cover.secSelling" }
         ] },
         { "id": "scheduler", "labelKey": "profile.tabs.scheduler", "sections": [
-          { "id": "sc-next", "num": "01", "labelKey": "profile.scheduler.cover.secNext" },
-          { "id": "sc-rhythm", "num": "02", "labelKey": "profile.scheduler.cover.secRhythm" },
-          { "id": "sc-cont", "num": "03", "labelKey": "profile.scheduler.cover.secCont" },
-          { "id": "sc-rare", "num": "04", "labelKey": "profile.scheduler.cover.secRare" },
-          { "id": "sc-all", "num": "05", "labelKey": "profile.scheduler.cover.secAll" },
-          { "id": "sc-agents", "num": "06", "labelKey": "profile.scheduler.cover.secAgents" }
+          { "id": "sc-all", "num": "01", "labelKey": "profile.scheduler.cover.secAll" },
+          { "id": "sc-next", "num": "02", "labelKey": "profile.scheduler.cover.secNext" },
+          { "id": "sc-rhythm", "num": "03", "labelKey": "profile.scheduler.cover.secRhythm" },
+          { "id": "sc-cont", "num": "03.1", "labelKey": "profile.scheduler.cover.secCont" },
+          { "id": "sc-rare", "num": "03.2", "labelKey": "profile.scheduler.cover.secRare" },
+          { "id": "sc-agents", "num": "04", "labelKey": "profile.scheduler.cover.secAgents" }
         ] },
         { "id": "workflows", "labelKey": "profile.tabs.workflows", "sections": [
-          { "id": "wp-list", "num": "01", "labelKey": "profile.workflows.title" },
-          { "id": "wp-waiting", "num": "02", "labelKey": "profile.workflows.cover.secWaiting" },
+          { "id": "wp-waiting", "num": "01", "labelKey": "profile.workflows.cover.secWaiting" },
+          { "id": "wp-list", "num": "02", "labelKey": "profile.workflows.title" },
           { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" }
         ] },
         { "id": "receivers", "labelKey": "profile.tabs.receivers", "sections": [
@@ -126,9 +126,9 @@
           { "id": "nt-quiet", "num": "04", "labelKey": "notifpage.quietTitle" }
         ] },
         { "id": "email", "labelKey": "profile.tabs.email", "sections": [
-          { "id": "em-address", "num": "01", "labelKey": "emailpage.secAddress" },
-          { "id": "em-mailboxes", "num": "02", "labelKey": "emailpage.secMailboxes" },
-          { "id": "em-sent", "num": "03", "labelKey": "emailpage.secSent" },
+          { "id": "em-mailboxes", "num": "01", "labelKey": "emailpage.secMailboxes" },
+          { "id": "em-sent", "num": "02", "labelKey": "emailpage.secSent" },
+          { "id": "em-address", "num": "03", "labelKey": "emailpage.secAddress" },
           { "id": "em-letters", "num": "04", "labelKey": "emailpage.lettersTitle" }
         ] },
         { "id": "chatsessions", "labelKey": "profile.tabs.chatSessions" }
@@ -169,15 +169,15 @@
           { "id": "pk-ai", "num": "05", "labelKey": "pkpage.secAi" }
         ] },
         { "id": "appdev", "labelKey": "profile.tabs.appDev", "sections": [
-          { "id": "ad-start", "num": "01", "labelKey": "appdevpage.secStart" },
-          { "id": "ad-learned", "num": "02", "labelKey": "appdevpage.secLearned" },
-          { "id": "ad-proposals", "num": "03", "labelKey": "appdevpage.secProposals" },
+          { "id": "ad-learned", "num": "01", "labelKey": "appdevpage.secLearned" },
+          { "id": "ad-proposals", "num": "02", "labelKey": "appdevpage.secProposals" },
+          { "id": "ad-start", "num": "03", "labelKey": "appdevpage.secStart" },
           { "id": "ad-curated", "num": "04", "labelKey": "appdevpage.secCurated" }
         ] },
         { "id": "extensions", "labelKey": "profile.tabs.extensions", "sections": [
-          { "id": "ex-ext", "num": "", "labelKey": "extpage.secExt" },
-          { "id": "ex-cortex", "num": "", "labelKey": "extpage.secCortex" },
-          { "id": "ex-new", "num": "", "labelKey": "extpage.secNew" }
+          { "id": "ex-ext", "num": "01", "labelKey": "extpage.secExt" },
+          { "id": "ex-cortex", "num": "02", "labelKey": "extpage.secCortex" },
+          { "id": "ex-new", "num": "03", "labelKey": "extpage.secNew" }
         ] },
         { "id": "libraries", "labelKey": "librariesTab.tabLabel", "sections": [
           { "id": "lb-base", "num": "01", "labelKey": "libspage.secBase" },
@@ -195,12 +195,13 @@
         ] },
         { "id": "skills", "labelKey": "skills.tabLabel", "sections": [
           { "id": "sk-own", "num": "01", "labelKey": "skpage.secOwn" },
-          { "id": "sk-node", "num": "02", "labelKey": "skpage.secNode" },
-          { "id": "sk-ws", "num": "03", "labelKey": "skpage.secWs" },
-          { "id": "sk-new", "num": "04", "labelKey": "skpage.secNew" },
+          { "id": "sk-ws", "num": "02", "labelKey": "skpage.secWs" },
+          { "id": "sk-new", "num": "03", "labelKey": "skpage.secNew" },
+          { "id": "sk-node", "num": "04", "labelKey": "skpage.secNode" },
           { "id": "sk-ai", "num": "05", "labelKey": "skpage.secAi" }
         ] },
         { "id": "portfolio", "labelKey": "portfolio.tabLabel", "sections": [
+          { "id": "pf-first", "num": "01", "labelKey": "pfpage.secFirst" },
           { "id": "pf-addresses", "num": "01", "labelKey": "pfpage.secAddresses" },
           { "id": "pf-visibility", "num": "02", "labelKey": "pfpage.secVisibility" },
           { "id": "pf-page", "num": "03", "labelKey": "pfpage.secPage" },
@@ -263,9 +264,10 @@
           { "id": "kyc-mine", "num": "05", "labelKey": "kyc.secMine" }
         ] },
         { "id": "storage", "labelKey": "profile.tabs.storage", "sections": [
-          { "id": "fs-rule", "num": "01", "labelKey": "profile.storage.rule.title" },
-          { "id": "fs-store", "num": "02", "labelKey": "profile.storage.store.title" },
-          { "id": "fs-connect", "num": "03", "labelKey": "profile.storage.connect.title" }
+          { "id": "fs-store", "num": "01", "labelKey": "profile.storage.store.title" },
+          { "id": "fs-places", "num": "02", "labelKey": "profile.storage.places.title" },
+          { "id": "fs-connect", "num": "03", "labelKey": "profile.storage.connect.title" },
+          { "id": "fs-rule", "num": "04", "labelKey": "profile.storage.rule.title" }
         ] },
         { "id": "access", "labelKey": "profile.tabs.access", "sections": [
           { "id": "ac-signin", "num": "01", "labelKey": "accesspage.secSignIn" },
@@ -286,8 +288,8 @@
         ] },
         { "id": "exposure", "labelKey": "profile.tabs.exposure", "sections": [
           { "id": "ex-conflicts", "num": "01", "labelKey": "exposure.cls.conflictsTitle" },
-          { "id": "ex-data", "num": "02", "labelKey": "exposure.data.title" },
-          { "id": "ex-items", "num": "03", "labelKey": "exposure.itemsTitle" },
+          { "id": "ex-items", "num": "02", "labelKey": "exposure.itemsTitle" },
+          { "id": "ex-data", "num": "03", "labelKey": "exposure.data.title" },
           { "id": "ex-notes", "num": "04", "labelKey": "exposure.notesTitle" }
         ] },
         { "id": "agreements", "labelKey": "profile.tabs.agreements", "sections": [

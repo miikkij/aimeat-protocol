@@ -13,6 +13,11 @@
  * @structure providerRow · providerOpen
  * @usage import { providerRow } from './rows.js';
  * @version-history
+ *   v1.19.0 -- 2026-11-27 -- A rejected entry of the person's own has the warn rail and says so on its
+ *     coral line. The opened row's "For the agent" shows the id the agent calls, not an MCP tool call,
+ *     and a discovery-only entry says how it is used in the page's words (capspage.usageWords.*): the
+ *     entry's `usage`, written for an AI, stays in the copied text. A status or type the page has no
+ *     word for shows the server's value, not the locale key.
  *   v1.18.0 -- 2026-11-08 -- A public draft offers "Show to agents" instead of "Hide from agents": it was
  *     public in name only, and the row had no way to publish it (shownToAgents, publish.js).
  *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): a provider's row, its members and its opened panel are the List (the status dot and the version tag are the Name's, the member ids the words' line, the id form and its call line a typewriter cell), the try panel the Box's copy tone with the TextArea and the tall Code block, the facts the Facts (the copy inside a value the Action's link tone, main's crumb link). The file writes no class.
@@ -41,7 +46,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { Action, Actions } from '/components/Action.js';
 import { Code, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -49,7 +54,7 @@ import { Box } from '/components/Box.js';
 import { Facts } from '/components/Facts.js';
 import { TextArea } from '/components/TextField.js';
 import { List, Row, Name, Desc, Num, Cell, Doors, Panel } from '/components/List.js';
-import { x, ownerName, authWord, costWord, memberSummary, agentTextFor, schemaWords, callsWord, vouchesWord, openTab } from './frame.js';
+import { x, ownerName, authWord, costWord, memberSummary, agentTextFor, schemaWords, callsWord, vouchesWord, statusWord, typeWord, openTab } from './frame.js';
 import { shownToAgents } from './publish.js';
 
 function subLine(g) {
@@ -57,10 +62,11 @@ function subLine(g) {
   if (g.shelf === 'ext') parts.push(x('actionsN', { n: g.members.length }));
   else if (g.shelf === 'app') parts.push(x('toolsN', { n: g.members.length }));
   else if (g.shelf === 'agent') parts.push(x('offersN', { n: g.members.length }));
-  else parts.push(x('type.' + g.type));
+  else parts.push(typeWord(g.type));
   if (g.priced) parts.push(x('priced'));
   if (g.visibility !== 'public') parts.push(x('hidden'));
-  if (g.status !== 'active') parts.push(x('status.' + g.status));
+  // A rejected entry of the person's own says so on its coral line instead (providerRow).
+  if (g.status !== 'active' && !(g.own && g.status === 'rejected')) parts.push(statusWord(g.status));
   return parts.join(' · ');
 }
 
@@ -71,9 +77,12 @@ export function providerRow(ctx, g) {
   const ids = g.members.map((m) => m.member).filter(Boolean);
   const acts = ids.length > 1 || g.shelf !== 'other' ? `${ids.slice(0, 6).join(' · ')}${ids.length > 6 ? ` · +${ids.length - 6}` : ''}` : null;
   const callLine = [g.callable ? authWord(g.members[0]) : x('discoveryOnly'), g.priced ? x('pricedShort') : '', g.calls ? callsWord(g.calls) : x('callsNone'), g.vouches ? vouchesWord(g.vouches) : ''].filter(Boolean).join(' · ');
+  // What needs the person: an entry of their own the operator rejected, which no agent finds.
+  const rejected = g.own && g.status === 'rejected';
   return html`
-    <${Row} key=${g.key} open=${open}>
-      <${Name} dot=${g.status === 'active' ? 'active' : 'inactive'} tag=${g.version && g.shelf === 'ext' ? 'v' + g.version : null} meta=${subLine(g)}>${g.name}<//>
+    <${Row} key=${g.key} open=${open} rail=${rejected ? 'warn' : undefined}>
+      <${Name} dot=${g.status === 'active' ? 'active' : 'inactive'} tag=${g.version && g.shelf === 'ext' ? 'v' + g.version : null} meta=${subLine(g)}
+        attention=${rejected} note=${rejected ? x('rejectedNote') : undefined}>${g.name}<//>
       <${Desc} sub=${acts}>${g.summary || ''}<//>
       <${Cell} meta>${idForm(g)}<br />${callLine}<//>
       <${Doors}>
@@ -87,9 +96,10 @@ export function providerRow(ctx, g) {
 function providerOpen(ctx, g) {
   const test = ctx.test && ctx.test.key === g.key ? ctx.test : null;
   const first = g.members[0];
-  const invokeLine = first ? `aimeat_capabilities_invoke { id: "${first.id}", input: { … } }` : '';
   const sourceTab = g.shelf === 'ext' ? 'extensions' : g.shelf === 'app' ? 'apps' : g.shelf === 'agent' ? 'agents' : null;
-  const usage = ctx.details[first?.id]?.usage || first?.usage || '';
+  // How a discovery-only entry is used, in the page's words: the entry's own `usage` is written for an
+  // AI (it names MCP tools), so it goes in the text copied for the agent and not on the page.
+  const usageWords = tOr('capspage.usageWords.' + g.shelf, x('usageWords.other'));
   const agentText = agentTextFor(g, ctx.details);
   const copyAgent = html`<${Action} tone="link" copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>`;
   const toggleVouch = () => ctx.vouch(g);
@@ -104,7 +114,7 @@ function providerOpen(ctx, g) {
     const tryIt = () => ctx.toggleTest(g, c);
     return html`
       <${Row} key=${c.id}>
-        <${Name} code meta=${c.status !== 'active' ? x('status.' + c.status) : null}>${c.member || c.id}<//>
+        <${Name} code meta=${c.status !== 'active' ? statusWord(c.status) : null}>${c.member || c.id}<//>
         <${Desc} sub=${io}>${words}<//>
         <${Num}>${callsWord(c.stats?.totalInvocations || 0)}<//>
         <${Doors}>${c.callable ? html`<${Action} small soft onClick=${tryIt}>${test && test.id === c.id ? x('close') : x('try')}<//>` : html`<${Note} kind="meta" inline>${x('discoveryOnly')}<//>`}<//>
@@ -123,9 +133,10 @@ function providerOpen(ctx, g) {
           ${test.result ? html`<${Label} block>${test.result.ok ? x('tryOk') : x('tryFail')}<//><${Code} block tall>${test.result.text}<//>` : null}
         <//>` : null}
       <${Facts} rows=${[
+        // The id the agent calls, not the tool call itself: the copied text has every step.
         g.callable
-          ? { k: x('forAgent'), v: invokeLine, mono: true, sub: html`${x('forAgentSub', { id: first?.id || '' })} · ${copyAgent}` }
-          : { k: x('forAgent'), v: usage, sub: html`${x('discoveryOnlySub')} · ${copyAgent}` },
+          ? { k: x('forAgent'), v: first?.id || '', mono: true, sub: html`${x('forAgentSub', { id: first?.id || '' })} · ${copyAgent}` }
+          : { k: x('forAgent'), v: usageWords, sub: html`${x('discoveryOnlySub')} · ${copyAgent}` },
         { k: x('whoMayCall'), v: first ? `${authWord(first)} · ${g.priced ? x('pricedLong') : x('cost.free')}` : '', sub: x('whoMayCallSub') },
         { k: x('trust'), v: `${g.vouches ? vouchesWord(g.vouches) : x('noVouches')} · ${g.members.some((c) => c.trust?.operatorReviewed) ? x('reviewed') : x('notReviewed')}`,
           sub: html`${x('trustSub')}${!g.own && first ? html` · <${Action} tone="more" onClick=${toggleVouch}>${g.members.some((c) => ctx.vouched[c.id]) ? x('unvouch') : x('vouch')}<//>` : null}` },

@@ -14,6 +14,9 @@
  * @structure extRow · codeByRow · unattendedRow · extOpen · cortexRow · cortexOpen
  * @usage import { extRow, cortexRow } from './rows.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- An own extension that needs the person (frame.js attentionOf) has the warn
+ *     rail and its reason as the coral line under its name. An instance's state is said in the page's
+ *     words (instanceWord), the raw value only for one the page has no word for.
  *   v2.1.0 -- 2026-10-20 -- Two facts on an opened extension, for the account holder in person: who
  *     wrote its code, and what it reads when it runs with nobody present, with the control that
  *     changes it (codeByRow, unattendedRow; the server's English `summary` is never drawn, the page
@@ -49,7 +52,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { List, Row, Name, Desc, Cell, Doors, Panel } from '/components/List.js';
 import { Action, Actions } from '/components/Action.js';
 import { Mark, Marks, Label, Code } from '/components/Mark.js';
@@ -59,10 +62,12 @@ import { Box } from '/components/Box.js';
 import { Choice } from '/components/Choice.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { TextField, TextArea } from '/components/TextField.js';
-import { x, day, when, kindOf, cronWords, appName, appUrlOf } from './frame.js';
+import { x, day, when, kindOf, attentionOf, cronWords, appName, appUrlOf } from './frame.js';
 
 /** A copy inside a fact's grey line: the coral link that says it copied. */
 const copyLink = (text, label) => html`<${Action} tone="link" copy=${text} copiedLabel=${x('copied')}>${label}<//>`;
+/** An instance's state in the page's words (the store's 'active' or 'paused'); any other value as the server named it. */
+const instanceWord = (status) => tOr('extpage.instanceState.' + status, String(status || ''));
 /** The apps that use a thing, each a link to the app, and how many more. */
 const appLinks = (used) => html`${(used.app_names || []).map((ref) => html`<${Action} tone="link" key=${ref} href=${appUrlOf(ref)} newTab>${appName(ref)}<//> `)}${(used.apps || 0) > (used.app_names || []).length ? x('usedMore', { n: used.apps - used.app_names.length }) : ''}`;
 
@@ -87,9 +92,11 @@ export function extRow(ctx, ext) {
   const open = ctx.expanded === 'ext:' + ext.name;
   const busy = ctx.busy === 'ext:' + ext.name;
   const ids = (ext.actions || []).map((a) => a.id);
+  // What needs the person, on their own extension only: the reason is the row's coral line.
+  const needs = own ? attentionOf(ext, ctx.jobs) : null;
   return html`
-    <${Row} key=${'ext:' + ext.name} open=${open}>
-      <${Name} dot=${active ? 'active' : 'inactive'} tag=${'v' + (ext.version || '?')}
+    <${Row} key=${'ext:' + ext.name} open=${open} rail=${needs ? 'warn' : undefined}>
+      <${Name} dot=${active ? 'active' : 'inactive'} tag=${'v' + (ext.version || '?')} attention=${!!needs} note=${needs ? x('attention.' + needs) : undefined}
         meta=${`${active ? x('stateActive') : x('stateOff')} · ${x('actionsN', { n: ext.actionCount ?? ids.length })}${own ? '' : ' · ' + x('ownedBy', { owner: ext.installedBy || ext.author || '' })}`}>${ext.name}<//>
       <${Desc}>${ext.description || ''}<//>
       ${usedCell(ext, ids)}
@@ -207,7 +214,7 @@ function extOpen(ctx, ext, own) {
         ext.instances?.supported
           ? {
             k: x('instances'),
-            v: instances.length ? html`<${Marks}>${instances.map((i) => html`<${Mark} key=${i.id}>${i.id} · ${i.status}<//>`)}<//>` : x('instancesNone'),
+            v: instances.length ? html`<${Marks}>${instances.map((i) => html`<${Mark} key=${i.id}>${i.id} · ${instanceWord(i.status)}<//>`)}<//>` : x('instancesNone'),
             sub: x('instancesSub'),
             actions: own && active ? html`<${TextField} placeholder=${x('instanceIdPlaceholder')} value=${ctx.newInstanceId} onInput=${(v) => ctx.setNewInstanceId(v)}
               actions=${html`<${Action} small onClick=${() => ctx.createInstance(ext)}>${x('createInstance')}<//>${instances.map((i) => html`<${Action} small soft key=${'x' + i.id} onClick=${() => ctx.deleteInstance(ext, i.id)}>${x('deleteInstance', { id: i.id })}<//>`)}`} />` : null,

@@ -15,6 +15,13 @@
  * @structure renderPage · secStart · secLearned · secProposals · secCurated
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- Usability pass: the pitfalls the agents filed are the main thing, first and
+ *     open (most severe first, appdev-tab.js); the template proposals are drawn only when there are
+ *     some; the two prompts ("The start") and the platform's own registry are rows that open in place
+ *     (the first open while nothing is filed), numbered after the filter. With nothing filed there is
+ *     no strip; otherwise it says what was filed, what is critical (the notice tone, the one to look
+ *     at), what is shared with other owners and the proposals when there are any; the registry's and
+ *     the templates' counts stand in their own rows. The head's marks repeated the strip and are gone.
  *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "appdev" (folded once an agent has filed a pitfall; its button copies the flow
  *     prompt) and the title's question mark concept.appdev. Section 05 "How this accrues" explained
@@ -78,49 +85,49 @@ export function renderPage(ctx) {
   const none = L && filed === 0;
   const proposals = ctx.proposals || [];
   const curatedTotal = ctx.curatedSummary?.total || 0;
-  const curatedFigure = { key: 'curated', n: curatedTotal, label: a('stripCurated'), sub: a('stripCuratedSub', { n: ctx.curatedSummary?.facets?.severity?.critical || 0 }) };
+  const shared = scope.shared?.shared || 0;
 
-  const strip = html`<${FigureStrip} items=${none ? [
-    { key: 'filed', n: 0, label: a('stripFiled'), sub: a('stripNoneYet') },
-    { key: 'proposals', n: 0, label: a('stripProposals'), sub: a('stripNoneYet') },
-    curatedFigure,
-    { key: 'templates', n: ctx.templates, label: a('stripTemplates'), sub: a('stripTemplatesSub') },
-  ] : [
-    { key: 'filed', n: L ? filed : '…', label: a('stripFiled'), sub: L ? a('stripFiledSub', { models: Object.keys(scope.model || {}).length, apps: ctx.appsTaught, none: ctx.noApp }) : '' },
-    { key: 'critical', n: L ? critical : '…', tone: critical ? 'coral' : undefined, label: a('stripCritical'), sub: criticalSub(ctx) },
-    { key: 'proposals', n: proposals.length, label: a('stripProposals'), sub: proposals.length ? a('stripProposalsSub', { proven: proposals.filter((p) => (p.proofs || []).some((x) => x.verdict === 'pass')).length }) : a('stripNoneYet') },
-    curatedFigure,
+  // With nothing filed the strip is not drawn: the head's paragraph says how the first entry comes,
+  // the list's one line says the same, and the registry's and the templates' counts stand in their
+  // own rows. Otherwise: what was filed, what is critical (the one to look at), what of it teaches
+  // other owners (the person decides that), and the template proposals when there are any. The
+  // registry's count left the strip: it is the same for everyone and its row says it.
+  const strip = !L ? html`<${FigureStrip} loading=${3} />` : none ? null : html`<${FigureStrip} items=${[
+    { key: 'filed', n: filed, label: a('stripFiled'), sub: a('stripFiledSub', { models: Object.keys(scope.model || {}).length, apps: ctx.appsTaught, none: ctx.noApp }) },
+    { key: 'critical', n: critical, tone: critical ? 'notice' : undefined, label: a('stripCritical'), sub: criticalSub(ctx) },
+    { key: 'shared', n: shared, label: a('stripShared'), sub: a('stripSharedSub', { n: scope.shared?.private || 0 }) },
+    proposals.length ? { key: 'proposals', n: proposals.length, label: a('stripProposals'), sub: a('stripProposalsSub', { proven: proposals.filter((p) => (p.proofs || []).some((x) => x.verdict === 'pass')).length }) } : null,
   ]} />`;
 
-  const marks = [
-    none ? { label: a('chipNone'), tone: 'coral' } : L ? { label: a('chipFiled', { n: filed }) } : null,
-    !none && critical ? { label: a('chipCritical', { n: critical }), tone: 'coral' } : null,
-    none ? { label: a('chipCuratedReady', { n: curatedTotal }), tone: 'dim' } : L ? { label: a('chipShared', { n: scope.shared?.shared || 0 }), tone: 'dim' } : null,
-  ];
-
+  // The head's marks repeated the strip and are gone.
   const actions = html`
     <${Loud} control copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('flowSlab')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.goTab('apps')}>${a('appsDoor')}<//><//>`;
-  // The start: folded once an agent has filed what it learned; its button copies the flow prompt.
+  // The start: its button copies the flow prompt.
   const start = html`<${PageStart} id="appdev" done=${L ? filed > 0 : null}
     action=${ctx.flow ? { copy: ctx.flow } : undefined} />`;
 
+  // What the agents filed is the page's main thing, so it is first. The two prompts are a row that
+  // opens in place: open while nothing is filed (a build from them is how the first entry comes),
+  // shut after that. The proposals are drawn only when there are some; the platform's own registry
+  // is a row with its count, since it is the same for everyone and read rarely here.
+  const startOpen = ctx.folds.start ?? !!none;
+  const curatedOpen = ctx.folds.curated ?? false;
+  const parts = [
+    { id: 'ad-learned', label: a('secLearned'), count: L ? filed : '', draw: (nr) => secLearned(ctx, nr, none) },
+    proposals.length ? { id: 'ad-proposals', label: a('secProposals'), count: proposals.length, draw: (nr) => secProposals(ctx, nr, proposals) } : null,
+    { id: 'ad-start', label: a('secStart'), count: '', open: () => ctx.setFold('start', true), draw: (nr) => secStart(ctx, nr, startOpen) },
+    { id: 'ad-curated', label: a('secCurated'), count: curatedTotal, open: () => ctx.setFold('curated', true), draw: (nr) => secCurated(ctx, nr, none, curatedOpen) },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+
   return html`
-    <${SettingsPage} name="appdev" crumb=${crumb()} title=${t('profile.tabs.appDev')} sub=${a('titleSub')} help="concept.appdev" marks=${marks}
+    <${SettingsPage} name="appdev" crumb=${crumb()} title=${t('profile.tabs.appDev')} sub=${a('titleSub')} help="concept.appdev"
       desc=${none ? a('descEmpty') : a('desc')} actions=${actions} start=${start} strip=${strip}
       railTitle=${a('railTitle')}
-      sections=${[
-        { id: 'ad-start', num: '01', label: a('secStart'), count: '' },
-        { id: 'ad-learned', num: '02', label: a('secLearned'), count: L ? filed : '' },
-        { id: 'ad-proposals', num: '03', label: a('secProposals'), count: proposals.length },
-        { id: 'ad-curated', num: '04', label: a('secCurated'), count: curatedTotal },
-      ]}
+      sections=${parts.map(({ id, num, label, count, open }) => ({ id, num, label, count, open }))}
       pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${secStart(ctx)}
-      ${secLearned(ctx, none)}
-      ${secProposals(ctx, proposals)}
-      ${secCurated(ctx, none)}
+      ${parts.map((s) => s.draw(s.num))}
     <//>`;
 }
 
@@ -137,14 +144,14 @@ function criticalSub(ctx) {
   return a('stripCriticalSub', { area: areaLabel(area[0]), an: area[1], model: model ? model[0] : '', mn: model ? model[1] : 0 });
 }
 
-/* ── 01 · Start right ─────────────────────────────────────────────────────────────────────────── */
+/* ── The start: the two prompts, one row that opens in place ──────────────────────────────────── */
 
-function secStart(ctx) {
+function secStart(ctx, nr, open) {
   const fmt = (n) => fmtNum(Number(n || 0));
   const item = (id) => ctx.openItems?.[id];
   const flowShown = ctx.shown === 'flow';
   return html`
-    <${Section} id="ad-start" num="01" title=${a('secStart')} count=${a('secStartSub')} first>
+    <${Section} fold id="ad-start" num=${nr} title=${a('secStart')} sub=${a('secStartSub')} open=${open} onToggle=${() => ctx.setFold('start', !open)}>
       <${List} cols="name-desc-doors">
         <${Row} open=${flowShown}>
           <${Name} meta=${a('flowMeta', { n: fmt(ctx.flow ? ctx.flow.length : 0) })}>${a('flowTitle')}<//>
@@ -175,9 +182,9 @@ function secStart(ctx) {
     <//>`;
 }
 
-/* ── 02 · The pitfalls the agents filed ───────────────────────────────────────────────────────── */
+/* ── 01 · The pitfalls the agents filed ───────────────────────────────────────────────────────── */
 
-function secLearned(ctx, none) {
+function secLearned(ctx, nr, none) {
   const L = ctx.learned;
   const F = ctx.filters;
   const scope = L?.facets || {};
@@ -187,7 +194,7 @@ function secLearned(ctx, none) {
   const rows = L?.pitfalls || [];
   const filed = sum(scope.status);
   return html`
-    <${Section} id="ad-learned" num="02" title=${a('secLearned')} count=${L ? filed : null}>
+    <${Section} id="ad-learned" num=${nr} title=${a('secLearned')} count=${L ? filed : null} first>
       ${none ? html`<${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${a('learnedEmptyHead')}</b> ${a('learnedEmptyBody')}<//>`} />`
         : !L ? html`<${List} loading=${t('common.loading')} />` : html`
         <${Filters}>
@@ -214,21 +221,21 @@ function secLearned(ctx, none) {
     <//>`;
 }
 
-/* ── 03 · Template proposals ──────────────────────────────────────────────────────────────────── */
+/* ── Template proposals: drawn only when there are some ───────────────────────────────────────── */
 
-function secProposals(ctx, proposals) {
+function secProposals(ctx, nr, proposals) {
   return html`
-    <${Section} id="ad-proposals" num="03" title=${a('secProposals')} count=${ctx.proposals ? proposals.length : null}>
-      <${List} cols="state-name-who-doors" keepCols loading=${ctx.proposals ? false : t('common.loading')} empty=${a('proposalsEmpty')}
+    <${Section} id="ad-proposals" num=${nr} title=${a('secProposals')} count=${proposals.length}>
+      <${List} cols="state-name-who-doors" keepCols empty=${a('proposalsEmpty')}
         head=${[a('colTier'), a('colTemplate'), a('colModelSource'), '']}
         rows=${proposals} render=${(p) => proposalRow(ctx, p)} />
       <${Note}>${a('proposalsHint')}<//>
     <//>`;
 }
 
-/* ── 04 · The platform's own registry ─────────────────────────────────────────────────────────── */
+/* ── The platform's own registry: one row with its count, opened in place ─────────────────────── */
 
-function secCurated(ctx, none) {
+function secCurated(ctx, nr, none, open) {
   const S = ctx.curatedSummary;
   const C = ctx.curated;
   const F = ctx.curatedFilter;
@@ -236,9 +243,9 @@ function secCurated(ctx, none) {
   let rows = C?.pitfalls || [];
   if (F.severity) rows = rows.filter((p) => p.severity === F.severity);
   if (F.area) rows = rows.filter((p) => (p.appliesTo || []).includes(F.area));
-  const doors = S && !C ? html`<${Action} small soft disabled=${ctx.busy === 'curated'} onClick=${ctx.loadCurated}>${a('showRows', { n: S.total })}<//>` : null;
   return html`
-    <${Section} id="ad-curated" num="04" title=${a('secCurated')} count=${S ? S.total : null} doors=${doors}>
+    <${Section} fold id="ad-curated" num=${nr} title=${a('secCurated')} sub=${S ? a('curatedSub', { n: S.total }) : ''} open=${open} onToggle=${() => ctx.setFold('curated', !open)}>
+      ${S && !C ? html`<${Actions}><${Action} small soft disabled=${ctx.busy === 'curated'} onClick=${ctx.loadCurated}>${a('showRows', { n: S.total })}<//><//>` : null}
       ${!S ? html`<${List} loading=${t('common.loading')} />` : html`
         <${Filters}>
           ${facet(!F.severity, a('facetAll'), S.total, () => ctx.setCuratedFilter({ severity: '' }), 'all')}

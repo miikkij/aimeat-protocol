@@ -7,9 +7,11 @@
  *   an agent with its offers, a hand-added one on its own), the words for who may call and what it
  *   costs, the text an agent gets, the crumb and the cross-page rail links.
  * @structure x · providerOf · groupCapabilities · authWord · costWord · agentRule · agentTextFor ·
- *   crumb · pageLinks · openTab
+ *   statusWord · typeWord · refusalText · crumb · pageLinks · openTab
  * @usage import { x, groupCapabilities, agentRule } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-11-27 — statusWord and typeWord fall back to the server's value for one the page has
+ *     no word for (the key itself showed); refusalText says a refusal by its code in the page's words.
  *   v1.2.1 — 2026-11-15 — The prompt says "the contract MCP tools", not "the contract door".
  *   v1.2.0 — 2026-10-11 — costWord says the money price (or free) and the pacing amount (cost.morsels, the pacing per use); "priced" means a money price only (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-26 — crumb() and pageLinks() return data (the steps, the sibling pages) for the
@@ -17,7 +19,7 @@
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Kyvykkyydet-sivu", direction A, with the
  *     registry extended to app tools and agent offers; wish-kyvykkyydet-rekisteri-ja-sivu).
  */
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { openTab } from '/components/Rail.js';
 
 export const x = (key, vars) => t('capspage.' + key, vars);
@@ -116,6 +118,26 @@ export function schemaProps(schema) {
 export function schemaWords(schema) {
   const { props, required } = schemaProps(schema);
   return Object.entries(props).map(([k, v]) => `${k}${required.has(k) ? '*' : ''}: ${v.type || '?'}`).join(', ');
+}
+
+/** A status or a source type in the page's words; a value the page has no word for, as the server named it. */
+export const statusWord = (status) => tOr('capspage.status.' + status, String(status || ''));
+export const typeWord = (type) => tOr('capspage.type.' + type, String(type || ''));
+
+/** The refusals the page says in its own words; any other code shows the server's sentence. */
+const REFUSALS = new Set(['PUBLISHING_DISABLED', 'PUBLIC_DISABLED', 'WEBHOOKS_DISABLED', 'INVALID_WEBHOOK_URL',
+  'WEBHOOK_DOMAIN_NOT_ALLOWED', 'CAPABILITY_EXISTS', 'NOT_FOUND', 'FORBIDDEN', 'CANNOT_DELETE', 'CANNOT_VOUCH_OWN', 'NETWORK_ERROR']);
+
+/**
+ * A refusal in the reader's words, chosen by its code: the server's sentences are written for an AI
+ * ("Use visibility: private") and in English. INVALID_INPUT keeps the server's sentence, which names
+ * the field to fix.
+ */
+export function refusalText(e, fallback) {
+  const err = e?.error || e?.response?.error || e || {};
+  const code = err.code || e?.code || '';
+  if (REFUSALS.has(code)) return x('refusal.' + code);
+  return err.message || e?.message || fallback || t('profile.error');
 }
 
 export const callsWord = (n) => (n === 1 ? x('callsOne') : x('callsN', { n }));

@@ -9,6 +9,9 @@
  * @structure c · rel · firstLine · bodyLines · Switch · inboxRows · inboxHead · hasOwnPush · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.15.0 -- 2026-11-27 -- A notice's primary answer is the row's own action (Action small row), not a
+ *     Loud: a list of questions drew one dark button per row. needsAnswer says which notice still asks
+ *     the person to decide, for the cover's figure, its order and its filter (usability pass).
  *   v1.14.0 -- 2026-11-10 -- A notice shows its whole text, a paragraph a line (bodyLines), not its first
  *     line: an agent's notice that asked the person to say a sentence to a session hid the sentence.
  *   v1.13.0 -- 2026-11-08 -- The "AIMEAT itself" row draws no push switch (hasOwnPush). The switch
@@ -45,7 +48,7 @@ import { HelpTip } from '/components/HelpTip.js';
 import { Switch } from '/components/Switch.js';
 import { List, Row, When, Who, Name, Lead, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action } from '/components/Action.js';
 
 export const c = (key, vars) => t('notifpage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -64,13 +67,18 @@ export { Switch };
 const ACTION_WORD = { reply: 'action.reply', approve: 'action.approve', deny: 'action.deny', accept: 'action.accept', decline: 'action.decline', reject: 'action.reject' };
 export const actionWord = (a) => actionTextOf(a) || (ACTION_WORD[a.id] ? c(ACTION_WORD[a.id]) : a.label || a.id);
 
-/** One api answer of a notification (approve, accept): the loud one for the primary answer, a danger link for a refusal. */
+/** One api answer of a notification (approve, accept): the row's own action for the primary answer,
+ *  a softer one beside it, a danger link for a refusal. A row draws no Loud: with five questions in
+ *  the list that was five dark buttons beside the page's one main action. */
 function answer(ctx, n, a, busy) {
   const words = busy ? '…' : actionWord(a);
   const run = () => ctx.runAction(n, a);
-  if (a.style === 'primary') return html`<${Loud} key=${a.id} disabled=${busy} onClick=${run}>${words}<//>`;
-  return html`<${Action} small key=${a.id} tone=${a.style === 'danger' ? 'danger' : undefined} disabled=${busy} onClick=${run}>${words}<//>`;
+  if (a.style === 'primary') return html`<${Action} small row key=${a.id} disabled=${busy} onClick=${run}>${words}<//>`;
+  return html`<${Action} small row soft key=${a.id} tone=${a.style === 'danger' ? 'danger' : undefined} disabled=${busy} onClick=${run}>${words}<//>`;
 }
+
+/** A notice that still asks the person to decide: an api answer on it, and no answer recorded yet. */
+export const needsAnswer = (n) => !answerTextOf(n) && Array.isArray(n.actions) && n.actions.some((a) => a.kind === 'api');
 
 /** The inbox, with its heading row: when, who, what (unread marked), and the doors. */
 export function inboxRows(ctx, rows) {
@@ -93,8 +101,8 @@ export function inboxRows(ctx, rows) {
         <${Doors}>
           ${help ? html`<${HelpTip} term=${help} label=${titleOf(n)} />` : null}
           ${acts.slice(0, 2).map(a => answer(ctx, n, a, busy))}
-          ${change ? html`<${Action} small href=${change.link}>${change.label}<//>` : null}
-          ${opens ? html`<${Action} small onClick=${() => ctx.open(n)}>${c('open')}<//>` : null}
+          ${change ? html`<${Action} small row soft href=${change.link}>${change.label}<//>` : null}
+          ${opens ? html`<${Action} small row soft onClick=${() => ctx.open(n)}>${c('open')}<//>` : null}
         <//>
       <//>`; })}
   <//>`;

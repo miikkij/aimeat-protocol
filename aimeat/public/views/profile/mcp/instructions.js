@@ -9,6 +9,9 @@
  * @structure secInstructions · orgPromptBlock
  * @usage import { secInstructions } from './instructions.js';
  * @version-history
+ *   v2.2.0 — 2026-11-27 — One fold row numbered by the page, whose line names the organism the
+ *     instructions are made from (or says there is none yet), opening in place; drawn only once an AI
+ *     is connected. The contents are unchanged; mcppage.secInstructionsSub is no longer read.
  *   v2.1.0 — 2026-11-08 — The organism prompt's lead says only what this block does (mcppage.orgCreatesLead);
  *     what an organism is moved to its question mark, concept.organism (components/HelpTip.js).
  *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): Section
@@ -47,10 +50,14 @@ import { Space } from '/components/Layout.js';
 import { InstructionBlock } from '/components/InstructionBlock.js';
 import { m } from './frame.js';
 
-export function secInstructions(ctx) {
+export function secInstructions(ctx, n) {
   const orgs = ctx.organisms;
+  // The row's line is its state: the organism the instructions are made from, or none yet.
+  const chosen = orgs && orgs.length ? (orgs.find((o) => o.id === ctx.orgId) || orgs[0]) : null;
+  const sub = orgs === null ? '' : chosen ? (chosen.name || chosen.id) : m('instrNoOrg');
   return html`
-    <${Section} id="mcp-instr" num="03" title=${m('secInstructions')} count=${m('secInstructionsSub')}>
+    <${Section} fold clip id="mcp-instr" num=${n} title=${m('secInstructions')} sub=${sub}
+      open=${ctx.folds.instr} onToggle=${() => ctx.setFold('instr', !ctx.folds.instr)}>
       ${orgs === null ? html`<${Note} kind="loading">${t('helloMcp.block.loading')}<//>`
         : !orgs.length ? html`
           <${Note} kind="lead">${m('noOrgLead')}<//>

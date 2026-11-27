@@ -10,6 +10,7 @@
  * @structure learnedRow · proposalRow · curatedRow
  * @usage import { learnedRow, proposalRow, curatedRow } from './rows.js';
  * @version-history
+ *   v2.1.1 -- 2026-11-27 -- A proposal without a tier shows the page kit's "no value" mark (·), not a dash.
  *   v2.1.0 -- 2026-11-08 -- In an opened pitfall of your own, the word that says whether it is private or shared platform-wide opens the explanation of the two choices (term appdev.sharePitfall; .claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): a row is
  *     the List's Row (an outdated pitfall faded), the severity the Status Mark and the tier the Tag in
@@ -95,7 +96,7 @@ export function proposalRow(ctx, p) {
   const meta = [a('proposedOn', { date: day(p.createdAt) }), modeLabel(p.startMode), proofs.length ? a('proofsOf', { passed, n: proofs.length }) : a('noProof')].join(' · ');
   return html`
     <${Row} key=${key} open=${open}>
-      <${Cell}><${Mark}>${p.tier || '—'}<//><//>
+      <${Cell}><${Mark}>${p.tier || '·'}<//><//>
       <${Name} meta=${meta}>${p.title}<//>
       <${Who} sub=${appName(src.filename)}>${p.model || ''}<//>
       <${Doors}>

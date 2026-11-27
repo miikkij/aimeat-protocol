@@ -14,6 +14,13 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.16.0 -- 2026-11-27 -- Where the book stands is a figure strip with hideZeros (everyone in it, first messages that
+ *     wait for the person's answer in the notice tone, open invitations, who was messaged last), from the list the page
+ *     already reads; the head keeps only the blocked mark. A pending first message comes first among the people and the
+ *     agents, and its row says so. "No account yet" and "Agents and apps" are drawn once they hold someone, numbered
+ *     after the filter; the add row is always drawn. With nobody in the book the page is People with one line that says
+ *     how someone gets in. The head's Add is drawn quiet while the add row is open, so its own button is the one loud
+ *     action. No control was removed.
  *   v1.15.1 -- 2026-11-14 -- The contact search is a TextField `search`: a find field the browser's
  *     autofill cannot fill with the sign-in name (js/find-field-guard.js).
  *   v1.15.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
@@ -75,29 +82,46 @@ export function renderContactsView(ctx) {
   return renderCover(ctx);
 }
 
+/** A first message from them waits for the owner's answer (the message gate's pending state). */
+const waitsForYou = (r) => r.state === 'pending';
+/** The rows that need the person first, then the order they came in (stable). */
+const waitingFirst =(rows) => [...rows.filter(waitsForYou), ...rows.filter(r => !waitsForYou(r))];
+
 function renderCover(ctx) {
   const people = ctx.people, noAccount = ctx.noAccount, agents = ctx.agents;
   const invitesOpen = noAccount.filter(r => r.invitation).length;
   const latest = sortPeople(people.filter(r => r.last_message_at))[0];
-  const savedByMe = ctx.contacts.filter(r => r.origin === 'saved').length;
-  // "The other N came from messages": counted, not derived, since a colleague row came from neither.
-  const fromMessages = ctx.contacts.filter(r => r.origin === 'message').length;
-  const sharedTotal = people.reduce((n, r) => n + (r.shared_organisms || []).length, 0);
-  const sharedNames = (() => { const m = new Map(); for (const r of people) for (const o of r.shared_organisms || []) m.set(o.name, (m.get(o.name) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, k]) => `${n} ${k}`).join(' · '); })();
+  const waiting = ctx.contacts.filter(waitsForYou);
+  const loadingFirst = ctx.loading && !ctx.contacts.length;
   const mark = (n, key, tone) => ({ label: c(key, { n }), tone });
-  const strip = html`<${FigureStrip} items=${[
+  // Where the book stands, from the list the page already read: everyone in it, the first messages
+  // that wait for the person's answer, the invitations still open, and who was messaged last. With
+  // nobody in the book every figure is zero or "·" and the strip is not drawn (hideZeros).
+  const strip = ctx.contactsFailed ? null : loadingFirst ? html`<${FigureStrip} loading=${4} />` : html`<${FigureStrip} hideZeros items=${[
+    { key: 'all', n: ctx.contacts.length, label: c('stripAll'), sub: ctx.contacts.length ? c('stripAllSub', { p: people.length + noAccount.length, a: agents.length }) : undefined },
+    { key: 'waiting', n: waiting.length, tone: waiting.length ? 'notice' : undefined, label: c('stripWaiting'),
+      sub: waiting.length ? c('stripWaitingSub', { who: waiting.slice(0, 2).map(nameOf).join(' · ') }) : undefined },
+    { key: 'invites', n: invitesOpen, label: c('stripInvites'),
+      sub: invitesOpen ? noAccount.filter(r => r.invitation).map(r => `${nameOf(r)} · ${c('sentOn', { when: rel(r.invitation.created_at) })}`).join(' · ') : c('stripInvitesNone') },
     latest
       ? { key: 'last', n: rel(latest.last_message_at), label: c('stripLast'), sub: `${nameOf(latest)} · ${latest.last_message || ''}` }
       : { key: 'last', n: '·', label: c('stripLast'), sub: c('noMessagesYet') },
-    { key: 'invites', n: invitesOpen, tone: invitesOpen ? 'coral' : undefined, label: c('stripInvites'),
-      sub: invitesOpen ? noAccount.filter(r => r.invitation).map(r => `${nameOf(r)} · ${c('sentOn', { when: rel(r.invitation.created_at) })}`).join(' · ') : c('stripInvitesNone') },
-    { key: 'shared', n: sharedTotal, label: c('stripShared'), sub: sharedNames || c('stripSharedNone') },
-    { key: 'saved', n: savedByMe, label: c('stripSaved'), sub: c('stripSavedSub', { n: fromMessages }) },
   ]} />`;
+  const savedByMe = ctx.contacts.filter(r => r.origin === 'saved').length;
   // The start: folded once the person has saved someone; its button opens the add fold.
   const start = html`<${PageStart} id="contacts"
-    done=${ctx.contactsFailed || (ctx.loading && !ctx.contacts.length) ? null : savedByMe > 0}
+    done=${ctx.contactsFailed || loadingFirst ? null : savedByMe > 0}
     action=${{ onClick: () => ctx.openAdd('name') }} />`;
+  // What is drawn: People always (with nobody its one line is the page's empty line), the people
+  // without an account and the agents once they hold someone, and the add row always, since it is
+  // how one begins. Numbered after the filter, so a hidden section leaves no gap.
+  const shown = [
+    { id: 'ct-people', label: c('secPeople'), count: people.length },
+    noAccount.length ? { id: 'ct-noaccount', label: c('secNoAccount'), count: noAccount.length } : null,
+    agents.length ? { id: 'ct-agents', label: c('secAgents'), count: agents.length } : null,
+    { id: 'ct-add', label: c('add'), count: '' },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
   return html`
     <${SettingsPage} name="ct"
       crumb=${crumb(ctx, [])}
@@ -105,32 +129,24 @@ function renderCover(ctx) {
       help="concept.contact"
       start=${start}
       marks=${[
-        mark(people.length, 'chipPeople'),
-        noAccount.length ? mark(noAccount.length, 'chipNoAccount') : null,
-        agents.length ? mark(agents.length, 'chipAgents') : null,
-        invitesOpen ? mark(invitesOpen, 'chipInvites', 'coral') : null,
-        // The people you blocked count nothing here: main's dim tag.
+        // The people you blocked count nothing here: main's dim tag. The other counts are in the strip.
         ctx.blockedCount ? mark(ctx.blockedCount, 'chipBlocked', 'dim') : null,
       ]}
       desc=${c('desc')}
       actions=${html`
-        <${Loud} onClick=${() => ctx.openAdd('name')}>${c('add')}<//>
+        ${/* While the add row is open its own button is the loud one, so the head's is drawn quiet. */''}
+        <${Loud} quiet=${ctx.folds.add} onClick=${() => ctx.openAdd('name')}>${c('add')}<//>
         <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//><//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
-      sections=${[
-        { id: 'ct-people', num: '01', label: c('secPeople'), count: people.length },
-        { id: 'ct-noaccount', num: '02', label: c('secNoAccount'), count: noAccount.length },
-        { id: 'ct-agents', num: '03', label: c('secAgents'), count: agents.length },
-        { id: 'ct-add', num: '04', label: c('add'), count: '' },
-      ]}
+      sections=${shown}
       pagesLabel=${c('pages')}
       pages=${pageLinks(ctx)}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${secPeople(ctx)}
-      ${secNoAccount(ctx)}
-      ${secAgents(ctx)}
-      <${FoldSection} id="ct-add" num="04" title=${c('add')} sub=${c('addSub')} open=${ctx.folds.add} onToggle=${() => ctx.setFold('add', !ctx.folds.add)}>${addBody(ctx)}<//>
+      ${numOf['ct-noaccount'] ? secNoAccount(ctx, numOf['ct-noaccount']) : null}
+      ${numOf['ct-agents'] ? secAgents(ctx, numOf['ct-agents']) : null}
+      <${FoldSection} id="ct-add" num=${numOf['ct-add']} title=${c('add')} sub=${c('addSub')} open=${ctx.folds.add} onToggle=${() => ctx.setFold('add', !ctx.folds.add)}>${addBody(ctx)}<//>
     <//>`;
 }
 
@@ -142,7 +158,12 @@ function secPeople(ctx) {
   if (f === 'saved') list = list.filter(r => r.origin === 'saved');
   else if (f && f !== 'all') list = list.filter(r => r.relation === f);
   if (q) list = list.filter(r => nameOf(r).toLowerCase().includes(q) || r.contact_id.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q) || (r.tags || []).some(x => x.toLowerCase().includes(q)));
+  // A first message that waits for the person's answer comes first, so it is the first row they meet.
+  list = waitingFirst(list);
   const shown = ctx.showAll ? list : list.slice(0, PAGE);
+  // Nobody yet: the one line says what fills the book and how; with only people without an account
+  // or agents in it, the line says that nobody with an account is saved yet.
+  const empty = ctx.people.length ? c('emptyFiltered') : ctx.contacts.length ? c('emptyPeopleSome') : c('emptyPeople');
   // Which people show (all, the saved ones, one relation), and the search that stays pressed while it is shown.
   const doors = html`
     <${Tabs} tone="fold" value=${f} onSelect=${(v) => ctx.setPeopleFilter(v)}
@@ -153,31 +174,33 @@ function secPeople(ctx) {
       ${ctx.searchOpen ? html`<${Space} below="medium"><${TextField} search size="medium" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${(v) => ctx.setQ(v)} autoFocus /><//>` : null}
       ${ctx.contactsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
         : ctx.loading && !ctx.contacts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
-        : !shown.length ? html`<${Note} kind="quiet">${ctx.people.length ? c('emptyFiltered') : c('emptyPeople')}<//>`
+        : !shown.length ? html`<${Note} kind="quiet">${empty}<//>`
         : peopleRows(ctx, shown)}
       ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}
       ${ctx.truncated ? html`<${Hint}><${Tinted} tone="notice">${c('truncated')}<//><//>` : null}
-      <${Hint}>${c('peopleHint')}<//>
+      ${ctx.people.length ? html`<${Hint}>${c('peopleHint')}<//>` : null}
     <//>`;
 }
 
-function secNoAccount(ctx) {
+/** Drawn only once someone without an account is written down (renderCover); `n` is its number. */
+function secNoAccount(ctx, n) {
   const doors = html`<${Action} small onClick=${() => ctx.openAdd('person')}>${c('writeDown')}<//>`;
   return html`
-    <${PageSection} id="ct-noaccount" num="02" title=${c('secNoAccount')} count=${ctx.noAccount.length} doors=${doors}>
+    <${PageSection} id="ct-noaccount" num=${n} title=${c('secNoAccount')} count=${ctx.noAccount.length} doors=${doors}>
       ${ctx.contactsFailed ? null : !ctx.noAccount.length ? html`<${Note} kind="quiet">${c('emptyNoAccount')}<//>` : noAccountRows(ctx, ctx.noAccount)}
       <${Hint}>${c('noAccountHint')}<//>
     <//>`;
 }
 
-function secAgents(ctx) {
+/** Drawn only once an agent or an app is in the book (renderCover); `n` is its number. */
+function secAgents(ctx, n) {
   const mine = ctx.agents.filter(r => r.owner === ctx.me), others = ctx.agents.filter(r => r.owner !== ctx.me);
   const list = ctx.agentsFilter === 'mine' ? mine : others;
   const doors = html`<${Tabs} tone="fold" value=${ctx.agentsFilter === 'mine' ? 'mine' : 'others'} onSelect=${(v) => ctx.setAgentsFilter(v)}
     items=${[{ value: 'others', label: c('othersN', { n: others.length }) }, { value: 'mine', label: c('mineN', { n: mine.length }) }]} />`;
   return html`
-    <${PageSection} id="ct-agents" num="03" title=${c('secAgents')} count=${`${ctx.agents.length} · ${c('secAgentsSub')}`} doors=${doors}>
-      ${ctx.contactsFailed ? null : !list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, sortPeople(list))}
+    <${PageSection} id="ct-agents" num=${n} title=${c('secAgents')} count=${`${ctx.agents.length} · ${c('secAgentsSub')}`} doors=${doors}>
+      ${ctx.contactsFailed ? null : !list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, waitingFirst(sortPeople(list)))}
       <${Hint}>${c('agentsHint')}<//>
     <//>`;
 }

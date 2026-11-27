@@ -12,6 +12,14 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- Usability pass. The strip says what an agent finds here and how much of it
+ *     it can call, what is the person's own, what the operator rejected of theirs (notice tone, only
+ *     then) and the calls, with hideZeros; the head's tags, which repeated it, go. A shelf is drawn
+ *     only when it holds something; with nothing at all the first shelf's one line says what fills the
+ *     page. A rejected entry of the person's own is first on its shelf. "Hand-added and other" is a
+ *     fold that says whether adding by hand is open here until something is in it, and "Calls, trust
+ *     and the rule for your AI" (formerly a clause as a heading) is a fold that says how calls are
+ *     counted. Numbered after the filter; the rail only with two or more sections. Nothing was removed.
  *   v1.21.0 -- 2026-11-08 -- The hand-added form's Webhook address and "Visible to agents" open their
  *     explanations (help capabilities.webhook, capabilities.public). The line beside the Add button
  *     (capspage.formHint) goes: the webhook's explanation says what it said, and FormActions loses
@@ -55,9 +63,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { x, crumb, pageLinks, agentRule, openTab } from './frame.js';
 import { providerRow, loadingRow } from './rows.js';
+import { shownToAgents } from './publish.js';
 import { Hint } from '/components/Hint.js';
 import { Note } from '/components/Note.js';
 import { Label } from '/components/Mark.js';
@@ -92,45 +102,51 @@ export function renderPage(ctx) {
   const own = all.filter((g) => g.own);
   const none = groups && own.length === 0;
   const canCreate = ctx.policy && ctx.policy.publishing !== 'disabled';
+  // What needs the person: an entry of their own the operator rejected, which no agent finds.
+  const rejected = own.filter((g) => g.status === 'rejected').length;
+  const hidden = own.filter((g) => !shownToAgents(g)).length;
 
-  const strip = html`<${FigureStrip} items=${[
-    { n: groups ? members(ext) : '…', label: x('stripActions'), sub: groups ? x('stripActionsSub', { ext: ext.length, own: ext.filter((g) => g.own).length, others: ext.filter((g) => !g.own).length }) : '' },
-    { n: groups ? members(app) : '…', label: x('stripTools'), sub: groups ? (app.length ? x('stripToolsSub', { apps: app.length }) : x('stripToolsNone')) : '' },
-    { n: groups ? members(agent) : '…', label: x('stripOffers'), sub: groups ? (agent.length ? x('stripOffersSub', { agents: agent.length }) : x('stripOffersNone')) : '' },
-    { n: groups ? other.length : '…', label: x('stripOther'), sub: ctx.policy ? (canCreate ? x('stripOtherOn') : x('stripOtherOff')) : '' },
+  // The figures, from the registry the page already read: everything an agent finds here and how
+  // much of it runs here, what is the person's own, what of theirs was rejected (only then), and the
+  // calls. With nothing in the registry the strip is not drawn (hideZeros: the first figure counts all).
+  const strip = !groups ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} hideZeros items=${[
+    { key: 'all', n: members(all), label: x('stripAll'), sub: x('stripAllSub', { n: callable }) },
+    { key: 'own', n: own.length, label: x('stripOwn'), sub: own.length ? (hidden ? x('stripOwnHidden', { n: hidden }) : x('stripOwnShown')) : x('chipNone') },
+    rejected ? { key: 'rejected', n: rejected, tone: 'notice', label: x('stripRejected'), sub: x('stripRejectedSub') } : null,
+    { key: 'calls', n: calls, label: x('stripCalls'), sub: ctx.policy?.call_counting ? x('countAll') : x('countRegistry') },
   ]} />`;
 
-  const marks = groups ? [
-    { label: x('chipCallable', { n: callable }), tone: 'sun' },
-    { label: x('chipProviders', { n: all.length }) },
-    { label: x('chipCalls', { n: calls }) },
-    { label: x('chipVouches', { n: vouches }), tone: vouches ? undefined : 'dim' },
-    none ? { label: x('chipNone'), tone: 'coral' } : null,
-  ] : [];
   const actions = html`
     <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
     <${Actions}><${Action} small onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')}<//><//>`;
-  const sections = [
-    { id: 'cp-ext', num: '01', label: x('secExt'), count: groups ? ext.length : '' },
-    { id: 'cp-app', num: '02', label: x('secApp'), count: groups ? app.length : '' },
-    { id: 'cp-agent', num: '03', label: x('secAgent'), count: groups ? agent.length : '' },
-    { id: 'cp-other', num: '04', label: x('secOther'), count: groups ? other.length : '' },
-    { id: 'cp-ai', num: '05', label: x('secAi') },
-  ];
+
+  // What is drawn: a shelf only when it holds something, and with nothing at all the extension shelf
+  // with the page's one line; "Hand-added and other" and the rule for one's AI always, as a fold
+  // until the first holds something. Numbered after the filter, so a missing shelf leaves no gap.
+  const empty = !!groups && all.length === 0;
+  const drawn = [
+    !groups || ext.length || empty ? { id: 'cp-ext', label: x('secExt'), count: groups ? ext.length : '' } : null,
+    app.length ? { id: 'cp-app', label: x('secApp'), count: app.length } : null,
+    agent.length ? { id: 'cp-agent', label: x('secAgent'), count: agent.length } : null,
+    { id: 'cp-other', label: x('secOther'), count: groups ? other.length : '' },
+    { id: 'cp-ai', label: x('secAi') },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(drawn.map((s) => [s.id, s.num]));
+  const firstId = drawn[0]?.id;
 
   // The start: the first thing is a search the person's AI makes, which this page cannot see, so it
   // stays open until the person folds it.
   const start = html`<${PageStart} id="capabilities" />`;
   return html`
-    <${SettingsPage} name="caps" crumb=${crumb()} title=${t('capabilities.tabLabel')} help="concept.node_capability" sub=${x('titleSub')} marks=${marks}
+    <${SettingsPage} name="caps" crumb=${crumb()} title=${t('capabilities.tabLabel')} help="concept.node_capability" sub=${x('titleSub')}
       desc=${none ? x('descEmpty') : x('desc')} actions=${actions} start=${start} strip=${strip}
-      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      railTitle=${x('railTitle')} sections=${drawn.length > 1 ? drawn : undefined} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${shelf(ctx, 'ext', '01', x('secExt'), groups ? x('secExtSub', { actions: members(ext), ext: ext.length }) : null, ext, true)}
-      ${shelf(ctx, 'app', '02', x('secApp'), groups ? x('secAppSub', { tools: members(app), apps: app.length }) : null, app, false)}
-      ${shelf(ctx, 'agent', '03', x('secAgent'), groups ? x('secAgentSub', { offers: members(agent), agents: agent.length }) : null, agent, false)}
-      ${secOther(ctx, '04', other, canCreate)}
-      ${secAgent(ctx, '05', all, calls, vouches)}
+      ${numOf['cp-ext'] ? shelf(ctx, 'ext', numOf['cp-ext'], x('secExt'), groups ? x('secExtSub', { actions: members(ext), ext: ext.length }) : null, ext, firstId === 'cp-ext') : null}
+      ${numOf['cp-app'] ? shelf(ctx, 'app', numOf['cp-app'], x('secApp'), x('secAppSub', { tools: members(app), apps: app.length }), app, firstId === 'cp-app') : null}
+      ${numOf['cp-agent'] ? shelf(ctx, 'agent', numOf['cp-agent'], x('secAgent'), x('secAgentSub', { offers: members(agent), agents: agent.length }), agent, firstId === 'cp-agent') : null}
+      ${secOther(ctx, numOf['cp-other'], other, canCreate)}
+      ${secAgent(ctx, numOf['cp-ai'], all, calls, vouches)}
     <//>`;
 }
 
@@ -148,15 +164,17 @@ function shelf(ctx, key, num, title, sub, list, first) {
   if (F.priced) rows = rows.filter((g) => g.priced);
   if (F.vouched) rows = rows.filter((g) => g.vouches > 0);
   if (q) rows = rows.filter((g) => matches(q, g.name, g.summary, g.members.map((m) => m.member + ' ' + (m.summary || '')).join(' ')));
-  rows = rows.slice().sort((a, b) => (b.own - a.own) || (b.calls - a.calls) || a.name.localeCompare(b.name));
+  // An entry of the person's own that the operator rejected comes first, then their own, then the most called.
+  const rejectedOwn = (g) => (g.own && g.status === 'rejected' ? 1 : 0);
+  rows = rows.slice().sort((a, b) => (rejectedOwn(b) - rejectedOwn(a)) || (b.own - a.own) || (b.calls - a.calls) || a.name.localeCompare(b.name));
   const shown = rows.slice(0, ctx.shown[key]);
   const set = (patch) => ctx.setFilter(key, patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
   const ids = { ext: 'cp-ext', app: 'cp-app', agent: 'cp-agent' };
-  const empty = key === 'ext' ? x('emptyExt') : key === 'app' ? x('emptyApp') : x('emptyAgent');
+  // A shelf is drawn empty only when the whole registry is: its one line says what fills the page.
   return html`
     <${PageSection} id=${ids[key]} num=${num} title=${title} count=${sub} first=${first}>
-      ${!ctx.groups ? loadingRow() : !list.length ? html`<${Note} kind="quiet">${empty}<//>` : html`
+      ${!ctx.groups ? loadingRow() : !list.length ? html`<${Note} kind="quiet">${x('emptyAll')}<//>` : html`
         <${Filters}>
           ${facet(!F.who && !F.use && !F.priced && !F.vouched, x('facetAll'), list.length, () => set({ who: '', use: '', priced: false, vouched: false }), 'all')}
           ${facet(F.who === 'own', x('facetOwn'), count((g) => g.own), () => tog('who', 'own'), 'own')}
@@ -179,14 +197,22 @@ function shelf(ctx, key, num, title, sub, list, first) {
 
 /* ── Hand-added and other: manual webhooks, ecosystem apps, the old action list; the form ──────── */
 
+/**
+ * Open once something is in it; until then a fold whose row says whether adding by hand is open here.
+ * The policy facts and the form are the same in both.
+ */
 function secOther(ctx, num, other, canCreate) {
   const f = ctx.form;
+  const fold = !!ctx.groups && other.length === 0;
+  const props = fold
+    ? { fold: true, sub: ctx.policy ? (canCreate ? x('stripOtherOn') : x('stripOtherOff')) : '', open: ctx.otherOpen, onToggle: ctx.toggleOtherOpen }
+    : { count: ctx.groups ? x('secOtherSub', { n: other.length }) : null };
   return html`
-    <${PageSection} id="cp-other" num=${num} title=${x('secOther')} count=${ctx.groups ? x('secOtherSub', { n: other.length }) : null}>
+    <${Section} id="cp-other" num=${num} title=${x('secOther')} ...${props}>
       ${!ctx.groups ? loadingRow() : html`
-        <${List} cols="name-desc-call-doors" head=${head('other')} empty=${x('emptyOther')}>
+        ${other.length ? html`<${List} cols="name-desc-call-doors" head=${head('other')}>
           ${other.map((g) => providerRow(ctx, g))}
-        <//>
+        <//>` : null}
         <${Facts} wide rows=${[
           { k: x('manualK'), v: x('manualBody'), sub: canCreate ? x('manualOn') : x('manualOff', { policy: x('policy.' + (ctx.policy?.publishing || 'disabled')) }) },
           { k: x('policyK'), v: x('policyBody', { publishing: x('policy.' + (ctx.policy?.publishing || 'disabled')), webhooks: x('webhooks.' + (ctx.policy?.webhooks || 'disabled')) }), sub: x('policySub') },
@@ -213,9 +239,11 @@ function secOther(ctx, num, other, canCreate) {
 
 /* ── How an agent finds and calls ─────────────────────────────────────────────────────────────── */
 
+/** Calls, trust and the rule for one's AI: a fold whose row says how calls are counted here. */
 function secAgent(ctx, num, all, calls, vouches) {
   return html`
-    <${PageSection} id="cp-ai" num=${num} title=${x('secAi')} count=${null}>
+    <${Section} fold id="cp-ai" num=${num} title=${x('secAi')} sub=${ctx.policy ? (ctx.policy.call_counting ? x('countAll') : x('countRegistry')) : ''}
+      open=${ctx.aiOpen} onToggle=${ctx.toggleAiOpen}>
       <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>

@@ -13,6 +13,8 @@
  *   import KnowledgeTab from './knowledge-tab.js';
  *   html`<${KnowledgeTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v2.2.0 — 2026-11-27 — The cover's rows that open in place (make, library) keep their state here
+ *     (folds, setFold in the ctx bag); usability pass of knowledge/cover.js v1.22.0.
  *   v2.1.0 — 2026-10-16 — A failed load of the packages is drawn as one (packagesFailed: the could-not-load
  *     note with Retry), never as "no packages"; a failed reload keeps the list (QA audit F6-05).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Tietopankin sivu", direction A). The
@@ -68,6 +70,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const [openEntries, setOpenEntries] = useState(() => new Set());
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [shareOrg, setShareOrg] = useState('');
+  // The cover's rows that open in place (make, library); undefined means the cover's own default.
+  const [folds, setFolds] = useState({});
+  const setFold = useCallback((key, open) => setFolds(f => ({ ...f, [key]: open })), []);
 
   const ghii = session?.ghii || session?.owner || '';
   const organisms = session?.organisms || [];
@@ -258,7 +263,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const ctx = {
     ghii, organisms, showToast, packages, packagesFailed: pkgLoad.failed, reloadPackages: () => loadPackages(), loading, fedConsents, togglingFed, deleting, savingSharing, entryData, loadingEntries,
     discovered, discoverLoading, organismPackages, organismLoading,
-    view, pickView, sort, setSort, road, setRoad, pasteOpen, setPasteOpen, openEntries, toggleEntry, openEntry, setAllEntries, detailsOpen, setDetailsOpen, shareOrg, setShareOrg,
+    view, pickView, sort, setSort, road, setRoad, pasteOpen, setPasteOpen, openEntries, toggleEntry, openEntry, setAllEntries, detailsOpen, setDetailsOpen, shareOrg, setShareOrg, folds, setFold,
     importText, importPreview, setImportPreview, importError, importing, handleImportPaste, confirmImport,
     copyPrompt, handleDelete, handleExport, handleClone, handleSharingChange, handleEntryVisibility, toggleFederation, contributeToOrganism,
   };

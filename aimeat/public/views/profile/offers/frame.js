@@ -10,6 +10,9 @@
  *   deliveryRows · rel · crumb · pageLinks · renderPage
  * @usage import { renderPage, c, deliveryRows } from './frame.js';
  * @version-history
+ *   v2.4.0 -- 2026-11-27 -- word() and statusWord() show the node's own value when the page has no word for it:
+ *     t() answers the key itself for a missing key, so `|| v` never took effect and a new status showed as
+ *     "profile.offers.status.<value>".
  *   v2.3.0 -- 2026-11-02 -- The data products left the Offers page for "Data you share"
  *     (views/profile/shared-data-tab.js): the rail no longer lists them, and renderPage hands a page to
  *     `ctx.frame` when the tab that hosts it passes one, so the product page and its wizard stay the
@@ -62,9 +65,11 @@ const two = (n) => String(n).padStart(2, '0');
 export const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
 export const dayLabel = (d) => fmtDate(d, { weekday: 'short', day: 'numeric', month: 'numeric' });
 
+/** The reader's word for a value the node sends; t() answers the key itself when there is none, so the raw value shows. */
+const said = (key, v) => { const w = t(key); return w === key ? v : w; };
 /** An offer's cost, speed, trust, data handling or format, in the reader's words. */
-export const word = (kind, v) => (v ? (t('profile.offers.' + kind + '.' + v) || v) : '');
-export const statusWord = (s) => (s ? (t('profile.offers.status.' + s) || s) : '');
+export const word = (kind, v) => (v ? said('profile.offers.' + kind + '.' + v, v) : '');
+export const statusWord = (s) => (s ? said('profile.offers.status.' + s, s) : '');
 /** A delivery's state as a Status tone: done is fine, failed or stalled is danger, the rest waits (off). */
 export const statusTone = (s) => (s === 'done' ? 'fine' : (s === 'failed' || s === 'stalled') ? 'danger' : 'off');
 /** An offer's agent as a Tag with its presence: the dot, and the coral "away" while it is not online. */

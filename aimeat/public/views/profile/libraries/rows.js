@@ -10,6 +10,9 @@
  * @structure packRow · packOpen
  * @usage import { packRow } from './rows.js';
  * @version-history
+ *   v1.16.0 -- 2026-11-27 -- A deprecated library that the reader's own apps still load names them in
+ *     the row's coral note line (usability pass of the Settings pages: what needs the person is said
+ *     where it is).
  *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (List Row with its Name, Desc, code Cell, Doors and Panel; Facts; Code; Note; Action; ProofLedger; ChangeLog): the page passes data and writes no class (page group G8).
  *   v1.14.0 -- 2026-09-26 -- The text for an AI is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.13.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -60,10 +63,13 @@ function usesWords(p) {
 export function packRow(ctx, p) {
   const open = ctx.expanded === p.id;
   const deprecated = p.status === 'deprecated';
+  // A deprecated library that the reader's own apps still load names those apps (libraries-tab.js).
+  const mine = deprecated ? (ctx.appsUsing?.mine?.[p.id] || []) : [];
   return html`
     <${Row} key=${p.id} open=${open}>
       <${Name} dot=${deprecated ? 'inactive' : 'active'} tag=${p.version || null}
-        meta=${deprecated && p.supersededBy ? `${statusWord(p)} → ${p.supersededBy}` : subLine(p)} warn=${deprecated}>${p.title || p.id}<//>
+        meta=${deprecated && p.supersededBy ? `${statusWord(p)} → ${p.supersededBy}` : subLine(p)} warn=${deprecated}
+        note=${mine.length ? x('yourAppsLoad', { list: mine.map(appName).join(', ') }) : undefined}>${p.title || p.id}<//>
       <${Desc}>${p.description || ''}<//>
       <${Cell} code sub=${usesWords(p)} subQuiet=${!(p.used_by?.apps || 0)}>${p.apiSurface || p.id}<//>
       <${Doors}>

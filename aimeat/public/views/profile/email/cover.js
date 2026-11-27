@@ -3,17 +3,27 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Email page in the poster face (design canvas "AIMEAT Sähköpostin sivu",
- *   direction A). Three sections and a fold: your address and what it is used for (with the
- *   change and the code), your mailboxes (the mail providers, each connection's state, the
- *   addresses it may send as, who may use it), what left through the node, and behind a fold what
- *   the node mails you (with the switches). The page's start (PageStart: the prompt connects a
+ *   direction A). Your mailboxes (the mail providers, each connection's state, the addresses it may
+ *   send as, who may use it), what left through the node once something has, your address and
+ *   what it is used for (with the change and the code; open and first while it needs the person,
+ *   otherwise a row), and as a row the emails the node sends you (with the switches). The page's
+ *   start (PageStart: the prompt connects a
  *   mailbox through the person's own AI, the mailboxes section is its button) and the title's
  *   question mark (concept.mailbox: reading and sending, who a mail may go to, an app's
  *   delegation, whose a connection is). Pure render over the ctx bag. How the page explains
  *   itself: .claude/rules/page-guidance.md.
- * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold
+ * @structure renderCover · lettersSub · secAddress · addressBody · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.24.0 -- 2026-11-27 -- Usability pass of the Settings pages: the mailboxes are the page (01), the
+ *     one that needs a new sign-in first in its list and its figure in the notice tone. The address
+ *     leads, open, only while it is missing or not confirmed; confirmed, it is one row that says the
+ *     address and since when and opens in place with the change inside. What left through here is
+ *     drawn once something has. The emails' row says how many are on and their language. The strip
+ *     draws nothing while the page holds nothing (hideZeros) and drops the last-email figure, whose
+ *     emails are listed in the emails' row; the head's marks that repeated it are gone, and the
+ *     mailboxes' head no longer repeats each row's Connect. Connect a mailbox is quiet while the
+ *     address is being changed or every service is connected. Sections are numbered after the filter.
  *   v1.23.0 -- 2026-11-08 -- Two letters explain themselves through their names (HelpLabel): the
  *     digest with notify.digest, the same term as the Notifications page's digest card, and the
  *     reminder with email.nudge (.claude/rules/page-guidance.md).
@@ -76,65 +86,109 @@ import { HelpLabel } from '/components/HelpTip.js';
 
 const PAGE = 12;
 
+/** A mailbox whose sign-in ran out: its owner signs in at the provider again. */
+const isStale = (conn) => conn.status === 'expired' || conn.status === 'needs-reauth';
+/** The mailbox rows' order: one that needs a new sign-in, then the connected, then the rest. */
+const mailboxRank = ({ conn }) => (!conn ? 3 : isStale(conn) ? 0 : conn.status === 'active' ? 1 : 2);
+const LANGUAGES = [['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']];
+
 export function renderCover(ctx) {
   const me = ctx.me || {};
   const verified = !!me.email_verified_at;
   const address = me.notification_email || '';
+  // The address needs the person while it is missing or not confirmed: recovery and sign-in by link
+  // wait for it. Said only once the record has loaded.
+  const addressNeeds = !!ctx.me && !verified;
   const since = Date.now() - 30 * 864e5;
   const sent30 = ctx.outbound.filter(m => new Date(m.createdAt).getTime() >= since).length;
-  const lastMail = ctx.mailLog[0] || null;
   const mailboxes = ctx.connections.length;
-  const strip = html`<${FigureStrip} items=${[
-    { key: 'address', n: address || '·', tone: 'long', label: c('stripAddress'), sub: verified ? c('verifiedOn', { when: day(me.email_verified_at) }) : address ? c('notVerified') : c('noAddress') },
-    { key: 'mailboxes', n: mailboxes, label: c('stripMailboxes'), sub: mailboxes ? ctx.connections.map(x => `${providerWord(ctx.providerOf(x.provider))} · ${x.accountLabel || ''}`).join(' · ') : c('stripMailboxesNone') },
+  const stale = ctx.connections.filter(isStale).length;
+  const toConnect = ctx.providers.some(p => !ctx.connections.some(x => x.provider === p.id));
+  // The figures, from what the page already read: the address and its state, the mailboxes (in the
+  // notice tone when one needs a new sign-in), and what left through here in 30 days. With no
+  // address, no mailbox and nothing sent the strip is not drawn (hideZeros).
+  const strip = html`<${FigureStrip} hideZeros items=${[
+    { key: 'address', n: address || '·', tone: address && !verified ? 'long notice' : 'long', label: c('stripAddress'), sub: verified ? c('verifiedOn', { when: day(me.email_verified_at) }) : address ? c('notVerified') : c('noAddress') },
+    { key: 'mailboxes', n: mailboxes, tone: stale ? 'notice' : undefined, label: c('stripMailboxes'),
+      sub: stale ? c('stripMailboxesStale', { n: stale }) : mailboxes ? c('stripMailboxesActive') : c('stripMailboxesNone') },
     { key: 'sent', n: sent30, label: c('stripSent'), sub: ctx.outbound.length ? c('stripSentSub', { total: ctx.outboundTotal }) : c('stripSentNone') },
-    lastMail
-      ? { key: 'last', n: rel(lastMail.at), label: c('stripLastMail'), sub: `${kindWord(lastMail.kind)}${lastMail.subject ? ' · ' + lastMail.subject : ''}` }
-      : { key: 'last', n: '·', label: c('stripLastMail'), sub: c('stripLastMailNone') },
   ]} />`;
   // The start: folded once a mailbox is connected; its button goes to the mailboxes.
   const start = html`<${PageStart} id="email" done=${ctx.me ? mailboxes > 0 : null}
     action=${{ onClick: () => scrollToSection('em-mailboxes') }} />`;
+  // The mailboxes are the page. The address leads only while it needs the person; once confirmed it
+  // is one row that says it. What left through here is drawn once something has, and the emails
+  // AIMEAT sends are one row with their state. Numbered after the filter.
+  const shown = [
+    addressNeeds ? { id: 'em-address', label: c('secAddress'), count: '' } : null,
+    { id: 'em-mailboxes', label: c('secMailboxes'), count: mailboxes },
+    ctx.outbound.length ? { id: 'em-sent', label: c('secSent'), count: ctx.outboundTotal } : null,
+    addressNeeds ? null : { id: 'em-address', label: c('secAddress'), count: '' },
+    { id: 'em-letters', label: c('lettersTitle'), count: '' },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
+  const sectionOf = {
+    'em-address': () => secAddress(ctx, me, verified, address, numOf['em-address'], addressNeeds),
+    'em-mailboxes': () => secMailboxes(ctx, numOf['em-mailboxes'], !addressNeeds),
+    'em-sent': () => secSent(ctx, numOf['em-sent']),
+    'em-letters': () => html`<${FoldSection} id="em-letters" num=${numOf['em-letters']} title=${c('lettersTitle')} sub=${lettersSub(ctx)} open=${ctx.folds.letters} onToggle=${() => ctx.setFold('letters', !ctx.folds.letters)}>${lettersFold(ctx)}<//>`,
+  };
   return html`
     <${SettingsPage} name="em"
       crumb=${crumb()}
       title=${c('title')}
       help="concept.mailbox"
       start=${start}
-      marks=${[
-        verified ? { label: c('chipVerified') } : { label: c('chipUnverified'), tone: 'coral' },
-        mailboxes ? { label: c('chipMailboxes', { n: mailboxes }) } : null,
-        // No letter sent in 30 days counts nothing yet: main's dim tag.
-        { label: c('chipSent', { n: sent30 }), tone: sent30 ? undefined : 'dim' },
-      ]}
       desc=${c('desc')}
       actions=${html`
-        <${Loud} onClick=${() => scrollToSection('em-mailboxes')}>${c('connectMailbox')}<//>
+        <${Loud} quiet=${ctx.changing || !toConnect} onClick=${() => scrollToSection('em-mailboxes')}>${c('connectMailbox')}<//>
         <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//><//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
-      sections=${[
-        { id: 'em-address', num: '01', label: c('secAddress'), count: '' },
-        { id: 'em-mailboxes', num: '02', label: c('secMailboxes'), count: mailboxes },
-        { id: 'em-sent', num: '03', label: c('secSent'), count: ctx.outboundTotal },
-        { id: 'em-letters', num: '04', label: c('lettersTitle'), count: '' },
-      ]}
+      sections=${shown}
       pagesLabel=${c('pages')}
       pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      ${secAddress(ctx, me, verified, address)}
-      ${secMailboxes(ctx)}
-      ${secSent(ctx)}
-      <${FoldSection} id="em-letters" num="04" title=${c('lettersTitle')} sub=${c('lettersSub')} open=${ctx.folds.letters} onToggle=${() => ctx.setFold('letters', !ctx.folds.letters)}>${lettersFold(ctx)}<//>
+      ${shown.map((s) => sectionOf[s.id]())}
     <//>`;
 }
 
-function secAddress(ctx, me, verified, address) {
-  const doors = ctx.changing ? null : html`<${Action} small soft onClick=${() => ctx.startChange()}>${address ? c('changeAddress') : c('addAddress')}<//>`;
+/** The emails' row: how many of the four that can be switched are on, and their language. */
+function lettersSub(ctx) {
+  const s = ctx.settings || {};
+  const em = s.email || { workflowEnd: true };
+  const on = [em.workflowEnd !== false, !!s.emailDigest?.enabled, em.nudge === true, em.agentAsks !== false].filter(Boolean).length;
+  const lang = (LANGUAGES.find(([k]) => k === (ctx.me?.locale || 'en')) || LANGUAGES[0])[1];
+  return ctx.me?.email_verified_at ? c('lettersSubOn', { n: on, all: 4, lang }) : c('lettersSubWaiting', { lang });
+}
+
+/**
+ * The address. While it needs the person (none, or not confirmed) it is an open section with its
+ * door in the plain tone; once confirmed it is one row that says the address and since when, and
+ * opens in place, the change door inside it.
+ */
+function secAddress(ctx, me, verified, address, num, needs) {
+  const door = ctx.changing ? null
+    : needs ? html`<${Action} small onClick=${() => ctx.startChange()}>${address ? c('verifyAddress') : c('addAddress')}<//>`
+      : html`<${Action} small soft onClick=${() => ctx.startChange()}>${c('changeAddress')}<//>`;
+  const body = addressBody(ctx, verified, address);
+  if (needs) {
+    return html`
+      <${PageSection} id="em-address" num=${num} title=${c('secAddress')} count=${c('secAddressSub')} doors=${door} first>${body}<//>`;
+  }
+  const open = !!ctx.folds.address || ctx.changing;
+  return html`
+    <${FoldSection} id="em-address" num=${num} title=${c('secAddress')} sub=${c('addressSub', { address, when: day(me.email_verified_at) })} clip
+      open=${open} onToggle=${() => { if (ctx.changing) ctx.cancelChange(); ctx.setFold('address', !open); }}>
+      ${door ? html`<${Actions}>${door}<//>` : null}
+      ${body}
+    <//>`;
+}
+
+function addressBody(ctx, verified, address) {
   const uses = ['recovery', 'magic', 'invites', 'contact', 'letters'];
   const setForm = (patch) => ctx.setForm({ ...ctx.form, ...patch });
   return html`
-    <${PageSection} id="em-address" num="01" title=${c('secAddress')} count=${c('secAddressSub')} doors=${doors} first>
       ${ctx.changing ? html`
         <${Fields}>
           <${TextField} type="email" label=${c('fAddress')} value=${ctx.form.email} disabled=${ctx.busy || ctx.form.codeSent} placeholder=${t('profile.email.enterEmail')}
@@ -155,8 +209,7 @@ function secAddress(ctx, me, verified, address) {
           ${uses.map(k => html`<${Row} key=${k}><${Tick} bare state=${verified ? 'done' : 'off'} /><${Name} desc=${c('use.' + k + 'D')}>${c('use.' + k + 'T')}<//><//>`)}
           <${Row} key="never"><${Tick} bare state="off" /><${Name} desc=${c('use.neverD')}>${c('use.neverT')}<//><//>
         <//>
-        <${Hint}>${verified ? c('addressHint') : address ? c('unverifiedHint') : c('noAddressHint')}<//>`}
-    <//>`;
+        <${Hint}>${verified ? c('addressHint') : address ? c('unverifiedHint') : c('noAddressHint')}<//>`}`;
 }
 
 /** The delegations of a mailbox: which app may act on it, what it does, and the way to stop it. */
@@ -171,11 +224,13 @@ function delegations(ctx, conn) {
   <//>`;
 }
 
-function secMailboxes(ctx) {
-  const doors = html`${ctx.providers.filter(p => !isSender(p)).map(p => html`<${Action} small key=${p.id} disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${providerWord(p)}<//>`)}`;
-  const rows = ctx.providers.map(p => ({ p, conn: ctx.connections.find(x => x.provider === p.id) || null }));
+function secMailboxes(ctx, num, first) {
+  // One row per mail service, the one that needs a new sign-in first (stable within a rank). Each
+  // row has its own Connect; the head's provider buttons said the same a second time.
+  const rows = ctx.providers.map((p, i) => ({ p, i, conn: ctx.connections.find(x => x.provider === p.id) || null }))
+    .sort((a, b) => (mailboxRank(a) - mailboxRank(b)) || (a.i - b.i));
   return html`
-    <${PageSection} id="em-mailboxes" num="02" title=${c('secMailboxes')} count=${c('secMailboxesSub')} doors=${doors}>
+    <${PageSection} id="em-mailboxes" num=${num} title=${c('secMailboxes')} count=${c('secMailboxesSub')} first=${first}>
       <${List} cols="mark-name-desc-doors" keepCols empty=${c('noProviders')}>
         ${rows.map(({ p, conn }) => {
           const deleg = conn && (ctx.delegations[conn.id] || []).length;
@@ -196,7 +251,7 @@ function secMailboxes(ctx) {
     <//>`;
 }
 
-function secSent(ctx) {
+function secSent(ctx, num) {
   const f = ctx.sentFilter;
   let list = ctx.outbound;
   if (f === 'email') list = list.filter(m => m.channel !== 'inbox');
@@ -205,7 +260,7 @@ function secSent(ctx) {
   const doors = html`<${Tabs} tone="fold" value=${f} onSelect=${(v) => ctx.setSentFilter(v)}
     items=${[{ value: 'all', label: c('all') }, { value: 'email', label: c('via.email') }, { value: 'inbox', label: c('via.inbox') }]} />`;
   return html`
-    <${PageSection} id="em-sent" num="03" title=${c('secSent')} count=${`${ctx.outboundTotal} · ${c('secSentSub')}`} doors=${doors}>
+    <${PageSection} id="em-sent" num=${num} title=${c('secSent')} count=${`${ctx.outboundTotal} · ${c('secSentSub')}`} doors=${doors}>
       <${List} cols="when-name-via-doors" keepCols empty=${ctx.outbound.length ? c('emptyFiltered') : c('emptySent')}
         head=${shown.length ? [c('colWhen'), c('colWhat'), c('colVia'), ''] : null}>
         ${shown.map(m => html`
@@ -243,7 +298,7 @@ function lettersFold(ctx) {
   return html`
     <${List} cols="mark-name-desc-doors" keepCols>
       ${row('language', html`<${Select} fit ariaLabel=${c('letter.languageT')} value=${ctx.me?.locale || 'en'} disabled=${ctx.busy || !ctx.me}
-        onChange=${(v) => ctx.saveLanguage(v)} options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]} />`)}
+        onChange=${(v) => ctx.saveLanguage(v)} options=${LANGUAGES} />`)}
       ${row('security', html`<${Switch} on locked label=${c('always')} />`)}
       ${row('invites', html`<${Switch} on locked label=${c('always')} />`)}
       ${row('workflow', html`<${Switch} on=${em.workflowEnd !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, workflowEnd: em.workflowEnd === false } })} />`)}

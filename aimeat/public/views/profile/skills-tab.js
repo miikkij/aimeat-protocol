@@ -12,6 +12,8 @@
  * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'skills'
  * @version-history
+ *   v2.2.0 — 2026-11-27 — The page's rows that open in place (new, node, ai) keep their state here
+ *     (folds, setFold); opening the editor opens its row (usability pass, skills/page.js v1.27.0).
  *   v2.1.2 — 2026-10-26 — Publishing from the editor keeps the skill's other files (keepFiles); it had
  *     sent SKILL.md alone and the republish removed references/, assets/ and the rest.
  *   v2.1.1 — 2026-10-19 — The attach picker holds [name, shown name] pairs, in alphabetical order of the shown name.
@@ -69,6 +71,9 @@ export default function SkillsTab({ session, showToast }) {
   const [queries, setQueries] = useState({ own: '', node: '', ws: '' });
   const [shown, setShownState] = useState({ own: 20, node: 20, ws: 20 });
   const [editor, setEditorState] = useState(emptyEditor());
+  // The page's rows that open in place (new, node, ai); undefined means the page's own default.
+  const [folds, setFolds] = useState({});
+  const setFold = (key, open) => setFolds((f) => ({ ...f, [key]: open }));
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
 
@@ -172,11 +177,13 @@ export default function SkillsTab({ session, showToast }) {
 
   /* ── The editor: a new skill, or one of the owner's own opened for editing ─────────────── */
   const setEditor = (patch) => setEditorState((e) => ({ ...e, ...patch }));
-  const openEditor = () => setEditorState({ ...emptyEditor(), open: true });
+  // The editor stands in the "A new skill" row, so opening it opens the row.
+  const openEditor = () => { setEditorState({ ...emptyEditor(), open: true }); setFold('new', true); };
   const closeEditor = () => setEditorState(emptyEditor());
   const edit = async (s) => {
     const d = details[s.ref] || await loadDetail(s);
     setEditorState({ open: true, editing: s.name, md: d?.fileContents?.['SKILL.md'] ?? SKILL_TEMPLATE, visibility: s.visibility === 'public' ? 'public' : s.visibility === 'members' ? 'members' : 'owner', publishing: false });
+    setFold('new', true);
     document.getElementById('sk-new')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const publish = async () => {
@@ -193,7 +200,7 @@ export default function SkillsTab({ session, showToast }) {
 
   const ctx = {
     nodeUrl: getNodeUrl(), ownerName, showToast, ConfirmUI,
-    library, apps, orgs, agentCount, details, fullText, expanded, picker, busy, filters, queries, shown, editor,
+    library, apps, orgs, agentCount, details, fullText, expanded, picker, busy, filters, queries, shown, editor, folds, setFold,
     setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),

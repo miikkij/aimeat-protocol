@@ -13,6 +13,14 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.24.0 — 2026-11-27 — Usability pass on the person's three situations. The ways to get paid and
+ *     how your AI uses the wallet are fold rows that say their state (in use n of 3; rows your agents
+ *     made); the transactions are drawn once there is one, and money once there is a share or a money
+ *     trade; sections are numbered after the filter. Before the first transaction the flow's two empty
+ *     columns give way to the page's one empty line. The strip leaves out a figure that would only say
+ *     "nothing yet" (the flow, the shares); a balance under one day's accrual takes the notice tone and
+ *     says so. The head's balance and rails marks repeated the strip and are gone. No control was
+ *     removed, and no wording about what a morsel is changed.
  *   v1.23.1 — 2026-10-11 — A checkout at money total 0 (a free item that only took pacing) is not listed as a €0.00 purchase or sale.
  *   v1.23.0 — 2026-10-11 — The mast names the pacing pack when the operator sells one ("pacing capacity: 500 morsels for 5,00 €", GET /v1/wallet pacing_pack); a 3.x session in currency 'morsel' is never counted as money.
  *   v1.22.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI about their morsels, its button opens the history) and the title's question mark, concept.morsel (guidance part B).
@@ -87,25 +95,36 @@ export function renderPage(ctx) {
   const l = w?.lifetime || {};
   const sh = ctx.shares;
   const railsOn = ctx.railsOn;
-  const sections = [
-    { id: 'wal-sources', num: '01', label: x('secSources'), count: w ? `${signed(l.earned)} / ${signed(-l.spent)}` : '' },
-    { id: 'wal-ledger', num: '02', label: x('secLedger'), count: w ? String(ctx.rowsTotal) : '' },
-    { id: 'wal-money', num: '03', label: x('secMoney'), count: sh ? money(sh.total, sh.currency) : '' },
-    { id: 'wal-rails', num: '04', label: x('secRails'), count: ctx.payout ? `${railsOn} / 3` : '' },
-    { id: 'wal-roads', num: '05', label: x('secRoads'), count: '' },
-  ];
+  const rows = ctx.rowsTotal > 0;
+  const trades = hasMoney(ctx);
+  // What is drawn, numbered after the filter: where the morsels came from and went to always (with
+  // no transaction yet its one line is the page's empty line), the transactions and the money once
+  // there is any, and the two settings as rows that say their state.
+  const shown = !w ? [] : [
+    { id: 'wal-sources', label: x('secSources'), count: rows ? `${signed(l.earned)} / ${signed(-l.spent)}` : '' },
+    rows ? { id: 'wal-ledger', label: x('secLedger'), count: String(ctx.rowsTotal) } : null,
+    trades ? { id: 'wal-money', label: x('secMoney'), count: sh ? money(sh.total, sh.currency) : '' } : null,
+    { id: 'wal-rails', label: x('secRails'), count: ctx.payout ? `${railsOn} / 3` : '' },
+    { id: 'wal-roads', label: x('secRoads'), count: '' },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
   return html`
     <${SettingsPage} name="wal" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
-      start=${html`<${PageStart} id="wallet" action=${{ onClick: () => scrollToSection('wal-ledger') }} />`}
-      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      start=${html`<${PageStart} id="wallet" action=${{ onClick: () => scrollToSection(rows ? 'wal-ledger' : 'wal-sources') }} />`}
+      railTitle=${x('railTitle')} sections=${shown.length > 1 ? shown : undefined} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!w ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
-        ${secSources(ctx)}
-        ${secLedger(ctx)}
-        ${secMoney(ctx)}
-        ${secRails(ctx)}
-        ${secRoads(ctx)}`}
+        ${secSources(ctx, numOf['wal-sources'])}
+        ${numOf['wal-ledger'] ? secLedger(ctx, numOf['wal-ledger']) : null}
+        ${numOf['wal-money'] ? secMoney(ctx, numOf['wal-money']) : null}
+        ${secRails(ctx, numOf['wal-rails'])}
+        ${secRoads(ctx, numOf['wal-roads'])}`}
     <//>`;
+}
+
+/** Whether there is money to show: a share owed to the person, or a money purchase or sale. */
+function hasMoney(ctx) {
+  return !!ctx.shares || (ctx.sessions || []).some(isMoney) || (ctx.orders || []).some(isMoney);
 }
 
 function federated(ctx) {
@@ -122,12 +141,12 @@ function head(ctx) {
   const cap = Number(w?.daily_allowance?.accumulation_cap) || 0;
   const pace = Number(w?.daily_allowance?.amount) || 0;
   const room = w ? Math.max(0, cap - (Number(w.balance) || 0)) : 0;
+  // The balance and the ways to get paid are the strip's figures, so the head's marks say only what
+  // the strip does not: the daily pace, a pacing pack for sale, a stablecoin on a test network.
   const marks = !w ? [] : [
-    { label: morsels(w.balance), tone: 'sun' },
     { label: x('chipPace', { n: pace, cap }) },
     // Pacing capacity the operator sells for money (GET /v1/wallet pacing_pack); absent when none is sold.
     w.pacing_pack ? { label: x('chipPack', { n: w.pacing_pack.morsels, price: money(w.pacing_pack.price.amount, w.pacing_pack.price.currency) }) } : null,
-    p ? { label: [x('rail.stripe'), p.x402?.enabled ? x('rail.x402') : '', x('rail.invoice')].filter(Boolean).join(' · ').toLowerCase() } : null,
     p?.x402?.enabled && p.x402.testnet ? { label: x('chipTestnet'), tone: 'dim' } : null,
   ];
   const copy = w ? x('copyBalanceText', { balance: morsels(w.balance), available: w.available, escrow: w.in_escrow }) : '';
@@ -137,7 +156,7 @@ function head(ctx) {
       : w ? html`<${Note} kind="hint" slab inline>${x('atCap', { cap })}<//>` : null}
     <${Actions}>
       ${w ? html`<${Action} small copy=${copy}>${x('copyBalance')}<//>` : null}
-      <${Action} small soft onClick=${() => scrollToSection('wal-roads')}>${x('toAi')}<//>
+      <${Action} small soft onClick=${() => { ctx.openFold('roads'); scrollToSection('wal-roads'); }}>${x('toAi')}<//>
     <//>`;
   return { title: t('profile.tabs.wallet'), sub: x('titleSub'), help: 'concept.morsel', marks, desc: html`${x('desc')}${msg(ctx.requestMsg)}`, actions };
 }
@@ -149,13 +168,19 @@ function strip(ctx) {
   const cap = Number(w.daily_allowance?.accumulation_cap) || 0;
   const sh = ctx.shares;
   const p = ctx.payout;
+  const pace = Number(w.daily_allowance?.amount) || 0;
+  // Less than one day's accrual left: the server refuses what the balance cannot pace, so this is
+  // the figure that needs the person, and the head's request is the way out.
+  const low = pace > 0 && Number(w.balance) < pace && Number(w.balance) < cap;
+  // A figure that would only say "nothing yet" is left out: the flow before the first transaction,
+  // the shares before the first one. The balance and the ways to get paid always say something.
   return html`<${FigureStrip} items=${[
-    { n: w.balance, label: x('stripBalance'), sub: `${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap')}` : ''}` },
-    { n: html`<${Tinted} tone="fine">${signed(l.earned)}<//> / <${Tinted} tone="notice">${signed(-l.spent)}<//>`, label: x('stripFlow'),
-      sub: `${x('stripFlowSub', { n: l.total_rows ?? ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}${l.unrecorded > 0 ? ` · ${x('stripUnrecorded', { n: l.unrecorded })}` : ''}` },
+    { n: w.balance, tone: low ? 'notice' : undefined, label: x('stripBalance'), sub: low ? x('stripLow') : `${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap')}` : ''}` },
+    ctx.rowsTotal > 0 ? { n: html`<${Tinted} tone="fine">${signed(l.earned)}<//> / <${Tinted} tone="notice">${signed(-l.spent)}<//>`, label: x('stripFlow'),
+      sub: `${x('stripFlowSub', { n: l.total_rows ?? ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}${l.unrecorded > 0 ? ` · ${x('stripUnrecorded', { n: l.unrecorded })}` : ''}` } : null,
     sh
       ? { n: money(sh.total, sh.currency), label: x('stripShares'), sub: x('stripSharesSub', { accrued: money(sh.accrued, sh.currency), released: money(sh.released, sh.currency) }) }
-      : { n: '·', tone: 'dim', label: x('stripShares'), sub: x('stripNoShares') },
+      : null,
     p
       ? { n: `${ctx.railsOn} / 3`, label: x('stripRails'), sub: [p.stripe?.configured ? x('rail.stripe') + ' ✓' : x('rail.stripe') + ' ✗', p.x402?.enabled ? (p.x402.configured ? x('rail.x402') + ' ✓' : x('rail.x402') + ' ✗') + (p.x402.testnet ? ` (${x('testnetShort')})` : '') : '', x('stripInvoiceAlways')].filter(Boolean).join(' · ') }
       : { n: '·', tone: 'dim', label: x('stripRails'), sub: x('stripRailsOff') },
@@ -164,7 +189,7 @@ function strip(ctx) {
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secSources(ctx) {
+function secSources(ctx, n) {
   const w = ctx.wallet;
   const l = w.lifetime || {};
   const s = sourcesOf(ctx.rows, ctx.self, ctx.agents);
@@ -182,9 +207,16 @@ function secSources(ctx) {
   });
   const capWords = Number(w.balance) >= cap ? x('paceAtCap', { balance: w.balance, cap }) : x('paceBelowCap', { balance: w.balance, days: pace ? Math.ceil((cap - Number(w.balance)) / pace) : 0 });
   const rowWords = l.total_rows ? (l.unrecorded > 0 ? x('paceRows', { sum: signed(l.ledger_sum), unrecorded: morsels(l.unrecorded) }) : l.unrecorded < 0 ? x('paceRowsOver', { sum: signed(l.ledger_sum), n: morsels(-l.unrecorded) }) : x('paceRowsExact', { sum: signed(l.ledger_sum) })) : '';
+  // Before the first transaction the two columns would be two boxes that say "nothing yet": the
+  // page's one empty line stands in their place, and the pace under it still says what accrues.
+  // A transaction of the accrual alone (GRANTED) fills neither column, so it counts as none: an
+  // account with only its daily morsels showed two columns of zeros.
+  const none = !ctx.rowsTotal || !real.length;
   return html`
-    <${Section} id="wal-sources" num="01" title=${x('secSources')} count=${x('secSourcesSub', { in: signed(l.earned), out: signed(-l.spent), unrecorded: l.unrecorded > 0 ? l.unrecorded : 0 })} first=${true}>
-      <${MorselFlow} columns=${[col('in', x('came'), l.earned, s.in, inRows, 'fine'), col('out', x('went'), -l.spent, s.out, outRows, 'notice')]} />
+    <${Section} id="wal-sources" num=${n} title=${x('secSources')} count=${none ? null : x('secSourcesSub', { in: signed(l.earned), out: signed(-l.spent), unrecorded: l.unrecorded > 0 ? l.unrecorded : 0 })} first=${true}>
+      ${none
+        ? html`<${Note} kind="quiet"><b>${x('noRowsLead')}</b> ${x('noRowsBody')}<//>`
+        : html`<${MorselFlow} columns=${[col('in', x('came'), l.earned, s.in, inRows, 'fine'), col('out', x('went'), -l.spent, s.out, outRows, 'notice')]} />`}
       <${MorselPace} title=${x('paceTitle')} words=${`${x('paceBody', { pace, cap })} ${capWords} ${rowWords}`} pct=${pct} figure=${`${w.balance} / ${cap}`} />
       <${Space} above="large" below="tight"><${Label} block>${x('usesTitle')}<//><//>
       <${CardGrid}>
@@ -196,7 +228,7 @@ function secSources(ctx) {
 
 /* ── 02 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secLedger(ctx) {
+function secLedger(ctx, n) {
   const rows = ctx.filtered;
   const shown = rows.slice(0, ctx.shown);
   const counts = ctx.counts;
@@ -204,7 +236,7 @@ function secLedger(ctx) {
   const copyAll = ctx.rows.map((tx) => `${tx.timestamp || ''}\t${signed(tx.amount)}\t${tx.type}\t${tx.tracking_code || ''}\t${tx.counterparty_gaii || ''}\t${tx.initiator_gaii || ''}`).join('\n');
   const showMore = rows.length > shown.length ? () => ctx.showMore() : null;
   return html`
-    <${Section} id="wal-ledger" num="02" title=${x('secLedger')} count=${x('secLedgerSub', { n: ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}>
+    <${Section} id="wal-ledger" num=${n} title=${x('secLedger')} count=${x('secLedgerSub', { n: ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}>
       ${ctx.rowsTotal ? html`
         <${Tabs} tone="filter" value=${ctx.filter} onSelect=${(v) => ctx.setFilter(v)}
           items=${filters.map(([id, n]) => ({ value: id, label: x('filter.' + id), count: n }))} />
@@ -221,7 +253,7 @@ function secLedger(ctx) {
 
 /* ── 03 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secMoney(ctx) {
+function secMoney(ctx, n) {
   const sh = ctx.shares;
   const purchases = (ctx.sessions || []).filter(isMoney);
   const sales = (ctx.orders || []).filter(isMoney);
@@ -229,7 +261,7 @@ function secMoney(ctx) {
   const verified = ctx.earnings?.verification;
   const entries = ctx.earnings?.entries || [];
   return html`
-    <${Section} id="wal-money" num="03" title=${x('secMoney')} count=${sh ? x('secMoneySub', { shares: money(sh.total, sh.currency), sales: doneSales.length }) : x('secMoneySubNone')}>
+    <${Section} id="wal-money" num=${n} title=${x('secMoney')} count=${sh ? x('secMoneySub', { shares: money(sh.total, sh.currency), sales: doneSales.length }) : x('secMoneySubNone')}>
       <${Note} kind="lead">${x('moneyIntro')}<//>
       ${sh ? html`
         <${FigureStrip} lead wrap items=${[
@@ -259,11 +291,13 @@ function secMoney(ctx) {
 
 /* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secRails(ctx) {
+/** The ways to get paid: one row that says how many are in use, the three rails inside it. */
+function secRails(ctx, n) {
   const p = ctx.payout;
   const rails = [{ id: 'stripe' }, ...(p?.x402?.enabled ? [{ id: 'x402' }] : []), { id: 'invoice' }];
+  const sub = p === false ? x('stripRailsOff') : p ? x('secRailsSub', { n: ctx.railsOn }) : '';
   return html`
-    <${Section} id="wal-rails" num="04" title=${x('secRails')} count=${p ? x('secRailsSub', { n: ctx.railsOn }) : null}>
+    <${Section} fold id="wal-rails" num=${n} title=${x('secRails')} sub=${sub} open=${ctx.folds.rails} onToggle=${() => ctx.toggleFold('rails')}>
       <${Note} kind="lead">${x('railsIntro')}<//>
       ${p === false ? html`<${Note} kind="quiet">${x('railsOff')}<//>` : !p ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
         <${List} cols="name-state-cur-doors" keepCols head=${[x('rail.colRail'), x('rail.colState'), x('rail.colCurrencies'), '']}>
@@ -275,10 +309,12 @@ function secRails(ctx) {
 
 /* ── 05 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secRoads(ctx) {
+/** How the person's AI uses the wallet: one row that says how many rows their agents made, the prompt inside. */
+function secRoads(ctx, n) {
   const request = x('leadRequest');
   return html`
-    <${Section} id="wal-roads" num="05" title=${x('secRoads')}>
+    <${Section} fold id="wal-roads" num=${n} title=${x('secRoads')} sub=${ctx.rowsTotal ? x('roadAgentSub', { n: ctx.counts.agent, total: ctx.rowsTotal }) : x('roadAsk')}
+      open=${ctx.folds.roads} onToggle=${() => ctx.toggleFold('roads')}>
       <${Note} kind="lead">${x('roadsIntro')}<//>
       <${Roads} wide>
         <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${request}

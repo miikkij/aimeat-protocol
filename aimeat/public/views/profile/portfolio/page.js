@@ -15,6 +15,14 @@
  *   secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.20.0 -- 2026-11-27 -- With no page yet there is no figure strip (its four figures counted a reserved address,
+ *     the ways to a page and other people's pages, nothing to act on); with a page the strip drops the address count,
+ *     which section 01 says. "Changing the page" and "Your AI and your page" are FoldSection rows that say their state
+ *     and open in place (a pasted page keeps the first open); the sections are numbered after the filter, so a page off
+ *     the web no longer starts at 02, and the rail is drawn only with two or more. Off the web, Make it public again
+ *     in the visibility row is a quiet action beside the head's loud one; the head's "Ask your AI" is drawn quiet while
+ *     a pasted page waits for Publish. A style or page kind the page has no word for shows its own value, not a key.
+ *     No control was removed.
  *   v1.19.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "portfolio" in the start slot (folded once a page is stored; its button opens the
  *     builder) and the title's question mark concept.portfolio. Section 05 loses its lead paragraph
@@ -52,6 +60,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Facts } from '/components/Facts.js';
@@ -78,11 +87,19 @@ export function renderPage(ctx) {
   const hasPage = !!d?.html;     // a stored file, published or not
   const isOn = hasPage && !!cfg?.enabled;
   const state = !d ? 'loading' : !hasPage ? 'none' : isOn ? 'on' : 'off';
-  const rail = state === 'none'
-    ? [['01', 'pf-first', x('secFirst'), ''], ['05', 'pf-ai', x('secAi'), '']]
-    : state === 'off'
-      ? [['02', 'pf-visibility', x('secVisibility'), ''], ['03', 'pf-page', x('secPage'), d?.html ? x('kb', { n: d.html.size_kb }) : ''], ['04', 'pf-change', x('secChange'), ''], ['05', 'pf-ai', x('secAi'), '']]
-      : [['01', 'pf-addresses', x('secAddresses'), ctx.standaloneUrl ? '2' : '1'], ['02', 'pf-visibility', x('secVisibility'), ''], ['03', 'pf-page', x('secPage'), d?.html ? x('kb', { n: d.html.size_kb }) : ''], ['04', 'pf-change', x('secChange'), ''], ['05', 'pf-ai', x('secAi'), '']];
+  const stored = state === 'on' || state === 'off';
+  // What is drawn in each state, numbered after the filter so a section that is not drawn leaves no
+  // gap: with no page, the first page and the AI's rule; a page off the web has no addresses to give;
+  // the ways to change the page and the AI's rule are rows that open in place.
+  const rail = [
+    state === 'none' ? { id: 'pf-first', label: x('secFirst') } : null,
+    state === 'on' ? { id: 'pf-addresses', label: x('secAddresses'), count: ctx.standaloneUrl ? '2' : '1' } : null,
+    stored ? { id: 'pf-visibility', label: x('secVisibility') } : null,
+    stored ? { id: 'pf-page', label: x('secPage'), count: x('kb', { n: d.html.size_kb }) } : null,
+    stored ? { id: 'pf-change', label: x('secChange') } : null,
+    state !== 'loading' ? { id: 'pf-ai', label: x('secAi') } : null,
+  ].filter(Boolean).map((s, i) => ({ count: '', ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(rail.map((s) => [s.id, s.num]));
 
   // The start: folded once a page is stored; its button opens the builder.
   const start = html`<${PageStart} id="portfolio" done=${state === 'loading' ? null : hasPage}
@@ -95,21 +112,24 @@ export function renderPage(ctx) {
       start=${start}
       strip=${strip(ctx, state)}
       railTitle=${x('railTitle')}
-      sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
+      sections=${rail.length > 1 ? rail : undefined}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
       after=${html`
         <${FileDrop} hidden accept=".html,.htm,text/html" inputRef=${ctx.fileRef} onChange=${(e) => ctx.readFile(e)} />
         <${ctx.ConfirmUI} />`}>
       ${state === 'loading' ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
-      ${state === 'none' ? secFirst(ctx) : null}
-      ${state === 'on' ? secAddresses(ctx) : null}
-      ${state === 'on' || state === 'off' ? secVisibility(ctx, state) : null}
-      ${state === 'on' || state === 'off' ? secPage(ctx, state) : null}
-      ${state === 'on' || state === 'off' ? secChange(ctx) : null}
-      ${state !== 'loading' ? secAgent(ctx, state) : null}
+      ${state === 'none' ? secFirst(ctx, numOf['pf-first']) : null}
+      ${state === 'on' ? secAddresses(ctx, numOf['pf-addresses']) : null}
+      ${stored ? secVisibility(ctx, state, numOf['pf-visibility']) : null}
+      ${stored ? secPage(ctx, state, numOf['pf-page']) : null}
+      ${stored ? secChange(ctx, numOf['pf-change']) : null}
+      ${state !== 'loading' ? secAgent(ctx, state, numOf['pf-ai']) : null}
     <//>`;
 }
+
+/** A style or a kind of page in the reader's words; a value the page has no word for is shown as it is. */
+const choiceWord = (kind, v) => { if (!v) return ''; const k = `pfpage.${kind}.${v}`; const w = t(k); return w === k ? v : w; };
 
 /** The head: the title, its tags and line, the loud action and the doors, as SettingsPage props. */
 function mast(ctx, state) {
@@ -128,7 +148,8 @@ function mast(ctx, state) {
     ? html`<${Loud} control disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
     : state === 'none'
       ? html`<${Loud} control disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('makeMat')}<//>`
-      : html`<${Loud} onClick=${() => ctx.copyAiRequest()}>${x('askAi')}<//>`;
+      // While a pasted page waits under "Changing the page", its Publish is the loud action.
+      : html`<${Loud} quiet=${!!(ctx.paste || '').trim()} onClick=${() => ctx.copyAiRequest()}>${x('askAi')}<//>`;
   return {
     title: t('portfolio.tabLabel'), sub: x('titleSub'), marks, desc,
     actions: html`${loud}<${Actions}>
@@ -143,38 +164,32 @@ function strip(ctx, state) {
   const cfg = d?.config;
   const m = ctx.members;
   const others = m == null ? null : Math.max(0, m - (state === 'on' ? 1 : 0));
-  if (state === 'loading') return html`<${FigureStrip} loading=${4} />`;
-  if (state === 'none') {
-    return html`<${FigureStrip} items=${[
-      { key: 'pages', n: 0, label: x('stripPages'), sub: x('stripPagesNone') },
-      { key: 'showcase', n: m ?? '…', label: x('stripShowcase'), sub: x('stripShowcaseNone') },
-      { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddressesReady'), sub: ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne') },
-      { key: 'roads', n: 3, label: x('stripRoads'), sub: x('stripRoadsSub') },
-    ]} />`;
-  }
+  if (state === 'loading') return html`<${FigureStrip} loading=${3} />`;
+  // With no page there is nothing to count: the reserved address, the ways to a page and the other
+  // people's pages were a band of figures that said nothing to act on. The first section says it.
+  if (state === 'none') return null;
+  // The number of addresses is in section 01's count and its rows; the strip keeps the state.
   if (state === 'off') {
     return html`<${FigureStrip} items=${[
       { key: 'off', n: x('stripOff'), tone: 'coral', label: x('stripOffLabel'), sub: x('stripOffSub') },
-      { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: `${x('kb', { n: d.html.size_kb })}${cfg?.designStyle ? ` · ${x('style.' + cfg.designStyle) || cfg.designStyle}` : ''}` },
+      { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: `${x('kb', { n: d.html.size_kb })}${cfg?.designStyle ? ` · ${choiceWord('style', cfg.designStyle)}` : ''}` },
       { key: 'showcase', n: others ?? '…', label: x('stripShowcase'), sub: x('stripShowcaseOff') },
-      { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddresses'), sub: x('stripAddressesOff') },
     ]} />`;
   }
   return html`<${FigureStrip} items=${[
-    { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: [timeWord(d.html.stored_at), x('kb', { n: d.html.size_kb }), cfg?.designStyle ? x('style.' + cfg.designStyle) : ''].filter(Boolean).join(' · ') },
+    { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: [timeWord(d.html.stored_at), x('kb', { n: d.html.size_kb }), choiceWord('style', cfg?.designStyle)].filter(Boolean).join(' · ') },
     { key: 'public', n: x('stripPublic'), tone: 'coral', label: x('stripPublicLabel'), sub: cfg?.seoIndex ? x('stripSearchOn') : x('stripSearchOff') },
     { key: 'showcase', n: m ?? '…', label: x('stripShowcase'), sub: others != null ? x('stripShowcaseSub', { n: others }) : '' },
-    { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddresses'), sub: ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne') },
   ]} />`;
 }
 
-function secAddresses(ctx) {
+function secAddresses(ctx, n) {
   const url = apexUrl(ctx.ownerName);
   const badgeOn = ctx.data.config?.showBadge !== false;
   const copied = () => ctx.toast(x('copiedAddress'));
   const own = ctx.standaloneUrl;
   return html`
-    <${PageSection} id="pf-addresses" num="01" title=${x('secAddresses')} count=${own ? '2' : '1'} first=${true}>
+    <${PageSection} id="pf-addresses" num=${n} title=${x('secAddresses')} count=${own ? '2' : '1'} first=${true}>
       <${Facts} rows=${[
         { k: x('addressNode'), v: url, sub: x('addressNodeSub'),
           actions: html`${copyDoor(url, t('common.copy'), copied)}${openDoor(url, x('open'))}` },
@@ -185,20 +200,21 @@ function secAddresses(ctx) {
     <//>`;
 }
 
-function secVisibility(ctx, state) {
+function secVisibility(ctx, state, n) {
   const cfg = ctx.data.config || {};
   const off = state === 'off';
   const others = Math.max(0, (ctx.members ?? 1) - (off ? 0 : 1));
   // A state word in its colour: on in the fine colour, off in coral (main's b.is-on / b.is-off).
   const said = (tone, word, rest) => html`<${Tinted} strong tone=${tone}>${word}<//> ${rest}`;
+  // Off the web, "Make it public again" is the head's loud action; here the same act is a quiet one.
   const webDoor = off
-    ? html`<${Loud} control disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
+    ? html`<${Action} small disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
     : html`<${Action} small soft tone="danger" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(false)}>${x('unpublish')}<//>`;
   const search = off
     ? said(undefined, x('visSearchOffWeb'), cfg.seoIndex ? x('visSearchOffWebAllowed') : x('visSearchOffWebDenied'))
     : cfg.seoIndex ? said('fine', x('visSearchOn'), x('visSearchOnSub')) : said(undefined, x('visSearchOff'), x('visSearchOffSub'));
   return html`
-    <${PageSection} id="pf-visibility" num="02" title=${x('secVisibility')} count=${x('secVisibilitySub')} first=${off}>
+    <${PageSection} id="pf-visibility" num=${n} title=${x('secVisibility')} count=${x('secVisibilitySub')} first=${off}>
       <${Facts} rows=${[
         { k: x('visWeb'), v: off ? said('notice', x('visWebOff'), x('visWebOffSub')) : said('fine', x('visWebOn'), x('visWebOnSub')),
           sub: x('visWebHint'), actions: webDoor },
@@ -210,15 +226,15 @@ function secVisibility(ctx, state) {
     <//>`;
 }
 
-function secPage(ctx, state) {
+function secPage(ctx, state, n) {
   const d = ctx.data;
   const cfg = d.config || {};
   const title = ctx.title || x('untitled');
   const by = writtenBy(cfg, ctx.ai);
-  const choices = [cfg.designStyle ? x('style.' + cfg.designStyle) : '', cfg.portfolioType ? x('type.' + cfg.portfolioType) : '', (cfg.authGates || []).length ? x('gatesN', { n: cfg.authGates.length }) : x('gatesNone')].filter(Boolean);
+  const choices = [choiceWord('style', cfg.designStyle), choiceWord('type', cfg.portfolioType), (cfg.authGates || []).length ? x('gatesN', { n: cfg.authGates.length }) : x('gatesNone')].filter(Boolean);
   const on = state === 'on';
   return html`
-    <${PageSection} id="pf-page" num="03" title=${x('secPage')} count=${x('kb', { n: d.html.size_kb })}>
+    <${PageSection} id="pf-page" num=${n} title=${x('secPage')} count=${x('kb', { n: d.html.size_kb })}>
       <${List} cols="mark-name-doors">
         <${Row} key="page">
           <${Thumb} />
@@ -245,9 +261,15 @@ function secPage(ctx, state) {
     <//>`;
 }
 
-function secChange(ctx) {
+/**
+ * The ways to change the page: one row that opens in place. The head's loud action already asks the
+ * AI, so the three ways are a secondary tool; a pasted page keeps the row open until it is published
+ * or cleared.
+ */
+function secChange(ctx, n) {
+  const open = ctx.changeOpen || !!(ctx.paste || '').trim();
   return html`
-    <${PageSection} id="pf-change" num="04" title=${x('secChange')} count=${x('secChangeSub')}>
+    <${FoldSection} id="pf-change" num=${n} title=${x('secChange')} sub=${x('secChangeSub')} open=${open} onToggle=${() => ctx.toggleChange()}>
       <${Note} kind="lead">${x('changeIntro')}<//>
       ${roads(ctx, true)}
     <//>`;
@@ -277,10 +299,10 @@ function roads(ctx, hasPage) {
     <//>`;
 }
 
-function secFirst(ctx) {
+function secFirst(ctx, n) {
   const mat = ctx.matPrompt ? `${ctx.matPrompt.slice(0, 420)}${ctx.matPrompt.length > 420 ? '…' : ''}` : null;
   return html`
-    <${PageSection} id="pf-first" num="01" title=${x('secFirst')} count=${x('secFirstSub')} first=${true}>
+    <${PageSection} id="pf-first" num=${n} title=${x('secFirst')} count=${x('secFirstSub')} first=${true}>
       <${Note} kind="quiet"><b>${x('emptyNone')}</b> ${x('emptyNoneSub')}<//>
       <${Roads} cols="three" wide>
         <${Road} lead name=${x('roadMat')} text=${x('roadMatBody')} code=${mat}
@@ -293,9 +315,10 @@ function secFirst(ctx) {
     <//>`;
 }
 
-function secAgent(ctx, state) {
+/** The rule an agent gets and what a publish does: one row that opens in place, in every state. */
+function secAgent(ctx, state, n) {
   return html`
-    <${PageSection} id="pf-ai" num="05" title=${x('secAi')} count=${null}>
+    <${FoldSection} id="pf-ai" num=${n} title=${x('secAi')} sub=${x('secAiSub')} open=${ctx.aiOpen} onToggle=${() => ctx.toggleAi()}>
       <${Box} doors=${html`<${Action} small onClick=${() => ctx.copyRule()}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>

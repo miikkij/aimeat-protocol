@@ -13,6 +13,8 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.5.0 -- 2026-11-27 -- contOpen and rareOpen with their setters in the ctx bag: the continuous and the rarer
+ *     schedules are rows that open in place on the cover (scheduler/cover.js).
  *   v2.4.1 -- 2026-10-19 -- The fallback agent list reads listAgents' array; it read `.data.agents` and was always empty.
  *   v2.4.0 -- 2026-10-16 -- The menu find opens one schedule here (useOpenItem, js/open-item.js).
  *   v2.3.0 -- 2026-10-11 -- "Run now" on a stopped agent's schedule says the agent is stopped.
@@ -64,6 +66,9 @@ export default function SchedulerTab({ showToast }) {
   const [regQuery, setRegQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [agentsOpen, setAgentsOpen] = useState(false);
+  // The continuous and the rarer schedules are rows that open in place on the cover.
+  const [contOpen, setContOpen] = useState(false);
+  const [rareOpen, setRareOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(() => new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -157,7 +162,7 @@ export default function SchedulerTab({ showToast }) {
   const ctx = {
     showToast, loadData, error, agents, model, internal: data.agentInternal || [], reloadTick, occLoading,
     view, pickView, nextOpen, setNextOpen, rhythmSort, setRhythmSort, regFilter, setRegFilter, regQuery, setRegQuery,
-    showSearch, setShowSearch, agentsOpen, setAgentsOpen, moreOpen, toggleMore, editOpen, setEditOpen,
+    showSearch, setShowSearch, agentsOpen, setAgentsOpen, contOpen, setContOpen, rareOpen, setRareOpen, moreOpen, toggleMore, editOpen, setEditOpen,
     busy, detail, onToggle, onTrigger, onCancel,
   };
   return renderSchedulerView(ctx);

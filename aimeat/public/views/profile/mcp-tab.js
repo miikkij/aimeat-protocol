@@ -10,6 +10,8 @@
  * @structure McpTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'mcp'.
  * @version-history
+ *   v2.1.0 — 2026-11-27 — The fold state holds the page's three rows (connect, instr, suggest), which
+ *     mcp/page.js draws once an AI is connected; nothing else changes.
  *   v2.0.0 — 2026-09-02 — The poster face (design canvas "AIMEAT MCP-sivu", direction A). The list
  *     is per agent from the MCP door's own mark (`mcp_last_seen`), the older per-tool rows stay
  *     until their agent connects again, "Disconnect" deletes the agent (which revokes its keys)
@@ -48,7 +50,8 @@ export default function McpTab({ session, showToast, onStats }) {
   const [checking, setChecking] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(null);           // the row being disconnected
-  const [folds, setFolds] = useState({ proof: false, org: false, guide: false });
+  // connect, instr and suggest: the page's own rows once an AI is connected (mcp/page.js).
+  const [folds, setFolds] = useState({ proof: false, org: false, guide: false, connect: false, instr: false, suggest: false });
   const [organisms, setOrganisms] = useState(null);
   const [orgId, setOrgId] = useState('');
   const [purpose, setPurpose] = useState('');

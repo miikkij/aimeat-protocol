@@ -3,10 +3,11 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Notifications page in the poster face (design canvas "AIMEAT Ilmoitusten sivu",
- *   direction A). Three sections and a fold: what happened (the bell's list with the sender
- *   shown, filters, the actions), who may notify you (the node's groups, the apps with the grant,
- *   the extensions and agents, each with the owner's decision), where notifications arrive (this
- *   browser, the other devices, the email digest), and quiet hours. The page's start (PageStart:
+ *   direction A). One open section and three rows: the received notifications (the bell's list with
+ *   the sender shown, filters, the actions; what asks for a decision first), and as rows that open in
+ *   place the senders (the node's groups, the apps with the grant, the extensions and agents, each
+ *   with the owner's decision), the devices and email (this browser, the other devices, the email
+ *   digest), and quiet hours. The page's start (PageStart:
  *   the prompt asks the person's AI for a test notification, push in this browser is its button)
  *   and the title's question mark (concept.notification: who may notify whom, push, mute, the
  *   digest, how long a notification is kept). Pure render functions over the ctx bag. How the
@@ -14,6 +15,14 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-27 -- Usability pass of the Settings pages: the inbox is the page, and what asks
+ *     for a decision comes first (its figure in the notice tone leads the strip, its rows lead the list,
+ *     then the unread); the strip draws nothing while the page holds nothing (hideZeros) and no longer
+ *     counts senders; the head's marks that repeated the strip are gone. Who may notify, where notices
+ *     arrive and the quiet hours are rows that say their state and open in place (nt-senders and
+ *     nt-devices were open sections). Mark all read is quiet while nothing is unread; the quiet hours'
+ *     Save is an ordinary action. The headings are noun phrases. The senders' question mark stands on
+ *     the label over the rows, since the fold's title is a button.
  *   v1.20.0 -- 2026-11-08 -- The settings explain themselves: notify.senderPush by the senders'
  *     title (the hint under the rows is gone, its words are in it), notify.digest on the email
  *     digest card's name (the same term as the Email page's digest row), notify.quietZone beside the
@@ -71,8 +80,9 @@ import { Choice } from '/components/Choice.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
+import { Label } from '/components/Mark.js';
 import { groupWord, kindWord, sourceName, titleOf } from '/js/services/notifications.js';
-import { c, rel, day, firstLine, Switch, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
+import { c, rel, day, firstLine, Switch, inboxRows, senderRows, needsAnswer, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
 import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { LoadFailed } from '/js/load-state.js';
@@ -80,21 +90,25 @@ import { LoadFailed } from '/js/load-state.js';
 const PAGE = 12;
 const GROUPS = ['organisms', 'messages', 'workflows', 'apps', 'account', 'other'];
 
+/** The inbox order: a notice that asks for a decision, then one not read yet, then the rest; within
+ *  each, the server's order (newest first). */
+const rankOf = (n) => (needsAnswer(n) ? 0 : !n.read ? 1 : 2);
+
 export function renderCover(ctx) {
   const items = ctx.items, unread = items.filter(n => !n.read).length;
-  const since = Date.now() - 30 * 864e5;
-  const recent = items.filter(n => new Date(n.createdAt).getTime() >= since);
-  const senderNames = (() => { const m = new Map(); for (const n of recent) { const k = sourceName(n); m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); })();
-  const appSenders = ctx.senders.filter(s => s.kind === 'app').length;
+  const needs = items.filter(needsAnswer).length;
   const devices = ctx.devices.length;
-  const mark = (n, key, tone) => ({ label: c(key, { n }), tone });
-  const strip = html`<${FigureStrip} items=${[
+  const firstLoad = ctx.loading && !items.length;
+  // The figures, from what the page already read: what asks for a decision (only when something
+  // does, first and in the notice tone), what is unread, when the latest arrived, and the devices
+  // push reaches. With nothing at all the strip is not drawn (hideZeros).
+  const strip = ctx.itemsFailed ? null : firstLoad ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} hideZeros items=${[
+    needs ? { key: 'needs', n: needs, tone: 'notice', label: c('stripNeeds'), sub: c('stripNeedsSub') } : null,
+    { key: 'unread', n: unread, tone: unread ? 'notice' : undefined, label: c('stripUnread'),
+      sub: unread ? [...new Set(items.filter(n => !n.read).map(n => sourceName(n)))].join(' · ') : c('stripUnreadNone') },
     items[0]
       ? { key: 'latest', n: rel(items[0].createdAt), label: c('stripLatest'), sub: `${sourceName(items[0])} · ${titleOf(items[0])}` }
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: c('nothingYet') },
-    { key: 'unread', n: unread, tone: unread ? 'coral' : undefined, label: c('stripUnread'),
-      sub: unread ? [...new Set(items.filter(n => !n.read).map(n => sourceName(n)))].join(' · ') : c('stripUnreadNone') },
-    { key: 'senders', n: senderNames.length, label: c('stripSenders'), sub: senderNames.slice(0, 4).map(([k, n]) => `${k} ${n}`).join(' · ') || c('nothingYet') },
     { key: 'devices', n: devices, label: c('stripDevices'), sub: devices ? ctx.devices.map(d => (d.thisBrowser ? c('thisBrowser') : c('family.' + d.family))).join(' · ') : c('stripDevicesNone') },
   ]} />`;
   // The start: folded once a notification has arrived; its button turns push on in this browser
@@ -102,48 +116,47 @@ export function renderCover(ctx) {
   const mine = ctx.devices.some(d => d.thisBrowser);
   const canPush = !mine && ctx.pushSupport !== false && ctx.vapid !== false;
   const start = html`<${PageStart} id="notifications"
-    done=${ctx.itemsFailed || (ctx.loading && !items.length) ? null : items.length > 0}
+    done=${ctx.itemsFailed || firstLoad ? null : items.length > 0}
     action=${canPush ? { onClick: () => ctx.subscribe() } : undefined} />`;
+  // The inbox is the page; who may notify, where notices arrive and the quiet hours are rarely
+  // changed, so each is one row that says its state and opens in place.
+  const sections = [
+    { id: 'nt-inbox', label: c('secInbox'), count: items.length },
+    { id: 'nt-senders', label: c('secSenders'), count: ctx.senders.length + 1 },
+    { id: 'nt-devices', label: c('secDevices'), count: devices },
+    { id: 'nt-quiet', label: c('quietTitle'), count: '' },
+  ].map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const fold = (k) => ({ open: !!ctx.folds[k], onToggle: () => ctx.setFold(k, !ctx.folds[k]) });
   return html`
     <${SettingsPage} name="nt"
       crumb=${crumb()}
       title=${c('title')}
       help="concept.notification"
       start=${start}
-      marks=${[
-        unread ? mark(unread, 'chipUnread', 'coral') : null,
-        mark(recent.length, 'chipRecent'),
-        appSenders ? mark(appSenders, 'chipApps') : null,
-        devices ? mark(devices, 'chipDevices') : null,
-      ]}
       desc=${c('desc')}
       actions=${html`
-        <${Loud} control disabled=${ctx.busy || !unread} onClick=${() => ctx.markAllRead()}>${c('markAllRead')}<//>
+        <${Loud} control quiet=${!unread} disabled=${ctx.busy || !unread} onClick=${() => ctx.markAllRead()}>${c('markAllRead')}<//>
         <${Actions}><${Action} small soft disabled=${ctx.busy || !items.length} onClick=${() => ctx.clearAll()}>${c('clear')}<//><//>`}
       strip=${strip}
       railTitle=${c('railTitle')}
-      sections=${[
-        { id: 'nt-inbox', num: '01', label: c('secInbox'), count: items.length },
-        { id: 'nt-senders', num: '02', label: c('secSenders'), count: ctx.senders.length + 1 },
-        { id: 'nt-devices', num: '03', label: c('secDevices'), count: devices },
-        { id: 'nt-quiet', num: '04', label: c('quietTitle'), count: '' },
-      ]}
+      sections=${sections}
       pagesLabel=${c('pages')}
       pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${secInbox(ctx)}
-      ${secSenders(ctx)}
-      ${secDevices(ctx)}
-      <${FoldSection} id="nt-quiet" num="04" title=${c('quietTitle')} sub=${quietSub(ctx)} open=${ctx.folds.quiet} onToggle=${() => ctx.setFold('quiet', !ctx.folds.quiet)}>${quietFold(ctx)}<//>
+      <${FoldSection} id="nt-senders" num="02" title=${c('secSenders')} sub=${sendersSub(ctx)} ...${fold('senders')}>${secSenders(ctx)}<//>
+      <${FoldSection} id="nt-devices" num="03" title=${c('secDevices')} sub=${devicesSub(ctx)} ...${fold('devices')}>${secDevices(ctx)}<//>
+      <${FoldSection} id="nt-quiet" num="04" title=${c('quietTitle')} sub=${quietSub(ctx)} ...${fold('quiet')}>${quietFold(ctx)}<//>
     <//>`;
 }
 
 function secInbox(ctx) {
   const f = ctx.filter;
   const kinds = [...new Set(ctx.items.map(n => n.source?.kind || 'aimeat'))];
-  let list = ctx.items;
+  // Stable: within a rank the server's order stays.
+  let list = ctx.items.map((n, i) => [n, i]).sort((a, b) => (rankOf(a[0]) - rankOf(b[0])) || (a[1] - b[1])).map(([n]) => n);
   if (f === 'unread') list = list.filter(n => !n.read);
-  else if (f === 'needs') list = list.filter(n => Array.isArray(n.actions) && n.actions.length);
+  else if (f === 'needs') list = list.filter(needsAnswer);
   else if (f !== 'all') list = list.filter(n => (n.source?.kind || 'aimeat') === f);
   const shown = ctx.showAll ? list : list.slice(0, PAGE);
   const doors = html`<${Tabs} tone="fold" value=${f} onSelect=${(v) => ctx.setFilter(v)} items=${[
@@ -157,8 +170,22 @@ function secInbox(ctx) {
         : !shown.length ? html`<${Note} kind="quiet">${ctx.items.length ? c('emptyFiltered') : c('emptyInbox')}<//>`
         : inboxRows(ctx, shown)}
       ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}
-      <${Hint}>${c('inboxHint')}<//>
+      ${ctx.items.length ? html`<${Hint}>${c('inboxHint')}<//>` : null}
     <//>`;
+}
+
+/** The senders' row: how many may notify and how many of them are muted. */
+function sendersSub(ctx) {
+  const n = ctx.senders.length + 1;
+  const muted = ctx.senders.filter(r => r.prefs?.muted).length;
+  return muted ? c('sendersSub', { n, muted }) : c('sendersSubNone', { n });
+}
+
+/** The devices' row: push in this browser, and the email digest. */
+function devicesSub(ctx) {
+  const mine = ctx.devices.some(d => d.thisBrowser);
+  const digest = ctx.settings?.emailDigest;
+  return `${c(mine ? 'devicesSubPush' : 'devicesSubNoPush')} · ${c(digest?.enabled ? 'devicesSubDigest' : 'devicesSubNoDigest')}`;
 }
 
 function secSenders(ctx) {
@@ -177,25 +204,23 @@ function secSenders(ctx) {
       : r.kind === 'agent' ? html`<${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>`
       : r.kind === 'ecosystem' ? html`<${Action} small soft onClick=${() => ctx.openTab('ecosystem')}>${t('profile.tabs.ecosystem')}<//>` : null,
   }));
-  // The push switch on every row is one setting per sender: its question mark stands once, by the
-  // section's title, and carries what the grey hint under the rows said (notify.senderPush).
-  const title = html`${c('secSenders')} <${HelpTip} term="notify.senderPush" label=${c('secSenders')} />`;
+  // The push switch on every row is one setting per sender: its question mark stands once, on the
+  // label over the rows, and carries what the grey hint under the rows said (notify.senderPush). It
+  // stood by the section's title; the title is now the fold's button, which holds no other button.
   return html`
-    <${PageSection} id="nt-senders" num="02" title=${title} count=${c('secSendersSub')}>
-      ${senderRows({ ...ctx, setPref: (r, patch) => ctx.setPref(r, patch) }, [aimeatRow])}
-      ${ctx.groupsOpen ? html`<${Box} tone="edge">${senderRows(ctx, groupRows, { under: true })}<//>` : null}
-      ${others.length ? senderRows(ctx, others) : html`<${Note} kind="quiet">${c('noOtherSenders')}<//>`}
-    <//>`;
+    <${Label} block>${c('secSendersSub')} · <${HelpLabel} term="notify.senderPush" label=${c('push')}>${c('push')}<//><//>
+    ${senderRows({ ...ctx, setPref: (r, patch) => ctx.setPref(r, patch) }, [aimeatRow])}
+    ${ctx.groupsOpen ? html`<${Box} tone="edge">${senderRows(ctx, groupRows, { under: true })}<//>` : null}
+    ${others.length ? senderRows(ctx, others) : html`<${Note} kind="quiet">${c('noOtherSenders')}<//>`}`;
 }
 
 function secDevices(ctx) {
   const s = ctx.settings || {};
   const digest = s.emailDigest || { enabled: false, afterHours: 8 };
   const mine = ctx.devices.find(d => d.thisBrowser);
-  const doors = html`<${Action} small disabled=${ctx.busy || !mine} onClick=${() => ctx.testPush()}>${c('sendTest')}<//>`;
   const setDigest = (patch) => ctx.saveSettings({ ...s, emailDigest: { ...digest, ...patch } });
   return html`
-    <${PageSection} id="nt-devices" num="03" title=${c('secDevices')} count=${c('secDevicesSub')} doors=${doors}>
+      <${Label} block>${c('secDevicesSub')}<//>
       <${CardGrid}>
         <${Card} tone="framed" state=${mine ? 'current' : undefined} name=${c('thisBrowser')}
           meta=${ctx.pushSupport === false ? c('noBrowserSupport') : ctx.vapid === false ? c('notConfigured') : mine ? c('pushOn') : c('pushOff')}
@@ -213,8 +238,8 @@ function secDevices(ctx) {
               options=${[2, 4, 8, 24, 72].map(h => [String(h), c('afterHours', { h })])} />` : null}
             <${Switch} on=${digest.enabled} label=${c('digestSwitch')} disabled=${ctx.busy || ctx.emailVerified === false} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`} />
       <//>
-      <${Hint}>${c('devicesHint')}<//>
-    <//>`;
+      <${Actions}><${Action} small disabled=${ctx.busy || !mine} onClick=${() => ctx.testPush()}>${c('sendTest')}<//><//>
+      <${Hint}>${c('devicesHint')}<//>`;
 }
 
 function quietSub(ctx) {
@@ -245,7 +270,7 @@ function quietFold(ctx) {
         options=${[0, 5, 10, 30].map(m => [m, m ? c('throttleN', { n: m }) : c('throttleOff')])} onChange=${(m) => set({ throttleMinutes: m })} />
     <//>
     <${FormActions}>
-      <${Loud} control disabled=${ctx.busy} onClick=${save}>${c('save')}<//>
+      <${Action} small disabled=${ctx.busy} onClick=${save}>${c('save')}<//>
     <//>`;
 }
 
