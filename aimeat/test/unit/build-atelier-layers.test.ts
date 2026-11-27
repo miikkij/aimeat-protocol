@@ -7,6 +7,7 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.6.1 — 2026-11-28 — A part is held to HARD_PART_CHARS; MAX_PART_CHARS is the recommended size.
  *   v1.6.0 — 2026-11-08 — The level is the interview's question 0 and decides the rest; reading by level.
  *   v1.5.0 — 2026-11-08 — The genre index line and the parts index in `start` say the fork and the
  *     register refusal hold on `fine`.
@@ -20,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { MODEL_QUALITY_ADVICE } from '../../src/services/model-recommendation.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
-import { ATELIER_PARTS, atelierPiece, splitAtelierSpec, MAX_PART_CHARS } from '../../src/services/builder/atelier-layers.js';
+import { ATELIER_PARTS, atelierPiece, splitAtelierSpec, HARD_PART_CHARS } from '../../src/services/builder/atelier-layers.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;
 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
@@ -35,7 +36,7 @@ describe('the Atelier specification in parts', () => {
     for (const p of ATELIER_PARTS) {
       const piece = atelierPiece(full, p.id, config.baseUrl);
       expect(piece, p.id).not.toBeNull();
-      expect(piece!.text.length, `${p.id} is ${piece!.text.length} characters`).toBeLessThanOrEqual(MAX_PART_CHARS);
+      expect(piece!.text.length, `${p.id} is ${piece!.text.length} characters`).toBeLessThanOrEqual(HARD_PART_CHARS);
     }
   });
 

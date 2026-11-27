@@ -10,12 +10,13 @@
  *   `libraries`; every part still fits one result; and the questions that were there are kept.
  * @usage cd aimeat && pnpm exec vitest run test/unit/build-introduction-step.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-28 — A part is held to HARD_PART_CHARS; MAX_PART_CHARS is the recommended size.
  *   v1.0.0 — 2026-11-07 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
-import { atelierPiece, atelierPieceIds, MAX_PART_CHARS, splitAtelierSpec } from '../../src/services/builder/atelier-layers.js';
+import { atelierPiece, atelierPieceIds, HARD_PART_CHARS, splitAtelierSpec } from '../../src/services/builder/atelier-layers.js';
 import { lookById } from '../../src/data/atelier-looks.js';
 import { CLEAN_LOOK_ID, INTRODUCTION_QUESTION } from '../../src/services/app-build/build-introduction-step.js';
 
@@ -94,7 +95,7 @@ describe('the build section', () => {
 
   it('leaves every part inside one result', () => {
     for (const id of atelierPieceIds()) {
-      expect(atelierPiece(full, id, config.baseUrl)!.text.length, id).toBeLessThanOrEqual(MAX_PART_CHARS);
+      expect(atelierPiece(full, id, config.baseUrl)!.text.length, id).toBeLessThanOrEqual(HARD_PART_CHARS);
     }
   });
 });

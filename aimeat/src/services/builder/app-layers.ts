@@ -34,6 +34,8 @@
  *   import { buildAppPiece } from './app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-11-28 — MAX_PART_CHARS is the recommended size; HARD_PART_CHARS (50 000, where Claude Code
+ *     saves a result to a file) is the one a test holds a part to.
  *   2026-11-15 — The section "Installing the app on a phone, and its home-screen icon" is on demand,
  *     id `install`, with a short `when`: its pointer line is read from part `start`, which has
  *     about 80 characters left under MAX_PART_CHARS on a long node address.
@@ -59,10 +61,17 @@ export type SpecLayer = 'core' | 'on-demand';
 export type SpecPartId = 'start' | 'libraries' | 'data' | 'look';
 
 /**
- * A tool result longer than this may not reach the model. Measured, not read from a document:
- * 18 071 characters arrived whole in the Claude client and 66 174 did not. The margin is on purpose.
+ * The RECOMMENDED size of one part. A tool result longer than this may not reach the model whole.
+ * Measured, not read from a document: 18 071 characters arrived whole in the Claude client and
+ * 66 174 did not. A part past it is a reason to split it, never a failed build (Jouni, 2026-11-28).
  */
 export const MAX_PART_CHARS = 24_000;
+
+/**
+ * The size a part must stay under. Claude Code saves a tool result over 50 000 characters to a file
+ * and gives the model only its path, so past this the part does not reach the model as text.
+ */
+export const HARD_PART_CHARS = 50_000;
 
 /** The core in reading order. `what` is the line the index shows for the part. */
 export const SPEC_PARTS: Array<{ id: SpecPartId; what: string }> = [

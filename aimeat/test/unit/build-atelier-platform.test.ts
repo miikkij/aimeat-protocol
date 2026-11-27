@@ -7,12 +7,13 @@
  *   retired Classic track or its tiers, part `start` names the index, and the parts still rebuild
  *   the full text because the platform sections are not in it.
  * @version-history
+ *   v1.1.1 — 2026-11-28 — A part is held to HARD_PART_CHARS; MAX_PART_CHARS is the recommended size.
  *   v1.1.0 — 2026-11-19 — `other-owners` and the pointer the served `group` and `row-spaces` end with.
  *   v1.0.0 — 2026-11-19 — Initial, with `from-classic` and the paste delivery.
  */
 import { describe, it, expect } from 'vitest';
 import { buildAtelierPrompt } from '../../src/services/builder/atelier-prompt.js';
-import { ATELIER_PARTS, atelierPiece, atelierPieceIds, MAX_PART_CHARS } from '../../src/services/builder/atelier-layers.js';
+import { ATELIER_PARTS, atelierPiece, atelierPieceIds, HARD_PART_CHARS } from '../../src/services/builder/atelier-layers.js';
 import { ATELIER_PLATFORM, atelierPlatformPiece } from '../../src/services/builder/atelier-platform.js';
 
 const LONG = 'https://a-rather-long-organisation-node-address.example.com';
@@ -35,7 +36,7 @@ describe('Atelier platform sections', () => {
 
   it('keeps each section and the index under what one tool result carries', () => {
     for (const id of ['platform', ...ATELIER_PLATFORM.map(s => s.id)]) {
-      expect(atelierPlatformPiece(id, LONG)!.text.length, id).toBeLessThanOrEqual(MAX_PART_CHARS);
+      expect(atelierPlatformPiece(id, LONG)!.text.length, id).toBeLessThanOrEqual(HARD_PART_CHARS);
     }
   });
 
@@ -57,7 +58,7 @@ describe('Atelier platform sections', () => {
   it('is named in part `start`, which stays under the limit on a long node address', () => {
     const start = atelierPiece(full, 'start', LONG)!.text;
     expect(start).toContain('- `platform` —');
-    expect(start.length).toBeLessThanOrEqual(MAX_PART_CHARS);
+    expect(start.length).toBeLessThanOrEqual(HARD_PART_CHARS);
   });
 
   it('stays out of the full text, so the parts still rebuild it', () => {

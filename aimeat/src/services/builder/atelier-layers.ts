@@ -22,6 +22,7 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.10.1 — 2026-11-28 — Re-exports HARD_PART_CHARS beside the recommended MAX_PART_CHARS.
  *   v1.10.0 — 2026-11-27 — "The frame, the moments and the owner's templates" (atelier-moments.ts)
  *     goes to part `screens` (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.9.0 — 2026-11-20 — Part `screens` (atelier-screens.ts): the phone and the desktop, read
@@ -57,7 +58,7 @@
  *     against the 24 000 a result holds, and the section is about a library (AIMEAT.ai, the aide block).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
-import { MAX_PART_CHARS } from './app-layers.js';
+import { MAX_PART_CHARS, HARD_PART_CHARS } from './app-layers.js';
 import { ATELIER_PLATFORM_PART_LINE, atelierPlatformIds, atelierPlatformPiece } from './atelier-platform.js';
 
 export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'screens' | 'look' | 'motion';
@@ -198,4 +199,4 @@ export function atelierPiece(full: string, id: string, baseUrl: string): Atelier
 /** Every id atelierPiece answers to: the parts in reading order, then the platform index and its sections. */
 export function atelierPieceIds(): string[] { return [...ATELIER_PARTS.map(p => p.id as string), ...atelierPlatformIds()]; }
 
-export { MAX_PART_CHARS };
+export { MAX_PART_CHARS, HARD_PART_CHARS };

@@ -27,6 +27,7 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-28) A spec part is held to 50 000 characters, the hard limit; 24 000 is the recommended size.
  *   (2026-11-19) One track: build-app hands out the Atelier token, a new non-Atelier page is warned
  *     whatever token it carried, and an update of a Classic app stays quiet.
  *   (2026-11-15) Audit M276: DOOR 3 asserts the refused draft left no catalogue row and no version.
@@ -432,7 +433,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(list.status === 200, `parts list ${list.status}`);
         const ids = (list.body.data.parts as any[]).map(p => p.id);
         assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'libraries', 'book', 'patterns', 'screens', 'look', 'motion']), `parts: ${JSON.stringify(ids)}`);
-        for (const p of list.body.data.parts as any[]) assert(p.chars > 1000 && p.chars <= 24000, `${p.id} is ${p.chars} characters`);
+        for (const p of list.body.data.parts as any[]) assert(p.chars > 1000 && p.chars <= 50_000, `${p.id} is ${p.chars} characters`);
         const start = await json('/v1/prompts/build-app-atelier/sections/start');
         assert(start.status === 200 && start.body.data.spec_token === atelierToken, 'part start carries the Atelier token');
         assert((start.body.data.prompt as string).includes('build-app-atelier/<id>'), 'part start says how to read the others');

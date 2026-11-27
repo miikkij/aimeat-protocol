@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The templates the node ships, as the template tools answer for them.
  * @version-history
+ *   v1.1.1 — 2026-11-28 — An answer is held to HARD_PART_CHARS; MAX_PART_CHARS is the recommended size.
  *   v1.1.0 — 2026-11-19 — The shell read is shell-atelier; the retired shell-pure-client answers null.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
@@ -12,7 +13,7 @@ import {
   nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage, splitAtLines, MAX_TEMPLATE_CONTENT_CHARS,
 } from '../../src/services/node/templates.js';
 import { getAppTemplates } from '../../src/data/app-templates.js';
-import { MAX_PART_CHARS } from '../../src/services/builder/app-layers.js';
+import { HARD_PART_CHARS } from '../../src/services/builder/app-layers.js';
 
 describe('node templates', () => {
   it('returns the shell every build text names, with its file and how to start from it', () => {
@@ -35,14 +36,14 @@ describe('node templates', () => {
     const index = nodeTemplateIndex();
     expect(index.length).toBe(getAppTemplates().length);
     expect(index.every(t => t.id && t.kind && t.title)).toBe(true);
-    expect(JSON.stringify(index, null, 2).length).toBeLessThan(MAX_PART_CHARS / 2);
+    expect(JSON.stringify(index, null, 2).length).toBeLessThan(HARD_PART_CHARS / 2);
   });
 
   it('serves every shell whole in one tool result', () => {
     for (const t of getAppTemplates().filter(x => x.kind === 'app-shell')) {
       const answer = nodeTemplateAnswer(t.id)!;
       expect(answer.parts, t.id).toBeUndefined();
-      expect(JSON.stringify(answer, null, 2).length, t.id).toBeLessThan(MAX_PART_CHARS);
+      expect(JSON.stringify(answer, null, 2).length, t.id).toBeLessThan(HARD_PART_CHARS);
     }
   });
 
@@ -57,7 +58,7 @@ describe('node templates', () => {
       let joined = '';
       for (let part = 1; part <= count; part++) {
         const answer = nodeTemplateAnswer(t.id, part)!;
-        expect(JSON.stringify(answer, null, 2).length, `${t.id} part ${part}`).toBeLessThan(MAX_PART_CHARS);
+        expect(JSON.stringify(answer, null, 2).length, `${t.id} part ${part}`).toBeLessThan(HARD_PART_CHARS);
         joined += String(answer.content);
       }
       expect(joined, t.id).toBe(t.content);

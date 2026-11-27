@@ -17,6 +17,8 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-28 — A part is held to HARD_PART_CHARS (50 000); 24 000 is the recommended size and no
+ *     longer fails the suite (Jouni, 2026-11-28).
  *   2026-11-20 — 17c: the parts include `screens` (the phone and the desktop).
  *   2026-11-19 — 15-17, 17e, 17f, 18, 19: the Classic specification and shells are retired; its
  *     addresses answer with the Atelier text behind a notice, and the shell read is shell-atelier.
@@ -49,6 +51,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { HARD_PART_CHARS as HARD_PART } from '../src/services/builder/app-layers.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -464,7 +467,7 @@ async function main() {
             const start = toolText(body);
             const rest = await fetch(`${BASE}/v1/prompts/build-app/sections/start?format=txt`).then(r => r.text());
             assert(start === rest, `the MCP part equals the REST part (${start.length} vs ${rest.length})`);
-            assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
+            assert(start.length < HARD_PART, `one tool result carries it: ${start.length} characters`);
             assert(start.startsWith('## This address now serves the Atelier specification'), 'it says first that Classic is retired');
             const atelierStart = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/start?format=txt`).then(r => r.text());
             assert(start.endsWith(atelierStart), 'after the notice it is the Atelier first part, unchanged');
@@ -513,7 +516,7 @@ async function main() {
             const start = toolText(body);
             const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/start?format=txt`).then(r => r.text());
             assert(start === rest, `the MCP part equals the REST part (${start.length} vs ${rest.length})`);
-            assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
+            assert(start.length < HARD_PART, `one tool result carries it: ${start.length} characters`);
             const full = await json('/v1/prompts/build-app-atelier');
             assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
             // By level since 2026-11-08 (B): `libraries` and `patterns` always, `genre` and `book` on `fine`;
@@ -529,7 +532,7 @@ async function main() {
             for (const p of list.body.data.parts) {
                 const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
                 const text = toolText(body);
-                assert(text.length === p.chars && text.length < 24_000, `${p.id}: ${text.length} characters, listed as ${p.chars}`);
+                assert(text.length === p.chars && text.length < HARD_PART, `${p.id}: ${text.length} characters, listed as ${p.chars}`);
                 carried += text.length;
             }
             // The parts add one index to the text and drop nothing.
@@ -566,7 +569,7 @@ async function main() {
             assert(patterns.includes('THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE'), 'part patterns says where the mosaic goes in a genre fork');
             assert(/target: '#work'/.test(patterns) && patterns.includes('name="aimeat-book-parts"') && patterns.includes('id="aimeat-layout"'),
                 'with the mount, the parts named in the head and the layout carried as data, which the publish records');
-            assert(patterns.length < 24_000, `and the part still fits one tool result: ${patterns.length}`);
+            assert(patterns.length < HARD_PART, `and the part still fits one tool result: ${patterns.length}`);
             const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 413)).body);
             assert(start.includes('From the Design Book I take nothing, because'), 'the proposal owes the line, in both of its shapes');
         });
@@ -575,7 +578,7 @@ async function main() {
             const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/book' } }, 414)).body);
             assert(patterns.includes('id="aimeat-build-notes"') && patterns.includes('NOTHING GOES INTO THE BOOK BECAUSE A BUILD IS FINISHED'),
                 'the specification asks for the reasons and says when the Book hears of them');
-            assert(patterns.length < 24_000, `the part still fits one tool result: ${patterns.length}`);
+            assert(patterns.length < HARD_PART, `the part still fits one tool result: ${patterns.length}`);
             const queue = JSON.parse(toolText((await v1('tools/call', { name: 'aimeat_designbook_search', arguments: { view: 'reasons' } }, 415)).body));
             assert(Array.isArray(queue.made) && Array.isArray(queue.passed_over) && /not measurements/.test(queue.note), `the queue answers, and says how to read it: ${JSON.stringify(Object.keys(queue))}`);
             const none = await v1('tools/call', { name: 'aimeat_designbook_keep', arguments: { filename: 'no-such-app.html' } }, 416);
@@ -626,7 +629,7 @@ async function main() {
             const list = await json('/v1/prompts/features/sections');
             const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
             assert(parts.length > 10 && parts[0].id === 'start', `the parts: ${parts.length}`);
-            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < HARD_PART, `${p.id} fits one tool result: ${p.chars}`);
             // A long area is split between features, and each part names the next one.
             for (const later of parts.filter(p => /\.\d+$/.test(p.id))) {
                 const n = Number(later.id.split('.').pop());
@@ -657,7 +660,7 @@ async function main() {
             const list = await json('/v1/prompts/settings/sections');
             const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
             assert(parts.length > 50 && parts[0].id === 'start' && parts.some(p => p.id === 'ai.temperature'), `the parts: ${parts.length}`);
-            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < HARD_PART, `${p.id} fits one tool result: ${p.chars}`);
             const temp = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'settings/ai.temperature' } }, 424)).body);
             assert(temp.includes('Temperature') && temp.includes('Lämpötila') && temp.includes('Temperatura'), `English, Finnish and Spanish: ${temp.slice(0, 200)}`);
             assert(temp.includes('Arvoalue') && temp.includes('Ejemplos'), 'each language uses its own section words');
@@ -691,7 +694,7 @@ async function main() {
             const list = await json('/v1/prompts/places/sections');
             const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
             assert(parts.map(p => p.id).join(',') === 'start,admin', `the parts: ${parts.map(p => p.id)}`);
-            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < HARD_PART, `${p.id} fits one tool result: ${p.chars}`);
             const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 472)).body);
             assert(handbook.includes('"places"'), 'the handbook says where the list of places is');
         });
@@ -738,7 +741,7 @@ async function main() {
             let joined = '';
             for (let part = 1; part <= first.parts; part++) {
                 const text = toolText((await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'genre-match', part } }, 431 + part)).body);
-                assert(text.length < 24_000, `part ${part} fits one tool result: ${text.length} characters`);
+                assert(text.length < HARD_PART, `part ${part} fits one tool result: ${text.length} characters`);
                 joined += JSON.parse(text).content;
             }
             const rest = await json('/v1/app-templates/genre-match');
