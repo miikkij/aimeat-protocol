@@ -79,7 +79,7 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/start',
   '/v1/app-grant',   // H-2 app-grant consent page (SPA)
   '/v1/app-open',    // Opening an app or a page that needs a sign-in (SPA, ?app=<owner>/<file>, ?portfolio=<user>, ?company=<id>; routes/apps/open.ts, routes/page-open.ts)
-  '/v1/app-join',    // An app's membership: its price and the purchase, signed in or with an email address (SPA, ?app=<owner>/<file>; routes/app-membership.ts)
+  '/v1/app-join',    // An app's membership: its price and the purchase, signed in or with an email address (SPA, ?app=<owner>/<file>; routes/apps/membership.ts)
   '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
   '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
   '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)

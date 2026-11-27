@@ -643,7 +643,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:b8f0c6410b3867fa28d506a3",
+      "digest": "sha256:c65dc5a0962f3e48f0c61486",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -660,7 +660,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:b8f0c6410b3867fa28d506a3",
+      "digest": "sha256:c65dc5a0962f3e48f0c61486",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -1059,14 +1059,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "55aa1c60d2105e5b"
+      "aimeat/test/run-e2e-ci.ts": "6fd69097a58c17f1"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "211c8fbd99a62b9c"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "55aa1c60d2105e5b"
+      "aimeat/test/run-e2e-ci.ts": "6fd69097a58c17f1"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

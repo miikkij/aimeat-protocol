@@ -64,6 +64,31 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The hold ledger and its state machine, plus the seller's payment settings."
     },
+    "src/commerce/membership-end.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-27 (app membership sale), the node's own read: the membership subscription records (commerce.subscription.app~*) a seller's refund names, to end the membership the payment bought. No content."
+    },
+    "src/commerce/membership-guest.ts": {
+      "reads": {
+        "getMemory": 3,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-27 (app membership sale), the node's own read: the purchase record of a membership bought without an account (platform namespace app-member-purchase) and the seller's sealed selling key (commerce.psp) for the card page; the sweep lists the purchase records to delete old ones. No content."
+    },
+    "src/commerce/membership-sale.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27 (app membership sale), the node's own read: the seller's selling key (commerce.psp) for the checkout line. No content."
+    },
+    "src/commerce/membership-stripe.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27 (app membership sale), the node's own read: the seller's sealed selling key (commerce.psp) to read a paid Stripe checkout's lines back from Stripe. No content."
+    },
     "src/commerce/pacing-pack.ts": {
       "reads": {
         "getMemory": 1

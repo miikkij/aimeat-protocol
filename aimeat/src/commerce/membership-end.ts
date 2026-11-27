@@ -78,6 +78,9 @@ export async function endMembershipsByCharge(
     for (const row of page.items) {
       const sub = row.value as SubscriptionRecord | null;
       if (!sub || sub.kind !== 'membership' || sub.seller_ghii !== sellerGhii || sub.refunded_at || !sub.app) continue;
+      // Only the record the node wrote under the buyer's own identity: a value of the same shape
+      // under any other namespace names nobody this refund may remove.
+      if (row.ownerGaii !== sub.buyer_ghii) continue;
       const ref = named(sub.charges);
       if (!ref) continue;
       try {

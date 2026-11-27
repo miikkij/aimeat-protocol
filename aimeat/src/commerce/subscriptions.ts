@@ -177,6 +177,7 @@ const extensionSource: SubscriptionSource = {
   },
 };
 
+// process-local: nothing breaks with a second process; every process registers the same sources at boot (server-bootstrap/commerce-rails.ts).
 const sources = new Map<string, SubscriptionSource>();
 /** Register the source of one record kind (commerce/membership-sale.ts registers `membership`). */
 export function registerSubscriptionSource(kind: NonNullable<SubscriptionRecord['kind']>, source: SubscriptionSource): void {

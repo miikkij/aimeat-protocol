@@ -1,5 +1,5 @@
 /**
- * @file src/routes/app-membership.ts
+ * @file src/routes/apps/membership.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an app's membership costs and how to buy it, for the door of the app: the node's
@@ -22,22 +22,22 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import type { AimeatConfig } from '../config-types.js';
-import type { Storage } from '../storage/interface.js';
-import { success, error } from '../middleware/envelope.js';
-import { rateLimit } from '../middleware/rate-limit.js';
-import { optionalAuth } from '../auth/middleware.js';
-import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { resolveGhii } from '../utils/ghii-resolver.js';
-import { CommerceError } from '../commerce/errors.js';
-import { PaymentError } from '../commerce/payment-handlers.js';
-import { getCarryPlan, getMember, seatsTaken, accountOf } from '../services/app/members.js';
-import { appDisplayName, resolveAppFilename } from '../services/app/app-ref.js';
-import { registrationRefusal } from '../services/owner/provisioning.js';
-import { listSubscriptions } from '../commerce/subscriptions.js';
-import { membershipExt } from '../commerce/membership-sale.js';
-import { openGuestPurchase, completeGuestPurchase } from '../commerce/membership-guest.js';
+import type { AimeatConfig } from '../../config-types.js';
+import type { Storage } from '../../storage/interface.js';
+import { success, error } from '../../middleware/envelope.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
+import { optionalAuth } from '../../auth/middleware.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
+import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveGhii } from '../../utils/ghii-resolver.js';
+import { CommerceError } from '../../commerce/errors.js';
+import { PaymentError } from '../../commerce/payment-handlers.js';
+import { getCarryPlan, getMember, seatsTaken, accountOf } from '../../services/app/members.js';
+import { appDisplayName, resolveAppFilename } from '../../services/app/app-ref.js';
+import { registrationRefusal } from '../../services/owner/provisioning.js';
+import { listSubscriptions } from '../../commerce/subscriptions.js';
+import { membershipExt } from '../../commerce/membership-sale.js';
+import { openGuestPurchase, completeGuestPurchase } from '../../commerce/membership-guest.js';
 
 const OWNER_RE = /^[A-Za-z0-9_-]{1,60}$/;
 

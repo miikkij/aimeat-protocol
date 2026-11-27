@@ -10,7 +10,7 @@
  *   It reads GET /v1/apps/:owner/:filename/membership: the roles for sale with price, period, renewal
  *   and seller, and the person's own standing. Signed in, the person buys through the checkout and
  *   Stripe's card page; signed out, they give the email address the membership is for (the purchase
- *   is an invitation, routes/app-membership.ts), or sign in. Back from the card page it completes the
+ *   is an invitation, routes/apps/membership.ts), or sign in. Back from the card page it completes the
  *   purchase and opens the app, or says that the next step is in the email.
  *
  *   Same page shape as the app-open page (components/AskPage.js).

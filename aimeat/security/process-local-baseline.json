@@ -165,6 +165,14 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/commerce/subscriptions.ts :: map :: sources": {
+      "count": 1,
+      "reason": "Nothing breaks with a second process: every process registers the same subscription sources at boot (server-bootstrap/commerce-rails.ts), and the renewal reads its records from storage."
+    },
+    "src/services/app/member-invites.ts :: let :: paidStarter": {
+      "count": 1,
+      "reason": "Nothing breaks with a second process: every process sets the same paid-membership starter at boot (server-bootstrap/commerce-rails.ts); the starter writes storage only."
+    },
     "src/commerce/sellable-resolvers.ts :: map :: registry": {
       "count": 1,
       "reason": "DEBT"

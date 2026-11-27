@@ -116,6 +116,7 @@ export interface PaidInvite {
  * commerce code).
  */
 type PaidStarter = (storage: Storage, nodeId: string, args: { appId: string; role: string; account: string; paid: PaidInvite }) => Promise<void>;
+// process-local: nothing breaks with a second process; every process sets the same starter at boot (server-bootstrap/commerce-rails.ts).
 let paidStarter: PaidStarter | null = null;
 export function setPaidMembershipStarter(fn: PaidStarter | null): void { paidStarter = fn; }
 

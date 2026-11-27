@@ -1,7 +1,7 @@
 /**
  * @file iam/membership.js
  * @description AIMEAT.iam.membership: buying a membership of this app, for an app on the node roster
- *   (init({ app })). The owner prices a role in the member plan; the node sells it (routes/app-membership.ts,
+ *   (init({ app })). The owner prices a role in the member plan; the node sells it (routes/apps/membership.ts,
  *   commerce/membership-sale.ts), and this is the app's side of that.
  *
  *     joinUrl()           the node's own join page for this app (/v1/app-join?app=…)
