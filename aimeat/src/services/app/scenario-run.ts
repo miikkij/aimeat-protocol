@@ -47,6 +47,8 @@ const RUNNING_NOTE_MAX_MS = BACKGROUND_DEADLINE_MS + 60_000;
 export interface ScenarioRunAnswer extends ScenarioRunResult {
   /** True while the run goes on in the background: `scenarios` is empty and the same call reads it later. */
   running?: boolean;
+  /** The criteria the node marked evidenced from this run: no criteria_set is owed for them. */
+  criteria_evidenced?: string[];
   /** The app version the run was started for. */
   app_version?: number;
   started_at?: string;
@@ -91,7 +93,7 @@ export async function scenarioRunFor(
   const slot = takeSlot();
   if ('reason' in slot) return { ran: false, reason: slot.reason, member: 'Not started.', scenarios: [], criteria_evidence: [] };
   const started: AppScenarioRunNote = { key, appVersion: app.appVersion, state: 'running', startedAt: new Date(now()).toISOString() };
-  if (!await writeAppScenarioRun(storage, appId, started)) {
+  if (await writeAppScenarioRun(storage, appId, started) === null) {
     slot.release();
     return { ran: false, reason: 'The app has no design spec to keep the run beside: write it with spec_set first.', member: 'Not started.', scenarios: [], criteria_evidence: [] };
   }
@@ -100,10 +102,16 @@ export async function scenarioRunFor(
   // note it started under, and only there: a newer run's note is never overwritten by an older one.
   const work = runAppScenarios(storage, config, app, scenarios, { deadlineMs: BACKGROUND_DEADLINE_MS, ...(opts.launch ? { launch: opts.launch } : {}) })
     .catch((err: unknown): ScenarioRunResult => ({ ran: false, reason: `The scenarios did not finish: ${(err as Error)?.message ?? 'unknown error'}.`, member: 'Not known.', scenarios: [], criteria_evidence: [] }))
-    .then(async (result) => {
+    .then(async (ran) => {
       const finishedAt = new Date(now()).toISOString();
-      await writeAppScenarioRun(storage, appId, { ...started, state: 'done', finishedAt, result }, { onlyIfKey: key })
-        .catch((err: unknown) => { logger.warn('scenario run: the result was not kept', { app: appId, error: String(err) }); });
+      // What a scenario proved at every size and theme is written as evidence in the same write as
+      // the result: the node saw it, so the builder does not send the whole criteria list back.
+      const result: ScenarioRunResult & { criteria_evidenced?: string[] } = { ...ran };
+      await writeAppScenarioRun(
+        storage, appId,
+        (marked) => { if (marked.length) result.criteria_evidenced = marked; return { ...started, state: 'done', finishedAt, result }; },
+        { onlyIfKey: key, evidence: ran.criteria_evidence, appVersion: app.appVersion },
+      ).catch((err: unknown) => { logger.warn('scenario run: the result was not kept', { app: appId, error: String(err) }); });
       return { ...result, app_version: app.appVersion, started_at: started.startedAt, finished_at: finishedAt } satisfies ScenarioRunAnswer;
     })
     .finally(() => slot.release());

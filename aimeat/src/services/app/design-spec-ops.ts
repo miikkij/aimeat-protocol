@@ -14,6 +14,8 @@
  * @structure readDesignSpecFor · writeDesignSpecFor · writeCriteriaFor · writeScenariosFor · clearDesignSpecFor
  * @usage const out = await writeDesignSpecFor(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.3.0 — 2026-11-27 — writeDesignSpecFor takes `confirm: true` in place of the text: the spec
+ *     there is marked current for the app's version without the document being sent back.
  *   v1.2.0 — 2026-11-26 — writeScenariosFor: the playtest scenarios inside the spec (scenarios.ts).
  *   v1.1.0 — 2026-11-26 — writeCriteriaFor: the acceptance criteria inside the spec (acceptance-criteria.ts);
  *     a builder of another account may not newly waive a line.
@@ -86,7 +88,16 @@ export async function writeDesignSpecFor(
   const found = await specTarget(storage, config, caller, ref);
   if (!found.ok) return found;
   const body = (rawBody ?? {}) as Record<string, unknown>;
-  const checked = checkDesignSpecMarkdown(body.markdown);
+  // `confirm: true` in place of the text: the document that is there still describes the app. The
+  // write below then gets the stored text, which marks the spec current without a new revision.
+  // Confirming used to mean sending the whole document back, a few thousand tokens to say "yes".
+  let text = body.markdown;
+  if (body.confirm === true && (text === undefined || text === null)) {
+    const stored = await readAppDesignSpec(storage, found.appId);
+    if (!stored) return refuse(400, 'INVALID_INPUT', 'There is no design spec to confirm: write it with markdown first.');
+    text = stored.markdown;
+  }
+  const checked = checkDesignSpecMarkdown(text);
   if (!checked.ok) return refuse(400, 'INVALID_INPUT', checked.message);
   const expected = body.expected_revision;
   if (expected !== undefined && expected !== null && (!Number.isInteger(expected) || (expected as number) < 0)) {

@@ -166,6 +166,10 @@ const SCENARIOS = [
         if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
         const ev = (run.criteria_evidence ?? []) as Array<{ id: string; evidence: string }>;
         assert(ev.length === 1 && ev[0].id === 'saves-item' && ev[0].evidence.includes('"saves"'), `evidence: ${JSON.stringify(ev)}`);
+        // The node wrote that evidence itself: the criterion is evidenced with no criteria write from the builder.
+        assert(JSON.stringify(run.criteria_evidenced) === '["saves-item"]', `the run names what it marked: ${JSON.stringify(run.criteria_evidenced)}`);
+        const kept = JSON.stringify((await json(`${app}/design-spec`, { headers: auth })).body?.data ?? {});
+        assert(/"status":"evidenced"/.test(kept) && kept.includes('node:playtest') && kept.includes('Playtest scenario'), `the criterion is evidenced in the spec: ${kept.slice(0, 400)}`);
         const owners = await json('/v1/admin/owners', { headers: auth });
         assert(owners.status === 200, `owners: ${owners.status}`);
         const names = JSON.stringify(owners.body?.data ?? {});

@@ -102,7 +102,7 @@ export async function appFreshnessFor(
 
   const behind: Array<{ item: string; what: string }> = [];
   if (!spec) behind.push({ item: 'design_spec', what: 'There is no design spec: write one with spec_set.' });
-  else if (isDesignSpecStale(spec, live)) behind.push({ item: 'design_spec', what: `Written against version ${spec.version}; the app is at version ${live}. Read it, then confirm it (the same text) or update it with spec_set.` });
+  else if (isDesignSpecStale(spec, live)) behind.push({ item: 'design_spec', what: `Written against version ${spec.version}; the app is at version ${live}. Read it, then confirm it (spec_set with confirm: true) or update it with spec_set.` });
   if (counts.open) behind.push({ item: 'criteria', what: `${counts.open} acceptance criteria are open: evidence them, or ask the owner to waive them, with criteria_set.` });
   if (evidencedBefore.length) behind.push({ item: 'criteria', what: `${evidencedBefore.length} criteria were evidenced at an earlier version (${evidencedBefore.map(c => `${c.id} at v${c.evidenced_version}`).join(', ')}): check that each still holds at version ${live}, and evidence it again or set it open.` });
   if (!dataMap) behind.push({ item: 'data_map', what: 'There is no data map: write one with aimeat_datamap_set, saying where each family of data lives and why.' });

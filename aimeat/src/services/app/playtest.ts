@@ -35,6 +35,8 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.4.0 — 2026-11-27 — The audit asks scenario-run.ts for the scenarios: a run is started once,
+ *     goes on on the node when it is long, and is read with the same request again.
  *   v1.3.0 — 2026-11-26 — The audit bundle carries `scenarios`: the builder's own scenarios from the
  *     design spec, run signed in at four sizes and both themes (playtest-scenarios.ts), in a slot of
  *     their own that counts against the hourly limit.

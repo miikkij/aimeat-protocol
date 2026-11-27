@@ -11,6 +11,8 @@
  *   that a stale spec is told on every app and never refused.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-design-spec
  * @version-history
+ *   v1.2.0 — 2026-11-27 — `confirm: true` marks the spec current without its text; refused when
+ *     there is no spec, and for a stranger.
  *   v1.1.0 — 2026-10-27 — An erased account's spec and roadmap do not pass to the next holder of the
  *     name; the owner's own delete and republish keeps both (secaudit2026oct26).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
@@ -156,6 +158,11 @@ await test('the owner reads an empty spec and gets the outline to start from', a
     assert(String(r.body.data.meaning).includes('Nobody has written one'), 'and the meaning says so');
 });
 
+await test('confirming a spec nobody has written is refused', async () => {
+    const r = await json(spec(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ confirm: true }) });
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${r.body?.error?.code}`);
+});
+
 await test('an unknown app is not found rather than given an outline', async () => {
     const r = await json(`/v1/apps/${owner.name}/no-such-app.html/design-spec`, { headers: auth(owner.token) });
     assert(r.status === 404, `expected 404, got ${r.status}`);
@@ -222,6 +229,16 @@ await test('a publish past the spec says it has fallen behind, and does not refu
     assert(pub.body.data.manifest?.designSpec?.revision === 1, 'the new version\'s manifest carries the stamp');
     const r = await json(spec(), { headers: auth(owner.token) });
     assert(r.body.data.stale === true, 'and the read says the spec is stale');
+});
+
+await test('confirm: true marks the spec current without the text, and the revision stays', async () => {
+    const r = await json(spec(), { method: 'PUT', headers: auth(builder.token), body: JSON.stringify({ confirm: true }) });
+    assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.unchanged === true && r.body.data.design_spec.revision === 1, `the text and the revision are the ones there: ${JSON.stringify({ unchanged: r.body.data.unchanged, revision: r.body.data.design_spec?.revision })}`);
+    assert(r.body.data.design_spec.version === 3 && r.body.data.stale === false, 'and the spec is current for version 3');
+    assert(r.body.data.design_spec.markdown === SPEC_V1.replace(/\r\n?/g, '\n').trim() + '\n' || String(r.body.data.design_spec.markdown).includes(SPEC_V1.trim().slice(0, 40)), 'the document is the one that was there');
+    const stranger_ = await json(spec(), { method: 'PUT', headers: auth(stranger.token), body: JSON.stringify({ confirm: true }) });
+    assert(stranger_.status === 403 || stranger_.status === 404, `a stranger may not confirm it: ${stranger_.status}`);
 });
 
 await test('a write naming the wrong revision is refused with the document that is there', async () => {

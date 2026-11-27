@@ -242,24 +242,43 @@ export async function writeAppSpecParts(
  * last wrote the spec stay: this is the node keeping a result beside the scenarios, not somebody
  * editing the document, so a builder's `expected_revision` still names the record they read.
  * `onlyIfKey` writes only while the note there is the same run's, so a run that finishes after a
- * newer one started does not overwrite it. False when there is no spec or the note moved on.
+ * newer one started does not overwrite it. Null when there is no spec or the note moved on.
+ *
+ * `evidence` is what a finished run proved: each criterion it names that is not waived becomes
+ * evidenced in the same write, stamped as the node's own playtest at the run's app version. The
+ * builder then has no list to send back. Returns the ids that were marked.
  */
 export async function writeAppScenarioRun(
-  storage: Storage, appId: string, note: AppScenarioRunNote, opts: { onlyIfKey?: string } = {},
-): Promise<boolean> {
+  storage: Storage, appId: string, noteOf: AppScenarioRunNote | ((marked: string[]) => AppScenarioRunNote),
+  opts: { onlyIfKey?: string; evidence?: ReadonlyArray<{ id: string; evidence: string }>; appVersion?: number } = {},
+): Promise<string[] | null> {
   for (let attempt = 0; attempt < 40; attempt++) {
     const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
     const current = existing?.value as AppDesignSpec | undefined;
-    if (!existing || !current || current.spec !== APP_DESIGN_SPEC_SPEC) return false;
-    if (opts.onlyIfKey !== undefined && current.scenarioRun?.key !== opts.onlyIfKey) return false;
+    if (!existing || !current || current.spec !== APP_DESIGN_SPEC_SPEC) return null;
+    if (opts.onlyIfKey !== undefined && current.scenarioRun?.key !== opts.onlyIfKey) return null;
+    const now = new Date().toISOString();
+    const proved = new Map((opts.evidence ?? []).map(e => [e.id, e.evidence]));
+    const marked: string[] = [];
+    const criteria = current.criteria?.map((c) => {
+      const evidence = proved.get(c.id);
+      if (evidence === undefined || c.status === 'waived') return c;
+      marked.push(c.id);
+      return { ...c, status: 'evidenced' as const, evidence, evidencedBy: PLAYTEST_EVIDENCER, evidencedAt: now, ...(opts.appVersion !== undefined ? { evidencedVersion: opts.appVersion } : {}) };
+    });
+    // The note may name the criteria this write marked, so a later read of the kept run names them.
+    const note = typeof noteOf === 'function' ? noteOf(marked) : noteOf;
     const saved = await storage.setMemoryIfVersion(
-      { ...existing, value: { ...current, scenarioRun: note }, version: existing.version + 1, updatedAt: new Date().toISOString() },
+      { ...existing, value: { ...current, ...(criteria ? { criteria } : {}), scenarioRun: note }, version: existing.version + 1, updatedAt: now },
       existing.version,
     );
-    if (saved) return true;
+    if (saved) return marked;
   }
   throw new Error('The design spec changed repeatedly. Retry this write.');
 }
+
+/** Who evidenced a criterion the node's own scenario run proved. */
+export const PLAYTEST_EVIDENCER = 'node:playtest';
 
 /** Take the document away. Returns whether there was one. */
 export async function deleteAppDesignSpec(storage: Storage, appId: string): Promise<boolean> {
@@ -319,7 +338,7 @@ export function designSpecHint(input: { stamp: AppDesignSpecStamp | undefined; n
   if (!isDesignSpecStale(input.stamp, input.newVersion)) return undefined;
   return `The design spec was written against version ${input.stamp.version}; this publish made version ${input.newVersion}. `
     + 'Read it with aimeat_app_manage { action: "spec" } and, when this change altered what it describes, update it with '
-    + '{ action: "spec_set" }. Sending the same text again marks it current for this version.';
+    + '{ action: "spec_set" }. When it still describes the app, { action: "spec_set", confirm: true } marks it current for this version without the text.';
 }
 
 /** The sentence a reader of the spec gets with it. */
@@ -330,7 +349,7 @@ export function designSpecMeaning(spec: AppDesignSpec | null, appVersion: number
   }
   if (isDesignSpecStale(spec, appVersion)) {
     return `Written against version ${spec.version}; the app is at version ${appVersion}. Read it, then confirm it `
-      + '(write the same text) or update it, so the next builder reads a document that describes the app as it is.';
+      + '(spec_set with confirm: true) or update it, so the next builder reads a document that describes the app as it is.';
   }
   return `Describes the app as it is at version ${spec.version}. Read it before you change the app, and write it back `
     + 'with what changed after you publish.';

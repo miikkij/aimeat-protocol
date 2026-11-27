@@ -446,8 +446,9 @@ publish answer counts them in \`next_steps\`. Only the owner waives a line. When
 of your own, write playtest scenarios with \`scenarios_set\` (steps: click, fill, press, wait,
 expect_text, expect_visible, expect_absent; each scenario names the criteria it proves) and run them
 with \`audit\` \`{ playtest: true }\`: the node opens the published app signed in as a throwaway member
-at four sizes and both themes, and answers pass or fail per size and theme and \`criteria_evidence\`
-lines to write back with \`criteria_set\`. Write the criteria first: a scenario names them. Every run
+at four sizes and both themes, and answers pass or fail per size and theme. A scenario that passes
+at all of them marks the criteria it names as evidenced by itself (\`criteria_evidenced\`): no
+\`criteria_set\` is owed for those. Write the criteria first: a scenario names them. Every run
 of a size and theme is on an account of its own that holds nothing. A short run is answered in the
 same call. A longer one goes on on the node for up to eight minutes and the answer says
 \`running\`: ask for the same audit again in about a minute, which reads the finished run and starts

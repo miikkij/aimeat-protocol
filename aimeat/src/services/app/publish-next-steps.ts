@@ -132,7 +132,7 @@ export function documentSteps(ownerName: string, filename: string, d: DocumentsB
       : `This app has a data map. If this change moved or added where data is stored, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
   const designSpec = d.designSpecVersion === undefined
     ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data is stored, what was decided and why, what is open, and what went wrong; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
-    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
+    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; when nothing in it changed, { action: "spec_set", confirm: true } marks it current without the text.`;
   const counts = criteriaCounts(d.criteria);
   const open = (d.criteria ?? []).filter(c => c.status === 'open').map(c => c.id);
   const criteria = counts.total === 0

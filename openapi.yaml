@@ -45929,9 +45929,11 @@ paths:
       operationId: appDesignSpecWrite
       summary: Write the whole design spec
       description: >
-        Body `{ markdown, expected_revision? }`. `markdown` is the whole document, at most 64 KB; it
-        replaces what is there. Sending the text that is there marks the spec current for the app's
-        version without a new revision, which is how a builder confirms it after a publish. With
+        Body `{ markdown, expected_revision? }` or `{ confirm: true }`. `markdown` is the whole
+        document, at most 64 KB; it replaces what is there. `confirm: true` in place of the text says
+        the document that is there still describes the app, and marks it current for the app's version
+        without a new revision: how a builder confirms it after a publish, without sending the text
+        back (400 when there is no spec yet). Sending the same text again does the same. With
         `expected_revision` the write is refused (409 `REVISION_MISMATCH`, with the current document
         in `details`) when the stored revision differs, so two builders' AIs cannot overwrite each
         other unseen. The manifest's `designSpec` stamp follows every write. Needs `app:write` and
@@ -45948,9 +45950,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [markdown]
               properties:
                 markdown: { type: string, minLength: 3, maxLength: 65536 }
+                confirm: { type: boolean, description: 'In place of markdown: the spec that is there still describes the app.' }
                 expected_revision: { type: integer, minimum: 0 }
       responses:
         '200':

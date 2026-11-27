@@ -79,7 +79,7 @@ const VALUE: Record<string, unknown> = {
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
-    markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
+    markdown: '# zqxspec', confirm: true, expected_revision: 4, words: ['zqxword'],
     criteria: [{ id: 'zqxline', text: 'zqxtext', check: 'person', status: 'open' }],
     scenarios: [{ id: 'zqxscene', name: 'zqxname', steps: [{ do: 'wait', ms: 10 }] }],
     purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',

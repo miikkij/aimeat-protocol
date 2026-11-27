@@ -198,7 +198,7 @@
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:2e8882cc5213f17a9198c632"
+      "digest": "sha256:18de5770677b979bdfd9e101"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-22",
@@ -721,7 +721,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "905fba7ed8d0e386",
-      "aimeat/src/services/app/publish-next-steps.ts": "33d61dc97db52021"
+      "aimeat/src/services/app/publish-next-steps.ts": "b95844f66eeebc89"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",

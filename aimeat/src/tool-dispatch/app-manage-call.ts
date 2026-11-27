@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-27 -- spec_set forwards `confirm`.
  *   2026-11-26 -- scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 -- freshness reaches GET /v1/apps/:owner/:filename/freshness.
  *   2026-11-26 -- criteria_set reaches PUT /v1/apps/:owner/:filename/design-spec/criteria.
@@ -238,7 +239,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'spec':
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
         case 'spec_set':
-            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec`, pick(input, ['markdown', 'expected_revision']));
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec`, pick(input, ['markdown', 'confirm', 'expected_revision']));
         case 'spec_clear':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
         case 'criteria_set':
