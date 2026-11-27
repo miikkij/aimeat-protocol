@@ -36,6 +36,7 @@
  *
  *   AIMEAT.atelier.micro(page, { selector: '.ak-btn, .ak-card', hover: 'lift', press: 'squash' });
  * @version-history
+ *   2026-11-28 — Comment only: swipeStack's JSDoc says the rules are in the stylesheet.
  *   v0.46.0 — 2026-09-02 — Initial: the Motion show module (layoutMove, swipeStack, micro).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
@@ -345,7 +346,7 @@ export function layoutMove(container, opts) {
  * keys once the stack has focus. `undo()` brings the last card back.
  *
  * The pull, the pile's depth and the two edge marks are numbers written into custom properties;
- * every rule that turns them into a tilt, a lift or a tint lives in the stylesheet. Under reduced
+ * every rule that turns them into a tilt, a lift or a tint is in the stylesheet. Under reduced
  * motion a card leaves the moment it is thrown, with no travel, and everything else is unchanged.
  * @param {{
  *   target?: string|Element,

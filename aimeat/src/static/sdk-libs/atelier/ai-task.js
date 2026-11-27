@@ -59,6 +59,7 @@
  *     onResult: (r) => AIMEAT.data.set('my-app.analyses.' + id, r) });
  *   task.show(await AIMEAT.data.get('my-app.analyses.' + id));
  * @version-history
+ *   2026-11-28 — Comment only: AiResult's JSDoc says the app passes it to show() again.
  *   v0.64.0 — 2026-10-02 — The way to the fix: with the AI off, the notice carries an Open AI
  *     settings button (part `settings`) to the node's `settingsUrl`, which opens the person's AI
  *     settings at the provider to fix; a refused call's failure line says the node's sentence for the
@@ -310,7 +311,7 @@ export function errorWords(e) {
  */
 
 /**
- * What a call gave, and what the app keeps and hands back to show().
+ * What a call gave, and what the app keeps and passes to show() again.
  * @typedef {object} AiResult
  * @property {string} [content]  the answer's text (the raw JSON text for a schema call)
  * @property {any} [parsed]  the object of a schema call

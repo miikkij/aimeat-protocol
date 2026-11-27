@@ -38,6 +38,8 @@
  *   markup an app would want to fill, so it carries no @parts declaration and describe() claims
  *   nothing for it. Adding it is the same three steps as the queue's.
  * @version-history
+ *   2026-11-28 — Comment only: queue's JSDoc stands above queue() again (it stood above a helper),
+ *     so the kit reference reads its options (tools/build-atelier-parts.ts).
  *   2026-11-19 — health and queue warn once in the console when the rows come as `items` (the
  *     list's and the grid's shape) instead of `data.items`; they still read only `data.items`.
  *   v0.51.0 — 2026-09-05 — THE WALL AND THE QUEUE TAKE WHAT THE APP GIVES THEM: named parts on
@@ -142,13 +144,6 @@ export function health(spec) {
 const QUEUE_STATES = ['waiting', 'running', 'done', 'failed'];
 const QUEUE_TONE = { waiting: 'plain', running: 'warn', done: 'ok', failed: 'err' };
 
-/**
- * The work queue.
- * @param {{ target?: string|Element, title?: string,
- *   data?: { items: Array<{ id: string, title: string, state?: string, sub?: string }> }|null,
- *   empty?: { title?: string, hint?: string }, onPick?: (item: any) => void,
- * }} spec
- */
 /** One job's row contents, written into the element that already stands for it.
  *  @param {HTMLElement} row @param {any} item @param {any} spec */
 function fillJob(row, item, spec) {
@@ -165,6 +160,13 @@ function fillJob(row, item, spec) {
   slotInto(row, spec, 'aside', null, { cls: 'ak-queue__aside', args: [item] });
 }
 
+/**
+ * The work queue.
+ * @param {{ target?: string|Element, title?: string,
+ *   data?: { items: Array<{ id: string, title: string, state?: string, sub?: string }> }|null,
+ *   empty?: { title?: string, hint?: string }, onPick?: (item: any) => void,
+ * }} spec
+ */
 export function queue(spec) {
   const root = el('div', { class: 'ak-root ak-queue', 'data-ak-part': 'root' });
   applyVariant(root, spec, ['dense', 'plain']);

@@ -27,11 +27,20 @@
  *   the whole list. Its words are a closed list, the same words the node's own component catalogue
  *   uses (src/services/ui-library) plus two an app needs: a word outside the list fails the build,
  *   because a use nobody else can ask for selects nothing.
- * @structure USES · readTags() → per-component records · emit() → the generated module · main():
- *   write or --check
+ *
+ *   A SECOND OUTPUT, FOR A BUILDER WITH NO BROWSER. describe() answers in a browser. A builder
+ *   working over MCP from a terminal has none, and five measured builds on 2026-11-27 each
+ *   downloaded the kit's bundle and searched it for `function form(spec)` and its like, 110 calls
+ *   in all. readReference() takes the JSDoc above each component's function, with the types it
+ *   names, into src/services/builder/atelier-kit-reference.generated.ts, which the node serves as
+ *   the specification's sections `kit` and `kit-<name>` (services/builder/atelier-kit.ts).
+ * @structure USES · readTags() → per-component records · emit() → the generated module ·
+ *   readReference() · emitReference() → the server-side module · main(): write or --check
  * @usage cd aimeat && pnpm exec tsx tools/build-atelier-parts.ts [--check]
  *   (or: pnpm build:atelier-parts / pnpm check:atelier-parts)
  * @version-history
+ *   v1.2.0 — 2026-11-28 — readReference() and the second generated file: each component's call and
+ *     options, for the specification's sections `kit` and `kit-<name>`.
  *   v1.1.0 — 2026-11-27 — `@use`, held to the closed list USES; the generated record carries
  *     `use` (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.0.0 — 2026-09-05 — Initial (wish-atelier-always-excellent, part 3).
@@ -42,6 +51,7 @@ import { join } from 'node:path';
 
 const SRC = fileURLToPath(new URL('../src/static/sdk-libs/atelier/', import.meta.url));
 const OUT = join(SRC, 'describe-data.js');
+const OUT_REFERENCE = fileURLToPath(new URL('../src/services/builder/atelier-kit-reference.generated.ts', import.meta.url));
 
 /** One component's answer to "what can I change without forking this". */
 type Record_ = {
@@ -132,17 +142,114 @@ ${body}
 `;
 }
 
-const want = emit(readTags());
+// ── The reference a builder reads without a browser ──────────────────────────────────────────────
+
+/** One component's call and the options it takes, as its own module documents them. */
+type Reference = Record_ & { call: string; doc: string };
+
+/**
+ * A JSDoc block's text with the comment frame taken away. A type named through its module
+ * (`import('./ambient.js').AmbientWish`) is left as its name: the path is the source's own, and a
+ * builder calls the kit, not its modules.
+ */
+const unframe = (block: string): string => block.split(/\r?\n/)
+  .map((l) => l.replace(/^\s*\*\s?/, '').replace(/\s+$/, '').replace(/import\((['"])[^'"]+\1\)\./g, ''))
+  .join('\n').trim();
+
+/**
+ * The JSDoc block above `function <id>(` and the parameter list, from the component's own file
+ * first and any other atelier module after it (a component's function can live beside its parts).
+ * The `@typedef` blocks of that file whose names the block uses follow it, so `fields: FormField[]`
+ * comes with what a FormField is.
+ */
+export function readReference(records: Record_[]): Reference[] {
+  const files = readdirSync(SRC).filter((f) => f.endsWith('.js') && f !== 'describe-data.js').sort();
+  const text = new Map(files.map((f) => [f, readFileSync(join(SRC, f), 'utf8')]));
+  // Every function the kit's public object carries, with the components describe() knows first:
+  // a builder calls app(), mosaic() and toast() as often as a component that declares parts.
+  const known = new Set(records.map((r) => r.id));
+  const all: Record_[] = [
+    ...records,
+    ...publicNames(text.get('index.js') ?? '').filter((n) => !known.has(n))
+      .map((id) => ({ id, parts: [], slots: [], variants: [], tokens: [], use: [], fork: '', file: '' })),
+  ].sort((a, b) => a.id.localeCompare(b.id));
+  return all.map((r) => {
+    const fn = new RegExp(String.raw`/\*\*((?:(?!\*/)[\s\S])*?)\*/\s*(?:export\s+)?(?:async\s+)?function\s+` + r.id.replace(/\$/g, String.raw`\$`) + String.raw`\s*\(([^)]*)\)`);
+    for (const file of [...(r.file ? [r.file] : []), ...files.filter((f) => f !== r.file)]) {
+      const m = fn.exec(text.get(file) ?? '');
+      if (!m || !/@param|@returns/.test(m[1])) continue;
+      let doc = unframe(m[1]);
+      const typedefs = [...(text.get(file) ?? '').matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?@typedef\s+\{[^}]*\}\s+([A-Za-z][A-Za-z0-9]*)(?:(?!\*\/)[\s\S])*?)\*\//g)];
+      for (const [, block, name] of typedefs) {
+        if (new RegExp(String.raw`\b${name}\b`).test(doc)) doc += '\n\n' + unframe(block);
+      }
+      return { ...r, file: r.file || file, call: `${r.id}(${m[2].replace(/\s+/g, ' ').trim()})`, doc };
+    }
+    return { ...r, call: '', doc: '' };
+    // A public name with no documented function and no parts has nothing to say: it is left out.
+  }).filter((r) => r.doc || r.parts.length > 0);
+}
+
+/**
+ * The functions the kit's public object carries: the names its object literal lists in shorthand
+ * (`app, section, tabs, bottomNav,`), below the `version` member. Constants in capitals are data.
+ */
+function publicNames(index: string): string[] {
+  const names = new Set<string>();
+  const from = index.indexOf("version: '");
+  if (from < 0) throw new Error('index.js: the public object\'s `version` member was not found; publicNames() reads the members below it');
+  for (const line of index.slice(from).split(/\r?\n/)) {
+    if (!/^\s{2}(?:[A-Za-z_$][\w$]*\s*,\s*)+$/.test(line)) continue;
+    for (const n of line.split(',').map((s) => s.trim()).filter(Boolean)) if (!/^[A-Z0-9_]+$/.test(n)) names.add(n);
+  }
+  return [...names];
+}
+
+/** The generated server-side module: one line per component, so its size follows the kit and not the docs. */
+function emitReference(refs: Reference[]): string {
+  const body = refs.map((r) => `  ${JSON.stringify(r.id)}: ${JSON.stringify({ call: r.call, doc: r.doc, use: r.use, parts: r.parts, slots: r.slots, variants: r.variants, tokens: r.tokens, fork: r.fork, file: r.file })},`).join('\n');
+  return `/**
+ * @file src/services/builder/atelier-kit-reference.generated.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description GENERATED — do not edit. Every Atelier kit component's call, the options it takes
+ *   (the JSDoc above its function, with the types it names) and the parts, slots, variants, tokens,
+ *   uses and fork sentence \`AIMEAT.atelier.describe(name)\` answers, read out of the component
+ *   modules by tools/build-atelier-parts.ts. services/builder/atelier-kit.ts serves it as the
+ *   specification's sections \`kit\` and \`kit-<name>\`, for a builder that has no browser to ask the
+ *   library in. Run \`pnpm build:atelier-parts\` after changing a component's JSDoc; \`pnpm
+ *   check:atelier-parts\` refuses a commit where the two have drifted.
+ * @structure KIT_REFERENCE: one entry per public component
+ * @version-history
+ *   v1.0.0 — 2026-11-28 — Generated (wish-atelier-kirjaston-osan-asetukset-saa-yhdell-kutsulla-ilman-s).
+ */
+export interface KitReference {
+  call: string; doc: string; use: string[]; parts: string[]; slots: string[]; variants: string[]; tokens: string[]; fork: string; file: string;
+}
+
+export const KIT_REFERENCE: Record<string, KitReference> = {
+${body}
+};
+`;
+}
+
+const records = readTags();
+const want = emit(records);
+const wantReference = emitReference(readReference(records));
+const same = (a: string, b: string): boolean => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
+const read = (path: string): string => { try { return readFileSync(path, 'utf8'); } catch { return ''; } };
 if (process.argv.includes('--check')) {
-  let have: string;
-  try { have = readFileSync(OUT, 'utf8'); } catch { have = ''; }
-  if (have.replace(/\r\n/g, '\n') !== want.replace(/\r\n/g, '\n')) {
+  if (!same(read(OUT), want)) {
     console.error('\n✖ src/static/sdk-libs/atelier/describe-data.js drifts from the modules\' @parts/@slots/@variants/@tokens lines — run `pnpm build:atelier-parts` and commit the result.\n');
     process.exit(1);
   }
-  const n = readTags().length;
-  console.log(`  ok   describe-data.js matches the source (${n} components)`);
+  if (!same(read(OUT_REFERENCE), wantReference)) {
+    console.error('\n✖ src/services/builder/atelier-kit-reference.generated.ts drifts from the component modules\' JSDoc — run `pnpm build:atelier-parts` and commit the result.\n');
+    process.exit(1);
+  }
+  console.log(`  ok   describe-data.js and atelier-kit-reference.generated.ts match the source (${records.length} components)`);
 } else {
   writeFileSync(OUT, want, 'utf8');
-  console.log(`  wrote describe-data.js (${readTags().length} components)`);
+  writeFileSync(OUT_REFERENCE, wantReference, 'utf8');
+  console.log(`  wrote describe-data.js and atelier-kit-reference.generated.ts (${records.length} components)`);
 }

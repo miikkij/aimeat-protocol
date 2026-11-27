@@ -35,6 +35,8 @@
  *   AIMEAT.atelier.legalLinks({ target: host });
  *   AIMEAT.atelier.auditTrail({ target: host, org, ws, space: 'event' });
  * @version-history
+ *   2026-11-28 — Comment only: auditTrail's and marksSwitches' JSDoc name the two approvals and the
+ *     settings route by their names; the text is served as the kit reference.
  *   v0.39.0 — 2026-08-30 — THE SAMPLE STATES: `sample: true`, or any prop still carrying a
  *     fill's <angle-bracketed> placeholder, renders built-in sample content marked with the
  *     sample chip — a legal surface with five pages written and two to write, three trail rows,
@@ -280,9 +282,9 @@ export function legalPageFrame(spec) {
 
 /**
  * The append-only trail from an organism row space, newest first: when, what, who. Needs
- * AIMEAT.rows on the page and the two hands open — the organism naming the app in the space,
+ * AIMEAT.rows on the page and both approvals given — the organism naming the app in the space,
  * the person approving organism:rows — and when the node refuses, ITS OWN sentence is shown
- * with the two-hand rule beside it, never swallowed.
+ * with the rule of the two approvals beside it, never swallowed.
  * @param {{ target?: string|Element, org: string, ws: string, space: string,
  *   where?: Record<string, string>, limit?: number, title?: string, hint?: string }} spec
  * @returns {{ el: HTMLElement, reload: () => void, destroy: () => void }}
@@ -451,7 +453,7 @@ export function reviewerLine(spec) {
 
 /**
  * The owner's two switches on the served app — the badge and the browser install offer — read
- * from the owner's own listing and written through the app's settings door (PATCH). Renders
+ * from the owner's own listing and written through the app's settings route (PATCH). Renders
  * nothing without a session, and tells a non-owner the switches are not theirs: the write
  * itself is refused by the node either way; this component just never pretends.
  * @param {{ target?: string|Element, filename?: string,

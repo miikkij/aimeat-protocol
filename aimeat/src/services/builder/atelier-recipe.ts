@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.10.4 — 2026-11-28 — renderCustomisation names the platform sections `kit` and `kit-<name>`
+ *     for a builder with no browser to call describe() in (atelier-kit.ts).
  *   v1.10.3 — 2026-11-27 — The token count says seventy-nine: the moments' two (kit 0.73.0, shared
  *     by ask, propose and handoff) and the stage frame's two. The variants line names `inline` on
  *     ask, propose and handoff.
@@ -70,7 +72,10 @@
 export function renderCustomisation(): string {
   return '## A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED\n\n'
     + 'Four ways to customise, the same four on every component; `AIMEAT.atelier.describe("list")` tells '
-    + 'you which ones a component has, and `describe()` names every component that answers.\n\n'
+    + 'you which ones a component has, and `describe()` names every component that answers. '
+    + 'WITH NO BROWSER TO ASK IT IN, the platform section `kit-list` answers the same over MCP, with every option the call takes '
+    + '(`aimeat_handbook_get { tier: "build-app-atelier/kit-<name>" }`; `kit` lists every function of the kit). '
+    + 'Read that in place of searching the library\'s source.\n\n'
     + '1. **Named parts.** Every element the kit builds has `data-ak-part="<name>"`; your own '
     + 'CSS reaches it by name — `[data-ak-part="aside"] { … }` — so the rule keeps working when '
     + 'the markup around it changes, which a selector written by DOM depth does not.\n'

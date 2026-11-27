@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-28 — 17q: the kit reference, sections `kit` and `kit-<name>`, the same over MCP and REST.
  *   2026-11-28 — A part is held to HARD_PART_CHARS (50 000); 24 000 is the recommended size and no
  *     longer fails the suite (Jouni, 2026-11-28).
  *   2026-11-20 — 17c: the parts include `screens` (the phone and the desktop).
@@ -618,6 +619,22 @@ async function main() {
             const paste = await fetch(`${BASE}/v1/prompts/build-app-atelier?delivery=paste&format=txt`).then(r => r.text());
             assert(paste.startsWith('## Before you start: you are not connected') && paste.includes('## When the app is ready') && paste.includes(full),
                 'the paste delivery wraps the whole text with the preface and the publish-by-hand section');
+        });
+
+        // The kit's reference (services/builder/atelier-kit.ts): what a builder with no browser reads
+        // in place of the library's source. The index names every function, `kit-<name>` answers one.
+        await test('17q. the kit reference: the index and one function arrive the same over MCP and REST', async () => {
+            const index = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/kit' } }, 483)).body);
+            assert(index.startsWith('## The kit') && index.includes('- `form`') && index.includes('- `mosaic`'), `the index names the kit's functions: ${index.slice(0, 160)}`);
+            assert(index.length < 24_000, `the index fits one tool result: ${index.length}`);
+            const form = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/kit-form' } }, 484)).body);
+            assert(form.includes('AIMEAT.atelier.form(spec)') && form.includes('fields: FormField[]') && form.includes('@typedef {object} FormField'), `one function whole, with its options and their types: ${form.slice(0, 200)}`);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/kit-form?format=txt`).then(r => r.text());
+            assert(rest === form, 'REST answers the same text');
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/kit-no-such-part' } }, 485);
+            assert(body.result?.isError === true, 'a name the kit does not have is refused');
+            const platform = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/platform' } }, 486)).body);
+            assert(platform.includes('- `kit` —'), 'the platform index names the kit reference');
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it

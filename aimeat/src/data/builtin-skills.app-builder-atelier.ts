@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-28 — Step 4: the kit's reference over MCP (the sections `kit` and `kit-<name>`), read
+ *     in place of the library's source. Five measured builds each searched the bundle for functions.
  *   2026-11-27 — A membership the owner sells is the node's: the plan's `sale`, joinRequest's Buy
  *     button and AIMEAT.iam.membership; never a checkout or a payment service of the app's own
  *     (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
@@ -509,8 +511,8 @@ changed after you fetched it says so.
    that asked for the decision. A Classic page may load the
    kit for these blocks alone; a page without the app frame sets their look with \`data-ak-look\` on
    \`<html>\` or \`<body>\`.
-4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
-   you. \`AIMEAT.atelier.describe("<component>")\` returns
+4. **Ask the kit before you call it, and before you fork.** WITH NO BROWSER, the kit answers over MCP: \`aimeat_handbook_get { tier: "build-app-atelier/kit" }\` lists every function of \`AIMEAT.atelier\`, and \`.../kit-<name>\` (\`kit-form\`, \`kit-list\`, \`kit-mosaic\`, \`kit-app\`) answers one whole, with every option it takes and what it returns. Read that; never download the library and search its source for a function.
+   In a browser, \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, use, fork }\` for the components that have the model,
    \`describe()\` lists them and \`find("<use>")\` names the ones for a job; the answer is generated from each component's source and held to
    it by \`pnpm check:atelier-parts\`. The order, stopping at the first that works: a token

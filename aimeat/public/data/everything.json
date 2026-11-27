@@ -3147,6 +3147,15 @@
      "plain": "Choosing a kit part by its use An AI that builds an app asks the kit which parts are for a job (to decide, to wait, to list, to pick) and gets their names, so it takes the part that exists and does not make its own. Every part says what it is for. AIMEAT.atelier.find(use) and AIMEAT.atelier.describe(name).use in aimeat-atelier (0.73.0)"
     },
     {
+     "slug": "g-11-the-kit-s-reference-without-a-browser",
+     "cells": [
+      "<strong>The kit's reference without a browser</strong>",
+      "An AI that builds an app reads what a kit function takes in one request: its call, every option with its type, what it returns, and for a component the parts, slots, variants and tokens it may change. One list names every function of the kit. The text is read from the kit's own source, so it holds for the kit the node serves, and the AI does not download the library and search its code.",
+      "<code>aimeat_handbook_get</code> tier <code>build-app-atelier/kit</code> (the list) and <code>build-app-atelier/kit-&lt;name&gt;</code> (one function), <code>GET /v1/prompts/build-app-atelier/sections/kit-&lt;name&gt;</code>"
+     ],
+     "plain": "The kit's reference without a browser An AI that builds an app reads what a kit function takes in one request: its call, every option with its type, what it returns, and for a component the parts, slots, variants and tokens it may change. One list names every function of the kit. The text is read from the kit's own source, so it holds for the kit the node serves, and the AI does not download the library and search its code. aimeat_handbook_get tier build-app-atelier/kit (the list) and build-app-atelier/kit-<name> (one function), GET /v1/prompts/build-app-atelier/sections/kit-<name>"
+    },
+    {
      "slug": "g-11-own-app-templates",
      "cells": [
       "<strong>Own app templates</strong>",
@@ -5342,6 +5351,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 550
+  "rows": 551
  }
 }
