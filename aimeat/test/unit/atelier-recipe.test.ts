@@ -138,6 +138,8 @@ describe('the customisation section is held to describe-data.js', () => {
       'sixty-six': 66, 'sixty-seven': 67, 'sixty-eight': 68,
       // The fingerprint added nine on 2026-11-02.
       'seventy-five': 75, 'seventy-six': 76, 'seventy-seven': 77,
+      // The moments added two and the stage frame two on 2026-11-27.
+      'seventy-eight': 78, 'seventy-nine': 79,
     };
     const said = [...text.matchAll(/and ((?:thirty|forty|fifty|sixty|seventy)(?:-[a-z]+)?) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);

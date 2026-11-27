@@ -24,6 +24,8 @@
  * @structure STEP_IDS · structurePageUrl · computeStructure · readStructureFor · writePlanFor · listPlansFor
  * @usage const out = await readStructureFor(storage, config, req.auth!, { owner, filename });
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The layout step carries the `frame` and `moments` choices, and a person's one
+ *     the AI has not built makes it in progress; `values` lists both (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.1 — 2026-11-08 — The visibility step reads forkable as the store and the settings do: an app
  *     with no forkable flag is not forkable (it said true while the settings said false).
  *   v1.2.0 — 2026-10-30 — A choice of an option the AI drew carries its name; the answer lists the values each choice takes.
@@ -104,9 +106,13 @@ export function computeStructure(input: {
     steps.push({ id: 'data', state: 'missing', detail: { published: !!app }, said: app ? 'The app has no data map. Write it with aimeat_datamap_set.' : 'Nobody has said what data the app keeps. Write `data` in the plan after the data map questions.' });
   }
 
-  const layoutState = choiceState([c.layout, c.nav]);
+  // The frame and the moments belong to the layout step, and only a person's choice the AI has not
+  // built yet moves it: a plan without them reads exactly as before.
+  const shapeWaiting = [c.frame, c.moments].some((x) => x?.state === 'waiting');
+  const layoutState = shapeWaiting ? 'progress' : choiceState([c.layout, c.nav]);
   const drawn = plan?.proposals ?? {};
-  steps.push({ id: 'layout', state: layoutState, detail: { layout: choiceDetail(c.layout, drawn.layout), nav: choiceDetail(c.nav, drawn.nav), proposals: (drawn.layout?.length ?? 0) + (drawn.nav?.length ?? 0) },
+  steps.push({ id: 'layout', state: layoutState, detail: { layout: choiceDetail(c.layout, drawn.layout), nav: choiceDetail(c.nav, drawn.nav), proposals: (drawn.layout?.length ?? 0) + (drawn.nav?.length ?? 0),
+    ...(c.frame ? { frame: choiceDetail(c.frame) } : {}), ...(c.moments ? { moments: choiceDetail(c.moments) } : {}) },
     said: layoutState === 'progress' ? 'The person chose a layout that is not built yet; a note on the choice is what they want changed in it. Build it, then write the same value with state "done".'
       : layoutState === 'fine' ? 'The layout is chosen.' : 'No layout is chosen. Draw two or three options for this app in `proposals` so the person can pick by seeing them, or choose one yourself and write it with your reason.' });
 

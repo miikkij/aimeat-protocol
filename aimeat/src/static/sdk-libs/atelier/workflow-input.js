@@ -29,6 +29,7 @@
  * @variants workflowInput dense
  * @tokens workflowInput --ak-wf-width
  * @fork workflowInput Copying it out means calling AIMEAT.workflows.pendingInputs() and answer() yourself, sending picks as option ids with other only when the step accepts it, treating WORKFLOW_STEP_NOT_WAITING as a step that is gone, and reading the list again when the live 'workflows' domain changes.
+ * @use workflowInput confirm · list
  * @structure workflowInput(spec) (helpers: workflowsOf · signedOut · listOf · local · when ·
  *   keyOf · isGone · sampleInputs)
  * @usage

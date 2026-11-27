@@ -25,6 +25,7 @@
  * @slots dialog before() · after() · actions() · aside()
  * @variants dialog danger · celebrate · ai · roomy · wide
  * @fork dialog Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.
+ * @use dialog open · confirm
  * @version-history
  *   v0.70.0 — 2026-11-21 — An action closes its dialog: without `run` the press closes it with the
  *     action's id as the reason, and a `run` that returns anything but `false` (or whose promise

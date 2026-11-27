@@ -20,6 +20,7 @@
  * @variants members list · table · dense
  * @tokens members --ak-mem-width
  * @fork members Copying it out means calling AIMEAT.iam's admin(), roster(), invite(), invites(), audit(), people(), plan() and setPlan() yourself, and keeping the one-click role (suggestRole), the confirm on a raise and the refusal sentence.
+ * @use members list · confirm · edit
  * @structure members(spec)
  * @usage
  *   AIMEAT.atelier.members({ target: '#members', app: 'me/club.html', roles: { member: ['use'], admin: ['use', 'manage'] } });

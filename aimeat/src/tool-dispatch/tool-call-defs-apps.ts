@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-11-27 -- aimeat_app_template_propose forwards `recipe` to POST /v1/appdev/templates
+ *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   2026-11-21 -- aimeat_appdev_pitfall_report forwards evidence, seen_version, tags, supersedes,
  *     confirm_new, kind and retired_by; aimeat_appdev_overview and aimeat_appdev_pitfall_list send `areas`.
  *   2026-11-20 -- aimeat_app_get finds an app named without `.html` (services/app/app-ref.ts order).
@@ -769,7 +771,7 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const body: JsonObject = {};
             for (const field of ['id', 'title', 'description', 'derived_from', 'tier', 'reuse_notes', 'model', 'tags',
-                'start_mode', 'start_mode_rationale', 'model_notes', 'packs', 'composes'] as const) {
+                'start_mode', 'start_mode_rationale', 'model_notes', 'packs', 'composes', 'recipe'] as const) {
                 if (input[field] !== undefined) body[field] = input[field];
             }
             return client.post('/v1/appdev/templates', body);

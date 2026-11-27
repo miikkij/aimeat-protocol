@@ -380,6 +380,87 @@ components:
       description: Ed25519 signature of the challenge for token acquisition
 
   schemas:
+    AppTemplateRecipe:
+      type: object
+      additionalProperties: false
+      description: >-
+        What the next build starts from when it starts from an owner's app template
+        (models/template-recipe.ts TemplateRecipeSchema). Every part is optional; an unknown key is refused.
+      properties:
+        look: { type: string, minLength: 1, maxLength: 80, description: 'A Design Book style kit id, e.g. kit-mappi.' }
+        genre: { type: string, minLength: 1, maxLength: 80, description: 'The genre template id the next app forks, e.g. genre-workbench.' }
+        frame: { type: string, enum: [pages, tool, stage, reading, game, story], description: 'The frame AIMEAT.atelier.app() is given.' }
+        screens:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name: { type: string, minLength: 1, maxLength: 80 }
+              from: { type: string, minLength: 1, maxLength: 80 }
+              note: { type: string, maxLength: 300 }
+        needs:
+          type: array
+          maxItems: 12
+          description: 'What AIMEAT.atelier.requires({ needs }) declares, e.g. session, ai, member:use.'
+          items: { type: string, minLength: 1, maxLength: 40, pattern: '^[a-z][a-zA-Z]*(:[a-zA-Z0-9_.-]+)?$' }
+        moments:
+          type: array
+          maxItems: 20
+          description: 'The Atelier moments the app uses, e.g. ask:signIn, propose:draft, handoff:say.'
+          items: { type: string, minLength: 1, maxLength: 40, pattern: '^(ask|propose|handoff):[a-zA-Z]+$' }
+        data:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [what, where]
+            properties:
+              what: { type: string, minLength: 1, maxLength: 160 }
+              where: { type: string, minLength: 1, maxLength: 160 }
+        scopes: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 60 } }
+        criteria:
+          type: array
+          maxItems: 20
+          description: 'Acceptance criteria the next app carries (aimeat_app_manage action criteria_set).'
+          items:
+            type: object
+            additionalProperties: false
+            required: [text, check]
+            properties:
+              text: { type: string, minLength: 1, maxLength: 300 }
+              check: { type: string, enum: [lint, scenario, screenshot, eval, person] }
+    AppTemplateProposal:
+      type: object
+      description: An owner's app template (memory key template.catalog.{id}.manifest).
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        derivedFrom:
+          type: object
+          properties:
+            owner: { type: string }
+            filename: { type: string }
+            version: { type: integer }
+            node: { type: string }
+        tier: { type: string, enum: [T1, T2, T3], deprecated: true }
+        tags: { type: array, items: { type: string } }
+        reuseNotes: { type: string }
+        startMode: { type: string, enum: [fork, scaffold, either] }
+        startModeRationale: { type: string }
+        model: { type: string }
+        modelNotes: { type: array, items: { type: object } }
+        proofs: { type: array, items: { type: object } }
+        packs: { type: array, items: { type: string } }
+        composes: { type: array, items: { type: string } }
+        recipe: { $ref: '#/components/schemas/AppTemplateRecipe' }
+        proposedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     ExposureLevelCounts:
       type: object
       description: How many things are readable at each level (GET /v1/exposure/mine).
@@ -20275,8 +20356,9 @@ paths:
       responses:
         '200':
           description: >-
-            data.templates + data.total, and data.node_templates: the templates the node ships
-            (shells, components, use cases) by id, kind and title.
+            data.templates (AppTemplateProposal, each with its recipe when it has one) + data.total,
+            and data.node_templates: the templates the node ships (shells, components, use cases) by
+            id, kind and title.
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -20324,6 +20406,9 @@ paths:
                       evidence: { type: string, maxLength: 10000 }
                 packs: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
                 composes: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
+                recipe:
+                  allOf: [{ $ref: '#/components/schemas/AppTemplateRecipe' }]
+                  description: Given, it replaces the stored recipe; left out, the stored one stays.
       responses:
         '200':
           description: data.id, data.updated (true when the id already existed) and data.key, the memory key it is stored under.
@@ -20358,11 +20443,65 @@ paths:
       responses:
         '200':
           description: >-
-            data.template + data.source_app for a proposal. When no proposal has the id and the
-            node ships a template by it (a shell such as shell-pure-client), data.template is that
-            template with its starting file in `content` and `source: node`.
+            data.template (an AppTemplateProposal, with its recipe when it has one) + data.source_app
+            + data.how_to_start for a proposal: the same how_to_start text aimeat_app_template_get
+            answers, which names how to build from the recipe when there is one. When no proposal has
+            the id and the node ships a template by it (a shell such as shell-pure-client),
+            data.template is that template with its starting file in `content` and `source: node`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      template: { $ref: '#/components/schemas/AppTemplateProposal' }
+                      source_app: { type: object }
+                      how_to_start: { type: string }
         '404':
           description: Neither a proposal nor a shipped template has the id; the message names the shells
+    patch:
+      operationId: setAppdevTemplateRecipe
+      summary: Replace or remove the recipe of one of the owner's templates
+      description: >-
+        For the page where the owner edits their own template: `recipe` replaces the stored recipe and
+        null removes it; nothing else in the template changes. The account holder signed in in person
+        only; an agent changes a template by proposing it again (POST /v1/appdev/templates). Written
+        on the record's version and under the owner's memory ceilings.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [recipe]
+              properties:
+                recipe:
+                  oneOf:
+                    - { $ref: '#/components/schemas/AppTemplateRecipe' }
+                    - { type: 'null' }
+      responses:
+        '200':
+          description: data.id, data.recipe (null when removed) and data.updated_at.
+        '400':
+          description: INVALID_INPUT — the recipe is out of bounds or carries an unknown key.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: ACCESS_DENIED — the caller is not the account holder in person (an agent, an app or a visitor).
+        '404':
+          description: NOT_FOUND — the owner has no template with this id.
+        '413':
+          description: QUOTA_EXCEEDED — the template would pass the owner's memory ceilings; nothing is written.
+        '429':
+          description: More than 30 changes in a minute.
     delete:
       operationId: deleteAppdevTemplateProposal
       summary: Delete a template proposal
@@ -43529,7 +43668,7 @@ paths:
         the prompts.
       tags: [Apps]
       responses:
-        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the nine presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak), effects (the nine post-process filters: feel, evokes, engine, volume, motion, backdrop, post, proof, params with their bounds and defaults, fits_looks; plus the hosts a prop or zone effect may apply to and the passes the ambient layer runs)" }
+        '200': { description: "The catalogue: components (id, summary, props), nav_modes, frames (the page frames an app plan's `frame` choice takes, each `{ id }`: pages, tool, stage, reading), looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the nine presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak), effects (the nine post-process filters: feel, evokes, engine, volume, motion, backdrop, post, proof, params with their bounds and defaults, fits_looks; plus the hosts a prop or zone effect may apply to and the passes the ambient layer runs)" }
 
   /v1/apps/ui/validate:
     post:
@@ -45630,7 +45769,7 @@ paths:
         it, the design spec, the data map, the listing, the development rights, the legal pages and
         the EU AI Act questions. Returns `{ app, name, published, has_draft, plan, steps, fine, total,
         next, page_url, values }`: `plan` holds the choices made on the structure page (layout, nav, look,
-        genre, visibility), each with who chose it and whether it is built, and the layouts the AI
+        genre, visibility, frame, moments), each with who chose it and whether it is built, and the layouts the AI
         drew in `proposals`; `page_url` is the page that shows all of it; `values` lists the ids each
         choice takes. 404 when there is no app, draft or plan by that name. For the owner, the
         owner's agents and everybody holding a development right. Needs `app:write`. MCP:
@@ -45656,7 +45795,10 @@ paths:
         The first write starts the plan, and the structure page exists from then on, before any code.
         Every field is optional and a field left out stays as it is; null or an empty string clears
         one. `choices` is keyed by layout (a layout preset id), nav (a navigation mode), look (an
-        Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted); the
+        Atelier look id), genre (a Design Book id), visibility (listed, community, unlisted), frame
+        (pages, tool, stage, reading: the catalogue's `frames`) or moments (a comma-separated list of
+        ask:signIn, ask:access, ask:device, propose:draft, propose:extract, propose:change, propose:run,
+        handoff:say and handoff:prompt, at most 12, stored sorted and without repeats; "" is none); the
         ids are those GET /v1/apps/ui/catalogue lists, so a new look or layout on the node is valid
         here at once. A person writing in person makes a choice that waits for the AI (`state:
         waiting`); the AI writing its own choice makes it `done`, and the AI writing the same value
@@ -45692,7 +45834,7 @@ paths:
                       - type: object
                         required: [value]
                         properties:
-                          value: { type: string, maxLength: 80 }
+                          value: { type: string, maxLength: 400, description: 'The id; for moments, the comma-separated list ("" for none).' }
                           state: { type: string, enum: [waiting, done] }
                           note: { type: string, maxLength: 600, description: 'Why it was chosen; for a "custom" layout or nav, which every layout and nav takes besides the listed ids, the description of it (required then); on a choice the person made, what they want changed in it.' }
                 proposals:

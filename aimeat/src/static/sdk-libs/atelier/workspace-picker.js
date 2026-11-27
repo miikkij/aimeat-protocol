@@ -41,6 +41,7 @@
  * @variants workspacePicker dense
  * @tokens workspacePicker --ak-mem-width
  * @fork workspacePicker Copying it out means calling AIMEAT.organism's recall(app, { verify: true }), organisms(), findOrCreateWorkspace() and remember() yourself, in that order, and keeping the one-line view of a remembered choice; with multiple, recallList() and rememberList() instead of recall() and remember().
+ * @use workspacePicker pick
  * @structure workspacePicker(spec) · findArgs · start · draw (using line, list, choose) · pick · choosePrivate · switchTo · removeEntry · names · the sample
  * @usage
  *   AIMEAT.atelier.workspacePicker({ target: '#home', app: 'cadence', name: 'CRM', kind: 'cadence-crm',

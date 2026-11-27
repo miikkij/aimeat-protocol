@@ -15,6 +15,7 @@
  * @variants requestPanel compact
  * @tokens requestPanel --ak-request-console-h
  * @fork requestPanel Copy .ak-request* out of board.css and keep the console as AIMEAT.atelier.console; you give up the plan's states, the gate row and the scanner.
+ * @use requestPanel act · confirm · status
  * @structure requestPanel(spec) → { el, set, append, focus, value, destroy }
  * @usage
  *   var p = AIMEAT.atelier.requestPanel({ target: host, onAsk: plan, onApprove: run, onCancel: drop });

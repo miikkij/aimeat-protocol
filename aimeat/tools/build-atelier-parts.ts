@@ -21,11 +21,19 @@
  *     @variants <component> <name> · …              what `variant:` accepts (default is implied)
  *     @tokens   <component> --ak-… · …              the properties an app may set on its own box
  *     @fork     <component> <one sentence>          what copying it out costs
- * @structure readTags() → per-component records · emit() → the generated module · main(): write
- *   or --check
+ *     @use      <component> <use> · <use> · …        what the component is for, from USES below
+ *
+ *   `@use` is what lets a builder choose a component by what a screen is for instead of reading
+ *   the whole list. Its words are a closed list, the same words the node's own component catalogue
+ *   uses (src/services/ui-library) plus two an app needs: a word outside the list fails the build,
+ *   because a use nobody else can ask for selects nothing.
+ * @structure USES · readTags() → per-component records · emit() → the generated module · main():
+ *   write or --check
  * @usage cd aimeat && pnpm exec tsx tools/build-atelier-parts.ts [--check]
  *   (or: pnpm build:atelier-parts / pnpm check:atelier-parts)
  * @version-history
+ *   v1.1.0 — 2026-11-27 — `@use`, held to the closed list USES; the generated record carries
+ *     `use` (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.0.0 — 2026-09-05 — Initial (wish-atelier-always-excellent, part 3).
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -42,11 +50,23 @@ type Record_ = {
   slots: string[];
   variants: string[];
   tokens: string[];
+  use: string[];
   fork: string;
   file: string;
 };
 
-const TAGS = ['parts', 'slots', 'variants', 'tokens'] as const;
+const TAGS = ['parts', 'slots', 'variants', 'tokens', 'use'] as const;
+
+/**
+ * What a component is for. The first eighteen are the words of the node's own component
+ * catalogue; `decorate` (an ornament, an ambient, an effect, a motion piece) and `play` (a game
+ * part) are the two an app's kit adds.
+ */
+export const USES = [
+  'layout', 'navigate', 'view', 'list', 'count', 'status', 'compare', 'search', 'open',
+  'pick', 'edit', 'act', 'confirm', 'copy', 'converse', 'notify', 'wait', 'explain',
+  'decorate', 'play',
+] as const;
 
 /** Read every `@<tag> <component> …` line out of the atelier sources. */
 export function readTags(): Record_[] {
@@ -56,16 +76,23 @@ export function readTags(): Record_[] {
     const text = readFileSync(join(SRC, file), 'utf8');
     for (const raw of text.split(/\r?\n/)) {
       const line = raw.replace(/^\s*\*\s?/, '').trim();
-      const m = /^@(parts|slots|variants|tokens|fork)\s+([A-Za-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
+      const m = /^@(parts|slots|variants|tokens|fork|use)\s+([A-Za-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
       if (!m) continue;
       const [, tag, id, rest] = m;
       let rec = found.get(id);
       if (!rec) {
-        rec = { id, parts: [], slots: [], variants: [], tokens: [], fork: '', file };
+        rec = { id, parts: [], slots: [], variants: [], tokens: [], use: [], fork: '', file };
         found.set(id, rec);
       }
       if (tag === 'fork') { rec.fork = rest.trim(); continue; }
+      if (!(TAGS as readonly string[]).includes(tag)) continue;
       const items = rest.split('·').map((s) => s.trim()).filter(Boolean);
+      if (tag === 'use') {
+        const unknown = items.filter((u) => !(USES as readonly string[]).includes(u));
+        if (unknown.length) {
+          throw new Error(`${file}: @use ${id} names ${unknown.join(', ')}; the closed list is ${USES.join(', ')}`);
+        }
+      }
       rec[tag as (typeof TAGS)[number]] = items;
     }
   }
@@ -81,18 +108,19 @@ function emit(records: Record_[]): string {
       + `    slots: ${j(r.slots)},\n`
       + `    variants: ${j(r.variants)},\n`
       + `    tokens: ${j(r.tokens)},\n`
+      + `    use: ${j(r.use)},\n`
       + `    fork: ${JSON.stringify(r.fork)},\n`
       + `    file: ${JSON.stringify(r.file)},\n`
       + `  },`;
   }).join('\n');
   return `/**
  * @file atelier/describe-data.js
- * @description GENERATED — do not edit. Every component's parts, slots, variants, tokens and
+ * @description GENERATED — do not edit. Every component's parts, slots, variants, tokens, uses and
  *   fork sentence, read out of the component modules' own JSDoc by tools/build-atelier-parts.ts.
  *   \`AIMEAT.atelier.describe(name)\` answers from this, so what an app reads at run time and what
  *   the source says are the same thing by construction. Run \`pnpm build:atelier-parts\` after
- *   changing an @parts / @slots / @variants / @tokens / @fork line; \`pnpm check:atelier-parts\`
- *   refuses a commit where the two have drifted.
+ *   changing an @parts / @slots / @variants / @tokens / @use / @fork line; \`pnpm
+ *   check:atelier-parts\` refuses a commit where the two have drifted.
  * @structure PARTS: one entry per public component
  * @usage  import { PARTS } from './describe-data.js';
  * @version-history
@@ -106,7 +134,7 @@ ${body}
 
 const want = emit(readTags());
 if (process.argv.includes('--check')) {
-  let have = '';
+  let have: string;
   try { have = readFileSync(OUT, 'utf8'); } catch { have = ''; }
   if (have.replace(/\r\n/g, '\n') !== want.replace(/\r\n/g, '\n')) {
     console.error('\n✖ src/static/sdk-libs/atelier/describe-data.js drifts from the modules\' @parts/@slots/@variants/@tokens lines — run `pnpm build:atelier-parts` and commit the result.\n');

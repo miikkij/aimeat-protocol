@@ -25,6 +25,7 @@
  * @variants fingerprint dense · plain
  * @tokens fingerprint --ak-fp-F · --ak-fp-A · --ak-fp-M · --ak-fp-O · --ak-fp-P · --ak-fp-K · --ak-fp-x · --ak-fp-zone · --ak-fp-dim
  * @fork fingerprint Copy fingerprint-draw.js's functions and .ak-fp* out of fingerprint.css and draw the profile yourself; you keep the drawing and give up the topic highlight across the parts, the seal focus, the hover card and the words in three languages.
+ * @use fingerprint view · status
  * @structure fingerprint(spec) → { el, set, destroy } · FINGERPRINT_SAMPLE
  * @usage
  *   // The app's grant needs storage:read and memory:read; the item is the app's own or the person's.

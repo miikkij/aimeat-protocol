@@ -9,6 +9,10 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-template-proposals).
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The recipe a template carries: proposed, read back on both lists and both
+ *     gets, kept by an upsert without one, replaced and removed on PATCH /v1/appdev/templates/:id, and
+ *     the PATCH refused to an agent, another owner and a caller without a session
+ *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   v1.2.1 — 2026-11-15 — Audit M208: after a public agent face and a bound skill, a republish's
  *     next_steps reports agent_face_present true and bound_skills_count 1.
  *   v1.2.0 — 2026-10-12 — The REST routes are called with the agent's own token from POST
@@ -170,10 +174,11 @@ const FILENAME = 'template-demo.html';
 let A: McpSession;
 let B: McpSession;
 let ownerAToken = '';
+let ownerBToken = '';
 
 await test('Setup: two owners + agents; A publishes an app over MCP (next_steps present)', async () => {
     ({ session: A, ownerToken: ownerAToken } = await setupOwnerAgentSession(ownerA, 'tpagenta'));
-    ({ session: B } = await setupOwnerAgentSession(ownerB, 'tpagentb'));
+    ({ session: B, ownerToken: ownerBToken } = await setupOwnerAgentSession(ownerB, 'tpagentb'));
     const pub = await A.call('aimeat_app_publish', {
         filename: FILENAME,
         content_base64: b64('<!doctype html><meta name="aimeat-app" content="template-demo.html"><h1>tpl demo</h1>'),
@@ -387,6 +392,114 @@ await test('GET /v1/appdev/pitfalls/index → 400 for an unknown scope, 401 with
     assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `unknown scope answered ${bad.status}`);
     const anon = await json('/v1/appdev/pitfalls/index');
     assert(anon.status === 401, `no credential answered ${anon.status}`);
+});
+
+// ── The recipe a template carries (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app) ──
+//
+// A template names what the next build starts from: the look, the genre, the frame, the needs, the
+// moments, where the data is kept and the criteria. It is written by the propose MCP tool and the POST
+// route, read back by both lists and both gets, and edited by the owner in person on PATCH.
+
+const RECIPE = {
+    look: 'kit-mappi', genre: 'genre-workbench', frame: 'tool',
+    screens: [{ name: 'List', from: 'genre-workbench', note: 'Newest first.' }],
+    needs: ['session', 'ai', 'member:use'],
+    moments: ['ask:signIn', 'propose:draft', 'handoff:say'],
+    data: [{ what: 'errands', where: 'memory key errands.list' }],
+    scopes: ['memory:read'],
+    criteria: [{ text: 'A new errand shows without a reload.', check: 'scenario' }],
+};
+const RECIPE_ID = 'recipe-proposal';
+const ownerRest = (token: string, path: string, opts: RequestInit = {}) =>
+    json(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...opts.headers } });
+const patchRecipe = (token: string | null, id: string, recipe: unknown) =>
+    json(`/v1/appdev/templates/${id}`, {
+        method: 'PATCH',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: JSON.stringify({ recipe }),
+    });
+const proposeRecipe = (extra: Record<string, unknown>) => A.call('aimeat_app_template_propose', {
+    id: RECIPE_ID, title: 'Errands workbench', description: 'A list of errands with an AI draft.',
+    derived_from: { owner: ownerA, filename: FILENAME },
+    reuse_notes: 'Keep the list and the draft moment; swap the fields.', model: 'claude-opus-5.5',
+    ...extra,
+});
+
+await test('recipe: proposed over MCP, read back on the REST list, the REST get and the MCP get and list', async () => {
+    const p = await proposeRecipe({ recipe: RECIPE });
+    assert(!p.result?.isError, `propose with a recipe failed: ${JSON.stringify(p).slice(0, 300)}`);
+
+    const list = await ownerRest(ownerAToken, '/v1/appdev/templates');
+    const row = list.body.data?.templates?.find((t: any) => t.id === RECIPE_ID);
+    assert(row?.recipe?.frame === 'tool' && row.recipe.moments?.join(',') === RECIPE.moments.join(','),
+        `REST list recipe: ${JSON.stringify(row?.recipe)}`);
+
+    const one = await ownerRest(ownerAToken, `/v1/appdev/templates/${RECIPE_ID}`);
+    assert(one.status === 200 && one.body.data.template.recipe?.criteria?.[0]?.check === 'scenario',
+        `REST get recipe: ${one.status} ${JSON.stringify(one.body.data?.template?.recipe)}`);
+    assert(/AIMEAT\.atelier\.app\(\)/.test(one.body.data.how_to_start) && /"tool"/.test(one.body.data.how_to_start),
+        `REST how_to_start does not name the frame: ${one.body.data.how_to_start}`);
+
+    const g = JSON.parse((await A.call('aimeat_app_template_get', { id: RECIPE_ID })).result.content[0].text);
+    assert(g.recipe?.look === 'kit-mappi' && g.recipe.needs?.includes('member:use'), `MCP get recipe: ${JSON.stringify(g.recipe)}`);
+    assert(g.how_to_start === one.body.data.how_to_start, `MCP and REST how_to_start differ:\n${g.how_to_start}\n${one.body.data.how_to_start}`);
+
+    const ml = JSON.parse((await A.call('aimeat_app_template_list', {})).result.content[0].text);
+    assert(ml.templates.find((t: any) => t.id === RECIPE_ID)?.recipe?.genre === 'genre-workbench', 'MCP list leaves the recipe out');
+});
+
+await test('recipe: an upsert without a recipe keeps it; a bad recipe is refused', async () => {
+    const p = await proposeRecipe({ title: 'Errands workbench v2' });
+    assert(!p.result?.isError, `upsert failed: ${JSON.stringify(p).slice(0, 300)}`);
+    const g = JSON.parse((await A.call('aimeat_app_template_get', { id: RECIPE_ID })).result.content[0].text);
+    assert(g.title === 'Errands workbench v2' && g.recipe?.frame === 'tool', `recipe lost on upsert: ${JSON.stringify(g.recipe)}`);
+    const bad = await rest(A, '/v1/appdev/templates', {
+        method: 'POST',
+        body: JSON.stringify({ id: RECIPE_ID, title: 'Bad recipe', description: 'a moment that is not one',
+            derived_from: { owner: ownerA, filename: FILENAME }, reuse_notes: 'should be refused for its recipe',
+            model: 'claude-opus-5.5', recipe: { moments: ['wait:forever'] } }),
+    });
+    // The contract's request validation answers before the route does (VALIDATION_ERROR); either names the field.
+    assert(bad.status === 400 && /recipe\.moments/.test(bad.body.error?.message ?? ''), `bad recipe answered ${bad.status}: ${JSON.stringify(bad.body.error)}`);
+});
+
+await test('PATCH /v1/appdev/templates/:id replaces the recipe, and null removes it', async () => {
+    const r = await patchRecipe(ownerAToken, RECIPE_ID, { frame: 'game', moments: ['ask:signIn'] });
+    assert(r.status === 200 && r.body.data?.recipe?.frame === 'game', `PATCH answered ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    const one = await ownerRest(ownerAToken, `/v1/appdev/templates/${RECIPE_ID}`);
+    const rec = one.body.data.template.recipe;
+    assert(rec?.frame === 'game' && rec.look === undefined && rec.moments?.join(',') === 'ask:signIn', `not replaced: ${JSON.stringify(rec)}`);
+    assert(/"game"/.test(one.body.data.how_to_start), 'how_to_start does not follow the new recipe');
+
+    const bad = await patchRecipe(ownerAToken, RECIPE_ID, { frame: 'poster' });
+    assert(bad.status === 400 && /recipe\.frame/.test(bad.body.error?.message ?? ''), `bad PATCH answered ${bad.status}: ${JSON.stringify(bad.body.error)}`);
+
+    const cleared = await patchRecipe(ownerAToken, RECIPE_ID, null);
+    assert(cleared.status === 200 && cleared.body.data?.recipe === null, `PATCH null answered ${cleared.status}: ${JSON.stringify(cleared.body).slice(0, 300)}`);
+    const after = await ownerRest(ownerAToken, `/v1/appdev/templates/${RECIPE_ID}`);
+    assert(after.body.data.template.recipe === undefined, `recipe still there: ${JSON.stringify(after.body.data.template.recipe)}`);
+    assert(!/AIMEAT\.atelier/.test(after.body.data.how_to_start), 'how_to_start still names the removed recipe');
+    const g = JSON.parse((await A.call('aimeat_app_template_get', { id: RECIPE_ID })).result.content[0].text);
+    assert(g.title === 'Errands workbench v2', 'PATCH changed more than the recipe');
+
+    const missing = await patchRecipe(ownerAToken, 'no-such-template', { frame: 'tool' });
+    assert(missing.status === 404 && missing.body.error?.code === 'NOT_FOUND', `unknown id answered ${missing.status}`);
+});
+
+await test('PATCH /v1/appdev/templates/:id → 403 for an agent, 403 or 404 for another owner, 401 without a session', async () => {
+    await patchRecipe(ownerAToken, RECIPE_ID, { frame: 'tool' });
+    const agent = await patchRecipe(A.restToken, RECIPE_ID, { frame: 'game' });
+    assert(agent.status === 403, `agent token answered ${agent.status}: ${JSON.stringify(agent.body).slice(0, 200)}`);
+    // Another owner in person passes the in-person check and reaches only their own templates, where
+    // this id does not exist: 404, and A's recipe is unchanged (read back below).
+    const other = await patchRecipe(ownerBToken, RECIPE_ID, { frame: 'game' });
+    assert(other.status === 404, `another owner answered ${other.status}`);
+    const anon = await patchRecipe(null, RECIPE_ID, { frame: 'game' });
+    assert(anon.status === 401, `no session answered ${anon.status}`);
+    const g = JSON.parse((await A.call('aimeat_app_template_get', { id: RECIPE_ID })).result.content[0].text);
+    assert(g.recipe?.frame === 'tool', `a refused PATCH changed the recipe: ${JSON.stringify(g.recipe)}`);
+    const del = await A.call('aimeat_app_template_delete', { id: RECIPE_ID });
+    assert(!del.result?.isError, 'cleanup delete failed');
 });
 
 console.log('\n' + '─'.repeat(40));

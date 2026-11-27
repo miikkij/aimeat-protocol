@@ -20,12 +20,19 @@
  *   node's presets in a section of their own. Under them, a field for what the person would change,
  *   which goes to the AI as the note on their choice.
  *
+ *   Under the layout and the navigation, two choices nobody has to make: the frame (the page around
+ *   the work: pages, tool, stage, reading) and the moments (what the app asks of a person). Both are
+ *   left to the AI until the person picks, and the AI's own choice is shown first with its reason;
+ *   an AI's choice the person leaves alone stays the AI's, so pressing send changes nothing of it.
+ *
  *   Writes no class; the parts are components.
  * @structure StructurePick({ kind, s, appRef, onSaved, onBack }) (`appRef`, never `ref`: Preact keeps
- *   `ref` for itself and the component never sees it) · layoutRows(preset) · NAV_SKETCH · LOOK_GROUPS ·
- *   PickSections · drawnOption · wishOf · patchOf(s, picks, wish)
+ *   `ref` for itself and the component never sees it) · layoutRows(preset) · NAV_SKETCH · FRAME_SKETCH ·
+ *   LOOK_GROUPS · PickSections · FramePick · MomentsPick · drawnOption · wishOf · ownPick · patchOf(s, picks, wish)
  * @usage html`<${StructurePick} kind="layout" s=${structure} appRef=${ref} onSaved=${set} onBack=${back} />`
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The frame and the moments under the layout and the navigation, sent and worded with
+ *     them (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.1.1 — 2026-11-15 — The change field stops at the route's 600 characters and shows the count;
  *     a refused send shows the route's own reason instead of "Try again".
  *   v1.1.0 — 2026-10-30 — The layouts the AI drew for the app first, the presets after, and the person's change.
@@ -51,7 +58,8 @@ import { TextArea } from '/components/TextField.js';
 import { swallowed } from '/js/swallowed.js';
 import { tOr } from '/js/i18n.js';
 import { x } from '/views/appcat/i18n.js';
-import { readCatalogue, readGenres, writePlan, choiceName, choiceLine, aiPrompt, proposalsOf, optionName } from '/views/appcat/structure-data.js';
+import { Check } from '/components/Check.js';
+import { readCatalogue, readGenres, writePlan, choiceName, choiceLine, aiPrompt, proposalsOf, optionName, momentIds, momentName } from '/views/appcat/structure-data.js';
 
 const html = htm.bind(h);
 const AI = '__ai';
@@ -92,6 +100,14 @@ const NAV_SKETCH = {
 };
 const AI_SKETCH = [{ height: 'l', cells: [{ w: 'full', tone: 'sun' }] }];
 
+/** How each frame looks, the part the frame is about on the sun; a frame the node adds later is one plain area. */
+const FRAME_SKETCH = {
+  pages: [{ height: 's', cells: [{ w: 'full' }] }, { height: 'm', cells: [{ w: 'full', tone: 'sun' }] }, { height: 'm', cells: [{ w: 'full', tone: 'sun' }] }],
+  tool: [{ height: 's', cells: [{ w: 'full' }] }, { height: 'l', cells: [{ w: 'side', tone: 'sun' }, { w: 'main' }] }],
+  stage: [{ height: 'l', cells: [{ w: 'main', tone: 'sun' }, { w: 'tiny' }] }],
+  reading: [{ height: 's', cells: [{ w: 'full' }] }, { height: 'l', cells: [{ w: 'side' }, { w: 'main', tone: 'sun' }, { w: 'side' }] }],
+};
+
 /** The groups a person narrows the looks by; a look the node adds later is in "All" only. */
 const LOOK_GROUPS = {
   calm: ['flat', 'calm-card', 'gallery', 'workbench', 'dawn'],
@@ -104,6 +120,21 @@ const theme = () => (document.documentElement.getAttribute('data-theme') === 'da
 
 /** The plan's value of a choice, or AI when nothing is chosen. */
 const picked = (s, key) => s.plan?.choices?.[key]?.value || AI;
+
+/**
+ * The person's own value of a choice, or AI. The AI's own choice keeps "let the AI decide" picked, so a
+ * send without a change leaves it the AI's (the frame and the moments).
+ */
+const ownPick = (s, key) => {
+  const c = s.plan?.choices?.[key];
+  return c && c.by === 'owner' ? c.value : AI;
+};
+
+/** The AI's own choice of `key`, or null. */
+const aiChoiceOf = (s, key) => {
+  const c = s.plan?.choices?.[key];
+  return c && c.by === 'ai' ? c : null;
+};
 
 /** The person's change to their layout choice, as the plan holds it: their own note on it. */
 const wishOf = (s) => {
@@ -195,11 +226,53 @@ function PickSections({ kind, cols, drawn, presets, value, onChange, aiOption })
     <//>`;
 }
 
+/**
+ * The frame: "let the AI decide" and the node's frames, each drawn. When the AI chose a frame itself,
+ * that frame comes first with the AI's reason, and "let the AI decide" stays the picked answer.
+ */
+function FramePick({ s, frames, value, onChange }) {
+  const ai = aiChoiceOf(s, 'frame');
+  const tile = (id, own) => ({
+    value: id, label: choiceName('frame', id),
+    hint: own ? html`${x('structure.aiChoice')} ${own.note || ''}` : choiceLine('frame', id, ''),
+    pic: html`<${LayoutSketch} rows=${FRAME_SKETCH[id] || AI_SKETCH} label=${choiceName('frame', id)} />`,
+  });
+  const aiOption = { value: AI, label: x('structure.aiDecides'), hint: x('structure.aiDecides.frame'), pic: html`<${LayoutSketch} rows=${AI_SKETCH} label=${x('structure.aiDecides')} />` };
+  const first = ai && frames.includes(ai.value) ? [tile(ai.value, ai)] : [];
+  const options = [...first, aiOption, ...frames.filter((id) => id !== first[0]?.value).map((id) => tile(id))];
+  return html`<${Section} id="structure-layout-frame" title=${x('structure.frameTitle')}>
+    <${Choice} boxed cols=${3} value=${value} onChange=${onChange} options=${options} ariaLabel=${x('structure.frameTitle')} />
+  <//>`;
+}
+
+/**
+ * The moments: "let the AI decide" first, then one check per moment the node knows. Left to the AI,
+ * the checks show the AI's own moments (first, with its reason); a press makes the shown set the
+ * person's, which they then take from or add to.
+ */
+function MomentsPick({ s, ids, value, onChange }) {
+  const ai = aiChoiceOf(s, 'moments');
+  const aiSet = ai ? momentIds(ai.value) : [];
+  const shown = value === AI ? aiSet : momentIds(value);
+  const ordered = [...aiSet.filter((id) => ids.includes(id)), ...ids.filter((id) => !aiSet.includes(id))];
+  const toggle = (id, on) => onChange([...new Set(on ? [...shown, id] : shown.filter((m) => m !== id))].sort().join(','));
+  return html`<${Section} id="structure-layout-moments" title=${x('structure.momentsTitle')}>
+    <${Note} kind="hint">${x('structure.momentsHint')}<//>
+    ${ai ? html`<${Note}>${x('structure.aiChoice')} ${optionName(s, 'moments', ai.value)}${ai.note ? `: ${ai.note}` : ''}<//>` : null}
+    <${Line} gap="small" wrap>
+      <${Check} pill checked=${value === AI} onChange=${(on) => onChange(on ? AI : shown.join(','))}>${x('structure.aiDecides')}<//>
+      ${ordered.map((id) => html`<${Check} key=${id} pill checked=${shown.includes(id)} onChange=${(on) => toggle(id, on)}>${momentName(id)}<//>`)}
+    <//>
+  <//>`;
+}
+
 function LayoutPick({ s, appRef: ref, onSaved }) {
   const [cat, setCat] = useState(null);
   const [layout, setLayout] = useState(picked(s, 'layout') === 'custom' ? AI : picked(s, 'layout'));
   const [nav, setNav] = useState(picked(s, 'nav') === 'custom' ? AI : picked(s, 'nav'));
   const [wish, setWish] = useState(wishOf(s));
+  const [frame, setFrame] = useState(ownPick(s, 'frame'));
+  const [moments, setMoments] = useState(ownPick(s, 'moments'));
   useEffect(() => { readCatalogue().then(setCat).catch((err) => swallowed('structure: catalogue', err)); }, []);
   if (!cat) return html`<${Note} kind="loading">${x('structure.loading')}<//>`;
   const aiOption = (kind) => ({ value: AI, label: x('structure.aiDecides'), hint: x(`structure.aiDecides.${kind}`), pic: html`<${LayoutSketch} rows=${AI_SKETCH} label=${x('structure.aiDecides')} />` });
@@ -208,6 +281,8 @@ function LayoutPick({ s, appRef: ref, onSaved }) {
     hint: html`${choiceLine('layout', p.id, p.summary)}<${Code}>${tOr(`appcat.structure.layout.${p.id}.say`, p.id)}<//>`,
     pic: html`<${LayoutSketch} rows=${layoutRows(p)} label=${choiceName('layout', p.id)} />`,
   }));
+  // The moments the node knows come with the structure answer (`values.moments`); an older node has none.
+  const momentList = Array.isArray(s.values?.moments) ? s.values.moments : [];
   const navPresets = cat.navModes.map((id) => ({
     value: id, label: choiceName('nav', id), hint: choiceLine('nav', id, ''),
     pic: html`<${LayoutSketch} rows=${NAV_SKETCH[id] || AI_SKETCH} label=${choiceName('nav', id)} />`,
@@ -215,6 +290,8 @@ function LayoutPick({ s, appRef: ref, onSaved }) {
   return html`
     <${PickSections} kind="main" cols=${3} drawn=${proposalsOf(s, 'layout')} presets=${layoutPresets} value=${layout} onChange=${setLayout} aiOption=${aiOption('layout')} />
     <${PickSections} kind="nav" cols=${4} drawn=${proposalsOf(s, 'nav')} presets=${navPresets} value=${nav} onChange=${setNav} aiOption=${aiOption('nav')} />
+    ${cat.frames.length ? html`<${FramePick} s=${s} frames=${cat.frames} value=${frame} onChange=${setFrame} />` : null}
+    ${momentList.length ? html`<${MomentsPick} s=${s} ids=${momentList} value=${moments} onChange=${setMoments} />` : null}
     <${Section} id="structure-layout-wish" title=${x('structure.wish.title')}>
       <${TextArea} label=${x('structure.wish.label')} labelNote=${x('structure.wish.count', { n: wish.length, max: WISH_MAX })}
         hint=${x('structure.wish.hint')} value=${wish} onInput=${setWish} rows=${3} grow maxLength=${WISH_MAX} />
@@ -226,7 +303,7 @@ function LayoutPick({ s, appRef: ref, onSaved }) {
         <${Note}>${x('structure.learn.example')}<//>
       <//>
     <//>
-    <${SendBar} s=${s} appRef=${ref} picks=${{ layout, nav }} wish=${wish} onSaved=${onSaved} />`;
+    <${SendBar} s=${s} appRef=${ref} picks=${{ layout, nav, ...(cat.frames.length ? { frame } : {}), ...(momentList.length ? { moments } : {}) }} wish=${wish} onSaved=${onSaved} />`;
 }
 
 function LookPick({ s, appRef: ref, onSaved }) {

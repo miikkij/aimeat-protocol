@@ -7,6 +7,7 @@
  *   never refused has never been tested.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ui
  * @version-history
+ *   v1.4.0 — 2026-11-27 — The catalogue carries `frames` (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.3.0 — 2026-10-30 — The read of an app not published yet answers the catalogue with no layout; the write still answers 404.
  *   v1.2.0 — 2026-09-05 — A block's `effect` and the ambient's `post` (wish-atelier-post-process-
  *     effects): a still under words validates, a picture effect on words refuses naming the hosts,
@@ -107,6 +108,8 @@ const GOOD_LAYOUT = {
         assert(cat.nav_modes.includes('canvas') && cat.nav_modes.includes('deck'),
             'every navigation mode ships from day one (decided 2026-08-27)');
         assert(cat.looks.includes('vivid') && cat.looks.includes('flat'), 'the looks are part of the vocabulary');
+        assert(JSON.stringify(cat.frames) === '[{"id":"pages"},{"id":"tool"},{"id":"stage"},{"id":"reading"}]',
+            `the page frames an app plan takes: ${JSON.stringify(cat.frames)}`);
     });
 
     await test('a reader says how much of the catalogue it wants: none for a page, the index for an AI, the named parts whole', async () => {

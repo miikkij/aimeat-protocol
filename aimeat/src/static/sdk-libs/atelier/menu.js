@@ -17,9 +17,12 @@
  * @parts menu root · item · label · hint · separator · ink
  * @parts popover root · body
  * @parts tooltip root
+ * @use tooltip explain · open
  * @tokens menu --ak-menu-min-w · --ak-menu-row-pad
  * @fork menu Build a list of buttons in a positioned box; you give up the growing entrance, the travelling highlight, the pick blink and the keyboard model.
+ * @use menu open · act
  * @fork popover Put your content in a positioned box; you give up the entrance from the anchor, the outside-click close and the focus return.
+ * @use popover open
  * @usage
  *   AIMEAT.atelier.menu({ anchor: button, items: [{ id: 'rename', label: 'Rename', hint: 'F2' }, '-', { id: 'del', label: 'Delete', danger: true }], onPick(id) {} });
  *   AIMEAT.atelier.contextMenu(row, { items: [...], onPick(id) {} });

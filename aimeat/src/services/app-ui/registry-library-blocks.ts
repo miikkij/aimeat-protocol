@@ -10,6 +10,8 @@
  * @structure LIBRARY_BLOCK_COMPONENTS
  * @usage import { LIBRARY_BLOCK_COMPONENTS } from './registry-library-blocks.js';
  * @version-history
+ *   v1.1.0 — 2026-11-27 — `ask` and `handoff`, the two moments an arrangement can hold from props
+ *     alone (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.0.0 — 2026-10-02 — Moved from registry.ts (v1.25.0) under the 800-line cap.
  */
 import { text, requiredText, type AppUiComponentDef } from './registry-defs.js';
@@ -168,6 +170,34 @@ export const LIBRARY_BLOCK_COMPONENTS: readonly AppUiComponentDef[] = [
       systemPrompt: text("Instructions to the model that replace the block's own (answer from the document only).", 2000),
       keep: text('How many earlier messages go with each question, e.g. "8".', 3),
       variant: text('"compact" for a side panel or a card.', 10),
+    },
+  },
+  // ── The moments (2026-11-27, append-only): a stop and a hand-off drawn from their props alone.
+  //    `propose` and `requires` take the app's own handlers and content, so they are called in the
+  //    page's code and are not blocks of an arrangement.
+  {
+    id: 'ask',
+    summary: 'A stop: why this part of the app cannot work now and the one thing the person does about it. `kind` picks the words and the way on: signIn (the button opens the sign-in window when aimeat-auth.js is on the page), settings and permission (give `url` for the button), access, refused and limit (give `when`), device (give `what`), offline. The words are in the kit in en, fi and es; `title` and `lead` replace them.',
+    maxPerLayout: 3,
+    props: {
+      kind: requiredText('"signIn", "settings", "access", "permission", "refused", "device", "limit" or "offline".', 12),
+      title: text("The stop's sentence, when the kit's own is not wanted.", 160),
+      lead: text('One line under it: what the person gets by doing it.', 300),
+      url: text('For "settings" and "permission": the address the button opens.', 500),
+      when: text('For "refused" and "limit": when it ends, as a date or in words.', 80),
+      what: text('For "device": "microphone", "camera" or "location".', 12),
+      variant: text('"inline" for one row inside a section that keeps its own title.', 10),
+    },
+  },
+  {
+    id: 'handoff',
+    summary: "One sentence the person copies to their own AI, for example to make an agent or to start a piece of work there, with the Copy button and what to do next. For a prompt whose answer comes back, call AIMEAT.atelier.handoff({ kind: 'prompt' }) in the page's code.",
+    maxPerLayout: 3,
+    props: {
+      text: requiredText('The sentence to copy, written as the person would say it to their AI.', 600),
+      title: text("The line over it, when the kit's own is not wanted.", 160),
+      lead: text('One line saying what the person gets by doing it.', 300),
+      variant: text('"inline" for one row inside a section that keeps its own title.', 10),
     },
   },
 ];

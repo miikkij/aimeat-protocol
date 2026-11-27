@@ -32,6 +32,7 @@
  * @parts connections root · title · intro · need · viaNode · openPage · failure · notice · accounts · row · who · status · can · acts · reconnect · disconnect · add · provider · instance · connect · providerNote
  * @tokens connections --ak-conn-width
  * @fork connections Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, keeping the confirm before a disconnect and the words for each status, and on an app origin linking to AIMEAT.connect.settingsUrl() (the node's accounts page) instead and reading the list again on focus.
+ * @use connections list · act · status
  * @structure connections(spec) (helpers: connectOf · signedOut · appSession · scopeRefused · nodePage · capWords · statusOf · instanceOf)
  * @usage
  *   AIMEAT.atelier.connections({ target: '#accounts' });

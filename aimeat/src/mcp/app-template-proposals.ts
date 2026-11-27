@@ -10,6 +10,9 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-27 — _list carries each template's `recipe`; _get's how_to_start comes from
+ *     services/appdev/template-start.ts, which GET /v1/appdev/templates/:id answers too, and names how
+ *     to build from the recipe (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   2026-11-19 — aimeat_app_template_get and _list name the session's agent as the reader, so a genre
  *     grown out of an app opened to some people only reaches those people alone (feature audit 1.2).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -42,6 +45,7 @@ import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { appToll } from '../services/app/pacing.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
+import { templateHowToStart } from '../services/appdev/template-start.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }] });
@@ -88,6 +92,7 @@ export function registerAppTemplateProposalTools(
                     model: p.model, start_mode: p.startMode,
                     derived_from: p.derivedFrom, updated: p.updatedAt,
                     proofs: (p.proofs ?? []).length,
+                    ...(p.recipe ? { recipe: p.recipe } : {}),
                 })),
                 total: proposals.length,
             });
@@ -121,6 +126,8 @@ export function registerAppTemplateProposalTools(
             const app = await templateSourceApp(storage, config.nodeId, m.derivedFrom, 'proofs');
             // The source's pacing amount: morsels taking the app once moves, never a price.
             const tollMorsels = appToll(app?.manifest);
+            // GET /v1/appdev/templates/:id answers the same text (services/appdev/template-start.ts).
+            const how_to_start = templateHowToStart(m, app);
             const source_app = app ? {
                 exists: true,
                 forkable: app.forkable ?? false,
@@ -132,17 +139,6 @@ export function registerAppTemplateProposalTools(
                 version: app.versionNumber,
                 download_url: `/v1/apps/${encodeURIComponent(m.derivedFrom.owner)}/${encodeURIComponent(m.derivedFrom.filename)}`,
             } : { exists: false };
-
-            // v1 proposals are owner-scoped, so the reader IS the source owner (same-owner fork
-            // always passes the gate). The note covers future/other-party readers: an app with a
-            // pacing amount is taken once (POST /v1/app-store/purchase) before the fork gate opens.
-            const how_to_start = !app
-                ? 'Source app is gone — scaffold from reuse_notes.'
-                : m.startMode === 'scaffold'
-                    ? 'Scaffold a fresh app from reuse_notes (do not fork).'
-                    : tollMorsels > 0
-                        ? `Fork the source app (aimeat_app_fork) and adapt per reuse_notes. Another owner takes the app first (POST /v1/app-store/purchase, ${tollMorsels} morsels of pacing) — the fork gate enforces it.`
-                        : 'Fork the source app (aimeat_app_fork) and adapt per reuse_notes.';
 
             return text({ ...m, source_app, how_to_start });
         },

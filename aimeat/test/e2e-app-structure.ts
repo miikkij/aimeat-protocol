@@ -8,6 +8,8 @@
  *   node's MCP server.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-structure
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The frame and the moments: an unknown frame or moment refused, stage kept, a moments
+ *     list sorted and deduplicated, "" as none (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.0 — 2026-10-30 — Layouts the AI drew: the person's pick with a change waits under the option's name;
  *     a list that drops the chosen option, an option nobody drew and a preset's id are refused.
  *   v1.1.0 — 2026-10-29 — A custom nav with a 340-character description, and custom without one refused.
@@ -170,6 +172,41 @@ await test('a screen no preset fits is written as custom with its description, a
     assert(r.body.data.plan.choices.nav.note === note, 'the description is kept whole');
     const back = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'bottom-bar' } } }) });
     assert(back.status === 200, `restoring the nav: ${back.status}`);
+});
+
+await test('FAILURE: a frame the node does not offer is refused, naming the frames; stage is kept and answered', async () => {
+    const bad = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { frame: { value: 'theatre' } } }) });
+    assert(bad.status === 400 && String(bad.body?.error?.message).includes('reading'), `an unknown frame: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
+    const r = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { frame: { value: 'stage' } } }) });
+    assert(r.status === 200, `stage: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const c = r.body.data.plan.choices.frame;
+    assert(c.value === 'stage' && c.by === 'owner' && c.state === 'waiting', `the frame: ${JSON.stringify(c)}`);
+    assert(stepOf(r.body.data, 'layout').state === 'progress' && stepOf(r.body.data, 'layout').detail.frame?.value === 'stage', `the layout step carries it: ${JSON.stringify(stepOf(r.body.data, 'layout'))}`);
+    const back = await json(path(), { headers: auth(owner.token) });
+    assert(back.body.data.plan.choices.frame.value === 'stage', 'the frame is stored');
+    assert(JSON.stringify(back.body.data.values?.frame) === '["pages","tool","stage","reading"]', `values.frame: ${JSON.stringify(back.body.data.values?.frame)}`);
+    const built = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { frame: { value: 'stage', state: 'done' } } }) });
+    assert(built.status === 200 && built.body.data.plan.choices.frame.by === 'owner' && built.body.data.plan.choices.frame.state === 'done', `the AI builds it: ${JSON.stringify(built.body.data?.plan?.choices?.frame)}`);
+});
+
+await test('moments take a list, sorted and without repeats; an unknown id is refused; "" is none', async () => {
+    const r = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { moments: { value: 'propose:draft,ask:signIn,propose:draft', note: 'Members sign in, and a message is read before it goes.' } } }) });
+    assert(r.status === 200, `a list: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const c = r.body.data.plan.choices.moments;
+    assert(c.value === 'ask:signIn,propose:draft' && c.by === 'ai' && c.state === 'done', `the moments: ${JSON.stringify(c)}`);
+    assert(Array.isArray(r.body.data.values?.moments) && r.body.data.values.moments.includes('handoff:prompt'), `values.moments: ${JSON.stringify(r.body.data.values?.moments)}`);
+    const all = 'handoff:prompt,handoff:say,propose:run,propose:change,propose:extract,propose:draft,ask:device,ask:access,ask:signIn';
+    const long = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { moments: { value: all } } }) });
+    assert(long.status === 200 && long.body.data.plan.choices.moments.value === all.split(',').sort().join(','), `every moment: ${long.status} ${JSON.stringify(long.body?.error ?? long.body.data.plan.choices.moments)}`);
+    const before = (await json(path(), { headers: auth(owner.token) })).body.data.plan.revision;
+    const bad = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { moments: { value: 'ask:signIn,ask:telepathy' } } }) });
+    assert(bad.status === 400 && String(bad.body?.error?.message).includes('ask:telepathy'), `an unknown moment: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
+    const after = (await json(path(), { headers: auth(owner.token) })).body.data.plan.revision;
+    assert(before === after, `nothing was written (revision ${before} → ${after})`);
+    const none = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { moments: { value: '' } } }) });
+    assert(none.status === 200 && none.body.data.plan.choices.moments.value === '' && none.body.data.plan.choices.moments.by === 'owner', `none: ${none.status} ${JSON.stringify(none.body?.error ?? none.body.data.plan.choices.moments)}`);
+    const clear = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { moments: null, frame: null } }) });
+    assert(clear.status === 200 && !clear.body.data.plan.choices.moments && !clear.body.data.plan.choices.frame, 'null clears both');
 });
 
 await test('the AI draws layouts for the app; the person picks one with a change, and it waits for the AI under its name', async () => {

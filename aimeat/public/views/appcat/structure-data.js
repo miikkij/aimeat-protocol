@@ -10,9 +10,11 @@
  *   files have no words for yet shows the node's own English sentence.
  * @structure readStructure · writePlan · readCatalogue · readGenres · stepLine(step, words) ·
  *   choiceName(kind, id) · proposalsOf(structure, kind) · optionName(structure, kind, id) ·
- *   aiPrompt(structure, picks, wish) · appRefFromAddress()
+ *   momentIds(value) · momentName(id) · aiPrompt(structure, picks, wish) · appRefFromAddress()
  * @usage const s = await readStructure('alice', 'talkoot.html');
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The frames from the catalogue, the moments' names, and a frame and a moments
+ *     choice in the prompt (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.0 — 2026-10-30 — The layouts the AI drew (proposalsOf, optionName), and a person's change to a choice.
  *   v1.1.0 — 2026-10-29 — A `custom` layout or nav reads as its name and the AI's note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -51,6 +53,7 @@ export async function readCatalogue() {
   catalogue = {
     layouts: Array.isArray(c.layouts) ? c.layouts : [],
     navModes: Array.isArray(c.nav_modes) ? c.nav_modes : [],
+    frames: Array.isArray(c.frames) ? c.frames.map((f) => f?.id).filter(Boolean) : [],
     looks: Array.isArray(c.look_sheets) ? c.look_sheets : (c.looks || []).map((id) => ({ id, feel: '' })),
   };
   return catalogue;
@@ -77,8 +80,25 @@ export function proposalsOf(structure, kind) {
   return Array.isArray(list) ? list : [];
 }
 
-/** The name of a choice's value: an option the AI drew is named by the AI, anything else as choiceName. */
+/** The ids of a moments value: the plan keeps them comma-separated in one string, "" for none. */
+export function momentIds(value) {
+  return typeof value === 'string' ? value.split(',').map((m) => m.trim()).filter(Boolean) : [];
+}
+
+/** A moment's plain name in the reader's language (`ask:signIn` is the key `moment.ask-signIn`), or its id. */
+export function momentName(id) {
+  return tOr(`appcat.structure.moment.${id.replace(':', '-')}`, id);
+}
+
+/**
+ * The name of a choice's value: an option the AI drew is named by the AI, a moments list by its
+ * moments' names, anything else as choiceName.
+ */
 export function optionName(structure, kind, id) {
+  if (kind === 'moments') {
+    const ids = momentIds(id);
+    return ids.length ? ids.map(momentName).join(', ') : x('structure.moments.none');
+  }
   return proposalsOf(structure, kind).find((p) => p.id === id)?.name || choiceName(kind, id);
 }
 
@@ -150,8 +170,9 @@ export function stepLine(step) {
 export function aiPrompt(structure, picks, wish) {
   const lines = [x('structure.prompt.head', { name: structure.name })];
   for (const [kind, id] of Object.entries(picks)) {
-    if (!id) continue;
-    lines.push(`- ${x(`structure.prompt.${kind}`)}: ${optionName(structure, kind, id)} (${id})`);
+    // An empty moments list is a choice too: the person wants none.
+    if (!id && !(kind === 'moments' && id === '')) continue;
+    lines.push(`- ${x(`structure.prompt.${kind}`)}: ${optionName(structure, kind, id)}${id ? ` (${id})` : ''}`);
   }
   if (wish) lines.push(`- ${x('structure.prompt.wish')}: ${wish}`);
   lines.push(x('structure.prompt.tail'));

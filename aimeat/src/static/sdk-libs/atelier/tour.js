@@ -37,6 +37,7 @@
  *   the button that does what it proposes to do.
  * @parts tour card · counter · title · text · hint · close · spot · invite · button
  * @fork tour Write the steps into a dialog of your own; you give up the spotlight, the phone's bottom sheet, the page's #aimeat-tour block (which the node reads too), the languages, the invitation and the owner's switch for it.
+ * @use tour explain
  * @structure tour(spec) → { start, end, next, back, point, invite, button, list, places, set, isRunning, destroy }
  *   · readTourBlock(doc) · tourSeen/markTourSeen
  * @usage

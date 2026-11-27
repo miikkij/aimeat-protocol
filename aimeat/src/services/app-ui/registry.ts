@@ -20,12 +20,14 @@
  *   APPEND-ONLY FROM THE FIRST STORED LAYOUT (decided 2026-08-27): a component's props may only
  *   gain entries; a breaking change is a NEW component id. Stored layouts outlive every runtime
  *   version.
- * @structure AppUiPropDef / AppUiComponentDef · NAV_MODES · CHOREOGRAPHIES · BLOCK_SPANS · LOOKS ·
- *   UI_COMPONENTS · SIGNATURE_TOKENS (re-exported) · componentById()
+ * @structure AppUiPropDef / AppUiComponentDef · NAV_MODES · APP_FRAMES · APP_MOMENTS · CHOREOGRAPHIES ·
+ *   BLOCK_SPANS · LOOKS · UI_COMPONENTS · SIGNATURE_TOKENS (re-exported) · componentById()
  * @usage
  *   import { UI_COMPONENTS, componentById } from './registry.js';
  *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.26.0 — 2026-11-27 — APP_FRAMES and APP_MOMENTS, the closed lists the app plan's `frame` and
+ *     `moments` choices take (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.25.0 — 2026-10-02 — The types and prop helpers move to registry-defs.ts and the
  *     library-drawn components to registry-library-blocks.ts, unchanged (800-line cap). Append-only: aiChat over AIMEAT.ai; doc takes `variant` ("plain") and
  *     decision takes `decisionId` (a decision recorded earlier); workspaceTeam takes `inviteInto` and
@@ -133,6 +135,21 @@ export type { AppUiPropDef, AppUiComponentDef };
  *  award-site move — one Menu control opening a full-screen list in display type (both
  *  append-only additions, 2026-08-27). */
 export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail', 'overlay'] as const;
+
+/** The page frame an app is built in with the Atelier kit: `pages` is the default page,
+ *  `tool` is `AIMEAT.atelier.app({ nav: 'side' })`, and `stage` and `reading` are
+ *  `AIMEAT.atelier.app({ frame })`. The app plan's `frame` choice takes one of these. */
+export const APP_FRAMES = ['pages', 'tool', 'stage', 'reading'] as const;
+
+/** The moments where an app asks something of a person, as the Atelier kit builds them: the part
+ *  before the colon is the call (`ask` through `AIMEAT.atelier.requires` / `ask`, `propose`,
+ *  `handoff`) and the part after it the need or the kind. The app plan's `moments` choice is a
+ *  comma-separated list of these. */
+export const APP_MOMENTS = [
+  'ask:signIn', 'ask:access', 'ask:device',
+  'propose:draft', 'propose:extract', 'propose:change', 'propose:run',
+  'handoff:say', 'handoff:prompt',
+] as const;
 
 /** How the page moves under the reader's hand. 'still' is the default and what every layout has
  *  been until now. 'cinema' is scroll-as-the-camera: the opening band recedes as you leave it and

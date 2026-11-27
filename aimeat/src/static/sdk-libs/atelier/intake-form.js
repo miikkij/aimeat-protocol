@@ -53,10 +53,12 @@
  * @slots intakeForm label(field)
  * @tokens intakeForm --ak-intake-width
  * @fork intakeForm Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, putting err.field on its field, and reading a label written per language in the page language.
+ * @use intakeForm edit
  * @parts intakeAdmin root · title · intro · failure · notice · forms · row · meta · acts · copy · action · delete · create · createName · fieldRows · addField · removeField · save
  * @slots intakeAdmin link(form) · create(name) · actions[{ label, run(form), tone? }]
  * @tokens intakeAdmin --ak-intake-width
  * @fork intakeAdmin Copying it out means calling AIMEAT.intake.listForms(), deleteForm() and defineForm() yourself, and building each form's link, its allowed and required fields and its honeypot.
+ * @use intakeAdmin list · act · copy
  * @structure intakeForm(spec) · intakeAdmin(spec) (helper: slug; the shared helpers are in
  *   intake-form-helpers.js: intakeOf · signedOut · linkedFormId · sampleForm · inLanguage · labelled · isDefinition)
  * @usage

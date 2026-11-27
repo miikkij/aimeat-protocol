@@ -22,8 +22,10 @@
  *             title: it.subject, chips: [{ text: it.klass }], note: it.waits ? { text: 'Extraction failed', tone: 'warn' } : null }); } } });
  * @parts promptPanel root · col · step · preview · copy · toggle · answer · apply
  * @fork promptPanel Two columns of your own; copy .ak-promptpanel* out of workbench.css and keep the parse in parseAnswer.
+ * @use promptPanel copy · edit
  * @parts queueRow root · top · who · when · title · chips · chip · note
  * @fork queueRow Build your own row content; copy .ak-qrow* out of workbench.css.
+ * @use queueRow list · status
  * @version-history
  *   v0.1.2 — 2026-10-01 — Copy goes through the kit's copy() (the platform's clipboard code, with
  *     its fallback). When the browser refuses, the whole prompt opens, selected, and a toast says

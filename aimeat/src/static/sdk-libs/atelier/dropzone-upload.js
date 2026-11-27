@@ -15,6 +15,7 @@
  *   over the signed-in session. Signed out, the storage library refuses and the row says so.
  * @structure storageLib() · uploader({ zone, upload, lib, onUploaded, onUploadError })
  * @parts dropzone root · label · hint · error · input · files · file · name · state · bar · open
+ * @use dropzone edit · status
  * @usage
  *   AIMEAT.atelier.dropzone({ target, accept: ['image/*'], upload: { visibility: 'public', chunkedOver: 4e6 },
  *     onUploaded(file, answer) { photos.push(answer.key); } });

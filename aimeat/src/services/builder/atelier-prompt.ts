@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.51.0 — 2026-11-27 — "The frame, the moments and the owner's templates" (atelier-moments.ts,
+ *     part `screens`) after "The phone and the desktop": optional for the builder, and no existing
+ *     sentence changes (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.50.1 — 2026-11-25 — Finishing reads the size matrix from app/publish-finish.ts, the text the
  *     handbook, the skills and the publish answer read; it called its four sizes "these three" and
  *     said every app owes all four items, where the owed items depend on the level (skill step 9).
@@ -212,6 +215,7 @@ import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 import { atelierPasteDelivery } from './atelier-platform.js';
 import { ATELIER_AI_PATH_SECTION } from './atelier-ai-path.js';
 import { ATELIER_SCREENS_SECTION } from './atelier-screens.js';
+import { ATELIER_MOMENTS_SECTION } from './atelier-moments.js';
 import { ATELIER_SCREENSHOT_SIZES, ATELIER_SIZE_MATRIX } from '../app/publish-finish.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
@@ -518,6 +522,8 @@ function composeBody(config: AimeatConfig): string {
     + 'first stored layout when the owner wants one.\n\n';
 
   body += ATELIER_SCREENS_SECTION;
+  // The frame, the moments and the owner's templates: optional for the builder, in the same part.
+  body += ATELIER_MOMENTS_SECTION;
 
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).

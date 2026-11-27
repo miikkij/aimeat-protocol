@@ -16,6 +16,7 @@
  * @variants shelf dense · plain
  * @tokens shelf --ak-shelf-preview-h
  * @fork shelf Copy .ak-shelf* out of board.css and build the cards yourself; you keep the tabs and the search bar as kit parts and give up the keyed grid and the designed empty state.
+ * @use shelf list · search · act
  * @structure shelf(spec) → { el, set, value, destroy }
  * @usage
  *   var s = AIMEAT.atelier.shelf({ target: host, items: pieces, onUse: function (item, action) { … } });

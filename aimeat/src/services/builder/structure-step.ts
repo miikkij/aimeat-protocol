@@ -15,9 +15,12 @@
  *   ITS OWN FILE because build-atelier-prompt.ts is near the 800-line limit. Served in part
  *   `libraries` of the layered specification (build-atelier-layers.ts), because part `start` is
  *   near the size one tool result carries; the index line of that part names it.
- * @structure ATELIER_STRUCTURE_HEADING · ATELIER_STRUCTURE_STEP
+ * @structure ATELIER_STRUCTURE_HEADING · ATELIER_STRUCTURE_STEP · ATELIER_STRUCTURE_FRAME_LINES
  * @usage full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
  * @version-history
+ *   v1.3.0 — 2026-11-27 — ATELIER_STRUCTURE_FRAME_LINES: what `frame` and `moments` mean in Atelier code, and how
+ *     the AI chooses them when the person leaves them to it; for part `screens`, because `libraries` is full
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.0 — 2026-10-30 — The AI draws two or three layouts of its own in `proposals`, the steps stay off the chat,
  *     and the values come from the structure answer.
  *   v1.1.0 — 2026-10-29 — `custom` layout or nav with a note, and an unset choice means the AI decides.
@@ -34,3 +37,13 @@ export const ATELIER_STRUCTURE_STEP = `## ${ATELIER_STRUCTURE_HEADING}\n\n`
   + '- After the data map questions, write `data`: `{ "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }`. While you build, write `now`, one line on what you are doing; the page shows it live.\n'
   + '- Before you build the screens, and whenever the person says they chose something, read action `structure`. A choice with `"state": "waiting"` is the person\'s: build it, then write the same value with `"state": "done"`.\n'
   + '- When the person leaves the choice to you, choose `layout` (one of your proposals or a preset), `nav` and `look` from `values` in the structure answer, and write each with `note`, one sentence on why. Until a choice is made, leave it unset: the page then says the AI decides. A genre you fork from is `genre`, its Design Book id. When the person says who may see the app, write `visibility` (listed, community or unlisted).\n\n';
+
+/**
+ * What the plan's `frame` and `moments` choices mean in Atelier code, and how the AI chooses them when
+ * the person leaves them to it. Not part of ATELIER_STRUCTURE_STEP: its part `libraries` stood at
+ * 23 964 of the 24 000 characters a part carries (2026-11-27), so these lines are appended where the
+ * frame and the moments are taught, in part `screens` (atelier-moments.ts). Each line ends in a newline.
+ */
+export const ATELIER_STRUCTURE_FRAME_LINES = ''
+  + '- `frame` is the page frame the app is built in: `stage` is `AIMEAT.atelier.app({ frame: \'stage\' })` and `reading` is `AIMEAT.atelier.app({ frame: \'reading\' })`, `tool` is `AIMEAT.atelier.app({ nav: \'side\' })`, and `pages` is neither, the default page. `moments` lists what the app asks of a person, comma-separated: an `ask:` moment is built with `AIMEAT.atelier.requires` or `AIMEAT.atelier.ask`, a `propose:` moment with `AIMEAT.atelier.propose` and a `handoff:` moment with `AIMEAT.atelier.handoff`, the part after the colon being the need or the kind (`ask:signIn` is the need `session`, `ask:access` a `member:<cap>` need, `ask:device` a microphone or a camera; `propose:draft` is kind `draft`, `handoff:say` kind `say`).\n'
+  + '- When the person leaves the frame and the moments to you, choose the frame from what the app\'s main work is (one big surface such as a map, a drawing, an editor or a game is `stage`; a long text read from start to end is `reading`; several work views used every day is `tool`; anything else is `pages`) and the moments from what the app asks of a person, and write each into the plan with `note`, one sentence that names your choice and its reason; the plan records it as `by: "ai"`, and the page shows it first.\n';

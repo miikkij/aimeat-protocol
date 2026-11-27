@@ -26,11 +26,13 @@
  * @variants health dense · plain
  * @tokens health --ak-health-lamp · --ak-health-row-pad-y
  * @fork health One row, one lamp; copy .ak-health* out of data.css.
+ * @use health status · list
  * @parts queue root · strip · list · row · state · words · title · sub · extra · aside
  * @slots queue row(item) · state(item) · title(item) · sub(item) · extra(item) · aside(item)
  * @variants queue dense · plain
  * @tokens queue --ak-queue-row-pad-y · --ak-queue-state-min
  * @fork queue Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.
+ * @use queue status · list · count
  *
  *   gauge has NOT joined the customisation model: the dial is arithmetic in this file rather than
  *   markup an app would want to fill, so it carries no @parts declaration and describe() claims

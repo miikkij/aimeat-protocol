@@ -4,6 +4,8 @@
  *   accepts and refuses (services/app/plan.ts readPlanPatch, held to the node's own registries), and
  *   how the eight steps read a plan, a draft and a published app (services/app/structure.ts).
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The `frame` and `moments` choices: closed lists from the registry, moments as a
+ *     sorted, deduplicated list (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.0 — 2026-10-30 — Layouts the AI drew (proposals); a layout or nav id is held to them where the plan is written.
  *   v1.1.0 — 2026-10-29 — A custom layout or nav with a note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -13,6 +15,7 @@ import { readPlanPatch, allowedChoiceValues, strayChoice, APP_PLAN_SPEC, type Ap
 import { computeStructure, nextStep, STEP_IDS } from '../../src/services/app/structure.js';
 import { LOOKS } from '../../src/data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS } from '../../src/services/app-ui/layouts.js';
+import { APP_FRAMES, APP_MOMENTS } from '../../src/services/app-ui/registry.js';
 
 const plan = (over: Partial<AppPlan> = {}): AppPlan => ({
   spec: APP_PLAN_SPEC, appId: 'alice/a.html', choices: {}, updatedBy: 'alice', updatedByPrincipal: 'alice@n',
@@ -53,6 +56,43 @@ describe('what a plan write accepts', () => {
     expect(readPlanPatch({ choices: { layout: { value: 'Agent decides!' } } }).ok).toBe(false);
     expect(readPlanPatch({ choices: { layout: { value: 'custom' } } }).ok).toBe(false);
     expect(readPlanPatch({ choices: { nav: { value: 'custom', note: 'One screen; the cube turns by drag.' } } }).ok).toBe(true);
+  });
+});
+
+describe('the frame and the moments', () => {
+  it('a frame is one of the registry\'s frames; another value is refused, naming them', () => {
+    expect(allowedChoiceValues('frame')).toEqual([...APP_FRAMES]);
+    const r = readPlanPatch({ choices: { frame: { value: 'stage' } } });
+    expect(r.ok && r.patch.choices?.frame).toEqual({ value: 'stage' });
+    const bad = readPlanPatch({ choices: { frame: { value: 'theatre' } } });
+    expect(bad.ok).toBe(false);
+    expect(!bad.ok && bad.message).toContain('reading');
+    expect(readPlanPatch({ choices: { frame: { value: 'custom', note: 'x' } } }).ok).toBe(false);
+  });
+  it('moments is a list, stored sorted and without repeats', () => {
+    const r = readPlanPatch({ choices: { moments: { value: 'propose:draft, ask:signIn,propose:draft', note: 'Sign-in first.' } } });
+    expect(r.ok && r.patch.choices?.moments).toEqual({ value: 'ask:signIn,propose:draft', note: 'Sign-in first.' });
+    const all = readPlanPatch({ choices: { moments: [...APP_MOMENTS].reverse().join(',') } });
+    expect(all.ok && all.patch.choices?.moments?.value).toBe([...APP_MOMENTS].sort().join(','));
+  });
+  it('moments refuses an unknown id and more than twelve, and takes the empty string as none', () => {
+    const bad = readPlanPatch({ choices: { moments: { value: 'ask:signIn,ask:telepathy' } } });
+    expect(bad.ok).toBe(false);
+    expect(!bad.ok && bad.message).toContain('ask:telepathy');
+    expect(!bad.ok && bad.message).toContain('handoff:prompt');
+    expect(readPlanPatch({ choices: { moments: Array(13).fill('ask:signIn').join(',') } }).ok).toBe(false);
+    const none = readPlanPatch({ choices: { moments: { value: '' } } });
+    expect(none.ok && none.patch.choices?.moments).toEqual({ value: '' });
+  });
+  it('a frame or moments the person chose and the AI has not built makes the layout step in progress', () => {
+    const waiting = computeStructure({ ...base, plan: plan({ choices: { frame: { value: 'stage', by: 'owner', state: 'waiting', at: '' } } }) });
+    const layout = waiting.find((s) => s.id === 'layout')!;
+    expect(layout.state).toBe('progress');
+    expect(layout.detail.frame).toMatchObject({ value: 'stage', by: 'owner' });
+    // The AI's own moments, built at once, leave the layout step where layout and nav put it.
+    const ai = computeStructure({ ...base, plan: plan({ choices: { moments: { value: 'ask:signIn', by: 'ai', state: 'done', at: '', note: 'Members only.' } } }) });
+    expect(state(ai, 'layout')).toBe('optional');
+    expect(computeStructure(base).find((s) => s.id === 'layout')!.detail).not.toHaveProperty('frame');
   });
 });
 

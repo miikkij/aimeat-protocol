@@ -36,6 +36,7 @@
  * @variants aiChat compact
  * @tokens aiChat --ak-ai-width
  * @fork aiChat Copying it out means building the grounded prompt from the document and the turns yourself, calling AIMEAT.ai.complete(), chatNotice() and disclose() per answer, AIMEAT.md.render(), writing the no-AI, signed-out and error words in three languages, and holding Ask busy.
+ * @use aiChat converse
  * @structure DEFAULT_SYSTEM · chatPrompt(context, turns, question) · aiChat(spec)
  * @usage
  *   const chat = AIMEAT.atelier.aiChat({ target: '#ask', appId: 'my-app',

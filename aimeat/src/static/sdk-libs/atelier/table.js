@@ -16,10 +16,12 @@
  * @variants table dense · plain · lined
  * @tokens table --ak-table-cell-pad-y · --ak-table-cell-pad-x
  * @fork table Copy .ak-table* out of content.css; you keep the tokens and the tabular numerals, and you give up the keyed body, so a sort stops being seen as a move.
+ * @use table list · compare
  * @parts searchBar root · input · clear
  * @slots searchBar aside()
  * @variants searchBar dense · plain
  * @fork searchBar Two elements and a debounce; copy them if the shape is wrong.
+ * @use searchBar search
  * @version-history
  *   v0.51.0 — 2026-09-05 — THE CELL AND THE HEADING TAKE WHAT THE APP GIVES THEM: `parts.cell`
  *     (value, row, column) and `parts.head` (column) accept a node where `format` only ever

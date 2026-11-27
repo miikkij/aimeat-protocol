@@ -56,6 +56,12 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.73.0 — 2026-11-27 — moments.css joins the imports: the one frame of a stop (ask), a
+ *     proposal (propose) and a hand-off (handoff), with its inline variant, and the area requires()
+ *     holds. frames.css joins them too, with the two frames app({ frame }) names: stage (the
+ *     working surface is the page, its controls a panel beside it or a sheet on a phone) and
+ *     reading (a measure-capped column). Nothing that existed changes its look
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v0.72.4 — 2026-11-25 — No change to the styles: a button inside drag() or a compare() layer
  *     answers a real mouse click (motion.js, parts-ui.js). The line keeps the kit's version here.
  *   v0.72.3 — 2026-11-25 — No change to the styles: the kit's board answers a real mouse click on
@@ -447,6 +453,8 @@
 @import url('./aimeat-atelier/controls.css');
 @import url('./aimeat-atelier/menu.css');
 @import url('./aimeat-atelier/island.css');
+@import url('./aimeat-atelier/moments.css');
+@import url('./aimeat-atelier/frames.css');
 @import url('./aimeat-atelier/margins.css');
 @import url('./aimeat-atelier/ornaments.css');
 @import url('./aimeat-atelier/fingerprint.css');

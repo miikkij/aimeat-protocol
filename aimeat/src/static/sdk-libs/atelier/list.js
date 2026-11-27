@@ -25,11 +25,13 @@
  * @variants list dense · numbered · plain
  * @tokens list --ak-list-gap · --ak-list-row-gap · --ak-list-row-pad-y · --ak-list-row-pad-x · --ak-list-line-gap · --ak-list-aside-size
  * @fork list Copy .ak-list and .ak-list__* out of content.css and build the row yourself; you keep the tokens, the look and settle()/keyedRows() if you call them, and you give up the empty state, the pick mark and every later fix to this row.
+ * @use list list
  * @parts listDetail root · master · detail · back · body
  * @slots listDetail title(item) · sub(item) · extra(item) · badge(item) · meta(item) · aside(item)
  * @variants listDetail dense · numbered · plain
  * @tokens listDetail --ak-list-gap · --ak-list-row-gap · --ak-list-aside-size
  * @fork listDetail Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.
+ * @use listDetail list · open
  * @version-history
  *   v0.70.0 — 2026-11-21 — listDetail.set({ items }) leaves the detail pane alone while the person
  *     has typed in it and its item is still in the list; it drew the pane again and the text was

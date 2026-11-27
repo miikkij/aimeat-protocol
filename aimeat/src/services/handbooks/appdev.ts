@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-27 — The template tools' line names the `recipe` a template can carry
+ *     (models/template-recipe.ts).
  *   2026-11-26 — Playtest scenarios: scenarios_set and audit with playtest (services/app/playtest-scenarios.ts).
  *   2026-11-26 — The app's acceptance criteria: criteria_set, the check kinds and statuses, and the
  *     refusal at the finest level (services/app/acceptance-criteria.ts).
@@ -281,7 +283,8 @@ framing any build: the owner's apps + template proposals, library packs with per
 the Atelier shells and genres, curated + learned pitfalls (pass your model id) · \`aimeat_appdev_pitfall_list\`
 (scope own/platform/all, paginated) · \`aimeat_appdev_pitfall_report\` (record what bit you — model
 required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_template_propose\`/
-\`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it).
+\`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it, and
+with \`recipe\` it carries the look, frame, screens, moments, data and checks as fields).
 
 ## Research-first build flow (research → frame → propose → build → finish)
 0. THE GUIDE: every app is built and changed with the **Atelier specification**, on the finest

@@ -12,6 +12,7 @@
  * @variants timeline dense · plain
  * @tokens timeline --ak-timeline-dot · --ak-timeline-rail · --ak-timeline-gap · --ak-timeline-indent
  * @fork timeline Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.
+ * @use timeline list
  * @version-history
  *   v0.70.0 — 2026-11-21 — A date string with no time of day ("3 Mar 1940", "Sun Mar 03 1940") is
  *     printed as a calendar date; it was read as local midnight and printed with "00.00".

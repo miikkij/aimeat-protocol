@@ -27,6 +27,7 @@
  * @variants doc plain
  * @tokens doc --ak-doc-width
  * @fork doc Copying it out means calling AIMEAT.md.render() or renderRich() yourself, catching a failure into pre-wrapped text, and colouring .md-body's headings, lists, code, tables, quotes and links with the --ak-* tokens.
+ * @use doc view
  * @structure doc(spec) (helpers: mdOf · blank)
  * @usage
  *   const d = AIMEAT.atelier.doc({ target: '#notes', markdown: text, rich: true });

@@ -11,7 +11,7 @@
  *   for the old page's bar. Nothing is kept in the browser's own storage: the view chosen lives in the
  *   address (?view=), the stars on the node. Writes no class; the parts are components.
  *
- *   Deep links (features.md F287–F291): ?lang= (the site reads it), ?view=library|community|favorites|building,
+ *   Deep links (features.md F287–F291): ?lang= (the site reads it), ?view=library|templates|community|favorites|building|org,
  *   ?filter=<state or condition>, ?q=<search>, ?app=<owner>/<filename> (that app's details, in the view
  *   it belongs to), ?create=1 (the generate-with-AI dialog), ?add=1 (sign
  *   in, then the Add dialog on its Paste tab). Keys (F170–F173): Escape closes the app viewer, else
@@ -20,6 +20,10 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.9.0 — 2026-11-27 — ?view=templates: the person's own app templates (appcat/templates.js),
+ *     signed-in only; signed out the address falls back to Your apps. The view has its own head, so
+ *     the masthead, the search tools, the tags, the foot and the install offer stand aside
+ *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   v1.8.0 — 2026-11-23 — While a "Something missing" row filters Your apps, the list opens with
  *     what that condition is and one action that copies a fix prompt for the apps shown (gaps.js).
  *   v1.7.0 — 2026-11-20 — ?view=org: the organisation's app wall (appcat/org-wall.js), with ?org=<organism id>.
@@ -61,6 +65,7 @@ import { LibraryList, RestingList, CommunityList, FavouritesList, BuildingList, 
 import { OrgWall } from '/views/appcat/org-wall.js';
 import { StartedList } from '/views/appcat/started.js';
 import { RecentList } from '/views/appcat/recent.js';
+import { TemplatesView, useTemplates } from '/views/appcat/templates.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { installAs } from '/js/install-prompt.js';
 import { t } from '/js/i18n.js';
@@ -68,7 +73,7 @@ import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts, resting } from '
 import { GapLead } from '/views/appcat/gaps.js';
 
 const html = htm.bind(h);
-const VIEWS = ['library', 'community', 'favorites', 'building', 'org'];
+const VIEWS = ['library', 'templates', 'community', 'favorites', 'building', 'org'];
 
 /** The view the address names (F71, F262 → ?view=); an unknown one is the library (F70). */
 export function readView() {
@@ -100,6 +105,14 @@ export default function AppCat() {
   const [tagsOpen, setTagsOpen] = useState(false);
   const viewer = useRef(null);
   const session = useSession();
+  // The person's app templates: one read for the rail's count and the view (appcat/templates.js).
+  const tpl = useTemplates(!!cat.me);
+
+  // ?view=templates is a signed-in person's own: once the listing says nobody is signed in, the
+  // address falls back to Your apps.
+  useEffect(() => {
+    if (view === 'templates' && cat.loaded && !cat.me) { setView('library'); writeView('library'); }
+  }, [view, cat.loaded, cat.me]);
 
   // The stream that dispatches `aimeat-live-update` to the blocks that listen for it (started.js,
   // sections/internet.js): this route opens it, as the home's routes do.
@@ -224,19 +237,22 @@ export default function AppCat() {
   const ownRedraw = [q, tag, stateFilter, sort, cat.favourites, cat.all];
   const serverRedraw = [sort, cat.favourites, cat.all];
   const counts = stateCounts(cat.own, cat.skillsBound);
-  // The organisation's wall has its own sides and no tag filter: the rail shows no tags there.
-  const tagRows = view === 'org' ? null : view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : view === 'building' ? (cat.building || []) : cat.own;
-  const wall = view === 'org';
+  // The organisation's wall has its own sides and no tag filter: the rail shows no tags there. The
+  // templates are not apps either: no tags, no search tools, no foot, no install offer, and the view
+  // draws its own head in the masthead's place.
+  const templatesView = view === 'templates';
+  const tagRows = view === 'org' || templatesView ? null : view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : view === 'building' ? (cat.building || []) : cat.own;
+  const wall = view === 'org' || templatesView;
   const Detail = detailModule.Detail || detailModule.default;
 
   const rail = html`<${CatRail} view=${view} onView=${chooseView} loaded=${cat.loaded} signedIn=${!!cat.me}
-    counts=${{ library: cat.own.length, community: cat.community.length, favorites: favRowsAll.length, building: (cat.building || []).length }}
+    counts=${{ library: cat.own.length, templates: tpl.loaded ? tpl.rows.length : '', community: cat.community.length, favorites: favRowsAll.length, building: (cat.building || []).length }}
     states=${view === 'library' ? counts : null} stateFilter=${stateFilter} onState=${chooseState}
     tagRows=${tagRows} tag=${tag} onTag=${setTag} tagsOpen=${tagsOpen} onTagsOpen=${() => setTagsOpen(!tagsOpen)} />`;
 
   return html`
     <${IndexFrame} dense index=${rail} label=${x('header.title')}>
-      <${CatMasthead} own=${cat.own} me=${cat.me} loaded=${cat.loaded} />
+      ${templatesView ? html`<${TemplatesView} data=${tpl} />` : html`<${CatMasthead} own=${cat.own} me=${cat.me} loaded=${cat.loaded} />`}
       ${cat.me && !wall ? html`<${InstallCta} id="apps" title=${t('install.titleApps')} body=${t('install.bodyApps')} />` : null}
       ${view === 'library' && cat.loaded && cat.own.length > 0 ? html`<${CatBand} counts=${counts} n=${cat.own.length} />` : null}
       ${wall ? null : html`<${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />`}

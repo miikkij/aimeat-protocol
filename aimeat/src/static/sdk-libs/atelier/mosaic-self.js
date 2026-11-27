@@ -8,6 +8,8 @@
  * @structure renderSelfSourced(block, into, handles) → whether the block was one of these
  * @usage if (renderSelfSourced(block, into, alive.handles)) return;   // inside mosaic.js buildBlock
  * @version-history
+ *   v0.73.0 — 2026-11-27 — ask and handoff join (moments.js): a stop and a sentence for the person's
+ *     own AI, drawn from props alone (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v0.63.0 — 2026-10-02 — aiChat joins (ai-chat.js); doc passes `variant`, decision `decisionId`,
  *     workspaceTeam `inviteInto`, workspacePicker `allowPrivate` and `multiple`, connections and
  *     decision `via`.
@@ -31,6 +33,7 @@ import { aiTask } from './ai-task.js';
 import { aiChat } from './ai-chat.js';
 import { doc } from './doc.js';
 import { decision } from './decision.js';
+import { ask, handoff } from './moments.js';
 
 /**
  * Render one self-sourced block into `into`, pushing its handle onto `handles`.
@@ -138,6 +141,22 @@ export function renderSelfSourced(block, into, handles) {
     }
     case 'connections': {
       handles.push(connections({ target: into, title: p.title, need: p.need, via: p.via }));
+      return true;
+    }
+    // ── The moments an arrangement can hold from props alone: a stop, and a sentence for the
+    //    person's own AI. An empty prop is left out, so the kit's own words stand.
+    case 'ask': {
+      handles.push(ask({
+        target: into, kind: p.kind, title: p.title || undefined, lead: p.lead || undefined, url: p.url || undefined,
+        when: p.when || undefined, what: p.what || undefined, variant: p.variant || undefined,
+      }));
+      return true;
+    }
+    case 'handoff': {
+      handles.push(handoff({
+        target: into, kind: 'say', text: p.text, title: p.title || undefined, lead: p.lead || undefined,
+        variant: p.variant || undefined,
+      }));
       return true;
     }
     default:

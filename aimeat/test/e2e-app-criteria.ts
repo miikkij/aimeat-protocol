@@ -9,9 +9,14 @@
  *     and goes through once each line is evidenced or waived;
  *   - a write of the prose keeps the criteria, and the publish answer counts them;
  *   - a quick prototype with an open line publishes, and the answer counts it;
- *   - another owner may not write the list, and a builder of another account may not waive a line.
+ *   - another owner may not write the list, and a builder of another account may not waive a line;
+ *   - a page that declares a session need with AIMEAT.atelier.requires is offered the criterion and
+ *     scenario pair that proves it (services/app/declared-needs.ts), a page that declares nothing is
+ *     offered nothing, and the pair is not offered again once it is in the list.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-criteria
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The publish answer's ready-made proof of a declared need
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.0.0 — 2026-11-26 — Initial (wish-acceptance-criteria-in-the-design-spec-checked-at-publish).
  */
 import { BASE, assert, expectRefusal, finish, json, test } from './helpers/harness.js';
@@ -128,6 +133,38 @@ const LINES = [
         const v2 = await publish(p, 'two', 'proto');
         assert(v2.status === 201, `a prototype is not held to its criteria: ${v2.status} ${JSON.stringify(v2.body?.error)}`);
         assert(v2.body.data.next_steps?.criteria_counts?.open === 1, `the answer counts the open line: ${JSON.stringify(v2.body.data.next_steps?.criteria_counts)}`);
+    });
+
+    await test('a page that declares a session need is offered its proof, and not again once the pair is in the list', async () => {
+        const n = `critneeds${Date.now()}.html`;
+        const napp = `/v1/apps/${encodeURIComponent(alice.name)}/${encodeURIComponent(n)}`;
+        const declares = '<div id="area"></div><script>AIMEAT.atelier.requires({ target: "#area", needs: ["session"], render: function (host) { host.textContent = "in"; } });</' + 'script>';
+        const put = (word: string) => json('/v1/apps', {
+            method: 'POST', headers: auth,
+            body: JSON.stringify({
+                filename: n, mime_type: 'text/html', name: 'Needs', description: 'An app that declares a need.', roadmap: `The page says ${word}.`,
+                content: b64(page(n, word, 'proto').replace('<div id="login"></div>', `<div id="login"></div>${declares}<script src="/v1/libs/aimeat-atelier.js"></` + 'script>')),
+            }),
+        });
+        const v1 = await put('one');
+        assert(v1.status === 201, `v1: ${v1.status} ${JSON.stringify(v1.body?.error)}`);
+        const steps = v1.body.data.next_steps;
+        assert(Array.isArray(steps?.declared_needs) && steps.declared_needs.includes('session'), `the answer names the declared need: ${JSON.stringify(steps?.declared_needs)}`);
+        const ready = steps?.needs_proof_ready;
+        assert(ready?.criteria?.length === 2 && ready?.scenarios?.length === 2, `the pair is ready-made: ${JSON.stringify(ready)}`);
+        assert(ready.scenarios[0].steps[0].target === '[data-ak-requires][data-ak-state="signIn"]', `the signed-out scenario reads the kit's state: ${JSON.stringify(ready.scenarios[0])}`);
+
+        // A page that declares nothing is offered nothing.
+        const plain = await publish(`critplain${Date.now()}.html`, 'plain', 'proto');
+        assert(plain.status === 201 && plain.body.data.next_steps?.needs_proof === undefined, `no offer without a declaration: ${JSON.stringify(plain.body.data.next_steps?.needs_proof)}`);
+
+        // The ready-made criteria are taken as they are; the next publish does not offer them again.
+        await json(`${napp}/design-spec`, { method: 'PUT', headers: auth, body: JSON.stringify({ markdown: '# Design spec\n\nA page with one area for a signed-in person.\n' }) });
+        const w = await json(`${napp}/design-spec/criteria`, { method: 'PUT', headers: auth, body: JSON.stringify({ criteria: ready.criteria }) });
+        assert(w.status === 200, `the ready-made criteria are accepted as they are: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        const v2 = await put('two');
+        assert(v2.status === 201, `v2: ${v2.status} ${JSON.stringify(v2.body?.error)}`);
+        assert(v2.body.data.next_steps?.needs_proof === undefined, `not offered twice: ${JSON.stringify(v2.body.data.next_steps?.needs_proof)}`);
     });
 
     await owed('warn');

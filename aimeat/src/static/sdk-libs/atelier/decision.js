@@ -49,6 +49,7 @@
  * @slots decision onOutcome(result) · onAnswered(result, round) · verdict(result) · labels{ questionId: words }
  * @tokens decision --ak-decision-width
  * @fork decision Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), decisions({ id }) and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, every round of a chained ask, a stored decision with its record, and recording the person's verdict only when they press.
+ * @use decision confirm · act · view
  * @structure decision(spec) (helpers: decideOf · signedOut · settingsHref · noState · errorWords ·
  *   needsPerson · money · SAMPLE; one answer's drawing and the stored-row helpers are in
  *   decision-answer.js)

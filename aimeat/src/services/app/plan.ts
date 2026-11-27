@@ -23,7 +23,9 @@
  *   navigation from the mosaic's nav modes, looks from the look registry. A look or layout added
  *   there is valid here with no change to this file. A genre is a Design Book id, held to its form
  *   only, because the Design Book is data an operator edits. Layout and navigation also take
- *   `custom` with a note, for a screen no preset fits.
+ *   `custom` with a note, for a screen no preset fits. The frame (APP_FRAMES) and the moments
+ *   (APP_MOMENTS) come from the mosaic registry too; `moments` is the one choice whose value is a
+ *   list, comma-separated in one string, and the empty string says "none".
  *
  *   THE AI DRAWS OPTIONS OF ITS OWN (Jouni, 2026-10-30: the AI draws layouts of
  *   its own and shapes them as it goes, and the presets stay beside them). `proposals.layout` and
@@ -42,6 +44,9 @@
  *   const plan = await readAppPlan(storage, 'alice/talkoot.html');
  *   const out = await writeAppPlan(storage, { appId, patch, by, principal, actor: 'owner' });
  * @version-history
+ *   v1.3.0 — 2026-11-27 — `frame` (APP_FRAMES) and `moments` (a list of APP_MOMENTS, stored sorted and
+ *     without repeats, empty for none) join the choices; the other choices validate as before
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   2026-11-19 — eraseAppPlansOf deletes for good, not to the bin (record-keys.ts eraseAppRecordsOfAuthor).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
@@ -53,7 +58,7 @@
 import type { Storage } from '../../storage/interface.js';
 import { appKeySegment, readAuthorAppRecord, eraseAppRecordsOfAuthor, equalAppId, canonicalAppId, listAppRecords } from './record-keys.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
-import { NAV_MODES, LOOKS } from '../app-ui/registry.js';
+import { NAV_MODES, LOOKS, APP_FRAMES, APP_MOMENTS } from '../app-ui/registry.js';
 
 export const APP_PLAN_SPEC = 'aimeat.appplan/1' as const;
 
@@ -61,7 +66,7 @@ export const APP_PLAN_SPEC = 'aimeat.appplan/1' as const;
 const NS_PLAN = 'app-plan';
 const PREFIX = 'appplan.';
 
-export const PLAN_CHOICE_KEYS = ['layout', 'nav', 'look', 'genre', 'visibility'] as const;
+export const PLAN_CHOICE_KEYS = ['layout', 'nav', 'look', 'genre', 'visibility', 'frame', 'moments'] as const;
 export type PlanChoiceKey = typeof PLAN_CHOICE_KEYS[number];
 
 export const PLAN_VISIBILITY = ['listed', 'community', 'unlisted'] as const;
@@ -166,8 +171,29 @@ export function allowedChoiceValues(key: PlanChoiceKey): readonly string[] | nul
     case 'nav': return [...NAV_MODES, CUSTOM_CHOICE];
     case 'look': return LOOKS;
     case 'visibility': return PLAN_VISIBILITY;
+    case 'frame': return APP_FRAMES;
+    case 'moments': return APP_MOMENTS;
     case 'genre': return null;
   }
+}
+
+/** The most moments one list may name, repeats counted. */
+const MOMENTS_MAX = 12;
+/** A moments list is longer than one id: every id once, with its commas, is under 120 characters. */
+const MOMENTS_TEXT = 400;
+
+/**
+ * A moments list as the plan stores it: ids from APP_MOMENTS, sorted, each once, joined with commas;
+ * the empty string says "none". Or the sentence that says what is wrong.
+ */
+function readMoments(raw: string): { ok: true; value: string } | { ok: false; message: string } {
+  const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  if (ids.length > MOMENTS_MAX) return { ok: false, message: `choices.moments names at most ${MOMENTS_MAX} moments, comma-separated.` };
+  const unknown = ids.find((id) => !(APP_MOMENTS as readonly string[]).includes(id));
+  if (unknown) {
+    return { ok: false, message: `"${unknown}" is not a moment. The moments on this node are: ${APP_MOMENTS.join(', ')}. Write them comma-separated in one value, or "" for none.` };
+  }
+  return { ok: true, value: [...new Set(ids)].sort().join(',') };
 }
 
 /** A choice as the caller sent it: a value, or null to clear the choice. */
@@ -279,7 +305,7 @@ export function readPlanPatch(body: unknown): { ok: true; patch: PlanPatch } | {
   }
   if ('choices' in b) {
     const c = b.choices;
-    if (!c || typeof c !== 'object' || Array.isArray(c)) return { ok: false, message: 'choices is an object keyed by layout, nav, look, genre or visibility.' };
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return { ok: false, message: `choices is an object keyed by ${PLAN_CHOICE_KEYS.join(', ')}.` };
     patch.choices = {};
     for (const [key, raw] of Object.entries(c as Record<string, unknown>)) {
       if (!(PLAN_CHOICE_KEYS as readonly string[]).includes(key)) {
@@ -288,6 +314,18 @@ export function readPlanPatch(body: unknown): { ok: true; patch: PlanPatch } | {
       const k = key as PlanChoiceKey;
       if (raw === null) { patch.choices[k] = null; continue; }
       const r = (typeof raw === 'string' ? { value: raw } : raw) as Record<string, unknown>;
+      if (k === 'moments') {
+        // The one list-valued choice: its own form, and the empty string is a value ("none").
+        const listed = r && typeof r === 'object' ? text(r.value, MOMENTS_TEXT) : null;
+        if (listed === null) return { ok: false, message: 'choices.moments is { "value": "ask:signIn,propose:draft" }, comma-separated ids, "" for none, or null to clear it.' };
+        const read = readMoments(listed);
+        if (!read.ok) return read;
+        const mState = r.state;
+        if (mState !== undefined && mState !== 'waiting' && mState !== 'done') return { ok: false, message: 'choices.moments.state is "waiting" or "done".' };
+        const mNote = r.note === undefined ? undefined : text(r.note, LIMITS.note);
+        patch.choices.moments = { value: read.value, ...(mState ? { state: mState } : {}), ...(mNote ? { note: mNote } : {}) };
+        continue;
+      }
       const value = r && typeof r === 'object' ? text(r.value, 80) : null;
       if (!value) return { ok: false, message: `choices.${k} is { "value": "<id>" }, or null to clear it.` };
       const allowed = allowedChoiceValues(k);

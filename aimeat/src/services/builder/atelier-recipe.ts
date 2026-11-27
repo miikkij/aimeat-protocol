@@ -24,6 +24,9 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.10.3 — 2026-11-27 — The token count says seventy-nine: the moments' two (kit 0.73.0, shared
+ *     by ask, propose and handoff) and the stage frame's two. The variants line names `inline` on
+ *     ask, propose and handoff.
  *   v1.10.2 — 2026-11-15 — Words only (Jouni's ruling): four ways to customise, two ways a node
  *     reaches the screen, the mosaic's own update, one extension, in place of doors and roads.
  *   v1.10.1 — 2026-11-08 — The sheet example drops `nav: 'stack'`, a mode the node does not have (the
@@ -86,11 +89,11 @@ export function renderCustomisation(): string {
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
     + 'rating, aiTask, aiChat and requestPanel; `plain` on doc and board; `fill` on board; '
     + '`dense` on tabs, bottomNav, segmented, members, workspacePicker, workflowInput and handbook; '
-    + '`dense` and `plain` on fingerprint; `pill` on tabs; '
+    + '`dense` and `plain` on fingerprint; `inline` on ask, propose and handoff; `pill` on tabs; '
     + '`quiet` on section; `ghost` on stateButton; `table` on members and workspaceTeam. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and seventy-five more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and seventy-nine more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

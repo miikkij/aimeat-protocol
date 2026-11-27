@@ -23,20 +23,24 @@
  * @variants hero tall · compact · center
  * @tokens hero --ak-hero-min · --ak-hero-pad · --ak-hero-gap · --ak-hero-title-size · --ak-hero-image · --ak-scrim
  * @fork hero Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.
+ * @use hero layout · view
  * @parts statRow root · tile · value · unit · delta · label · hint · trend · aside
  * @slots statRow label(tile) · hint(tile) · aside(tile)
  * @variants statRow compact · trend · plain
  * @tokens statRow --ak-stat-min · --ak-stat-pad · --ak-stat-gap · --ak-stat-figure-size · --ak-stat-unit-size · --ak-stat-up · --ak-stat-down
  * @fork statRow Copy .ak-statrow* out of shell.css; you keep the tokens and lose countUp() on a changed figure.
+ * @use statRow count
  * @parts figure root · label · row · value · unit · delta · sub · aside
  * @slots figure unit() · aside()
  * @variants figure compact · center
  * @tokens figure --ak-stat-unit-size · --ak-stat-up · --ak-stat-down
  * @fork figure One element, one number: build it yourself and call countUp(node, from, to).
+ * @use figure count
  * @parts rating root · value · track · fill · words
  * @slots rating words(state)
  * @variants rating compact
  * @fork rating Copy .ak-rating* out of content.css; the clip trick is four rules.
+ * @use rating count
  * @version-history
  *   v0.51.0 — 2026-09-05 — THE BAND AND THE TILE TAKE WHAT THE APP GIVES THEM. hero gains the
  *     kicker above the title (`parts.before`), the line under the actions (`parts.after`), the

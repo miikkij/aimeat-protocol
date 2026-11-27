@@ -10,10 +10,14 @@
  *   The tier/packs/composes fields reuse the curated AppTemplate vocabulary so promotion into
  *   src/data/app-templates.ts is a copy, not a mapping. Model attribution is MANDATORY and
  *   indicative. Read by the appdev overview and the `templates` discovery source.
- * @structure TemplateProposalManifest; proposeTemplate/listTemplateProposals/
+ * @structure TemplateProposalManifest; proposeTemplate/setTemplateRecipe/listTemplateProposals/
  *   getTemplateProposal/deleteTemplateProposal; templateProposalKey()
  * @usage import { proposeTemplate, listTemplateProposals } from './template-proposals.js';
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A template carries an optional `recipe` (models/template-recipe.ts): an upsert
+ *     with one replaces it, an upsert without one keeps the stored one, and setTemplateRecipe() replaces
+ *     or removes it alone, on the record's version and under the same memory ceilings
+ *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   v1.1.1 — 2026-11-20 — `derived_from.filename` takes the app named without `.html` (services/app/app-ref.ts).
  *   v1.1.0 — 2026-11-19 — `tier` is optional: the retired Classic track's T1/T2/T3, kept on older
  *     proposals and tagged only when given. Atelier has no tiers.
@@ -34,6 +38,7 @@ import { memoryCeilings } from '../memory/ceilings.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
 import { resolveAppFilename } from './app-ref.js';
+import type { TemplateRecipe } from '../../models/template-recipe.js';
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -64,6 +69,8 @@ export interface TemplateProposalManifest {
     packs?: string[];
     /** Component template ids this composes (curated registry vocabulary). */
     composes?: string[];
+    /** What the next build starts from, as structured fields (models/template-recipe.ts). */
+    recipe?: TemplateRecipe;
     proposedBy: string;
     createdAt: string;
     updatedAt: string;
@@ -86,7 +93,11 @@ export interface ProposeTemplateInput {
     model_notes?: Array<{ model: string; notes: string; evidence?: string }>;
     packs?: string[];
     composes?: string[];
+    /** Validated by TemplateRecipeSchema before it gets here (the catalog entry's schema). */
+    recipe?: TemplateRecipe;
 }
+
+type Refusal = { error: string; status?: number; code?: string };
 
 /** The caller's account on this node and its GHII; none for an ecosystem app or another node's identity. */
 function ownerGhiiOf(callerGaii: string, config: AimeatConfig): { owner: string; ownerGhii: string } | null {
@@ -144,6 +155,8 @@ export async function proposeTemplate(
             ...(existingValue?.proofs ? { proofs: existingValue.proofs } : {}),
             ...(input.packs ? { packs: input.packs } : {}),
             ...(input.composes ? { composes: input.composes } : {}),
+            // A recipe given replaces the stored one; a proposal without one keeps it, as proofs survive.
+            ...(input.recipe ? { recipe: input.recipe } : existingValue?.recipe ? { recipe: existingValue.recipe } : {}),
             proposedBy: callerGaii,
             createdAt: existingValue?.createdAt ?? now,
             updatedAt: now,
@@ -166,6 +179,36 @@ export async function proposeTemplate(
     if (!written) return refusal ?? { error: 'The proposal was not written' };
     // A first write is version 1; a write over an existing proposal is a later one.
     return { manifest: written.value as TemplateProposalManifest, updated: written.version > 1 };
+}
+
+/**
+ * Replace a template's recipe, or remove it with null, and change nothing else. For the page where the
+ * owner edits their own template (PATCH /v1/appdev/templates/:id). Written on the version that was
+ * read, and refused by the memory ceilings before it is written, as proposeTemplate is.
+ */
+export async function setTemplateRecipe(
+    storage: Storage, config: AimeatConfig, callerGaii: string, id: string, recipe: TemplateRecipe | null,
+): Promise<{ manifest: TemplateProposalManifest } | Refusal> {
+    const who = ownerGhiiOf(callerGaii, config);
+    if (!who || !ID_RE.test(id)) return { error: 'No such template proposal', status: 404, code: 'NOT_FOUND' };
+    const key = templateProposalKey(id);
+    let refusal: Refusal | null = null;
+    const written = await updateMemoryRecord(storage, who.ownerGhii, key, async (existing) => {
+        const current = existing?.value as TemplateProposalManifest | null | undefined;
+        if (!current) {
+            refusal = { error: 'No such template proposal', status: 404, code: 'NOT_FOUND' };
+            return UNCHANGED;
+        }
+        const manifest: TemplateProposalManifest = { ...current, updatedAt: new Date().toISOString() };
+        if (recipe) manifest.recipe = recipe;
+        else delete manifest.recipe;
+        const ceilings = await memoryCeilings({ storage, config }, who.ownerGhii, [{ key, value: manifest }]);
+        refusal = ceilings.ok ? null : { error: ceilings.refusal.message, status: ceilings.refusal.status, code: ceilings.refusal.code };
+        if (refusal) return UNCHANGED;
+        return { value: manifest };
+    });
+    if (!written) return refusal ?? { error: 'The recipe was not written' };
+    return { manifest: written.value as TemplateProposalManifest };
 }
 
 export async function listTemplateProposals(

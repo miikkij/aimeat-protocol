@@ -9,6 +9,8 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.8.0 — 2026-11-27 — My templates as the second view, under Your apps, for a signed-in person,
+ *     with the count of their app templates (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   v1.7.0 — 2026-11-23 — "Something missing" carries a question mark that opens its explanation
  *     (explain.concept.appGaps): what the rows count, that they are the person's own apps, and how a
  *     row is fixed.
@@ -39,7 +41,7 @@ const TAGS_FOLDED = 8;
 
 /**
  * @param {{ view: string, onView: (v: string) => void, loaded: boolean, signedIn?: boolean,
- *   counts: { library: number, community: number, favorites: number, building: number },
+ *   counts: { library: number, templates?: number|string, community: number, favorites: number, building: number },
  *   states: { listed: number, community: number, unlisted: number, draft: number, kunto: Record<string, number> } | null,
  *   stateFilter: string|null, onState: (s: string) => void,
  *   tagRows: any[]|null, tag: string|null, onTag: (t: string|null) => void, tagsOpen: boolean, onTagsOpen: () => void }} p
@@ -48,6 +50,8 @@ export function CatRail(p) {
   const [kuntoOpen, setKuntoOpen] = useState(false);
   const views = [
     { value: 'library', label: x('view.library'), n: p.loaded ? p.counts.library : '' },
+    // The person's own app templates (appcat/templates.js): a signed-out person never sees the row.
+    ...(p.signedIn ? [{ value: 'templates', label: x('templates.view'), n: p.counts.templates ?? '' }] : []),
     { value: 'community', label: x('view.community'), n: p.loaded && p.counts.community > 0 ? p.counts.community : '' },
     { value: 'favorites', label: x('view.favorites'), n: p.loaded ? p.counts.favorites : '' },
     // Only for a person who builds somebody else's app: the others never see an empty view.

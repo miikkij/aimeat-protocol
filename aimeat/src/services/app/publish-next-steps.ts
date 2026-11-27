@@ -18,6 +18,9 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.11.0 — 2026-11-27 — `declared_needs`, `needs_proof` and `needs_proof_ready`: a page that
+ *     declares `session` with AIMEAT.atelier.requires is offered the criterion and scenario pair
+ *     that proves it (declared-needs.ts; wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.10.0 — 2026-11-26 — `bound_skill_issues`: each bound skill whose calls the app's tools now
  *     refuse (services/app/freshness.ts).
  *   v1.9.0 — 2026-11-26 — `criteria` and `criteria_counts`: how the acceptance criteria stand, every
@@ -97,6 +100,7 @@ import { balancingTestStep } from '../compliance/lia-write.js';
 import { registerStep } from '../compliance/register-step.js';
 import { criteriaCounts, type AppCriterion } from './acceptance-criteria.js';
 import { boundSkillIssues } from './freshness.js';
+import { needsProof } from './declared-needs.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -262,6 +266,8 @@ export async function buildPublishNextSteps(
       // the face and the skill and stayed silent on these, and a builder who had read "next_steps
       // is the node's list of what this app still owes" shipped four versions without either.
       ...(documents ? documentSteps(ownerName, filename, documents) : {}),
+      // A page that declares its needs with the kit gets the proof of them ready-made (declared-needs.ts).
+      ...(html ? needsProof(ownerName, filename, html, documents?.criteria) : {}),
       // Recommended, never blocking (app-legal.ts): the publish does not wait for them.
       ...(legalMissing.length ? {
         legal_pages: `Recommended, not blocking: this app has no ${legalMissing.join(' or ')} page yet. `

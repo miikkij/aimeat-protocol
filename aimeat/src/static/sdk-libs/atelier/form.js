@@ -48,6 +48,7 @@
  * @parts form root · field · label · input · req · hint · error · range · readout · alert · gate · bar · submit · cancel
  * @tokens form --ak-range-track · --ak-range-thumb
  * @fork form Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.
+ * @use form edit
  * @version-history
  *   v0.66.0 — 2026-10-05 — Validation from one JSON Schema: field `format`, `pattern`, `minLength`,
  *     `sameAs` and `messages`, the host's `schema`, a format's hint under its field, the check when a

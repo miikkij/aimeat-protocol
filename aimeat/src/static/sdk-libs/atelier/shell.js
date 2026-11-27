@@ -105,6 +105,7 @@ export { section, tabs, bottomNav };
 import { margins } from './margins.js';
 import { motionLabel, motionIcon, motionIsLess } from './shell-motion.js';
 import { tour, hasTourBlock } from './tour.js';
+import { frameOf, stageFrame } from './shell-frames.js';
 
 /** How long after the first screen the tour's invitation waits, so it does not land on a moving page. */
 const TOUR_INVITE_MS = 700;
@@ -173,7 +174,9 @@ const MODE_BUTTON = '#aimeat-mode-switch button[data-mode]';
 /**
  * @typedef {object} AppHandle
  * @property {HTMLElement} el
- * @property {HTMLElement} main
+ * @property {HTMLElement} main  the main region; with `frame: 'stage'`, the stage's surface
+ * @property {HTMLElement|null} controls  the stage's controls panel to fill; null without `frame: 'stage'` and `controls`
+ * @property {{ setOpen: (on: boolean) => void, setTitle: (text: string) => void }|null} stage  the stage's panel, to fold or name; null without a stage
  * @property {(patch: { title?: string, look?: string, density?: 'comfortable'|'compact',
  *   quiet?: boolean, ambient?: AmbientWish }) => void} set
  * @property {(kind: 'loading'|'ready'|'empty'|'error'|'signin'|'none', opts?: { title?: string, hint?: string, onRetry?: () => void }) => void} status
@@ -224,6 +227,7 @@ function ambientSpec(want) {
  *   navItems?: Array<{ id: string, label: string, count?: number|string, tone?: string,
  *     group?: string, bottom?: boolean, onPick?: (item: any) => void }>,
  *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
+ *   frame?: 'pages'|'stage'|'reading', controls?: boolean|{ title?: string, open?: boolean },
  *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean, margins?: string|false,
  *   onReady?: (session: any) => void, onLogout?: () => void,
  *   onSession?: (session: any) => void, onOffline?: (who: { owner: string, ghii: string, displayName: string, at: string }) => void,
@@ -236,6 +240,11 @@ function ambientSpec(want) {
  *   column (the workbench layout); an entry may carry a `count`, a `tone` dot and a `group`
  *   heading, and on a phone the column becomes the bottom bar with the ungrouped entries (or
  *   those marked `bottom: true`), ending in a Menu that opens every entry in a sheet.
+ *   `frame: 'stage'` makes one working surface the whole page under the bar (the handle's `main`
+ *   is that surface) and, with `controls`, gives one panel for the app's controls (the handle's
+ *   `controls`): a float at the top right of a wide window, a sheet at the bottom edge of a
+ *   phone. `frame: 'reading'` holds the main column to a reading measure. Both are shell-frames.js;
+ *   with `nav: 'side'` the option is not read, because that frame already caps its column.
  *   `motion: false` is the WHOLE opt-out from the kit's default motion for this app: no
  *   entrances, no enter/exit/move on a change, no count-up, no transition between views.
  *   Everything still renders and still works; nothing travels. It is one option because the
@@ -334,13 +343,18 @@ export function app(spec) {
   const main = el('main', { class: 'ak-app__main' + (sideMode ? '' : ' ak-scroll') });
   let sideHost = sideMode ? el('aside', { class: 'ak-app__side' }) : null;
   const frame = sideMode ? el('div', { class: 'ak-app__frame ak-scroll' }, [sideHost, main]) : null;
+  // THE FRAME (`frame`): a stage or a reading column (shell-frames.js). The side-navigation frame
+  // is its own answer, so an app that asked for it gets no second one.
+  const framed = spec.nav === 'side' ? null : frameOf(spec.frame);
+  const stage = framed === 'stage' ? stageFrame(main, spec.controls) : null;
   const footer = spec.footer != null
     ? el('footer', { class: 'ak-app__foot', text: spec.footer })
     : null;
 
   const root = el('div', {
-    class: 'ak-root ak-app' + (sideMode ? ' ak-app--sidenav' : ''),
+    class: 'ak-root ak-app' + (sideMode ? ' ak-app--sidenav' : '') + (framed ? ' ak-app--' + framed : ''),
     'data-ak-look': state.look,
+    'data-ak-frame': framed,
     'aria-labelledby': titleId,
   }, [bar, statusHost, frame || main, footer]);
 
@@ -618,7 +632,9 @@ export function app(spec) {
 
   return {
     el: root,
-    main: main,
+    main: stage ? stage.surface : main,
+    controls: stage ? stage.body : null,
+    stage: stage && stage.body ? { setOpen: stage.setOpen, setTitle: stage.setTitle } : null,
 
     /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
      *    quiet?: boolean, ambient?: AmbientWish }} patch */
@@ -697,6 +713,7 @@ export function app(spec) {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
       if (statusCard) statusCard.destroy();
+      if (stage) stage.destroy();
       if (nav) nav.destroy();
       if (side) side.destroy();
       if (fullFrame) document.body.classList.remove('ak-body');

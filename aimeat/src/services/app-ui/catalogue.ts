@@ -16,6 +16,8 @@
  * @usage
  *   import { buildUiCatalogue } from './catalogue.js';
  * @version-history
+ *   v1.2.0 — 2026-11-27 — `frames`: the page frames an app plan's `frame` choice takes, each `{ id }`
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.1.1 — 2026-11-15 — The tokens summary says "the one colour you set" (as build-atelier-prompt.ts does), not "the one colour door".
  *   v1.1.0 — 2026-09-05 — THE EFFECTS SHELF (wish-atelier-post-process-effects, stage 4): the
  *     nine effects with their knobs' bounds, the hosts a prop or zone effect may land on, the
@@ -29,7 +31,7 @@ import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 import { PATTERNS } from '../../data/atelier-patterns.js';
 import { AMBIENTS } from '../../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS, POST_MAX, type AtelierEffectParam } from '../../data/atelier-effects.js';
-import { UI_COMPONENTS, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, type AppUiPropDef } from './registry.js';
+import { UI_COMPONENTS, NAV_MODES, APP_FRAMES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, type AppUiPropDef } from './registry.js';
 import { SIGNATURE_TOKENS } from './signature-tokens.js';
 
 /**
@@ -41,6 +43,7 @@ import { SIGNATURE_TOKENS } from './signature-tokens.js';
 export function buildUiCatalogue(): {
   components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
   nav_modes: readonly string[];
+  frames: Array<{ id: string }>;
   choreographies: { values: readonly string[]; summary: string };
   looks: readonly string[];
   spans: { values: readonly string[]; summary: string };
@@ -86,6 +89,7 @@ export function buildUiCatalogue(): {
       ...(c.maxPerLayout !== undefined ? { max_per_layout: c.maxPerLayout } : {}),
     })),
     nav_modes: NAV_MODES,
+    frames: APP_FRAMES.map((id) => ({ id })),
     choreographies: {
       values: CHOREOGRAPHIES,
       summary: 'How the page moves as the reader scrolls. still: nothing scroll-driven. cinema: the opening band recedes and each section rises as it enters the view — right for fronts, stories and reports; wrong for a tool someone uses all day.',

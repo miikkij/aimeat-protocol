@@ -31,6 +31,7 @@
  * @variants kanban dense · plain
  * @tokens kanban --ak-kanban-col-min · --ak-kanban-card-pad · --ak-kanban-gap
  * @fork kanban Copy .ak-kanban* out of planner.css; you keep the tokens and give up the drag, the arrow-key move and the card's spring travel.
+ * @use kanban list · edit · status
  *
  *   plan, schedule and steps have NOT joined the customisation model yet: they carry no @parts
  *   declaration, so describe() does not claim slots or tokens they do not have. Their shapes are

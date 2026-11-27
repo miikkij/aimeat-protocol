@@ -57,6 +57,17 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.73.0 — 2026-11-27 — THE MOMENTS AND TWO FRAMES, all additions: no component that existed
+ *     changes. ask (a stop: eight kinds, each with its words in three languages and the way out the
+ *     page's own libraries know), propose (a draft, an extracted value, a change or a plan the
+ *     person decides on, or is told about when the owner turned approval off) and handoff (a
+ *     sentence or a prompt for the person's own AI) share one frame and one set of part names
+ *     (moments.js, moments.css). requires (requires.js) takes `needs` and draws the first stop
+ *     that applies, then the app's content. app() takes `frame`: 'stage' (one working surface as
+ *     the whole page, its controls beside it on a wide window and in a sheet on a phone) and
+ *     'reading' (a column kept to a reading measure) (shell-frames.js). describe(name) answers
+ *     `use`, what a component is for, from each module's @use line, and find(use) lists the
+ *     components for one use (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v0.72.4 — 2026-11-25 — A button inside an element under drag() or in a compare() layer answers a
  *     real mouse click: the press is captured only once it moves into a drag.
  *   v0.72.3 — 2026-11-25 — The board's head actions, its Move/Use switch and the buttons in a frame
@@ -514,6 +525,8 @@ import { ambient, setWeather, weatherLevel } from './ambient.js';
 import { ambientStage, weather, attract } from './ambient-parts.js';
 import { fx, fxPlay } from './effects.js';
 import { scrollEdge } from './scroll-edge.js';
+import { ask, propose, handoff } from './moments.js';
+import { requires } from './requires.js';
 import { PARTS } from './describe-data.js';
 
 const atelier = {
@@ -522,7 +535,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.72.4',
+  version: '0.73.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -542,6 +555,24 @@ const atelier = {
     const found = PARTS[String(name)];
     if (!found) return null;
     return Object.assign({ id: String(name) }, found);
+  },
+
+  /**
+   * WHICH COMPONENTS ARE FOR THIS. Answers with the ids of the components whose `@use` line names
+   * the use: `find('confirm')` gives the ones a person decides with, `find('wait')` the ones that
+   * stand while something is not ready. The uses are a closed list (tools/build-atelier-parts.ts
+   * USES); with no argument the answer is every use that at least one component has.
+   * @param {string} [use]
+   * @returns {string[]}
+   */
+  find(use) {
+    const all = /** @type {Record<string, { use?: string[] }>} */ (/** @type {unknown} */ (PARTS));
+    if (use == null) {
+      const seen = new Set();
+      Object.keys(all).forEach(function (id) { (all[id].use || []).forEach(function (u) { seen.add(u); }); });
+      return Array.from(seen).sort();
+    }
+    return Object.keys(all).filter(function (id) { return (all[id].use || []).indexOf(String(use)) >= 0; }).sort();
   },
 
   // ── Shell and navigation ──
@@ -669,6 +700,10 @@ const atelier = {
 
   // ── Designed states ──
   emptyState, skeleton,
+
+  // ── The moments: a stop, a proposal the person decides on, a hand-off to their own AI; and
+  //    the caller that finds out which stop an area of the page is at (moments.js, requires.js) ──
+  ask, propose, handoff, requires,
 
   // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
   //    an app's own scroller joins with data-ak-scroll-edge or this call ──

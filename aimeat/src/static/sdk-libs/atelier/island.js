@@ -22,7 +22,9 @@
  * @variants stateButton ghost
  * @tokens island --ak-island-pad · --ak-island-radius
  * @fork island Animate width, height and border-radius yourself and swap the content; you give up the spring, the separate enter and exit timing of the content, and the interruption that continues from where it was.
+ * @use island status · notify
  * @fork stateButton Use a button with busy(); you give up the spinner, the check and the morph between them.
+ * @use stateButton act · status
  * @usage
  *   const isl = AIMEAT.atelier.island({ target: host, content: 'Agent is writing…', shape: 'pill', tone: 'ink' });
  *   isl.set({ content: card, shape: 'card', tone: 'surface' });

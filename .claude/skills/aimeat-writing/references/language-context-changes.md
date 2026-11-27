@@ -274,3 +274,9 @@ newest at the top.
   wish-riskimerkinn-t-oma-sis-lt-ei-merkitse-ja-ihminen-voi-hyv-ksy). *Hyväksyä* / *aceptar*, and
   *perua hyväksyntä* / *deshacer la aceptación* for unaccept: the everyday words for saying a flagged
   thing is fine.
+- **2026-11-27**: an owner's app template, an app's frame and a moment (wishes
+  wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app and
+  wish-atelier-contextual-templates-pyynt-lohko-ask). *Sovelluspohja* / *plantilla de aplicación*,
+  kept apart from the style kit (*tyylipohja* / *plantilla de estilo*), which is the look alone.
+  *Kehys* / *marco* for the frame, with the four names Sivut, Työkalu, Näyttämö and Lukusivu.
+  *Hetki* / *momento* for a point where an app asks something of a person.

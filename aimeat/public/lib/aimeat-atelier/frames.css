@@ -1,0 +1,104 @@
+/*
+ * @file aimeat-atelier/frames.css
+ * @description The two frames app({ frame }) names (atelier/shell-frames.js). STAGE: the main
+ *   region stops being a padded scrolling column and becomes one surface that fills everything
+ *   under the bar; the controls panel floats at the top right of a wide window and is a sheet at
+ *   the bottom edge of a phone, above the platform's own strip (--ak-chrome-bottom) and above the
+ *   bottom navigation when the app has one. READING: every direct child of the main region is held
+ *   to a reading measure and centred. An app that names no frame reads none of these rules.
+ * @structure reading · stage: main, surface, panel (wide), handle, body, folded · phone
+ * @version-history
+ *   v0.73.0 — 2026-11-27 — Initial (wish-atelier-contextual-templates-pyynt-lohko-ask).
+ */
+
+/* ── Reading: a measure for running text ──────────────────────────────────────────────────── */
+.ak-app--reading .ak-app__main > * {
+  width: 100%;
+  max-width: var(--ak-reading-measure, 42rem);
+  margin-inline: auto;
+}
+
+/* ── Stage: the working surface is the page ───────────────────────────────────────────────── */
+.ak-app--stage .ak-app__main {
+  position: relative;
+  max-width: none;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.ak-stage__surface { position: absolute; inset: 0; min-width: 0; min-height: 0; }
+.ak-stage__panel {
+  position: absolute;
+  top: var(--ak-pad);
+  right: var(--ak-pad);
+  box-sizing: border-box;
+  width: var(--ak-stage-panel-width, 19rem);
+  max-width: calc(100% - var(--ak-pad) * 2);
+  max-height: calc(100% - var(--ak-pad) * 2 - var(--ak-chrome-bottom));
+  display: flex;
+  flex-direction: column;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  box-shadow: var(--ak-elev-2);
+  color: var(--ak-ink);
+  overflow: hidden;
+}
+.ak-app--stage.ak-app--bottomnav .ak-stage__panel {
+  max-height: calc(100% - var(--ak-pad) * 2 - var(--ak-chrome-bottom) - var(--ak-touch));
+}
+.ak-stage__handle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--ak-touch);
+  padding: 0 var(--ak-pad);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.ak-stage__handle:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: -2px; }
+.ak-stage__grip { display: none; }
+.ak-stage__title { flex: 1; min-width: 0; }
+.ak-stage__body {
+  min-height: 0;
+  padding: 0 var(--ak-pad) var(--ak-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-gap);
+  overflow: auto;
+}
+.ak-stage__panel[data-ak-open='false'] .ak-stage__body { display: none; }
+
+/* ── On a phone the panel is a sheet at the bottom edge ──────────────────────────────────── */
+@media (max-width: 760px) {
+  .ak-stage__panel {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: var(--ak-chrome-bottom);
+    width: auto;
+    max-width: none;
+    max-height: var(--ak-stage-sheet-height, 55%);
+    border-width: var(--ak-line-w) 0 0;
+    border-radius: var(--ak-radius) var(--ak-radius) 0 0;
+  }
+  .ak-app--stage.ak-app--bottomnav .ak-stage__panel {
+    bottom: calc(var(--ak-chrome-bottom) + var(--ak-touch));
+    max-height: var(--ak-stage-sheet-height, 55%);
+  }
+  .ak-stage__handle { flex-direction: column; justify-content: center; gap: 6px; padding-top: 8px; text-align: center; }
+  .ak-stage__grip {
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: var(--ak-radius-pill);
+    background: color-mix(in oklab, var(--ak-ink) 28%, var(--ak-surface));
+  }
+  .ak-stage__title { flex: none; }
+}

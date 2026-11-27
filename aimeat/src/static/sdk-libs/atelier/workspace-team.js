@@ -35,6 +35,7 @@
  * @variants workspaceTeam list · table
  * @tokens workspaceTeam --ak-mem-width
  * @fork workspaceTeam Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke(), inviteByEmail(), invitations() and cancelInvitation() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.
+ * @use workspaceTeam list · confirm · edit
  * @structure workspaceTeam(spec) · targetsOf · roleSel · the sample · tabs requests, people, invite (inviteIntoTab), invitations
  * @usage
  *   AIMEAT.atelier.workspaceTeam({ target: '#team', org: orgId, ws: wsId });

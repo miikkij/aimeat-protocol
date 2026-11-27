@@ -25,6 +25,7 @@
  * @variants board fill · plain
  * @tokens board --ak-board-h · --ak-board-head · --ak-board-frame-radius · --ak-board-ring
  * @fork board Copy .ak-board* out of board.css and drive AIMEAT.viewport yourself; you keep the camera and give up the keyed frames, the ring geometry, the Move/Use overlay and the chrome that stays one size at every zoom.
+ * @use board layout · view
  * @structure board(spec) → { el, world, set, select, selected, frameEl, fit, centerOn, camera, mode, setMode, destroy }
  * @usage
  *   var b = AIMEAT.atelier.board({ target: host, frames: frames, rings: rings,

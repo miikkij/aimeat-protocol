@@ -25,6 +25,7 @@
  * @variants handbook dense
  * @tokens handbook --ak-handbook-w
  * @fork handbook Write the chapters into a dialog of your own; you give up the table of contents, the search, the chapters the page carries, the languages and the marked place.
+ * @use handbook explain · search · open
  * @structure handbook(spec) → { el, open, close, toggle, isOpen, set, add, scan, button, destroy }
  * @usage
  *   var book = AIMEAT.atelier.handbook({ title: { en: 'Guide', fi: 'Opas' }, chapters: [

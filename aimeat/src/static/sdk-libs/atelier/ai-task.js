@@ -44,6 +44,7 @@
  * @variants aiTask compact
  * @tokens aiTask --ak-ai-width
  * @fork aiTask Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.
+ * @use aiTask act · view
  * @structure exported helpers, shared with ai-chat.js (aiOf · authOf · signedOut · unset · money ·
  *   errorWords · errorOf · paintFailure · settingsLink · probeAi · aiNotice · sampleMark · aiLabelInto ·
  *   drawText · madeWhen) · aiTask(spec)

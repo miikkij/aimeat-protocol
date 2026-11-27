@@ -21,6 +21,7 @@
  *   nothing about the sender attached. A verb whose library is absent says so in the output.
  * @parts verbs (none: it renders nothing of its own; the words it writes go into the element the card names)
  * @fork verbs Copy the run() switch out and keep the attribute names; you give up the on-sight reads, the picture detection and the sign-in wait.
+ * @use verbs act
  * @structure verbs(spec) → { run, scan, destroy } · attr/ref readers · say/show · the verbs
  * @usage
  *   var v = AIMEAT.atelier.verbs({ root: card, adapters: { offer: commission, tool: callTool } });

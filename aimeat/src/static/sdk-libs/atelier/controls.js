@@ -24,8 +24,11 @@
  * @tokens toggle --ak-switch-w · --ak-switch-h · --ak-switch-pad · --ak-switch-knob
  * @tokens slider --ak-range-track · --ak-range-thumb
  * @fork toggle Use a plain checkbox with class ak-toggle; you keep the switch's look and give up the knob's stretch and travel.
+ * @use toggle edit
  * @fork segmented Build a radio group yourself; you give up the travelling ink, the arrow keys and the roving focus.
+ * @use segmented pick
  * @fork slider Use form({ fields: [{ type: 'range' }] }) or a plain input with class ak-input--range; the stretch comes with rangeMotion(input).
+ * @use slider edit
  * @usage
  *   AIMEAT.atelier.toggle({ target: host, label: 'Notifications', checked: true, onChange(on) {} });
  *   AIMEAT.atelier.segmented({ target: host, label: 'Range', items: [{ id: 'd', label: 'Day' }, { id: 'w', label: 'Week' }], value: 'd', onChange(id) {} });

@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-27 — aimeat_app_template_propose takes `recipe` (models/template-recipe.ts TemplateRecipeSchema)
+ *     (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   2026-11-25 — The knowledge package tools moved to ./knowledge.ts (max-file-lines), spread in place;
  *     aimeat_knowledge_create joins them there.
  *   2026-11-21 — aimeat_appdev_pitfall_report's category says a word outside the list files under the
@@ -89,6 +91,7 @@ import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js'
 import { organismAudienceInput } from '../input-schemas.js';
 import { CAPABILITY_RECORD_INPUT } from './capability-record-input.js';
 import { knowledgeTools } from './knowledge.js';
+import { TemplateRecipeSchema } from '../../models/template-recipe.js';
 
 export const capabilitiesGroupsSkillsTools = [
     {
@@ -635,6 +638,7 @@ export const capabilitiesGroupsSkillsTools = [
             model_notes: { type: 'array', description: 'Per-model observations [{model, notes, evidence?}].', zod: z.array(z.object({ model: z.string().max(64), notes: z.string().max(10_000), evidence: z.string().max(10_000).optional() })).max(10) },
             packs: { type: 'array', description: 'Library-pack ids the template relies on.', zod: z.array(z.string().max(40)).max(20) },
             composes: { type: 'array', description: 'Component template ids it composes.', zod: z.array(z.string().max(40)).max(20) },
+            recipe: { type: 'object', description: 'What the next build starts from, every part optional: look (style kit id), genre (genre id to fork), frame (pages, tool, stage, reading, game or story, for AIMEAT.atelier.app()), screens [{name, from?, note?}], needs (for AIMEAT.atelier.requires, e.g. "session", "member:use"), moments (e.g. "ask:signIn", "propose:draft", "handoff:say"), data [{what, where}], scopes, criteria [{text, check: lint|scenario|screenshot|eval|person}]. Given, it replaces the stored recipe; left out, the stored one stays.', zod: TemplateRecipeSchema },
         },
     },
     {

@@ -18,6 +18,9 @@
  * @parts bottomNav root · item
  * @slots bottomNav item(entry)
  * @variants bottomNav dense
+ * @use section layout
+ * @use tabs navigate · pick
+ * @use bottomNav navigate
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history

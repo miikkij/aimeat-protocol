@@ -4999,12 +4999,12 @@
     return left;
   }
   function keepInView(strip, selector) {
-    let frame2 = 0;
+    let frame3 = 0;
     let smooth = false;
     let dead = false;
     let box = null;
     function run() {
-      frame2 = 0;
+      frame3 = 0;
       if (dead) return;
       const glide2 = smooth;
       smooth = false;
@@ -5013,12 +5013,12 @@
     function request(wantSmooth) {
       if (dead) return;
       if (wantSmooth) smooth = true;
-      if (frame2) return;
+      if (frame3) return;
       if (typeof requestAnimationFrame !== "function") {
         run();
         return;
       }
-      frame2 = requestAnimationFrame(run);
+      frame3 = requestAnimationFrame(run);
     }
     if (typeof ResizeObserver === "function") {
       box = new ResizeObserver(function() {
@@ -5030,8 +5030,8 @@
       request,
       destroy() {
         dead = true;
-        if (frame2 && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame2);
-        frame2 = 0;
+        if (frame3 && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame3);
+        frame3 = 0;
         if (box) box.disconnect();
         box = null;
       }
@@ -8030,7 +8030,7 @@
     let settleUntil = 0;
     let disposed = false;
     const clock = { start: 0 };
-    function frame2(now2) {
+    function frame3(now2) {
       raf = 0;
       if (disposed) return;
       const entering = now2 < entranceUntil;
@@ -8040,11 +8040,11 @@
       }
       controls.update();
       renderer.render(scene, camera);
-      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame2);
+      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame3);
     }
     function wake(settleMs) {
       settleUntil = Math.max(settleUntil, performance.now() + (settleMs || 0));
-      if (!raf) raf = requestAnimationFrame(frame2);
+      if (!raf) raf = requestAnimationFrame(frame3);
     }
     controls.addEventListener("start", function() {
       wake(60 * 1e3);
@@ -8308,11 +8308,11 @@
           roughness: 0.35,
           metalness: 0.15
         }));
-        const frame3 = new THREE.LineSegments(
+        const frame32 = new THREE.LineSegments(
           new THREE.EdgesGeometry(geo),
           new THREE.LineBasicMaterial({ color: new THREE.Color(ink3), transparent: true, opacity: 0.35 })
         );
-        group.add(body, frame3);
+        group.add(body, frame32);
         applyEntrance = function(p) {
           const s = 0.25 + 0.75 * p;
           group.scale.setScalar(s);
@@ -9331,7 +9331,7 @@
     let card = null;
     let spot = null;
     let marked = null;
-    let frame2 = 0;
+    let frame3 = 0;
     let before = null;
     let doOff = null;
     let inviteCard = null;
@@ -9345,10 +9345,10 @@
       return (window.innerWidth || 1024) < NARROW_PX;
     }
     function follow(e) {
-      if (frame2) return;
+      if (frame3) return;
       if (e && card && e.target && typeof card.contains === "function" && card.contains(e.target)) return;
-      frame2 = requestAnimationFrame(function() {
-        frame2 = 0;
+      frame3 = requestAnimationFrame(function() {
+        frame3 = 0;
         place2();
       });
     }
@@ -9413,9 +9413,9 @@
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", place2);
       window.removeEventListener("scroll", follow, true);
-      if (frame2) {
-        cancelAnimationFrame(frame2);
-        frame2 = 0;
+      if (frame3) {
+        cancelAnimationFrame(frame3);
+        frame3 = 0;
       }
     }
     function bring(node) {
@@ -11268,7 +11268,7 @@
     let dated = [];
     let mounted = false;
     let emptyCard = null;
-    function kindOf(kind) {
+    function kindOf2(kind) {
       return KINDS.indexOf(kind) >= 0 ? kind : "info";
     }
     function settle4(dot) {
@@ -11310,7 +11310,7 @@
       rec.text.textContent = u.item.text != null ? String(u.item.text) : "";
       rec.text.hidden = u.item.text == null || u.item.text === "";
       rec.time.textContent = clockOf(u.when);
-      rec.node.className = "ak-notices__item ak-notices__item--" + kindOf(u.item.kind) + (u.item.read ? "" : " is-unread");
+      rec.node.className = "ak-notices__item ak-notices__item--" + kindOf2(u.item.kind) + (u.item.read ? "" : " is-unread");
       rec.dot.hidden = !!u.item.read;
     }
     function buildItem(u) {
@@ -16695,21 +16695,21 @@ Known schemas:
             disabled: sample ? true : null
           })
         );
-        const ask2 = el("div", { class: "ak-mem__ask" });
+        const ask3 = el("div", { class: "ak-mem__ask" });
         const send2 = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "send", disabled: sample ? true : null, on: {
           click: function() {
             if (sample || !iam2) return;
             iam2.request(note.value.trim()).then(function(r) {
               status.textContent = r && r.alreadyMember ? tm("join.already") : tm("join.sent");
-              if (ask2.parentNode) ask2.parentNode.removeChild(ask2);
+              if (ask3.parentNode) ask3.parentNode.removeChild(ask3);
             }, function(e) {
               status.textContent = tm("members.failed", { why: refusal(e) || String(e) });
             });
           }
         } }, tm("join.send"));
-        ask2.appendChild(note);
-        ask2.appendChild(send2);
-        root.appendChild(ask2);
+        ask3.appendChild(note);
+        ask3.appendChild(send2);
+        root.appendChild(ask3);
       }
       if (sample) {
         form2(null);
@@ -16764,7 +16764,7 @@ Known schemas:
     const sample = wantsSample2(spec);
     const root = el("section", { class: "ak-root ak-mem ak-mem-access", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
-    let ask2 = null;
+    let ask3 = null;
     function locked() {
       root.appendChild(el(
         "h3",
@@ -16774,12 +16774,12 @@ Known schemas:
       root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, tm("access.intro")));
       const join = el("div", { "data-ak-part": "join" });
       root.appendChild(join);
-      ask2 = joinRequest({ target: join, app: spec.app, roles: spec.roles, sample, title: tm("join.title") });
+      ask3 = joinRequest({ target: join, app: spec.app, roles: spec.roles, sample, title: tm("join.title") });
     }
     async function build() {
-      if (ask2) {
-        ask2.destroy();
-        ask2 = null;
+      if (ask3) {
+        ask3.destroy();
+        ask3 = null;
       }
       clear(root);
       root.classList.remove("is-open");
@@ -16809,7 +16809,7 @@ Known schemas:
     const stop = watch2(run, root);
     return { el: root, destroy: function() {
       stop();
-      if (ask2) ask2.destroy();
+      if (ask3) ask3.destroy();
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
   }
@@ -21709,7 +21709,7 @@ Known schemas:
       if (s.hint) root.appendChild(el("p", { class: "ak-aitask__hint", "data-ak-part": "hint" }, s.hint));
       for (const n of aiNotice("aitask", state, !!s.copyPrompt)) root.appendChild(n);
       const live = canAsk() || state.avail === "checking";
-      if (live || s.copyPrompt) ask2(live);
+      if (live || s.copyPrompt) ask3(live);
       parts.failure = el("p", { class: "ak-aitask__failure", role: "alert", "data-ak-part": "failure", hidden: true });
       root.appendChild(parts.failure);
       parts.answer = el("div", { class: "ak-aitask__answer", "data-ak-part": "result", role: "region", "aria-label": tai("aiTask.answer"), hidden: true });
@@ -21718,7 +21718,7 @@ Known schemas:
       paint();
       drawAnswer2(parts.answer);
     }
-    function ask2(live) {
+    function ask3(live) {
       const id = uid("ak-aitask");
       const reasonId = id + "-why";
       if (hasBox()) {
@@ -23579,7 +23579,7 @@ Known schemas:
       }
       return ruleHandle;
     }
-    async function put(lib, qs, round) {
+    async function put2(lib, qs, round) {
       const opts = { app_id: s.appId };
       if (s.subject) opts.subject = s.subject;
       const chosen2 = s.provider === "pick" ? pick : s.provider;
@@ -23595,12 +23595,12 @@ Known schemas:
       return lib.ask(state, qs, opts);
     }
     async function rounds(lib, mine) {
-      const done = [await put(lib, questions, 0)];
+      const done = [await put2(lib, questions, 0)];
       while (typeof s.onAnswered === "function" && done.length < MAX_ROUNDS && !destroyed && mine === asked) {
         const nextSet = await s.onAnswered(done[done.length - 1], done.length - 1);
         if (!nextSet || typeof nextSet !== "object" || !Object.keys(nextSet).length || destroyed || mine !== asked) break;
         say(td("decision.askingRound", { n: done.length + 1 }));
-        done.push(await put(lib, nextSet, done.length));
+        done.push(await put2(lib, nextSet, done.length));
       }
       return done;
     }
@@ -23738,6 +23738,612 @@ Known schemas:
       draw();
     }, root);
     return api;
+  }
+
+  // src/static/sdk-libs/atelier/moments-i18n.js
+  var STRINGS11 = {
+    en: {
+      "sample": "Sample",
+      "checking": "Checking…",
+      "failed": "That did not work: {why}",
+      "noLib": "This page has not loaded {lib}, so this cannot be checked.",
+      "unknownNeed": "Unknown need: {need}.",
+      "ask.signIn.kicker": "Sign in",
+      "ask.signIn.title": "Sign in to continue.",
+      "ask.signIn.way": "Sign in",
+      "ask.signIn.note": "Sign-in opens in a window of its own.",
+      "ask.settings.kicker": "Setting",
+      "ask.settings.title": "A setting is missing.",
+      "ask.settings.way": "Open settings",
+      "ask.settings.ai.title": "The AI is off.",
+      "ask.settings.ai.lead": "Turn it on in your own settings, and this works.",
+      "ask.settings.ai.way": "Open AI settings",
+      "ask.access.kicker": "Membership",
+      "ask.access.title": "This area is for members.",
+      "ask.permission.kicker": "Permission",
+      "ask.permission.title": "The app needs a permission.",
+      "ask.permission.lead": "You decide whether to give it.",
+      "ask.permission.way": "Give permission",
+      "ask.refused.kicker": "Not yet",
+      "ask.refused.title": "This did not go through.",
+      "ask.refused.when": "You can try again on {d}.",
+      "ask.device.lead": "Your browser asks for it when you press the button.",
+      "ask.device.denied": "The browser refused. Allow it in the browser's site settings and press again.",
+      "ask.device.microphone.kicker": "Microphone",
+      "ask.device.microphone.title": "This needs the microphone.",
+      "ask.device.microphone.way": "Allow the microphone",
+      "ask.device.camera.kicker": "Camera",
+      "ask.device.camera.title": "This needs the camera.",
+      "ask.device.camera.way": "Allow the camera",
+      "ask.device.location.kicker": "Location",
+      "ask.device.location.title": "This needs your location.",
+      "ask.device.location.way": "Allow location",
+      "ask.limit.kicker": "Limit",
+      "ask.limit.title": "The limit is full.",
+      "ask.limit.when": "You can go on {d}.",
+      "ask.offline.kicker": "No connection",
+      "ask.offline.title": "The connection dropped.",
+      "ask.offline.lead": "This tries again when the connection is back.",
+      "ask.offline.way": "Try now",
+      "propose.draft.kicker": "Draft",
+      "propose.draft.accept": "Send",
+      "propose.draft.edit": "Edit",
+      "propose.draft.reject": "Dismiss",
+      "propose.draft.accepted": "Sent.",
+      "propose.draft.rejected": "Dismissed.",
+      "propose.draft.auto": "Sent without asking, as set.",
+      "propose.extract.kicker": "Extracted",
+      "propose.extract.source": "Source:",
+      "propose.extract.accept": "Approve",
+      "propose.extract.edit": "Correct",
+      "propose.extract.reject": "Reject",
+      "propose.extract.accepted": "Approved.",
+      "propose.extract.rejected": "Rejected.",
+      "propose.extract.auto": "Approved without asking, as set.",
+      "propose.change.kicker": "Proposal",
+      "propose.change.accept": "Open",
+      "propose.change.edit": "Edit",
+      "propose.change.reject": "Dismiss",
+      "propose.change.accepted": "Opened.",
+      "propose.change.rejected": "Dismissed.",
+      "propose.change.auto": "Taken without asking, as set.",
+      "propose.run.kicker": "Plan",
+      "propose.run.accept": "Run",
+      "propose.run.edit": "Change",
+      "propose.run.reject": "Cancel",
+      "propose.run.accepted": "Running.",
+      "propose.run.rejected": "Cancelled.",
+      "propose.run.auto": "Run without asking, as set.",
+      "handoff.say.kicker": "For your own AI",
+      "handoff.say.title": "Copy this sentence to your own AI.",
+      "handoff.say.copy": "Copy",
+      "handoff.say.copied": "Copied. Paste it into your own AI.",
+      "handoff.say.copyFailed": "Copying was refused. The text is selected: copy it with the keyboard.",
+      "handoff.prompt.kicker": "Prompt",
+      "handoff.prompt.title": "Run this in your own AI and paste the answer here."
+    },
+    fi: {
+      "sample": "Esimerkki",
+      "checking": "Tarkistetaan…",
+      "failed": "Tämä ei onnistunut: {why}",
+      "noLib": "Sivu ei ole ladannut kirjastoa {lib}, joten tätä ei voi tarkistaa.",
+      "unknownNeed": "Tuntematon tarve: {need}.",
+      "ask.signIn.kicker": "Kirjautuminen",
+      "ask.signIn.title": "Kirjaudu sisään jatkaaksesi.",
+      "ask.signIn.way": "Kirjaudu sisään",
+      "ask.signIn.note": "Kirjautuminen aukeaa omaan ikkunaansa.",
+      "ask.settings.kicker": "Asetus",
+      "ask.settings.title": "Asetus puuttuu.",
+      "ask.settings.way": "Avaa asetukset",
+      "ask.settings.ai.title": "Tekoäly on pois päältä.",
+      "ask.settings.ai.lead": "Laita se päälle omista asetuksistasi, niin tämä toimii.",
+      "ask.settings.ai.way": "Avaa tekoälyasetukset",
+      "ask.access.kicker": "Jäsenyys",
+      "ask.access.title": "Tämä alue on jäsenille.",
+      "ask.permission.kicker": "Lupa",
+      "ask.permission.title": "Sovellus tarvitsee luvan.",
+      "ask.permission.lead": "Sinä päätät, annatko luvan.",
+      "ask.permission.way": "Anna lupa",
+      "ask.refused.kicker": "Ei vielä",
+      "ask.refused.title": "Tämä ei mennyt läpi.",
+      "ask.refused.when": "Voit yrittää uudelleen {d}.",
+      "ask.device.lead": "Selain kysyy luvan, kun painat painiketta.",
+      "ask.device.denied": "Selain esti tämän. Salli se selaimen sivustoasetuksista ja paina uudelleen.",
+      "ask.device.microphone.kicker": "Mikrofoni",
+      "ask.device.microphone.title": "Tämä tarvitsee mikrofonin.",
+      "ask.device.microphone.way": "Salli mikrofoni",
+      "ask.device.camera.kicker": "Kamera",
+      "ask.device.camera.title": "Tämä tarvitsee kameran.",
+      "ask.device.camera.way": "Salli kamera",
+      "ask.device.location.kicker": "Sijainti",
+      "ask.device.location.title": "Tämä tarvitsee sijaintisi.",
+      "ask.device.location.way": "Salli sijainti",
+      "ask.limit.kicker": "Raja",
+      "ask.limit.title": "Raja on täynnä.",
+      "ask.limit.when": "Voit jatkaa {d}.",
+      "ask.offline.kicker": "Ei yhteyttä",
+      "ask.offline.title": "Yhteys katkesi.",
+      "ask.offline.lead": "Yritän uudelleen, kun yhteys palaa.",
+      "ask.offline.way": "Yritä nyt",
+      "propose.draft.kicker": "Luonnos",
+      "propose.draft.accept": "Lähetä",
+      "propose.draft.edit": "Muokkaa",
+      "propose.draft.reject": "Hylkää",
+      "propose.draft.accepted": "Lähetetty.",
+      "propose.draft.rejected": "Hylätty.",
+      "propose.draft.auto": "Lähetetty kysymättä, kuten on asetettu.",
+      "propose.extract.kicker": "Poimittu",
+      "propose.extract.source": "Lähde:",
+      "propose.extract.accept": "Hyväksy",
+      "propose.extract.edit": "Korjaa",
+      "propose.extract.reject": "Hylkää",
+      "propose.extract.accepted": "Hyväksytty.",
+      "propose.extract.rejected": "Hylätty.",
+      "propose.extract.auto": "Hyväksytty kysymättä, kuten on asetettu.",
+      "propose.change.kicker": "Ehdotus",
+      "propose.change.accept": "Avaa",
+      "propose.change.edit": "Muokkaa",
+      "propose.change.reject": "Hylkää",
+      "propose.change.accepted": "Avattu.",
+      "propose.change.rejected": "Hylätty.",
+      "propose.change.auto": "Otettu käyttöön kysymättä, kuten on asetettu.",
+      "propose.run.kicker": "Suunnitelma",
+      "propose.run.accept": "Aja",
+      "propose.run.edit": "Muuta",
+      "propose.run.reject": "Peru",
+      "propose.run.accepted": "Käynnissä.",
+      "propose.run.rejected": "Peruttu.",
+      "propose.run.auto": "Ajettu kysymättä, kuten on asetettu.",
+      "handoff.say.kicker": "Omalle tekoälyllesi",
+      "handoff.say.title": "Kopioi tämä lause omaan tekoälyysi.",
+      "handoff.say.copy": "Kopioi",
+      "handoff.say.copied": "Kopioitu. Liitä se omaan tekoälyysi.",
+      "handoff.say.copyFailed": "Kopiointi estettiin. Teksti on valittuna: kopioi se näppäimistöllä.",
+      "handoff.prompt.kicker": "Kehote",
+      "handoff.prompt.title": "Aja tämä omassa tekoälyssäsi ja liitä vastaus tähän."
+    },
+    es: {
+      "sample": "Ejemplo",
+      "checking": "Comprobando…",
+      "failed": "No funcionó: {why}",
+      "noLib": "La página no cargó {lib}, así que esto no se puede comprobar.",
+      "unknownNeed": "Necesidad desconocida: {need}.",
+      "ask.signIn.kicker": "Acceso",
+      "ask.signIn.title": "Inicia sesión para continuar.",
+      "ask.signIn.way": "Iniciar sesión",
+      "ask.signIn.note": "El acceso se abre en su propia ventana.",
+      "ask.settings.kicker": "Ajuste",
+      "ask.settings.title": "Falta un ajuste.",
+      "ask.settings.way": "Abrir los ajustes",
+      "ask.settings.ai.title": "La IA está apagada.",
+      "ask.settings.ai.lead": "Actívala en tus ajustes y esto funcionará.",
+      "ask.settings.ai.way": "Abrir los ajustes de IA",
+      "ask.access.kicker": "Membresía",
+      "ask.access.title": "Esta área es para miembros.",
+      "ask.permission.kicker": "Permiso",
+      "ask.permission.title": "La aplicación necesita un permiso.",
+      "ask.permission.lead": "Tú decides si se lo das.",
+      "ask.permission.way": "Dar permiso",
+      "ask.refused.kicker": "Todavía no",
+      "ask.refused.title": "Esto no se pudo hacer.",
+      "ask.refused.when": "Puedes volver a intentarlo el {d}.",
+      "ask.device.lead": "Tu navegador te lo pedirá cuando presiones el botón.",
+      "ask.device.denied": "El navegador lo bloqueó. Permítelo en los ajustes del sitio y presiona de nuevo.",
+      "ask.device.microphone.kicker": "Micrófono",
+      "ask.device.microphone.title": "Esto necesita el micrófono.",
+      "ask.device.microphone.way": "Permitir el micrófono",
+      "ask.device.camera.kicker": "Cámara",
+      "ask.device.camera.title": "Esto necesita la cámara.",
+      "ask.device.camera.way": "Permitir la cámara",
+      "ask.device.location.kicker": "Ubicación",
+      "ask.device.location.title": "Esto necesita tu ubicación.",
+      "ask.device.location.way": "Permitir la ubicación",
+      "ask.limit.kicker": "Límite",
+      "ask.limit.title": "Se alcanzó el límite.",
+      "ask.limit.when": "Puedes continuar el {d}.",
+      "ask.offline.kicker": "Sin conexión",
+      "ask.offline.title": "Se perdió la conexión.",
+      "ask.offline.lead": "Se intentará de nuevo cuando vuelva la conexión.",
+      "ask.offline.way": "Intentar ahora",
+      "propose.draft.kicker": "Borrador",
+      "propose.draft.accept": "Enviar",
+      "propose.draft.edit": "Editar",
+      "propose.draft.reject": "Descartar",
+      "propose.draft.accepted": "Enviado.",
+      "propose.draft.rejected": "Descartado.",
+      "propose.draft.auto": "Enviado sin preguntar, según lo configurado.",
+      "propose.extract.kicker": "Extraído",
+      "propose.extract.source": "Fuente:",
+      "propose.extract.accept": "Aprobar",
+      "propose.extract.edit": "Corregir",
+      "propose.extract.reject": "Rechazar",
+      "propose.extract.accepted": "Aprobado.",
+      "propose.extract.rejected": "Rechazado.",
+      "propose.extract.auto": "Aprobado sin preguntar, según lo configurado.",
+      "propose.change.kicker": "Propuesta",
+      "propose.change.accept": "Abrir",
+      "propose.change.edit": "Editar",
+      "propose.change.reject": "Descartar",
+      "propose.change.accepted": "Abierto.",
+      "propose.change.rejected": "Descartado.",
+      "propose.change.auto": "Aplicado sin preguntar, según lo configurado.",
+      "propose.run.kicker": "Plan",
+      "propose.run.accept": "Ejecutar",
+      "propose.run.edit": "Cambiar",
+      "propose.run.reject": "Cancelar",
+      "propose.run.accepted": "En marcha.",
+      "propose.run.rejected": "Cancelado.",
+      "propose.run.auto": "Ejecutado sin preguntar, según lo configurado.",
+      "handoff.say.kicker": "Para tu propia IA",
+      "handoff.say.title": "Copia esta frase en tu propia IA.",
+      "handoff.say.copy": "Copiar",
+      "handoff.say.copied": "Copiado. Pégalo en tu propia IA.",
+      "handoff.say.copyFailed": "No se pudo copiar. El texto está seleccionado: cópialo con el teclado.",
+      "handoff.prompt.kicker": "Prompt",
+      "handoff.prompt.title": "Ejecuta esto en tu propia IA y pega la respuesta aquí."
+    }
+  };
+  function tmo(key, vars) {
+    const hosted = t("moments." + key, vars);
+    if (hosted !== "moments." + key) return hosted;
+    const lang2 = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS11[
+        /** @type {'en'|'fi'|'es'} */
+        lang2
+      ] || STRINGS11.en
+    );
+    const en = (
+      /** @type {Record<string, string>} */
+      STRINGS11.en
+    );
+    const text = table2[key] || en[key] || "";
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/moments.js
+  var ASK_KINDS = ["signIn", "settings", "access", "permission", "refused", "device", "limit", "offline"];
+  var PROPOSE_KINDS = ["draft", "extract", "change", "run"];
+  var HANDOFF_KINDS = ["say", "prompt"];
+  var DEVICES = ["microphone", "camera", "location"];
+  function kindOf(kind, allowed, block) {
+    if (allowed.indexOf(String(kind)) >= 0) return String(kind);
+    console.warn("aimeat-atelier: " + block + ' has no kind "' + kind + '" — it has: ' + allowed.join(", "));
+    return allowed[0];
+  }
+  function whenWords(when2) {
+    if (when2 == null || when2 === "") return "";
+    if (when2 instanceof Date || !Number.isNaN(Date.parse(String(when2)))) {
+      return dateTime(
+        /** @type {any} */
+        when2,
+        { dateStyle: "medium", timeStyle: "short" }
+      );
+    }
+    return String(when2);
+  }
+  function put(host, spec, name, tag, own, attrs) {
+    const given = partValue(spec, name);
+    if (given === null) return null;
+    const value = given === void 0 ? own : given;
+    if (value == null || value === "" || value === false) return null;
+    const node = el(tag, Object.assign({ class: "ak-ask__" + name, "data-ak-part": name }, attrs || {}));
+    if (!fillPart(node, value)) return null;
+    host.appendChild(node);
+    return node;
+  }
+  function frame2(root, spec, block, kind, words) {
+    clear(root);
+    root.className = "ak-root ak-ask ak-ask--" + block;
+    root.setAttribute("data-ak-kind", kind);
+    root.removeAttribute("data-ak-variant");
+    applyVariant(root, spec, ["inline"]);
+    const box = el("div", { class: "ak-ask__words", "data-ak-part": "words" });
+    root.appendChild(box);
+    const kicker = put(box, spec, "kicker", "p", words.kicker);
+    if (kicker && spec.sample) kicker.appendChild(el("span", { class: "ak-ask__sample" }, tmo("sample")));
+    const titleId = uid("ak-ask");
+    const title = put(box, spec, "title", "h3", words.title, { id: titleId });
+    put(box, spec, "lead", "p", words.lead);
+    if (title) {
+      root.setAttribute("role", "group");
+      root.setAttribute("aria-labelledby", titleId);
+    }
+  }
+  function wayButton(way, first, sample, onFail) {
+    const cls = "ak-btn" + ((way.tone ? way.tone === "primary" : first) ? " ak-btn--primary" : "");
+    const part = way.part || "way";
+    if (way.href) {
+      return el("a", { class: cls, href: sample ? null : way.href, target: "_blank", rel: "noopener", "data-ak-part": part }, way.label);
+    }
+    const b = el("button", { type: "button", class: cls, "data-ak-part": part, "data-ak-noguard": way.direct ? true : null }, way.label);
+    b.addEventListener("click", function() {
+      if (sample || typeof way.run !== "function") return;
+      const work = Promise.resolve().then(way.run);
+      (way.direct ? work : whileBusy(b, work)).catch(function(e) {
+        onFail(String(e && e.message || e));
+      });
+    });
+    return b;
+  }
+  function ask2(spec0) {
+    const spec = Object.assign({}, spec0);
+    const root = el("section", { class: "ak-root ak-ask", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let failure = "";
+    let denied = false;
+    async function requestDevice() {
+      const what = DEVICES.indexOf(spec.what) >= 0 ? spec.what : "microphone";
+      try {
+        if (typeof spec.request === "function") await spec.request();
+        else if (what === "location") {
+          await new Promise(function(ok, no) {
+            navigator.geolocation.getCurrentPosition(function() {
+              ok(null);
+            }, no);
+          });
+        } else {
+          const stream = await navigator.mediaDevices.getUserMedia(what === "camera" ? { video: true } : { audio: true });
+          stream.getTracks().forEach(function(t2) {
+            t2.stop();
+          });
+        }
+        denied = false;
+        if (spec.onGranted) spec.onGranted();
+      } catch (e) {
+        denied = true;
+        draw();
+        if (spec.onDenied) spec.onDenied(e);
+      }
+    }
+    function ownWays(kind, key) {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (kind === "signIn") {
+        const auth = ns && ns.auth;
+        return auth && typeof auth.signIn === "function" ? [{ label: tmo("ask.signIn.way"), run: function() {
+          return auth.signIn();
+        }, direct: true }] : [];
+      }
+      if (kind === "settings" || kind === "permission") {
+        return spec.url ? [{ label: spec.wayLabel || tmo("ask." + kind + ".way"), href: String(spec.url) }] : [];
+      }
+      if (kind === "device") return [{ label: tmo(key + ".way"), run: requestDevice, direct: true }];
+      if (kind === "offline") {
+        return typeof spec.onRetry === "function" ? [{ label: tmo("ask.offline.way"), run: spec.onRetry, tone: "quiet" }] : [];
+      }
+      return [];
+    }
+    function draw() {
+      const kind = kindOf(spec.kind, ASK_KINDS, "ask");
+      const what = DEVICES.indexOf(spec.what) >= 0 ? spec.what : "microphone";
+      const key = kind === "device" ? "ask.device." + what : "ask." + kind;
+      let lead = spec.lead;
+      if (lead == null) {
+        if (kind === "device") lead = tmo(denied ? "ask.device.denied" : "ask.device.lead");
+        else if ((kind === "refused" || kind === "limit") && spec.when) lead = tmo(key + ".when", { d: whenWords(spec.when) });
+        else if (kind === "refused" && spec.code) lead = refusalWords(spec.code, spec.details);
+        else lead = tmo(key + ".lead");
+      }
+      frame2(root, spec, "ask", kind, {
+        kicker: spec.kicker == null ? tmo(key + ".kicker") : spec.kicker,
+        title: spec.title == null ? tmo(key + ".title") : spec.title,
+        lead
+      });
+      put(root, spec, "body", "div", spec.body);
+      const ways = spec.ways === null ? [] : Array.isArray(spec.ways) ? spec.ways : ownWays(kind, key);
+      if (ways.length) {
+        const row = el("div", { class: "ak-ask__ways", "data-ak-part": "ways" });
+        ways.forEach(function(w, i) {
+          row.appendChild(wayButton(w, i === 0, !!spec.sample, function(why) {
+            failure = why;
+            draw();
+          }));
+        });
+        root.appendChild(row);
+      }
+      const ownNote = kind === "signIn" && ways.length && spec.ways === void 0 && spec.variant !== "inline" ? tmo("ask.signIn.note") : "";
+      put(root, spec, "note", "p", failure ? tmo("failed", { why: failure }) : spec.note == null ? ownNote : spec.note);
+    }
+    function online() {
+      if (spec.kind === "offline" && typeof spec.onRetry === "function" && !spec.sample) spec.onRetry();
+    }
+    window.addEventListener("online", online);
+    draw();
+    enter(root);
+    const stopLang = i18n.onChange(function() {
+      if (root.isConnected) draw();
+    });
+    return {
+      el: root,
+      set: function(patch) {
+        Object.assign(spec, patch || {});
+        failure = "";
+        draw();
+      },
+      destroy: function() {
+        window.removeEventListener("online", online);
+        if (typeof stopLang === "function") stopLang();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function propose(spec0) {
+    const spec = Object.assign({}, spec0);
+    const root = el("section", { class: "ak-root ak-ask", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let state = spec.state === "accepted" || spec.state === "rejected" ? spec.state : "open";
+    let failure = "";
+    function draw() {
+      const kind = kindOf(spec.kind, PROPOSE_KINDS, "propose");
+      const key = "propose." + kind;
+      const gated = spec.gate !== false;
+      frame2(root, spec, "propose", kind, {
+        kicker: spec.kicker == null ? tmo(key + ".kicker") : spec.kicker,
+        title: spec.title == null ? "" : spec.title,
+        lead: spec.lead == null ? "" : spec.lead
+      });
+      root.setAttribute("data-ak-state", gated ? state : "auto");
+      const given = partValue(spec, "body");
+      const hasEvidence = spec.body != null || spec.source || Array.isArray(spec.steps) && spec.steps.length || given != null;
+      if (hasEvidence && given !== null) {
+        const body = el("div", { class: "ak-ask__body", "data-ak-part": "body" });
+        if (given !== void 0) fillPart(body, given);
+        else {
+          if (spec.body != null) fillPart(body, spec.body);
+          if (spec.source) {
+            body.appendChild(el("p", { class: "ak-ask__source", "data-ak-part": "source" }, [
+              el("b", null, tmo("propose.extract.source") + " "),
+              String(spec.source)
+            ]));
+          }
+          if (Array.isArray(spec.steps) && spec.steps.length) {
+            body.appendChild(el(
+              "ol",
+              { class: "ak-ask__steps", "data-ak-part": "steps" },
+              spec.steps.map(function(s) {
+                return el("li", { "data-ak-part": "step" }, String(s));
+              })
+            ));
+          }
+        }
+        root.appendChild(body);
+      }
+      if (gated && state === "open") {
+        const labels = spec.labels || {};
+        const row = el("div", { class: "ak-ask__ways", "data-ak-part": "ways" });
+        const add = function(which, fn, always) {
+          if (!always && typeof fn !== "function") return;
+          row.appendChild(wayButton({
+            label: labels[which] || tmo(key + "." + which),
+            part: which,
+            tone: which === "accept" ? "primary" : "quiet",
+            run: function() {
+              return Promise.resolve(typeof fn === "function" ? fn() : void 0).then(function(answer) {
+                if (which === "edit" || answer === false) return;
+                state = which === "accept" ? "accepted" : "rejected";
+                failure = "";
+                draw();
+              });
+            }
+          }, false, !!spec.sample, function(why) {
+            failure = why;
+            draw();
+          }));
+        };
+        add("accept", spec.onAccept, true);
+        add("edit", spec.onEdit, false);
+        add("reject", spec.onReject, kind !== "extract");
+        root.appendChild(row);
+      }
+      let note = spec.note;
+      if (failure) note = tmo("failed", { why: failure });
+      else if (!gated) note = spec.note || tmo(key + ".auto");
+      else if (state !== "open") note = spec.note || tmo(key + "." + state);
+      put(root, spec, "note", "p", note);
+    }
+    draw();
+    enter(root);
+    const stopLang = i18n.onChange(function() {
+      if (root.isConnected) draw();
+    });
+    return {
+      el: root,
+      set: function(patch) {
+        Object.assign(spec, patch || {});
+        if (patch && (patch.state === "open" || patch.state === "accepted" || patch.state === "rejected")) state = patch.state;
+        failure = "";
+        draw();
+      },
+      state: function() {
+        return spec.gate === false ? "auto" : state;
+      },
+      destroy: function() {
+        if (typeof stopLang === "function") stopLang();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function handoff(spec0) {
+    const spec = Object.assign({}, spec0);
+    const root = el("section", { class: "ak-root ak-ask", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let panel = null;
+    let said = "";
+    function draw() {
+      if (panel) {
+        panel.destroy();
+        panel = null;
+      }
+      const kind = kindOf(spec.kind, HANDOFF_KINDS, "handoff");
+      const key = "handoff." + kind;
+      frame2(root, spec, "handoff", kind, {
+        kicker: spec.kicker == null ? tmo(key + ".kicker") : spec.kicker,
+        title: spec.title == null ? tmo(key + ".title") : spec.title,
+        lead: spec.lead == null ? "" : spec.lead
+      });
+      const body = el("div", { class: "ak-ask__body", "data-ak-part": "body" });
+      root.appendChild(body);
+      if (kind === "prompt") {
+        panel = promptPanel({
+          target: body,
+          prompt: spec.prompt == null ? "" : spec.prompt,
+          expect: spec.expect,
+          onResult: spec.sample ? void 0 : spec.onResult,
+          copyLabel: spec.copyLabel,
+          applyLabel: spec.applyLabel
+        });
+        put(root, spec, "note", "p", spec.note);
+        return;
+      }
+      const text = String(typeof spec.text === "function" ? spec.text() : spec.text == null ? "" : spec.text);
+      const line2 = el("p", { class: "ak-ask__say", "data-ak-part": "say" }, text);
+      body.appendChild(line2);
+      const row = el("div", { class: "ak-ask__ways", "data-ak-part": "ways" });
+      row.appendChild(wayButton({
+        label: spec.copyLabel || tmo("handoff.say.copy"),
+        run: function() {
+          return copy(text).then(function(ok) {
+            if (!ok) selectForHand(line2);
+            said = tmo(ok ? "handoff.say.copied" : "handoff.say.copyFailed");
+            const old = root.querySelector('[data-ak-part="note"]');
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+            put(root, {}, "note", "p", said, { role: "status" });
+            if (ok && spec.onCopied) spec.onCopied(text);
+          });
+        }
+      }, true, !!spec.sample, function() {
+      }));
+      root.appendChild(row);
+      put(root, spec, "note", "p", said || spec.note, said ? { role: "status" } : void 0);
+    }
+    draw();
+    enter(root);
+    const stopLang = i18n.onChange(function() {
+      if (root.isConnected) {
+        said = "";
+        draw();
+      }
+    });
+    return {
+      el: root,
+      set: function(patch) {
+        Object.assign(spec, patch || {});
+        said = "";
+        draw();
+      },
+      destroy: function() {
+        if (panel) panel.destroy();
+        if (typeof stopLang === "function") stopLang();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/mosaic-self.js
@@ -23885,6 +24491,32 @@ Known schemas:
       }
       case "connections": {
         handles.push(connections({ target: into, title: p.title, need: p.need, via: p.via }));
+        return true;
+      }
+      // ── The moments an arrangement can hold from props alone: a stop, and a sentence for the
+      //    person's own AI. An empty prop is left out, so the kit's own words stand.
+      case "ask": {
+        handles.push(ask2({
+          target: into,
+          kind: p.kind,
+          title: p.title || void 0,
+          lead: p.lead || void 0,
+          url: p.url || void 0,
+          when: p.when || void 0,
+          what: p.what || void 0,
+          variant: p.variant || void 0
+        }));
+        return true;
+      }
+      case "handoff": {
+        handles.push(handoff({
+          target: into,
+          kind: "say",
+          text: p.text,
+          title: p.title || void 0,
+          lead: p.lead || void 0,
+          variant: p.variant || void 0
+        }));
         return true;
       }
       default:
@@ -27107,6 +27739,63 @@ Known schemas:
     return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
   }
 
+  // src/static/sdk-libs/atelier/shell-frames.js
+  var FRAMES = ["stage", "reading"];
+  function frameOf(name) {
+    if (name == null || name === "" || name === "pages") return null;
+    if (name === "stage" || name === "reading") return name;
+    console.warn('aimeat-atelier: unknown frame "' + name + '" — app() has: ' + FRAMES.join(", "));
+    return null;
+  }
+  function stageFrame(main, controls) {
+    const surface = el("div", { class: "ak-stage__surface", "data-ak-part": "surface" });
+    main.appendChild(surface);
+    if (!controls) {
+      return { surface, body: null, setOpen: function() {
+      }, setTitle: function() {
+      }, destroy: function() {
+      } };
+    }
+    const wish = typeof controls === "object" ? controls : {};
+    let given = wish.title || "";
+    const bodyId = uid("ak-stage");
+    const title = el("span", { class: "ak-stage__title", "data-ak-part": "title" }, given || t("menu"));
+    const handle2 = el("button", {
+      type: "button",
+      class: "ak-stage__handle",
+      "data-ak-part": "handle",
+      "data-ak-noguard": true,
+      "aria-expanded": "true",
+      "aria-controls": bodyId
+    }, [el("span", { class: "ak-stage__grip", "aria-hidden": "true" }), title]);
+    const body = el("div", { class: "ak-stage__body", id: bodyId, "data-ak-part": "body" });
+    const panel = el("aside", { class: "ak-stage__panel", "data-ak-part": "panel", "data-ak-open": "true" }, [handle2, body]);
+    main.appendChild(panel);
+    function setOpen(on2) {
+      panel.setAttribute("data-ak-open", on2 ? "true" : "false");
+      handle2.setAttribute("aria-expanded", on2 ? "true" : "false");
+    }
+    handle2.addEventListener("click", function() {
+      setOpen(panel.getAttribute("data-ak-open") !== "true");
+    });
+    if (wish.open === false) setOpen(false);
+    const stopLang = i18n.onChange(function() {
+      if (!given) title.textContent = t("menu");
+    });
+    return {
+      surface,
+      body,
+      setOpen,
+      setTitle: function(text) {
+        given = String(text || "");
+        title.textContent = given || t("menu");
+      },
+      destroy: function() {
+        if (typeof stopLang === "function") stopLang();
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/shell.js
   var TOUR_INVITE_MS = 700;
   var LOGO_INLINE_MAX = 8192;
@@ -27218,13 +27907,16 @@ Known schemas:
     let sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
     const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
     let sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
-    const frame2 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
+    const frame3 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
+    const framed = spec.nav === "side" ? null : frameOf(spec.frame);
+    const stage = framed === "stage" ? stageFrame(main, spec.controls) : null;
     const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
     const root = el("div", {
-      class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : ""),
+      class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : "") + (framed ? " ak-app--" + framed : ""),
       "data-ak-look": state.look,
+      "data-ak-frame": framed,
       "aria-labelledby": titleId
-    }, [bar2, statusHost, frame2 || main, footer]);
+    }, [bar2, statusHost, frame3 || main, footer]);
     if (spec.motion === false) setMotionDefaults(root, false);
     let nav = null;
     let side = null;
@@ -27470,7 +28162,9 @@ Known schemas:
     setTimeout(startBoot, 0);
     return {
       el: root,
-      main,
+      main: stage ? stage.surface : main,
+      controls: stage ? stage.body : null,
+      stage: stage && stage.body ? { setOpen: stage.setOpen, setTitle: stage.setTitle } : null,
       /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
        *    quiet?: boolean, ambient?: AmbientWish }} patch */
       set(patch) {
@@ -27564,6 +28258,7 @@ Known schemas:
           graceTimer = null;
         }
         if (statusCard) statusCard.destroy();
+        if (stage) stage.destroy();
         if (nav) nav.destroy();
         if (side) side.destroy();
         if (fullFrame) document.body.classList.remove("ak-body");
@@ -28267,7 +28962,7 @@ Known schemas:
     box.style.height = height + "px";
     host.appendChild(box);
     let lastW = -1;
-    let frame2 = 0;
+    let frame3 = 0;
     const render = (animate) => {
       const W7 = Math.round(box.getBoundingClientRect().width) || host.clientWidth || 0;
       lastW = W7;
@@ -28277,15 +28972,15 @@ Known schemas:
     };
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
       if (Math.abs(Math.round(box.getBoundingClientRect().width) - lastW) < 2) return;
-      cancelAnimationFrame(frame2);
-      frame2 = requestAnimationFrame(() => render(false));
+      cancelAnimationFrame(frame3);
+      frame3 = requestAnimationFrame(() => render(false));
     }) : null;
     if (ro) ro.observe(box);
     return {
       render,
       teardown: () => {
         if (ro) ro.disconnect();
-        cancelAnimationFrame(frame2);
+        cancelAnimationFrame(frame3);
         box.remove();
       }
     };
@@ -29728,18 +30423,18 @@ Known schemas:
       spec.draw(layers, w, h, pad, p, host);
     };
     render(animate);
-    let frame2 = 0;
+    let frame3 = 0;
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
       if (Math.abs(host.offsetWidth - lastW) < 2 && Math.abs(host.offsetHeight - lastH) < 2) return;
-      cancelAnimationFrame(frame2);
-      frame2 = requestAnimationFrame(() => render(false));
+      cancelAnimationFrame(frame3);
+      frame3 = requestAnimationFrame(() => render(false));
     }) : null;
     if (ro) ro.observe(host);
     return {
       render,
       teardown: () => {
         if (ro) ro.disconnect();
-        cancelAnimationFrame(frame2);
+        cancelAnimationFrame(frame3);
         if (under) under.remove();
         if (over) over.remove();
         host.classList.remove("ak-orn-host", "ak-orn-host--placed");
@@ -29943,7 +30638,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/board-i18n.js
-  var STRINGS11 = {
+  var STRINGS12 = {
     en: {
       "move": "Move",
       "use": "Use",
@@ -30128,12 +30823,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS11[
+      STRINGS12[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS11.en
+      ] || STRINGS12.en
     );
-    const text = table2[key] || STRINGS11.en[key] || key;
+    const text = table2[key] || STRINGS12.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -30703,7 +31398,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/fingerprint-i18n.js
-  var STRINGS12 = {
+  var STRINGS13 = {
     en: {
       "genre.F": "Fact",
       "genre.A": "Analysis",
@@ -30898,9 +31593,9 @@ Known schemas:
     }
   };
   var FINGERPRINT_KEYS = {
-    en: Object.keys(STRINGS12.en),
-    fi: Object.keys(STRINGS12.fi),
-    es: Object.keys(STRINGS12.es)
+    en: Object.keys(STRINGS13.en),
+    fi: Object.keys(STRINGS13.fi),
+    es: Object.keys(STRINGS13.es)
   };
   function tf(key, vars) {
     const hosted = t("fingerprint." + key, vars);
@@ -30908,13 +31603,13 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS12[
+      STRINGS13[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS12.en
+      ] || STRINGS13.en
     );
     const text = table2[key] || /** @type {Record<string, string>} */
-    STRINGS12.en[key] || key;
+    STRINGS13.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -31570,12 +32265,12 @@ Known schemas:
       "data-ak-part": "send",
       "data-ak-noguard": true,
       text: tb("request.send"),
-      on: { click: ask2 }
+      on: { click: ask3 }
     });
     input.addEventListener("keydown", function(e) {
       if (e.key === "Enter") {
         e.preventDefault();
-        ask2();
+        ask3();
       }
     });
     root.appendChild(el("div", { class: "ak-request__line", "data-ak-part": "line" }, [
@@ -31602,7 +32297,7 @@ Known schemas:
       });
       root.appendChild(el("label", { class: "ak-request__loop", "data-ak-part": "loop" }, [loopBox, el("span", { text: tb("request.loop") })]));
     }
-    function ask2() {
+    function ask3() {
       const text = String(input.value || "").trim();
       if (!text || !spec.onAsk) return;
       spec.onAsk(text);
@@ -32137,13 +32832,13 @@ Known schemas:
           return;
         }
         if (kind === "ai") {
-          const ask2 = attr(elm, "prompt") || target || "";
+          const ask3 = attr(elm, "prompt") || target || "";
           const vals = Object.keys(input).map(function(k) {
             return k + ": " + input[k];
           }).join("\n");
           say(out, tb("verbs.thinking"));
           const lang2 = (spec.lang || document.documentElement.lang || "en").slice(0, 2);
-          const prompt2 = ask2 + (vals ? "\n\n" + vals : "") + "\n\nAnswer in " + (lang2 === "fi" ? "Finnish" : lang2 === "es" ? "Spanish" : "English") + ", plainly, with no preamble. Just the answer.";
+          const prompt2 = ask3 + (vals ? "\n\n" + vals : "") + "\n\nAnswer in " + (lang2 === "fi" ? "Finnish" : lang2 === "es" ? "Spanish" : "English") + ", plainly, with no preamble. Just the answer.";
           const asker = adapters.ai || async function(p) {
             if (!ns.ai || !ns.ai.complete) throw new Error(tb("verbs.notHere"));
             const a = await ns.ai.complete({ prompt: p });
@@ -32263,16 +32958,16 @@ Known schemas:
       root.style.removeProperty("height");
       root.style.removeProperty("border-radius");
     }
-    const frame2 = function(key) {
+    const frame3 = function(key) {
       return function(x, v) {
         box[key] = x;
         if (morphing) draw();
         if (v === 0) landed();
       };
     };
-    const w = liveSpring(frame2("w"), { el: root, precision: 0.1 });
-    const h = liveSpring(frame2("h"), { el: root, precision: 0.1 });
-    const r = liveSpring(frame2("r"), { el: root, precision: 0.1 });
+    const w = liveSpring(frame3("w"), { el: root, precision: 0.1 });
+    const h = liveSpring(frame3("h"), { el: root, precision: 0.1 });
+    const r = liveSpring(frame3("r"), { el: root, precision: 0.1 });
     function shapeAndTone(shape, tone) {
       if (shape) root.setAttribute("data-ak-shape", SHAPES.indexOf(shape) >= 0 ? shape : "pill");
       else if (!root.hasAttribute("data-ak-shape")) root.setAttribute("data-ak-shape", "pill");
@@ -35189,6 +35884,208 @@ Known schemas:
     };
   }
 
+  // src/static/sdk-libs/atelier/requires.js
+  var GRACE_MS = 2500;
+  var POLL_MS = 300;
+  function kindOfNeed(need) {
+    if (need === "ai") return "settings";
+    if (need === "online") return "offline";
+    if (need.indexOf("member:") === 0) return "access";
+    return "signIn";
+  }
+  function requires(spec) {
+    const needs = Array.isArray(spec.needs) ? spec.needs.map(String) : [];
+    const sample = spec.sample === true || spec.app != null && isPlaceholder2(spec.app);
+    const root = el("section", {
+      class: "ak-root ak-requires",
+      "data-ak-part": "root",
+      "data-ak-requires": needs.join(" "),
+      "data-ak-state": "checking"
+    });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let stopCard = null;
+    let inner = null;
+    let timer = null;
+    let open = false;
+    let state = "checking";
+    let destroyed = false;
+    let seq2 = 0;
+    const started2 = Date.now();
+    function authOf2() {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      return ns && ns.auth ? ns.auth : null;
+    }
+    function setState(next) {
+      if (state === next) return;
+      state = next;
+      root.setAttribute("data-ak-state", next);
+      if (typeof spec.onState === "function") spec.onState(next);
+    }
+    function dropStop() {
+      if (inner) {
+        inner.destroy();
+        inner = null;
+      }
+      if (stopCard) {
+        stopCard.destroy();
+        stopCard = null;
+      }
+    }
+    function empty() {
+      dropStop();
+      open = false;
+      clear(root);
+    }
+    function show(kind, more) {
+      empty();
+      stopCard = ask2(
+        /** @type {any} */
+        Object.assign({ target: root, kind, variant: spec.variant, sample }, more || {})
+      );
+      setState(kind);
+    }
+    function blocked(text) {
+      empty();
+      root.appendChild(el("p", { class: "ak-ask__builder", "data-ak-part": "note" }, text));
+      setState("blocked");
+    }
+    async function check3() {
+      for (const need of needs) {
+        if (need === "online") {
+          if (navigator.onLine === false) return { kind: "offline", more: { onRetry: run } };
+          continue;
+        }
+        if (need === "session") {
+          const auth = authOf2();
+          if (!auth || typeof auth.getSession !== "function") return { blocked: tmo("noLib", { lib: "aimeat-auth.js" }) };
+          if (!auth.getSession()) return { kind: "signIn", wait: true };
+          continue;
+        }
+        if (need === "ai") {
+          const st = await probeAi(String(spec.app || ""), false);
+          if (st.avail === "nolib") return { blocked: tmo("noLib", { lib: "aimeat-ai.js" }) };
+          if (st.avail === "signedout") return { kind: "signIn", wait: true };
+          if (st.avail === "off") {
+            return { kind: "settings", more: {
+              title: tmo("ask.settings.ai.title"),
+              lead: st.fix || tmo("ask.settings.ai.lead"),
+              url: st.settingsUrl || void 0,
+              wayLabel: tmo("ask.settings.ai.way")
+            } };
+          }
+          continue;
+        }
+        if (need.indexOf("member:") === 0 && need.length > 7 && spec.app) {
+          const iam = await ready({ app: spec.app, roles: spec.roles });
+          if (!iam) return { blocked: tmo("noLib", { lib: "aimeat-iam.js" }) };
+          const me = iam.me();
+          if (!(me && (me.isOwner || iam.can(need.slice(7))))) return { kind: "access" };
+          continue;
+        }
+        return { blocked: tmo("unknownNeed", { need }) };
+      }
+      return { ready: true };
+    }
+    function pollSession() {
+      timer = null;
+      if (destroyed || !root.isConnected) return;
+      const auth = authOf2();
+      if (auth && typeof auth.getSession === "function" && auth.getSession()) {
+        run();
+        return;
+      }
+      timer = setTimeout(pollSession, POLL_MS);
+    }
+    function run() {
+      const mine = ++seq2;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (sample) {
+        show(needs.length ? kindOfNeed(needs[0]) : "signIn", needs[0] === "ai" ? { title: tmo("ask.settings.ai.title"), lead: tmo("ask.settings.ai.lead") } : void 0);
+        return Promise.resolve();
+      }
+      return check3().then(function(v) {
+        if (destroyed || mine !== seq2) return;
+        if (v.ready) {
+          if (open) return;
+          empty();
+          open = true;
+          setState("ready");
+          const auth = authOf2();
+          if (typeof spec.render === "function") {
+            spec.render(root, { session: auth && typeof auth.getSession === "function" ? auth.getSession() : null });
+          }
+          return;
+        }
+        if (v.blocked) {
+          blocked(v.blocked);
+          return;
+        }
+        if (v.kind === "signIn" && v.wait) {
+          if (state === "checking" && Date.now() - started2 < GRACE_MS) {
+            if (!root.firstChild) root.appendChild(el("p", { class: "ak-ask__checking", "data-ak-part": "checking" }, tmo("checking")));
+            timer = setTimeout(run, POLL_MS);
+            return;
+          }
+          if (state !== "signIn") show("signIn", spec.signInLead ? { lead: spec.signInLead } : void 0);
+          timer = setTimeout(pollSession, POLL_MS);
+          return;
+        }
+        if (v.kind === "access") {
+          const host = el("div");
+          show("access", { body: host, ways: null });
+          inner = joinRequest({ target: host, app: String(spec.app), roles: spec.roles });
+          return;
+        }
+        show(String(v.kind), v.more);
+      }).catch(function(e) {
+        if (destroyed || mine !== seq2) return;
+        blocked(tmo("failed", { why: String(e && e.message || e) }));
+      });
+    }
+    function onNet() {
+      if (!destroyed && root.isConnected) run();
+    }
+    const watchesNet = needs.indexOf("online") >= 0;
+    if (watchesNet) {
+      window.addEventListener("online", onNet);
+      window.addEventListener("offline", onNet);
+    }
+    const stopWatch = watch2(function() {
+      if (state !== "ready" && state !== "checking") {
+        state = "again";
+      }
+      run();
+    }, root);
+    run();
+    return {
+      el: root,
+      check: run,
+      state: function() {
+        return state;
+      },
+      destroy: function() {
+        destroyed = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (watchesNet) {
+          window.removeEventListener("online", onNet);
+          window.removeEventListener("offline", onNet);
+        }
+        stopWatch();
+        dropStop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/describe-data.js
   var PARTS = {
     "accessState": {
@@ -35196,6 +36093,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["status", "act"],
       fork: "Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.",
       file: "members.js"
     },
@@ -35204,6 +36102,7 @@ Known schemas:
       slots: [],
       variants: ["compact"],
       tokens: ["--ak-ai-width"],
+      use: ["converse"],
       fork: "Copying it out means building the grounded prompt from the document and the turns yourself, calling AIMEAT.ai.complete(), chatNotice() and disclose() per answer, AIMEAT.md.render(), writing the no-AI, signed-out and error words in three languages, and holding Ask busy.",
       file: "ai-chat.js"
     },
@@ -35212,14 +36111,25 @@ Known schemas:
       slots: [],
       variants: ["compact"],
       tokens: ["--ak-ai-width"],
+      use: ["act", "view"],
       fork: "Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.",
       file: "ai-task.js"
+    },
+    "ask": {
+      parts: ["root", "words", "kicker", "title", "lead", "body", "ways", "way", "note"],
+      slots: ["kicker()", "title()", "lead()", "body()", "note()"],
+      variants: ["inline"],
+      tokens: ["--ak-ask-width", "--ak-ask-kicker-mark"],
+      use: ["wait", "explain", "act"],
+      fork: "Copy .ak-ask* out of moments.css; you give up the eight kinds' words in three languages and the way out each kind finds on the page.",
+      file: "moments.js"
     },
     "board": {
       parts: ["root", "tools", "tool", "world", "ring", "ringName", "frame", "head", "title", "kind", "extra", "actions", "act", "body", "grip", "empty", "note"],
       slots: ["title(frame)", "extra(frame)", "empty()"],
       variants: ["fill", "plain"],
       tokens: ["--ak-board-h", "--ak-board-head", "--ak-board-frame-radius", "--ak-board-ring"],
+      use: ["layout", "view"],
       fork: "Copy .ak-board* out of board.css and drive AIMEAT.viewport yourself; you keep the camera and give up the keyed frames, the ring geometry, the Move/Use overlay and the chrome that stays one size at every zoom.",
       file: "board.js"
     },
@@ -35228,6 +36138,7 @@ Known schemas:
       slots: ["item(entry)"],
       variants: ["dense"],
       tokens: ["--ak-chrome-bottom"],
+      use: ["navigate"],
       fork: "Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.",
       file: "shell-parts.js"
     },
@@ -35236,6 +36147,7 @@ Known schemas:
       slots: ["after()"],
       variants: [],
       tokens: ["--ak-callout-pad"],
+      use: ["notify", "explain"],
       fork: "A tinted box with an icon; copy .ak-callout* out of workbench.css.",
       file: "workbench.js"
     },
@@ -35244,6 +36156,7 @@ Known schemas:
       slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "aside(item)", "art(item)"],
       variants: ["dense", "wide", "plain"],
       tokens: ["--ak-card-min", "--ak-card-gap", "--ak-card-aspect", "--ak-card-pad"],
+      use: ["list"],
       fork: "Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the grid re-entering on every change.",
       file: "grid.js"
     },
@@ -35252,6 +36165,7 @@ Known schemas:
       slots: ["sub(item)"],
       variants: [],
       tokens: ["--ak-checkgrid-min"],
+      use: ["status", "list"],
       fork: "Copy .ak-checkgrid* out of workbench.css; the five state marks are inline SVG in this file.",
       file: "workbench.js"
     },
@@ -35260,6 +36174,7 @@ Known schemas:
       slots: ["text(item)"],
       variants: [],
       tokens: ["--ak-choice-min"],
+      use: ["pick"],
       fork: "A radio group drawn as cards; copy .ak-choices* out of workbench.css and keep role=radiogroup.",
       file: "workbench.js"
     },
@@ -35268,6 +36183,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-conn-width"],
+      use: ["list", "act", "status"],
       fork: "Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, keeping the confirm before a disconnect and the words for each status, and on an app origin linking to AIMEAT.connect.settingsUrl() (the node's accounts page) instead and reading the list again on focus.",
       file: "connections.js"
     },
@@ -35276,6 +36192,7 @@ Known schemas:
       slots: ["onOutcome(result)", "onAnswered(result, round)", "verdict(result)", "labels{ questionId: words }"],
       variants: [],
       tokens: ["--ak-decision-width"],
+      use: ["confirm", "act", "view"],
       fork: "Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), decisions({ id }) and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, every round of a chained ask, a stored decision with its record, and recording the person's verdict only when they press.",
       file: "decision.js"
     },
@@ -35284,6 +36201,7 @@ Known schemas:
       slots: ["before()", "after()", "actions()", "aside()"],
       variants: ["danger", "celebrate", "ai", "roomy", "wide"],
       tokens: [],
+      use: ["open", "confirm"],
       fork: "Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.",
       file: "dialog.js"
     },
@@ -35292,6 +36210,7 @@ Known schemas:
       slots: [],
       variants: ["plain"],
       tokens: ["--ak-doc-width"],
+      use: ["view"],
       fork: "Copying it out means calling AIMEAT.md.render() or renderRich() yourself, catching a failure into pre-wrapped text, and colouring .md-body's headings, lists, code, tables, quotes and links with the --ak-* tokens.",
       file: "doc.js"
     },
@@ -35300,6 +36219,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["edit", "status"],
       fork: "",
       file: "dropzone-upload.js"
     },
@@ -35308,6 +36228,7 @@ Known schemas:
       slots: ["unit()", "aside()"],
       variants: ["compact", "center"],
       tokens: ["--ak-stat-unit-size", "--ak-stat-up", "--ak-stat-down"],
+      use: ["count"],
       fork: "One element, one number: build it yourself and call countUp(node, from, to).",
       file: "hero.js"
     },
@@ -35316,6 +36237,7 @@ Known schemas:
       slots: ["title()", "meta()", "extra()"],
       variants: ["dense", "plain"],
       tokens: ["--ak-fp-F", "--ak-fp-A", "--ak-fp-M", "--ak-fp-O", "--ak-fp-P", "--ak-fp-K", "--ak-fp-x", "--ak-fp-zone", "--ak-fp-dim"],
+      use: ["view", "status"],
       fork: "Copy fingerprint-draw.js's functions and .ak-fp* out of fingerprint.css and draw the profile yourself; you keep the drawing and give up the topic highlight across the parts, the seal focus, the hover card and the words in three languages.",
       file: "fingerprint.js"
     },
@@ -35324,6 +36246,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-range-track", "--ak-range-thumb"],
+      use: ["edit"],
       fork: "Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.",
       file: "form.js"
     },
@@ -35332,14 +36255,25 @@ Known schemas:
       slots: ["body(chapter)"],
       variants: ["dense"],
       tokens: ["--ak-handbook-w"],
+      use: ["explain", "search", "open"],
       fork: "Write the chapters into a dialog of your own; you give up the table of contents, the search, the chapters the page carries, the languages and the marked place.",
       file: "handbook.js"
+    },
+    "handoff": {
+      parts: ["root", "words", "kicker", "title", "lead", "body", "say", "ways", "way", "note"],
+      slots: ["kicker()", "title()", "lead()", "note()"],
+      variants: ["inline"],
+      tokens: ["--ak-ask-width", "--ak-ask-kicker-mark"],
+      use: ["copy", "act"],
+      fork: "Copy .ak-ask* out of moments.css and call AIMEAT.atelier.copy(text) yourself; you give up the selected text when the browser refuses the clipboard.",
+      file: "moments.js"
     },
     "health": {
       parts: ["root", "row", "lamp", "name", "label", "sub", "reading", "aside"],
       slots: ["label(item)", "sub(item)", "reading(item)", "aside(item)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-health-lamp", "--ak-health-row-pad-y"],
+      use: ["status", "list"],
       fork: "One row, one lamp; copy .ak-health* out of data.css.",
       file: "ops.js"
     },
@@ -35348,6 +36282,7 @@ Known schemas:
       slots: ["before()", "title()", "sub()", "after()", "aside()"],
       variants: ["tall", "compact", "center"],
       tokens: ["--ak-hero-min", "--ak-hero-pad", "--ak-hero-gap", "--ak-hero-title-size", "--ak-hero-image", "--ak-scrim"],
+      use: ["layout", "view"],
       fork: "Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.",
       file: "hero.js"
     },
@@ -35356,6 +36291,7 @@ Known schemas:
       slots: ["link(form)", "create(name)", "actions[{ label, run(form), tone? }]"],
       variants: [],
       tokens: ["--ak-intake-width"],
+      use: ["list", "act", "copy"],
       fork: "Copying it out means calling AIMEAT.intake.listForms(), deleteForm() and defineForm() yourself, and building each form's link, its allowed and required fields and its honeypot.",
       file: "intake-form.js"
     },
@@ -35364,6 +36300,7 @@ Known schemas:
       slots: ["label(field)"],
       variants: [],
       tokens: ["--ak-intake-width"],
+      use: ["edit"],
       fork: "Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, putting err.field on its field, and reading a label written per language in the page language.",
       file: "intake-form.js"
     },
@@ -35372,6 +36309,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-island-pad", "--ak-island-radius"],
+      use: ["status", "notify"],
       fork: "Animate width, height and border-radius yourself and swap the content; you give up the spring, the separate enter and exit timing of the content, and the interruption that continues from where it was.",
       file: "island.js"
     },
@@ -35380,6 +36318,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["act", "status"],
       fork: "Copying it out means reading me().requested and calling AIMEAT.iam.request(note) yourself.",
       file: "members.js"
     },
@@ -35388,6 +36327,7 @@ Known schemas:
       slots: ["card(card)", "cardtitle(card)", "cardsub(card)", "extra(card)", "badge(card)", "aside(card)", "colhead(column)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-kanban-col-min", "--ak-kanban-card-pad", "--ak-kanban-gap"],
+      use: ["list", "edit", "status"],
       fork: "Copy .ak-kanban* out of planner.css; you keep the tokens and give up the drag, the arrow-key move and the card's spring travel.",
       file: "planner.js"
     },
@@ -35396,6 +36336,7 @@ Known schemas:
       slots: ["row(item)", "title(item)", "sub(item)", "extra(item)", "badge(item)", "meta(item)", "aside(item)"],
       variants: ["dense", "numbered", "plain"],
       tokens: ["--ak-list-gap", "--ak-list-row-gap", "--ak-list-row-pad-y", "--ak-list-row-pad-x", "--ak-list-line-gap", "--ak-list-aside-size"],
+      use: ["list"],
       fork: "Copy .ak-list and .ak-list__* out of content.css and build the row yourself; you keep the tokens, the look and settle()/keyedRows() if you call them, and you give up the empty state, the pick mark and every later fix to this row.",
       file: "list.js"
     },
@@ -35404,6 +36345,7 @@ Known schemas:
       slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "meta(item)", "aside(item)"],
       variants: ["dense", "numbered", "plain"],
       tokens: ["--ak-list-gap", "--ak-list-row-gap", "--ak-list-aside-size"],
+      use: ["list", "open"],
       fork: "Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.",
       file: "list.js"
     },
@@ -35412,6 +36354,7 @@ Known schemas:
       slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "art(item)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-card-aspect", "--ak-card-pad"],
+      use: ["view"],
       fork: "Same as cardGrid; this is one card and its action row.",
       file: "grid.js"
     },
@@ -35420,6 +36363,7 @@ Known schemas:
       slots: ["columns(member)", "actions[{ label, run(member), tone? }]", "sections[{ id, type, label, help?, value, onChange }]"],
       variants: ["list", "table", "dense"],
       tokens: ["--ak-mem-width"],
+      use: ["list", "confirm", "edit"],
       fork: "Copying it out means calling AIMEAT.iam's admin(), roster(), invite(), invites(), audit(), people(), plan() and setPlan() yourself, and keeping the one-click role (suggestRole), the confirm on a raise and the refusal sentence.",
       file: "members-admin.js"
     },
@@ -35428,6 +36372,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-menu-min-w", "--ak-menu-row-pad"],
+      use: ["open", "act"],
       fork: "Build a list of buttons in a positioned box; you give up the growing entrance, the travelling highlight, the pick blink and the keyboard model.",
       file: "menu.js"
     },
@@ -35436,6 +36381,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["open"],
       fork: "Put your content in a positioned box; you give up the entrance from the anchor, the outside-click close and the focus return.",
       file: "menu.js"
     },
@@ -35444,6 +36390,7 @@ Known schemas:
       slots: ["actions()"],
       variants: [],
       tokens: ["--ak-progress-figure"],
+      use: ["status", "count"],
       fork: "Copy .ak-progress* out of workbench.css; the count-up is dom.js countUp.",
       file: "workbench.js"
     },
@@ -35452,14 +36399,25 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["copy", "edit"],
       fork: "Two columns of your own; copy .ak-promptpanel* out of workbench.css and keep the parse in parseAnswer.",
       file: "workbench-parts.js"
+    },
+    "propose": {
+      parts: ["root", "words", "kicker", "title", "lead", "body", "source", "steps", "step", "ways", "accept", "edit", "reject", "note"],
+      slots: ["kicker()", "title()", "lead()", "body()", "note()"],
+      variants: ["inline"],
+      tokens: ["--ak-ask-width", "--ak-ask-kicker-mark"],
+      use: ["confirm", "view"],
+      fork: "Copy .ak-ask* out of moments.css and keep the three presses; you give up the decided states and the same block for an owner who turned approval off.",
+      file: "moments.js"
     },
     "queue": {
       parts: ["root", "strip", "list", "row", "state", "words", "title", "sub", "extra", "aside"],
       slots: ["row(item)", "state(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-queue-row-pad-y", "--ak-queue-state-min"],
+      use: ["status", "list", "count"],
       fork: "Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.",
       file: "ops.js"
     },
@@ -35468,6 +36426,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["list", "status"],
       fork: "Build your own row content; copy .ak-qrow* out of workbench.css.",
       file: "workbench-parts.js"
     },
@@ -35476,6 +36435,7 @@ Known schemas:
       slots: ["words(state)"],
       variants: ["compact"],
       tokens: [],
+      use: ["count"],
       fork: "Copy .ak-rating* out of content.css; the clip trick is four rules.",
       file: "hero.js"
     },
@@ -35484,14 +36444,25 @@ Known schemas:
       slots: ["plan(plan)", "step(step)"],
       variants: ["compact"],
       tokens: ["--ak-request-console-h"],
+      use: ["act", "confirm", "status"],
       fork: "Copy .ak-request* out of board.css and keep the console as AIMEAT.atelier.console; you give up the plan's states, the gate row and the scanner.",
       file: "request-panel.js"
+    },
+    "requires": {
+      parts: ["root", "checking", "note"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      use: ["wait", "layout"],
+      fork: "Copying it out means reading AIMEAT.auth.getSession(), AIMEAT.ai.capabilities() and AIMEAT.iam.can() yourself, in order, and drawing each refusal.",
+      file: "requires.js"
     },
     "searchBar": {
       parts: ["root", "input", "clear"],
       slots: ["aside()"],
       variants: ["dense", "plain"],
       tokens: [],
+      use: ["search"],
       fork: "Two elements and a debounce; copy them if the shape is wrong.",
       file: "table.js"
     },
@@ -35500,6 +36471,7 @@ Known schemas:
       slots: ["actions()", "before()", "after()"],
       variants: ["dense", "plain", "quiet"],
       tokens: ["--ak-section-pad", "--ak-section-gap"],
+      use: ["layout"],
       fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
       file: "shell-parts.js"
     },
@@ -35508,6 +36480,7 @@ Known schemas:
       slots: [],
       variants: ["dense"],
       tokens: [],
+      use: ["pick"],
       fork: "Build a radio group yourself; you give up the travelling ink, the arrow keys and the roving focus.",
       file: "controls.js"
     },
@@ -35516,6 +36489,7 @@ Known schemas:
       slots: ["after()"],
       variants: [],
       tokens: ["--ak-setgroup-help", "--ak-setgroup-measure"],
+      use: ["layout", "edit", "explain"],
       fork: "Two columns that fold to one; copy .ak-setgroup* out of workbench.css.",
       file: "workbench.js"
     },
@@ -35524,6 +36498,7 @@ Known schemas:
       slots: ["preview(item)", "extra(item)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-shelf-preview-h"],
+      use: ["list", "search", "act"],
       fork: "Copy .ak-shelf* out of board.css and build the cards yourself; you keep the tabs and the search bar as kit parts and give up the keyed grid and the designed empty state.",
       file: "shelf.js"
     },
@@ -35532,6 +36507,7 @@ Known schemas:
       slots: ["item(entry)", "foot()"],
       variants: [],
       tokens: ["--ak-sidenav-w", "--ak-sidenav-main"],
+      use: ["navigate", "count"],
       fork: "Copy .ak-sidenav* out of workbench.css; you give up the grouping, the counts and the view transition.",
       file: "workbench.js"
     },
@@ -35540,14 +36516,25 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-range-track", "--ak-range-thumb"],
+      use: ["edit"],
       fork: "Use form({ fields: [{ type: 'range' }] }) or a plain input with class ak-input--range; the stretch comes with rangeMotion(input).",
       file: "controls.js"
+    },
+    "stage": {
+      parts: ["surface", "panel", "handle", "title", "body"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-stage-panel-width", "--ak-stage-sheet-height"],
+      use: ["layout"],
+      fork: "Copy .ak-stage* out of frames.css and build the surface and the panel yourself; you give up the one panel that is a float on a wide window and a sheet on a phone.",
+      file: "shell-frames.js"
     },
     "stateButton": {
       parts: ["root", "content", "spinner", "check", "status"],
       slots: [],
       variants: ["ghost"],
       tokens: [],
+      use: ["act", "status"],
       fork: "Use a button with busy(); you give up the spinner, the check and the morph between them.",
       file: "island.js"
     },
@@ -35556,6 +36543,7 @@ Known schemas:
       slots: ["label(tile)", "hint(tile)", "aside(tile)"],
       variants: ["compact", "trend", "plain"],
       tokens: ["--ak-stat-min", "--ak-stat-pad", "--ak-stat-gap", "--ak-stat-figure-size", "--ak-stat-unit-size", "--ak-stat-up", "--ak-stat-down"],
+      use: ["count"],
       fork: "Copy .ak-statrow* out of shell.css; you keep the tokens and lose countUp() on a changed figure.",
       file: "hero.js"
     },
@@ -35564,6 +36552,7 @@ Known schemas:
       slots: ["actions()", "after()"],
       variants: [],
       tokens: ["--ak-band-pad"],
+      use: ["status", "act"],
       fork: "A section with a heading, a sentence and a bar; copy .ak-band* out of workbench.css.",
       file: "workbench.js"
     },
@@ -35572,6 +36561,7 @@ Known schemas:
       slots: ["cell(value, row, column)", "head(column)", "row(row)"],
       variants: ["dense", "plain", "lined"],
       tokens: ["--ak-table-cell-pad-y", "--ak-table-cell-pad-x"],
+      use: ["list", "compare"],
       fork: "Copy .ak-table* out of content.css; you keep the tokens and the tabular numerals, and you give up the keyed body, so a sort stops being seen as a move.",
       file: "table.js"
     },
@@ -35580,6 +36570,7 @@ Known schemas:
       slots: ["tab(item)"],
       variants: ["dense", "pill"],
       tokens: ["--ak-tabs-gap"],
+      use: ["navigate", "pick"],
       fork: "A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.",
       file: "shell-parts.js"
     },
@@ -35588,6 +36579,7 @@ Known schemas:
       slots: ["item(item)", "when(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
       variants: ["dense", "plain"],
       tokens: ["--ak-timeline-dot", "--ak-timeline-rail", "--ak-timeline-gap", "--ak-timeline-indent"],
+      use: ["list"],
       fork: "Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.",
       file: "timeline.js"
     },
@@ -35596,6 +36588,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: ["--ak-switch-w", "--ak-switch-h", "--ak-switch-pad", "--ak-switch-knob"],
+      use: ["edit"],
       fork: "Use a plain checkbox with class ak-toggle; you keep the switch's look and give up the knob's stretch and travel.",
       file: "controls.js"
     },
@@ -35604,6 +36597,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["explain", "open"],
       fork: "",
       file: "menu.js"
     },
@@ -35612,6 +36606,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["explain"],
       fork: "Write the steps into a dialog of your own; you give up the spotlight, the phone's bottom sheet, the page's #aimeat-tour block (which the node reads too), the languages, the invitation and the owner's switch for it.",
       file: "tour.js"
     },
@@ -35620,6 +36615,7 @@ Known schemas:
       slots: [],
       variants: [],
       tokens: [],
+      use: ["act"],
       fork: "Copy the run() switch out and keep the attribute names; you give up the on-sight reads, the picture detection and the sign-in wait.",
       file: "verbs.js"
     },
@@ -35628,6 +36624,7 @@ Known schemas:
       slots: ["onAnswered(input, answer)"],
       variants: ["dense"],
       tokens: ["--ak-wf-width"],
+      use: ["confirm", "list"],
       fork: "Copying it out means calling AIMEAT.workflows.pendingInputs() and answer() yourself, sending picks as option ids with other only when the step accepts it, treating WORKFLOW_STEP_NOT_WAITING as a step that is gone, and reading the list again when the live 'workflows' domain changes.",
       file: "workflow-input.js"
     },
@@ -35636,6 +36633,7 @@ Known schemas:
       slots: ["onReady(choice)", "onReady(list, current) with multiple"],
       variants: ["dense"],
       tokens: ["--ak-mem-width"],
+      use: ["pick"],
       fork: "Copying it out means calling AIMEAT.organism's recall(app, { verify: true }), organisms(), findOrCreateWorkspace() and remember() yourself, in that order, and keeping the one-line view of a remembered choice; with multiple, recallList() and rememberList() instead of recall() and remember().",
       file: "workspace-picker.js"
     },
@@ -35644,6 +36642,7 @@ Known schemas:
       slots: ["columns(member)", "actions[{ label, run(member), tone? }]", "inviteInto[{ ws, role?, label?, checked? }]"],
       variants: ["list", "table"],
       tokens: ["--ak-mem-width"],
+      use: ["list", "confirm", "edit"],
       fork: "Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke(), inviteByEmail(), invitations() and cancelInvitation() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.",
       file: "workspace-team.js"
     }
@@ -35656,7 +36655,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.72.4",
+    version: "0.73.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -35675,6 +36674,33 @@ Known schemas:
       const found = PARTS[String(name)];
       if (!found) return null;
       return Object.assign({ id: String(name) }, found);
+    },
+    /**
+     * WHICH COMPONENTS ARE FOR THIS. Answers with the ids of the components whose `@use` line names
+     * the use: `find('confirm')` gives the ones a person decides with, `find('wait')` the ones that
+     * stand while something is not ready. The uses are a closed list (tools/build-atelier-parts.ts
+     * USES); with no argument the answer is every use that at least one component has.
+     * @param {string} [use]
+     * @returns {string[]}
+     */
+    find(use) {
+      const all = (
+        /** @type {Record<string, { use?: string[] }>} */
+        /** @type {unknown} */
+        PARTS
+      );
+      if (use == null) {
+        const seen = /* @__PURE__ */ new Set();
+        Object.keys(all).forEach(function(id) {
+          (all[id].use || []).forEach(function(u) {
+            seen.add(u);
+          });
+        });
+        return Array.from(seen).sort();
+      }
+      return Object.keys(all).filter(function(id) {
+        return (all[id].use || []).indexOf(String(use)) >= 0;
+      }).sort();
     },
     // ── Shell and navigation ──
     app,
@@ -35905,6 +36931,12 @@ Known schemas:
     // ── Designed states ──
     emptyState,
     skeleton,
+    // ── The moments: a stop, a proposal the person decides on, a hand-off to their own AI; and
+    //    the caller that finds out which stop an area of the page is at (moments.js, requires.js) ──
+    ask: ask2,
+    propose,
+    handoff,
+    requires,
     // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
     //    an app's own scroller joins with data-ak-scroll-edge or this call ──
     scrollEdge,

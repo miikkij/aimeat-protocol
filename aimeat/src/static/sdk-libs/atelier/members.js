@@ -22,7 +22,9 @@
  * @parts joinRequest root · title · intro · note · send · status
  * @parts accessState root · title · intro · join
  * @fork joinRequest Copying it out means reading me().requested and calling AIMEAT.iam.request(note) yourself.
+ * @use joinRequest act · status
  * @fork accessState Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.
+ * @use accessState status · act
  * @structure members (re-exported) · joinRequest(spec) · accessState(spec)
  * @usage
  *   AIMEAT.atelier.joinRequest({ target: '#join', app: 'me/club.html' });

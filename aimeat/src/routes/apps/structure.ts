@@ -15,6 +15,8 @@
  *   GET /v1/apps/:owner/:filename/structure · PUT /v1/apps/:owner/:filename/structure · GET /v1/app-plans
  * @usage registerStructureRoutes(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A choice's value takes 400 characters, for the `moments` list
+ *     (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.0 — 2026-10-30 — `proposals`: the layouts and navigations the AI drew for the app, each with its sketch.
  *   v1.1.0 — 2026-10-29 — A choice's note takes 600 characters: a custom layout is described in it.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -41,10 +43,12 @@ const PlanWriteSchema = z.object({
     name: safeText(120).nullable().optional(),
     purpose: safeText(800).nullable().optional(),
     data: z.object({ summary: safeText(800), personalData: z.enum(['yes', 'no', 'unstated']).optional() }).nullable().optional(),
+    // A value takes 400: `moments` is a comma-separated list of ids. The service holds every other
+    // choice to its registry, whose ids are short.
     choices: z.record(z.string().max(40), z.union([
         z.null(),
-        safeText(80),
-        z.object({ value: safeText(80), state: z.enum(['waiting', 'done']).optional(), note: safeText(600).optional() }),
+        safeText(400),
+        z.object({ value: safeText(400), state: z.enum(['waiting', 'done']).optional(), note: safeText(600).optional() }),
     ])).optional(),
     proposals: z.record(z.string().max(20), z.union([z.null(), z.array(z.object({
         id: safeText(40),

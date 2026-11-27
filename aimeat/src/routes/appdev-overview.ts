@@ -9,6 +9,9 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-11-27 — PATCH /v1/appdev/templates/:id { recipe | null }: the owner in person replaces or removes
+ *     a template's recipe; POST takes `recipe`; GET /v1/appdev/templates/:id answers `how_to_start`, the
+ *     text aimeat_app_template_get answers (wish-omistaja-tekee-omia-sovelluspohjia-ja-aloittaa-seuraavan-app).
  *   2026-11-21 — GET /v1/appdev/overview takes ?areas=, the areas a draft uses, which narrow both pitfall sections.
  *   2026-11-19 — GET /v1/appdev/templates and /:id name the caller as the reader of a genre grown out
  *     of an app, which reaches only the people the app's audience admits (feature audit 1.2).
@@ -36,7 +39,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev/overview.js';
@@ -44,15 +47,20 @@ import { readerFor } from '../services/classification/reader.js';
 import { callerOf } from '../middleware/caller.js';
 import { readsAsOwner } from '../services/owner/scope-read.js';
 import {
-  listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
+  listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate, setTemplateRecipe,
   type ProposeTemplateInput,
 } from '../services/app/template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node/templates.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
+import { templateHowToStart } from '../services/appdev/template-start.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { TemplateRecipeSchema } from '../models/template-recipe.js';
 
 /** The body POST /v1/appdev/templates takes: the MCP tool's input, from its catalog entry. */
 const ProposeTemplateBody = z.object(zodShapeFor('aimeat_app_template_propose'));
+/** The body PATCH /v1/appdev/templates/:id takes: the recipe the catalog entry validates, or null to remove it. */
+const SetRecipeBody = z.object({ recipe: TemplateRecipeSchema.nullable() }).strict();
+const RECIPE_IN_PERSON = 'Only you, signed in yourself, edit the recipe of your template here. An agent proposes the template again with its recipe.';
 
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -139,8 +147,33 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
         version: app.versionNumber,
         download_url: `/v1/apps/${encodeURIComponent(m.derivedFrom.owner)}/${encodeURIComponent(m.derivedFrom.filename)}`,
       } : { exists: false },
+      // The same text aimeat_app_template_get answers (services/appdev/template-start.ts).
+      how_to_start: templateHowToStart(m, app),
     }));
   });
+
+  // PATCH /v1/appdev/templates/:id { recipe | null } — the owner replaces or removes the template's
+  // recipe on the page where they edit their own template. The account holder in person only: an
+  // agent changes a template by proposing it again (POST above, aimeat_app_template_propose).
+  router.patch('/v1/appdev/templates/:id', requireAuth(), requireOwnerPrincipal(RECIPE_IN_PERSON), requireScope('memory:write'),
+    rateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
+      const caller = callerOf(req, config.nodeId, storage);
+      if (!caller.inPerson) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', RECIPE_IN_PERSON));
+        return;
+      }
+      const parsed = SetRecipeBody.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')));
+        return;
+      }
+      const result = await setTemplateRecipe(storage, config, caller.principal, req.params.id as string, parsed.data.recipe);
+      if ('error' in result) {
+        res.status(result.status ?? 400).json(error(config.nodeId, result.code ?? 'INVALID_INPUT', result.error));
+        return;
+      }
+      res.json(success(config.nodeId, { id: result.manifest.id, recipe: result.manifest.recipe ?? null, updated_at: result.manifest.updatedAt }));
+    });
 
   // DELETE /v1/appdev/templates/:id — remove a proposal.
   router.delete('/v1/appdev/templates/:id', requireAuth(), requireScope('memory:write'), async (req, res) => {

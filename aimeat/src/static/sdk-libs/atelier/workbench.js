@@ -31,30 +31,37 @@
  * @slots sideNav item(entry) · foot()
  * @tokens sideNav --ak-sidenav-w · --ak-sidenav-main
  * @fork sideNav Copy .ak-sidenav* out of workbench.css; you give up the grouping, the counts and the view transition.
+ * @use sideNav navigate · count
  * @parts statusBand root · head · words · title · text · actions · bar · fill · body · after
  * @slots statusBand actions() · after()
  * @tokens statusBand --ak-band-pad
  * @fork statusBand A section with a heading, a sentence and a bar; copy .ak-band* out of workbench.css.
+ * @use statusBand status · act
  * @parts checkGrid root · tile · icon · title · sub
  * @slots checkGrid sub(item)
  * @tokens checkGrid --ak-checkgrid-min
  * @fork checkGrid Copy .ak-checkgrid* out of workbench.css; the five state marks are inline SVG in this file.
+ * @use checkGrid status · list
  * @parts choiceCards root · grid · card · kicker · title · text · panel
  * @slots choiceCards text(item)
  * @tokens choiceCards --ak-choice-min
  * @fork choiceCards A radio group drawn as cards; copy .ak-choices* out of workbench.css and keep role=radiogroup.
+ * @use choiceCards pick
  * @parts settingsGroup root · help · title · hint · body · after
  * @slots settingsGroup after()
  * @tokens settingsGroup --ak-setgroup-help · --ak-setgroup-measure
  * @fork settingsGroup Two columns that fold to one; copy .ak-setgroup* out of workbench.css.
+ * @use settingsGroup layout · edit · explain
  * @parts progressFigure root · kicker · figure · total · actions · bar · fill · now · nowLabel · nowText · chips · chip · counts · count
  * @slots progressFigure actions()
  * @tokens progressFigure --ak-progress-figure
  * @fork progressFigure Copy .ak-progress* out of workbench.css; the count-up is dom.js countUp.
+ * @use progressFigure status · count
  * @parts callout root · icon · words · title · text · after
  * @slots callout after()
  * @tokens callout --ak-callout-pad
  * @fork callout A tinted box with an icon; copy .ak-callout* out of workbench.css.
+ * @use callout notify · explain
  * @version-history
  *   v0.3.0 — 2026-11-21 — choiceCards: `value: null` or `allowNone: true` starts with no card chosen
  *     (the first was always chosen), and `keepKicker: true` keeps an item's own kicker on the chosen card.

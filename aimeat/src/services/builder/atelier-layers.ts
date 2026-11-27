@@ -22,6 +22,8 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.10.0 — 2026-11-27 — "The frame, the moments and the owner's templates" (atelier-moments.ts)
+ *     goes to part `screens` (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.9.0 — 2026-11-20 — Part `screens` (atelier-screens.ts): the phone and the desktop, read
  *     before any code beside `libraries` and `patterns`.
  *   v1.8.1 — 2026-11-20 — "How the person's own AI uses the app" goes to part `libraries`.
@@ -105,6 +107,9 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   // Since 2026-11-20 (atelier-ai-path.ts): how the person's own AI uses the app follows "Data, in
   // short" and comes before "Finishing", whose bound skill it describes.
   'How the person\'s own AI uses the app': 'libraries',
+  // Since 2026-11-27 (atelier-moments.ts): the frame is a phone-and-desktop decision, and this
+  // part had the room; `genre` and `libraries` were at their limit.
+  'The frame, the moments and the owner\'s templates': 'screens',
   // Since 2026-10-29: part `start` has no room for it (build-structure-step.ts).
   'The structure page: the person follows the build': 'libraries',
   'What the review always catches': 'libraries',
