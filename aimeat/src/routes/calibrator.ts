@@ -28,6 +28,7 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   v2.5.1 — 2026-11-27 — The write fence asks with the caller's resolved principal, not the raw `sub`.
  *   v2.5.0 — 2026-11-26 — The writes refuse an operator service's agent unless its entry's prefixes cover
  *     `calibrator.` (services/operator-services/write-fence.ts).
  *   v2.4.0 — 2026-11-19 — The handlers' work moved unchanged to services/calibrator/projects.ts and
@@ -84,7 +85,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
   // An operator service's agent writes the person's `calibrator.` records only when its entry's
   // prefixes cover that whole area (services/operator-services/write-fence.ts).
   const fence: RequestHandler = (req, res, next) => {
-    void operatorServiceAreaRefusal(storage, config, req.auth!.sub, 'calibrator.').then((fenced) => {
+    void operatorServiceAreaRefusal(storage, config, callerOf(req, config.nodeId, storage).principal, 'calibrator.').then((fenced) => {
       if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message)); return; }
       next();
     }, next);
