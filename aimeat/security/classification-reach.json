@@ -578,9 +578,7 @@
     },
     "src/routes/permissions.ts": {
       "reads": {
-        "getMemory": 2,
-        "listMemory": 1,
-        "listStorageFiles": 1
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads only visibility, existence and counts."
     },
@@ -705,12 +703,6 @@
       },
       "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
     },
-    "src/services/agent/task-event-item.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-27: the title of the one record an agent's own memory_write event names, read from the task's agent principal or its owner; a record outside the agent's own principal gives its title only when authorizeRead lets that agent read it, so the event shows the agent nothing it could not read. The value is reduced to one title line of at most 120 characters."
-    },
     "src/services/agent/offers-write.ts": {
       "reads": {
         "getMemory": 2
@@ -742,6 +734,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The statistics record, read to update it."
+    },
+    "src/services/agent/task-event-item.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27: the title of the one record an agent's own memory_write event names, read from the task's agent principal or its owner; a record outside the agent's own principal gives its title only when authorizeRead lets that agent read it, so the event shows the agent nothing it could not read. The value is reduced to one title line of at most 120 characters."
     },
     "src/services/agent/task-fanout.ts": {
       "reads": {
@@ -1522,12 +1520,6 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
-    },
-    "src/services/situation/index-line.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-27: the person's own situation.now record, read to decide whether one fixed paragraph goes into the MCP instructions of that person's own connecting AI. Only the record's presence and visibility are used; no string of its content is written anywhere. The caller passes the connecting principal's classification reader, and the row goes through presentMemories before the paragraph is written, so a picture classified away from AI is not named; a private one is left out for an agent, and a session without memory:read gets no paragraph."
     },
     "src/services/contribution-proofs.ts": {
       "reads": {
@@ -2661,12 +2653,6 @@
       },
       "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. 2026-10-27 (secaudit2026oct26): the third read is the step's own first-seen record beside the marker, {at} only, under the same system identity. No content is shown to anyone."
     },
-    "src/services/operator-services/ledger.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Written 2026-11-26 (operator services), the node's own reads: each operator service's ledger records (operator-service.<id>.*) under the node's system identity, one line per covered account with its state, the agent's proof and its time, read to reserve, complete and list a service's agents. Never a person's content; served only as states and account names to the operator and the service's credential agent."
-    },
     "src/services/open-items.ts": {
       "reads": {
         "getMemory": 2,
@@ -2679,6 +2665,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-02, the node's own read: the run-once marker under the node's system identity, and each owner's openrouter.settings record, read to clear the free router a key-only save wrote. No content is shown to anyone. 2026-10-18: the marker is read by services/once-only-step.ts."
+    },
+    "src/services/operator-services/ledger.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Written 2026-11-26 (operator services), the node's own reads: each operator service's ledger records (operator-service.<id>.*) under the node's system identity, one line per covered account with its state, the agent's proof and its time, read to reserve, complete and list a service's agents. Never a person's content; served only as states and account names to the operator and the service's credential agent."
     },
     "src/services/organism-read/workspace-access-requests.ts": {
       "reads": {
@@ -3259,6 +3251,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation. Reviewed 2026-11-12: the template's language versions, the operator's own __site__ files, listed and read like the default page."
+    },
+    "src/services/situation/index-line.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27: the person's own situation.now record, read to decide whether one fixed paragraph goes into the MCP instructions of that person's own connecting AI. Only the record's presence and visibility are used; no string of its content is written anywhere. The caller passes the connecting principal's classification reader, and the row goes through presentMemories before the paragraph is written, so a picture classified away from AI is not named; a private one is left out for an agent, and a session without memory:read gets no paragraph."
     },
     "src/services/skill/agent-link-records.ts": {
       "reads": {

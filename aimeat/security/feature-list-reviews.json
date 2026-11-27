@@ -67,7 +67,7 @@
       "digest": "sha256:c87b643aad2e7e6a621fbc1d"
     },
     "4. Access, consent and sharing": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/access-guard.ts",
         "aimeat/src/services/consent.ts",
@@ -86,7 +86,7 @@
         "aimeat/src/routes/account-events.ts",
         "aimeat/src/routes/permissions.ts"
       ],
-      "digest": "sha256:1506c1a2e60746f369c41320"
+      "digest": "sha256:2b46200e0bed4d3c5cec77b9"
     },
     "5. Memory, files and search": {
       "reviewedOn": "2026-11-27",
@@ -106,7 +106,7 @@
       "digest": "sha256:96e6b13d89f9adad0ca2e860"
     },
     "6. Organisms, workspaces and knowledge": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts",
         "aimeat/src/tool-catalog/definitions/workspace-spaces.ts",
@@ -125,7 +125,7 @@
         "aimeat/src/services/knowledge",
         "aimeat/src/services/living"
       ],
-      "digest": "sha256:acc101c61d63252bd53d68cc"
+      "digest": "sha256:f2c05521650725f035e28a75"
     },
     "7. The agent fleet": {
       "reviewedOn": "2026-11-27",
@@ -799,10 +799,10 @@
       "aimeat/src/routes/secrets.ts": "d97badf3c10162f4",
       "aimeat/src/services/group-shares.ts": "9b601f3d46cb598c",
       "aimeat/src/routes/sharing-groups.ts": "9e303d6918e58a3e",
-      "aimeat/src/services/db/data-wallet-db-service.ts": "ce3ab7e06bc670db",
+      "aimeat/src/services/db/data-wallet-db-service.ts": "cf2aec965e6cbd47",
       "aimeat/src/routes/parties.ts": "9498a48235a10e5b",
       "aimeat/src/routes/account-events.ts": "8d72e9e3074424b0",
-      "aimeat/src/routes/permissions.ts": "dabea2ea9473668b"
+      "aimeat/src/routes/permissions.ts": "db808268bb391257"
     },
     "5. Memory, files and search": {
       "aimeat/src/routes/memory.ts": "7f04e5dd4346b09f",
@@ -821,7 +821,7 @@
       "aimeat/src/tool-catalog/definitions/organisms-workspaces-apps.ts": "45ed95295a63a921",
       "aimeat/src/tool-catalog/definitions/workspace-spaces.ts": "56d1206ca672b86d",
       "aimeat/src/services/organism-join-requests/access-targets.ts": "e65a66f0ad193e20",
-      "aimeat/src/services/organism-join-requests/requests.ts": "7ff2859806cceb04",
+      "aimeat/src/services/organism-join-requests/requests.ts": "f3e492962906414a",
       "aimeat/src/routes/organisms/membership.ts": "4638defe37b16721",
       "aimeat/src/routes/organisms/workspace-rows.ts": "ec6c1658044e21ff",
       "aimeat/src/routes/organisms/intake.ts": "2591762b0da6cdca",
