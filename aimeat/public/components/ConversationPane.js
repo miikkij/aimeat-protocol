@@ -30,6 +30,7 @@
  *   thing opened from it; `label` names the list): html`<${Panes} framed label=${x('find')}
  *     head=${searchAndFilters} side=${rows}>${editor}<//>`
  * @version-history
+ *   v1.2.1 — 2026-11-27 — The reply bar's cancel draws the close Glyph instead of the ✕ letter.
  *   v1.2.0 — 2026-11-27 — Panes `folded` + `unfold`: on a wide screen the list folds to a narrow
  *     strip with the control that opens it again, so the open conversation gets the width.
  *   v1.1.0 — 2026-09-27 — `Panes framed` + `head` + `label`: the admin System Prompts page's list beside
@@ -46,7 +47,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { Avatar } from '/components/Avatar.js';
 import { PresenceDot } from '/components/PresenceDot.js';
-import { Action, Icon, Chevron } from '/components/Action.js';
+import { Action, Icon, Chevron, Glyph } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -128,7 +129,7 @@ export function ReplyBar({ label, text, onJump, cancelLabel, onCancel }) {
         <span class="conversation-replybar-label">${label}</span>
         <span class="conversation-replybar-text">${text}</span>
       </button>
-      <${Icon} small label=${cancelLabel} onClick=${onCancel}>✕<//>
+      <${Icon} small label=${cancelLabel} onClick=${onCancel}><${Glyph} name="close" /><//>
     </div>`;
 }
 

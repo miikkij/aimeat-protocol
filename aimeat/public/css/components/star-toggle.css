@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The star is the drawn star Glyph; .poster-star svg sizes it at 1em so it
+ *     keeps the letter's size.
  *   v1.1.0 — 2026-09-27 — .poster-star--bright (StarToggle bright): the old app catalogue's row star, for appcat; additive.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -15,6 +17,8 @@
   background: none; border: none; cursor: pointer; padding: 0 0.2rem;
   font-family: inherit; font-size: var(--text-body-sm); color: var(--muted); line-height: 1;
 }
+/* The drawn star Glyph at the letters' size. */
+.poster-star svg { display: block; width: 1em; height: 1em; }
 .poster-star:hover { color: var(--sun); }
 .poster-star--on { color: var(--sun); }
 /* The app catalogue's star (StarToggle bright, appcat; the old .fav-toggle in a row): faint until on. */

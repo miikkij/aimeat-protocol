@@ -17,6 +17,7 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-11-27: MailboxRow passes no mailbox emoji to its StatLine; the sentence stands alone.
  *   2026-11-14: YourTurn marks a thread a question of Ask someone who knows opened, and links it
  *     straight to that thread.
  *   2026-11-10: YourTurn takes `total` and `anyTime` from a server-filtered read (the waiting threads
@@ -103,7 +104,7 @@ export function MailboxRow({ mail }) {
   if (!mail) return null;
   const unread = mail.unread ?? 0;
   return html`
-    <${StatLine} href="/v1/profile?tab=messages" tone=${unread > 0 ? 'alert' : undefined} icon=${unread > 0 ? '📬' : '📪'}>
+    <${StatLine} href="/v1/profile?tab=messages" tone=${unread > 0 ? 'alert' : undefined}>
       ${unread > 0
         ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
         : tr('home.mail.empty', 'Mailbox: nothing new')}

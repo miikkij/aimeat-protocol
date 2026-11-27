@@ -10,10 +10,13 @@
  * @usage import { InboxLink } from '/components/InboxLink.js';
  *        html`<${InboxLink} to=${gaii} title=${t('inbox.messageThis')}>✉️</${InboxLink}>`
  * @version-history
+ *   v1.1.0 — 2026-11-27 — Without children the link draws the mail Glyph instead of the envelope
+ *     emoji, and its title is also its accessible name.
  *   v1.0.0 — 2026-06-23 — Initial inbox-link (mailto-style deep link to a prefilled compose).
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { Glyph } from '/components/Action.js';
 const html = htm.bind(h);
 
 /** Build the inbox-compose deep link for one or more recipients (array or comma-joined string). */
@@ -27,5 +30,5 @@ export function inboxLinkHref(to, subject) {
 /** A clickable link that opens the inbox composer prefilled to `to` (with an optional `subject`). */
 export function InboxLink({ to, subject, title, className, children }) {
   return html`<a class=${className || 'inbox-link'} href=${inboxLinkHref(to, subject)}
-    title=${title || 'Message'}>${children || '✉️'}</a>`;
+    title=${title || 'Message'} aria-label=${children ? undefined : (title || 'Message')}>${children || html`<${Glyph} name="mail" />`}</a>`;
 }

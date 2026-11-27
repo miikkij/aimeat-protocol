@@ -12,6 +12,8 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.27.1 -- 2026-11-27 -- A template section's remove draws the close Glyph instead of the ✕ letter;
+ *     Pulse now draws the refresh Glyph instead of ↻.
  *   v1.27.0 -- 2026-11-27 -- The list view leads with where things stand: a figure strip (living documents, documents that stopped updating in the notice tone, templates) from the overview it already reads, not drawn while all three are zero (FigureStrip hideZeros). The deployed documents are section 01 (lv-docs) once one exists, a stopped document first in it with its reason on the row; the templates are 01 or 02 (lv-templates), their list before the Author with AI field, and the contents rail is drawn when both sections are. One loud action at a time: Open on a document; Deploy on a template while no document exists; Author with AI while the page holds nothing (Loud quiet otherwise). The empty templates line says what fills the page and the one way to fill it. The emoji before Author with AI and before a pending proposal's title are gone (no emoji in the interface). No control was removed.
  *   v1.26.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: an open
  *     document's cadence (living.cadence, on its word) and a template section's slot id (living.slotId,
@@ -87,7 +89,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
-import { Action, Actions, Loud, Icon } from '/components/Action.js';
+import { Action, Actions, Loud, Icon, Glyph } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
@@ -390,7 +392,7 @@ export default function LivingTab({ session, showToast }) {
                 <${TextField} placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${v => patchSlot(i, { desc: v })} />
                 <${TextField} size="short" placeholder="slot-id" value=${s.slot} onInput=${v => patchSlot(i, { slot: v })} />
                 <${HelpTip} term="living.slotId" label="slot-id" />
-                <${Icon} small label=${t('field.remove')} onClick=${() => removeSlot(i)}>✕<//>`} />`)}
+                <${Icon} small label=${t('field.remove')} onClick=${() => removeSlot(i)}><${Glyph} name="close" /><//>`} />`)}
         <//>
         <${Line}><${Action} small onClick=${addSlot}>＋ ${t('profile.living.addSection')}<//><//>
 
@@ -430,7 +432,7 @@ export default function LivingTab({ session, showToast }) {
     const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
       <${Section} band title=${opened.config.title} doors=${html`
-        <${Loud} control disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}<//>
+        <${Loud} control disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : html`<${Glyph} name="refresh" /> ${t('profile.living.pulseNow')}`}<//>
         <${Action} small onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}<//>
         <${Action} small onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}<//>
         <${Action} tone="back" onClick=${() => setOpened(null)}>${t('profile.living.backToList')}<//>`}>

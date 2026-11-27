@@ -11,6 +11,8 @@
  * @structure renderPackage · entryRow · sourceRows · relationDoors
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v1.19.1 -- 2026-11-27 -- A source link and Show in library draw the external Glyph after their words instead of ↗;
+ *     an entry's visibility switch draws the small down Chevron instead of ▾.
  *   v1.19.0 -- 2026-11-08 -- The sharing rows explain themselves: each row's name opens its question
  *     mark (HelpLabel; knowledge.library, knowledge.clone, knowledge.federation, knowledge.toOrganism),
  *     with facts from routes/knowledge/sharing.ts, routes/knowledge/organism.ts, services/consent.ts,
@@ -65,7 +67,7 @@ import { AudienceBadge } from '/components/AudienceBadge.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { Note } from '/components/Note.js';
 import { Tab } from '/components/Tabs.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Glyph, Chevron } from '/components/Action.js';
 import { List, Row, Name, Cell, Doors, Panel } from '/components/List.js';
 import { c, day, rel, ctWord, maturityWord, synthWord, visWord, relWord, manifestOf, statsOf, pkgId, entryText, renderPage } from './frame.js';
 
@@ -79,7 +81,7 @@ function sourceRows(refs) {
   return html`<${List} cols="tag-name" keepCols dense>
     ${refs.map((r, j) => html`<${Row} key=${j}>
       <${Cell} meta><${Tinted} tone=${r.verified ? 'fine' : 'notice'}>${r.verified ? c('verified') : c('unverified')}<//><//>
-      ${r.url ? html`<${Name} href=${r.url} newTab tag=${r.type || null}>${r.title || r.url} ↗<//>` : html`<${Name} tag=${r.type || null}>${r.title || c('untitled')}<//>`}
+      ${r.url ? html`<${Name} href=${r.url} newTab tag=${r.type || null}>${r.title || r.url} <${Glyph} name="external" /><//>` : html`<${Name} tag=${r.type || null}>${r.title || c('untitled')}<//>`}
     <//>`)}
   <//>`;
 }
@@ -114,7 +116,7 @@ function entryRow(ctx, pkg, entry, i, allEntries) {
       <${Name} onOpen=${toggle}>${label}<//>
       <${Doors}>
         ${ctx.readOnly ? html`<${AudienceBadge} value=${vis} />`
-          : html`<${Tab} tone="fold" on=${pub} pressed=${pub} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${flip}>${visWord(vis)} ▾<//>`}
+          : html`<${Tab} tone="fold" on=${pub} pressed=${pub} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${flip}>${visWord(vis)} <${Chevron} small down /><//>`}
         ${!open ? html`<${Note} inline>${counts}<//>` : null}
         <${Action} small soft onClick=${toggle}>${open ? c('close') : c('open')}<//>
       <//>
@@ -157,7 +159,7 @@ export function renderPackage(ctx, pkg) {
   const remove = () => ctx.handleDelete(pkg);
   const doors = html`
     <${Loud} onClick=${exportIt}>${t('knowledge.myKnowledge.export')}<//>
-    ${listed ? html`<${Action} small onClick=${showInLibrary}>${c('showInLibrary')} ↗<//>` : null}
+    ${listed ? html`<${Action} small onClick=${showInLibrary}>${c('showInLibrary')} <${Glyph} name="external" /><//>` : null}
     <${Action} small tone="danger" disabled=${ctx.deleting === pkg.key} onClick=${remove}>${t('profile.delete')}<//>`;
   const strip = html`<${FigureStrip} items=${[
     { n: s.entries, label: c('stripEntries'), sub: c('stripEntriesSub', { n: s.publicN }) },

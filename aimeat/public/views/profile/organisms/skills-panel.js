@@ -12,6 +12,8 @@
  *   import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
  *   html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />`
  * @version-history
+ *   v1.9.2 -- 2026-11-27 -- The .zip download draws the download Glyph before its words instead of ⤓
+ *     (skills.zipBtn dropped the sign).
  *   v1.9.1 -- 2026-10-26 -- Publishing from the editor keeps the skill's other files (keepFiles); it had
  *     sent SKILL.md alone and the republish removed references/, assets/ and the rest.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the panel is the Section (its title, and New skill as its door), the editor the TextArea with FormActions and the Note, the skills the List (the version a tag, the description under the name, the ways at the end; View opens the row's panel with the ref, the front matter and the body in the Box's copy tone). The page writes no class.
@@ -47,7 +49,7 @@ import { HeadDesc } from '/components/SubHeading.js';
 import { Stack } from '/components/Layout.js';
 import { TextArea } from '/components/TextField.js';
 import { FormActions } from '/components/Field.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Glyph } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Code } from '/components/Mark.js';
 import { Box } from '/components/Box.js';
@@ -174,7 +176,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
             panel=${expanded === skill.ref && expandedSkill ? detail(skill) : null}>
             <${Name} tag=${'v' + skill.version} desc=${skill.description}>${skill.name}<//>
             <${Doors}>
-              <${Action} small title=${t('skills.zipHint') || ''} onClick=${() => zip(skill)}>${t('skills.zipBtn') || '⤓ .zip'}<//>
+              <${Action} small title=${t('skills.zipHint') || ''} onClick=${() => zip(skill)}><${Glyph} name="download" /> ${t('skills.zipBtn') || '.zip'}<//>
               <${Action} small onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}<//>
               <${Action} small expanded=${expanded === skill.ref} onClick=${() => handleToggleView(skill)}>
                 ${expanded === skill.ref ? (t('skills.hide') || 'Hide') : (t('skills.view') || 'View')}

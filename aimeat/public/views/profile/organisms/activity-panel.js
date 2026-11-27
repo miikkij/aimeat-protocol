@@ -9,6 +9,9 @@
  * @structure buildHeatmap, hmCell (internal helpers), ActivityPanel
  * @usage import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
  * @version-history
+ *   v1.7.1 — 2026-11-27 — No emoji: the panel's name stands alone; the key's four words drop their
+ *     ↖ ↗ ↙ ↘ arrows (the calendar sets them in a 2×2 grid beside the key day, in the quarters'
+ *     order); a log line's agent and its document or record draw the agent, file and note Glyph marks.
  *   v1.7.0 — 2026-09-26 — Every part is a kit component (page group G2a): the panel is the Box with its name, the count and the Hide/Show action in its head; the heatmap is the ActivityCalendar (components/ActivityCalendar.js, its own sheet), fed each day's tooltip and four levels as data; the agent beside a line is the Mark. The page writes no class.
  *   v1.6.0 — 2026-09-26 — The recent activity log is the home's Timeline (components/Timeline.js): the time, a dot (made for a publish, the system's grey for an edit), one line with who, the agent's Tag, what they did and to what; the square dots and the small row go (a unification: Jouni's decision "Activity log").
  *   v1.5.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -34,7 +37,7 @@ import { calendar } from '/js/format.js';
 import { TimelineList, TimelineRow } from '/components/Timeline.js';
 import { ActivityCalendar } from '/components/ActivityCalendar.js';
 import { Box } from '/components/Box.js';
-import { Action } from '/components/Action.js';
+import { Action, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 
@@ -104,7 +107,7 @@ export function ActivityPanel({ orgId, wsId }) {
   const { cols, monthLabels } = buildHeatmap(byDay, today);
 
   return html`
-    <${Box} name=${html`${'📊 '}${t('organisms.activity') || 'Activity'}`}
+    <${Box} name=${t('organisms.activity') || 'Activity'}
       marks=${html`<${Note} kind="meta" inline>${data.total} ${t('organisms.events') || 'events'}<//>`}
       end=${html`<${Action} small onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
       ${show ? html`
@@ -113,13 +116,13 @@ export function ActivityPanel({ orgId, wsId }) {
           months=${monthLabels}
           days=${['', t('organisms.mon') || 'Mon', '', t('organisms.wed') || 'Wed', '', t('organisms.fri') || 'Fri', '']}
           quarters=${[
-            `${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}`, `${'↗ '}${t('organisms.docsPublished') || 'Docs published'}`,
-            `${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}`, `${'↘ '}${t('organisms.recordsPublished') || 'Records published'}`,
+            t('organisms.docsDraft') || 'Docs draft', t('organisms.docsPublished') || 'Docs published',
+            t('organisms.recordsDraft') || 'Records draft', t('organisms.recordsPublished') || 'Records published',
           ]}
           less=${t('organisms.less') || 'Less'} more=${t('organisms.more') || 'More'} />
         <${TimelineList}>
           ${events.slice(0, 20).map((e, i) => html`<${TimelineRow} key=${i} category=${e.action === 'publish' ? 'made' : 'system'} when=${dt(e.at)}
-            text=${html`${(e.actor)}${e.agent ? html` <${Mark} title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}<//>` : null} ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')} ${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}`} />`)}
+            text=${html`${(e.actor)}${e.agent ? html` <${Mark} title=${t('organisms.viaAgent') || 'via this agent'}><${Glyph} name="agent" /> ${(e.agent)}<//>` : null} ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')} <${Glyph} name=${e.mode === 'document' ? 'file' : 'note'} /> ${(e.type)}${' / '}${(e.instance)}`} />`)}
         <//>` : null}
     <//>`;
 }

@@ -12,6 +12,8 @@
  *   WsGrantList (shared workspace checkbox+role list).
  * @usage import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
  * @version-history
+ *   v1.12.1 — 2026-11-27 — A sent invitation's kind (an email address or a member) draws the mail or
+ *     person Glyph instead of emoji.
  *   v1.12.0 — 2026-09-28 — An email invitation can say where the invitee lands after joining: the
  *     profile page (the default) or one of the apps pinned to the organism's workspaces, opened in
  *     that workspace. It is sent as return_url, which the server allowlists. Before this only an app
@@ -53,7 +55,7 @@ import { Field, Fields, FormActions } from '/components/Field.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { TextArea } from '/components/TextField.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Glyph } from '/components/Action.js';
 import { Mark, Code } from '/components/Mark.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Row, Stack } from '/components/Layout.js';
@@ -294,7 +296,7 @@ export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, sh
                   <${Action} small onClick=${() => setEditing(null)}>${t('organisms.cancel') || 'Cancel'}<//>
                 <//>
               <//>` : null}>
-              <${Name} tag=${html`<${Mark}>${row.role === 'admin' ? (t('organisms.roleAdmin') || 'Admin') : (t('organisms.roleMember') || 'Member')}<//>`}>${row.kind === 'email' ? '✉ ' : '👤 '}${row.label}<//>
+              <${Name} tag=${html`<${Mark}>${row.role === 'admin' ? (t('organisms.roleAdmin') || 'Admin') : (t('organisms.roleMember') || 'Member')}<//>`}><${Glyph} name=${row.kind === 'email' ? 'mail' : 'person'} /> ${row.label}<//>
               <${Desc}>
                 ${row.grants.length ? `${row.grants.length} ${t('organisms.workspacesShort') || 'ws'}` : ''}${row.grants.length && row.meta ? ' · ' : ''}${row.meta}
               <//>

@@ -12,6 +12,7 @@
  * @usage html`<${SettingsFrame} open=${o} onToggle=${…} onClose=${…} menuLabel=${t('…')} menu=${html`<${SideMenu}>…<//>`}>
  *   <${SettingsFrameHead}><span class="poster-crumb">Apps</span><//><${SettingsFrameBody}>…<//><//>`
  * @version-history
+ *   v1.3.1 — 2026-11-27 — The phone's Menu button drops the ☰ sign; its word stands alone.
  *   v1.3.0 — 2026-11-27 — On a wide screen the menu folds to a narrow strip and opens again
  *     (.settings-frame--folded, the fold control at its top), kept per browser: a page whose work
  *     area is the job (the messenger) gets the menu's 250px.
@@ -56,7 +57,7 @@ export function SettingsFrame({ open, onToggle, onClose, menuLabel, menu, overvi
   return html`
     <div class="settings-frame${open ? ' settings-frame--open' : ''}${folded ? ' settings-frame--folded' : ''}">
       ${dialogs}
-      <button class="settings-frame-toggle poster-slab" onClick=${onToggle}>☰ ${menuLabel}</button>
+      <button class="settings-frame-toggle poster-slab" onClick=${onToggle}>${menuLabel}</button>
       <div class="settings-frame-scrim" onClick=${onClose}></div>
       <aside class="settings-frame-menu">
         <div class="settings-frame-fold"><${Icon} small label=${foldWords} pressed=${folded} onClick=${fold}><${Chevron} left=${!folded} /><//></div>

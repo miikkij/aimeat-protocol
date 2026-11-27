@@ -1,7 +1,3 @@
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
-
 /**
  * @file Collapsible.js
  * @author Jouni Miikki
@@ -31,12 +27,20 @@ const html = htm.bind(h);
  *     .scope-advanced-toggle and .pkv-entry-arrow toggle patterns.
  *   v1.0.1 — 2026-09-27 — Its sheet is css/components/collapsible.css, which now names
  *     .collapsible-title too (the header's alignment; nothing moves).
+ *   v1.0.2 — 2026-11-27 — The chevron is the drawn Chevron (components/Action.js, small, pointing
+ *     down) instead of the ▼ letter; the sheet still turns it 180° while open. The header comment
+ *     now stands before the imports, as the file-header rule reads it.
  */
+import { h } from 'preact';
+import htm from 'htm';
+import { Chevron } from '/components/Action.js';
+const html = htm.bind(h);
+
 export function Collapsible({ title, open, onToggle, children }) {
   return html`<div class="collapsible">
     <button type="button" class="collapsible-header" aria-expanded=${!!open} onClick=${onToggle}>
       <span class="collapsible-title">${title}</span>
-      <span class="collapsible-chevron ${open ? 'open' : ''}">▼</span>
+      <span class="collapsible-chevron ${open ? 'open' : ''}" aria-hidden="true"><${Chevron} small down /></span>
     </button>
     ${open && html`<div class="collapsible-body">${children}</div>`}
   </div>`;

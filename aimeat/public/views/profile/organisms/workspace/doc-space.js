@@ -10,6 +10,7 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   v1.13.1 -- 2026-11-27 -- "Select a document" drops its page emoji; the quiet line stands alone.
  *   v1.13.0 -- 2026-10-16 -- An HTML page (a document with `html`) opens in its frame (HtmlPageView) and
  *     is edited as HTML (HtmlPageEditor); opening a Markdown page records the day it was opened.
  *   v1.12.0 -- 2026-09-30 -- The comment thread is told whether the viewer is the organism's creator or
@@ -122,7 +123,7 @@ export function renderDocSpace(ctx, ot) {
       onRemoveSection=${(secId) => removeSection(ot.name, secId, secById[secId]?.name)}
       onMove=${(docId, secId) => moveDocToSection(ot.name, docId, secId)}>
           ${(() => {
-            if (activeDoc?.type !== ot.name) return html`<${Note} kind="quiet">${'📄 '}${t('organisms.selectDoc') || 'Select a document, or create one.'}<//>`;
+            if (activeDoc?.type !== ot.name) return html`<${Note} kind="quiet">${t('organisms.selectDoc') || 'Select a document, or create one.'}<//>`;
             // Re-resolve the open document against the freshly-loaded list by id, so after a save (or
             // a live-update / F5 restore that only kept the id) the view shows the current draft —
             // with its correct draft badge, published copy, and Draft/Published toggle.

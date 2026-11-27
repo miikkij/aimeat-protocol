@@ -13,6 +13,8 @@
  *   by its sender).
  * @usage import { ThreadReadAloud } from './inbox-tab/read-aloud.js';
  * @version-history
+ *   v1.5.1 — 2026-11-27 — Listen's mark draws the speaker or pause Glyph and Stop the close Glyph
+ *     instead of emoji and the ✕ letter.
  *   v1.5.0 — 2026-10-17 — "You" is what I sent (senderGhii), not every outbound copy: my agent's own message is read under its name.
  *   v1.4.0 — 2026-09-26 — Listen is the pane head's door (ConversationPane PaneDoor): its words hide in a narrow pane, its mark stays.
  *   v1.3.1 — 2026-09-26 — The thread head's Listen is the kit's Action (small, row), the same cut as Reply with AI beside it; its 🔊/⏸ mark, its words (Listen, Pause, Continue) and its pressed state stay; ✕ is the Icon.
@@ -33,7 +35,7 @@ import { getGhii } from '/js/services/auth.js';
 import { isSpeechSupported, speak, stop, pause, resume, textToParagraphs } from '/js/services/speech-reader.js';
 // The phase hook and a message's own Listen live with the Message component now.
 import { useSpeechPhase } from '/components/Message.js';
-import { Icon } from '/components/Action.js';
+import { Icon, Glyph } from '/components/Action.js';
 import { PaneDoor } from '/components/ConversationPane.js';
 
 /** The open thread as speakable paragraphs: each message announces its sender, then its body. Messages
@@ -70,7 +72,7 @@ export function ThreadReadAloud({ thread, peerLabelText, convId }) {
     speak(id, threadParagraphs(thread, t('inbox.quoteYou'), peerLabelText));
   };
   return html`
-    <${PaneDoor} mark=${phase === 'speaking' ? '⏸' : '🔊'} label=${label} title=${t('inbox.speak.thread')}
+    <${PaneDoor} mark=${html`<${Glyph} name=${phase === 'speaking' ? 'pause' : 'speaker'} />`} label=${label} title=${t('inbox.speak.thread')}
       pressed=${!!phase} onClick=${onClick} />
-    ${phase ? html`<${Icon} small label=${t('inbox.speak.stop')} onClick=${() => stop()}>✕<//>` : null}`;
+    ${phase ? html`<${Icon} small label=${t('inbox.speak.stop')} onClick=${() => stop()}><${Glyph} name="close" /><//>` : null}`;
 }

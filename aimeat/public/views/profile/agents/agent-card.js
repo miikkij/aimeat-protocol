@@ -5,6 +5,10 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.34.3 -- 2026-11-27 -- The capabilities mark opens and closes with the drawn Chevron instead of
+ *     the arrow letters.
+ *   v2.34.2 -- 2026-11-27 -- Pop out and the host console link draw the external Glyph after their
+ *     words instead of the ↗ letter.
  *   v2.34.1 -- 2026-11-27 -- The required line stands under the service's line (AccessLine draws it), so the
  *     order is Service, Required, Private records, How you can help, Permissions.
  *   v2.34.0 -- 2026-11-26 -- A required operator service's agent: no run-mode change, stop switch, task-start
@@ -195,7 +199,7 @@ import { num } from '/js/format.js';
 import { Switch } from '/components/Switch.js';
 import { List, Row, Name, Cell, Who, When, Doors } from '/components/List.js';
 import { OpenCard, CardLine, TabGroups, CardPanel } from '/components/OpenCard.js';
-import { Action, Actions } from '/components/Action.js';
+import { Action, Actions, Glyph, Chevron } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Sticker, Meter } from '/components/Figure.js';
@@ -443,7 +447,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         ${/* An agent the operator set up owes no onboarding, so it has no readiness to show ("--"). */''}
         ${agent.set_by_operator ? null : renderReadinessBadge(state, onboarding)}
         ${agent.last_seen ? html`<${Mark} kind="status" tone=${seenTone}>${agent?.health?.delivery ? deliveryLabel(agent.health.delivery) : t('profile.agents.detail.lastSeen')} · ${timeAgo(agent.last_seen)}<//>` : null}
-        ${caps.summary ? html`<${Mark} tone="dim" expanded=${capsOpen} onClick=${() => setCapsOpen(o => !o)}>${caps.summary} ${capsOpen ? '↑' : '↓'}<//>` : null}
+        ${caps.summary ? html`<${Mark} tone="dim" expanded=${capsOpen} onClick=${() => setCapsOpen(o => !o)}>${caps.summary} <${Chevron} small up=${capsOpen} down=${!capsOpen} /><//>` : null}
         ${onFederateToggle
           ? html`<span title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}>
               <${Switch} on=${!!agent.federate} onToggle=${() => onFederateToggle(agent)}
@@ -524,7 +528,7 @@ function capabilitiesOf(agent) {
 function renderPopOut(onPopOut, agent) {
   if (!onPopOut) return null;
   return html`<${Action} small soft title=${t('profile.agents.detail.popOut')}
-    onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>${t('profile.agents.detail.popOut')} ↗<//>`;
+    onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>${t('profile.agents.detail.popOut')} <${Glyph} name="external" /><//>`;
 }
 
 // The way through to wherever this agent actually runs, when its host has said where that is
@@ -544,7 +548,7 @@ function renderHostConsole(agent) {
     return null;
   }
   return html`<${Action} small soft href=${url} newTab noReferrer
-    title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })} ↗<//>`;
+    title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })} <${Glyph} name="external" /><//>`;
 }
 
 // Collapsed-card mini-badge: total unseen changes across Tasks/Messages/Memory,

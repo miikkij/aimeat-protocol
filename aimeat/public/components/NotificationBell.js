@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.13.1 — 2026-11-27 — The bell button draws the bell Glyph instead of the emoji; a failed
+ *     action's result line starts with ✗ instead of the warning emoji.
  *   v1.13.0 — 2026-11-10 — A notice's text can be selected and copied: the notice is no longer one
  *     button (a browser selects no text inside a button); its title is the button, and a press on the
  *     text opens the link unless text was being selected. A notice without a link does nothing and
@@ -63,6 +65,7 @@ import { getJwt } from '/js/services/auth.js';
 import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, markAnswered, alreadyDecided, answerTextOf, answerChangeOf, helpTermOf } from '/js/services/notifications.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { Tooltip } from '/components/Tooltip.js';
+import { Glyph } from '/components/Action.js';
 import { ago } from '/js/format.js';
 import { openItem } from '/js/open-item.js';
 const html = htm.bind(h);
@@ -359,7 +362,7 @@ export function NotificationBell({ t, onNavigate }) {
               <button class="notif-action-btn btn-ghost" onClick=${() => { setReplyFor(null); setReplyText(''); }}>${tr('common.cancel', 'Cancel')}</button>
             </div>
           </div>` : null}
-        ${res ? html`<div class="notif-result ${res.ok ? 'ok' : 'err'}">${res.ok ? '✓ ' : '⚠ '}${res.msg}</div>` : null}
+        ${res ? html`<div class="notif-result ${res.ok ? 'ok' : 'err'}">${res.ok ? '✓ ' : '✗ '}${res.msg}</div>` : null}
       </div>`;
   };
 
@@ -367,7 +370,7 @@ export function NotificationBell({ t, onNavigate }) {
     <div class="notif-bell" ref=${ref}>
       <${Tooltip} text=${tr('notif.title', 'Notifications')} quiet=${open}>
         <button class="notif-bell-btn" aria-label=${tr('notif.title', 'Notifications')} onClick=${toggle}>
-          ${'🔔'}${unread > 0 ? html`<span class="poster-count poster-count--waiting poster-count--small notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
+          <${Glyph} name="bell" />${unread > 0 ? html`<span class="poster-count poster-count--waiting poster-count--small notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
         </button>
       <//>
       ${open ? html`

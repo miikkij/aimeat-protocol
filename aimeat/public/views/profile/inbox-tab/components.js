@@ -9,6 +9,10 @@
  *   re-exported from here; the composer is the Composer component's message tone
  *   (components/Composer.js, tone="message"). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.32.1 -- 2026-11-27 -- The close and remove icon buttons draw the close Glyph instead of the ✕
+ *     letter (a poll option's remove is named by field.remove, a key that exists); the command, the
+ *     schedule and the notebook buttons drop their emoji and their words stand alone; Regenerate
+ *     draws the refresh Glyph instead of ↻.
  *   v1.32.0 -- 2026-10-25 -- ReplyWithAiPopover is MCP only: no "Copy prompt" tab. It reads the AIs
  *     connected over MCP (the MCP page's rows) and, with none, says so and opens the MCP page
  *     (/v1/profile?tab=mcp) instead of a prompt (Jouni, 2026-10-25).
@@ -110,7 +114,7 @@ import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud, Icon, Glyph } from '/components/Action.js';
 import { Mark, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
@@ -181,13 +185,13 @@ export function PollBuilder({ questions, setQuestions }) {
             <${Row}>
               <${Label}>${qi + 1}.<//>
               <${TextField} placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(v) => update(qi, { header: v })}
-                actions=${html`<${Icon} small label=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}>✕<//>`} />
+                actions=${html`<${Icon} small label=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}><${Glyph} name="close" /><//>`} />
             <//>
             <${TextField} placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(v) => update(qi, { prompt: v })} />
             <${Stack}>
               ${q.options.map((o, oi) => html`<${TextField} key=${o.id} placeholder=${`${t('inbox.pollOption')} ${oi + 1}`}
                 value=${o.label} onInput=${(v) => updateOpt(qi, oi, v)}
-                actions=${q.options.length > 1 ? html`<${Icon} small label=${t('common.remove')} onClick=${() => removeOpt(qi, oi)}>✕<//>` : null} />`)}
+                actions=${q.options.length > 1 ? html`<${Icon} small label=${t('field.remove')} onClick=${() => removeOpt(qi, oi)}><${Glyph} name="close" /><//>` : null} />`)}
               <span><${Action} onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}<//></span>
             <//>
             <${Row} wrap gap="large">
@@ -208,7 +212,7 @@ export function PollBuilder({ questions, setQuestions }) {
 export function CommandBar({ commands, onPick }) {
   return html`<${PaneStrip}>
     <${Row} wrap>
-      <${Note} inline>⚡ ${t('inbox.cmdTitle')}<//>
+      <${Note} inline>${t('inbox.cmdTitle')}<//>
       ${commands.map(c => html`<${Mark} key=${c.id} title=${c.description || ''} onClick=${() => onPick(c)}>${c.label || c.id}<//>`)}
     <//>
   <//>`;
@@ -221,8 +225,8 @@ export function CommandFill({ command, onInsert, onCancel }) {
   const set = (name) => (v) => setValues(prev => ({ ...prev, [name]: v }));
   const missing = params.some(p => p.required && !valOf(p).trim());
   return html`<${PaneStrip} grey>
-    <${Row} justify="between"><b>⚡ ${command.label || command.id}</b>
-      <${Icon} small label=${t('inbox.close')} onClick=${onCancel}>✕<//><//>
+    <${Row} justify="between"><b>${command.label || command.id}</b>
+      <${Icon} small label=${t('inbox.close')} onClick=${onCancel}><${Glyph} name="close" /><//><//>
     ${command.description ? html`<${Note}>${command.description}<//>` : null}
     ${params.map(p => (p.type === 'select' && Array.isArray(p.options)
       ? html`<${Select} key=${p.name} label=${`${p.name}${p.required ? ' *' : ''}`} value=${valOf(p)}
@@ -261,8 +265,8 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
     finally { setBusy(false); }
   };
   return html`<${PaneStrip} grey>
-    <${Row} justify="between"><b>📅 ${t('inbox.schedTitle')}</b>
-      <${Icon} small label=${t('inbox.close')} onClick=${onClose}>✕<//><//>
+    <${Row} justify="between"><b>${t('inbox.schedTitle')}</b>
+      <${Icon} small label=${t('inbox.close')} onClick=${onClose}><${Glyph} name="close" /><//><//>
     ${jobs == null ? html`<${Note} kind="quiet">${t('inbox.loading')}<//>`
       : html`<${List} cols="name-state" keepCols dense empty=${jobs.length === 0 ? t('inbox.schedNone') : null}>
           ${jobs.map(j => html`<${ListRow} key=${j.id}>
@@ -378,14 +382,14 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <${Note}>${t('inbox.notebook.hintAi')}<//>
             ${!aiSummary ? html`
               <${FormActions} end>
-                <${Loud} control disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}<//>
+                <${Loud} control disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : t('inbox.notebook.genSummary')}<//>
               <//>`
             : html`
               <${AiInteractionNotice} titleKey="aiLabel.draftTitle" bodyKey="aiLabel.draftBody"
                 recordUrl=${aiProvenance?.recordUrl} />
               <${TextArea} rows=${12} value=${aiSummary} onInput=${setAiSummary} />
               <${FormActions} end>
-                <${Action} disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}<//>
+                <${Action} disabled=${running} onClick=${genSummary}>${running ? '…' : html`<${Glyph} name="refresh" /> ${t('inbox.notebook.regen')}`}<//>
                 <${Loud} control disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : t('inbox.notebook.park')}<//>
               <//>`}
           ` : mode === 'copy' ? html`
@@ -393,7 +397,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <${TextArea} readOnly rows=${8} value=${promptText} />
             <${FormActions} end>
               <${Loud} control copy=${promptText} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-                onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${'📋 ' + t('common.copy')}<//>
+                onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>
             <//>
             <${Note}>${t('inbox.notebook.pasteHint')}<//>
             <${TextArea} rows=${8} placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${setPasted} />
@@ -403,7 +407,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
           ` : html`
             <${Note}>${t('inbox.notebook.hintRaw')}<//>
             <${FormActions} end>
-              <${Loud} control disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}<//>
+              <${Loud} control disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : t('inbox.notebook.parkRaw')}<//>
             <//>
           `}
           <//>

@@ -5,6 +5,7 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.22.1 -- 2026-11-27 -- A group row's open mark draws the Chevron (down while open, right while closed) instead of ▼ ▶.
  *   v1.22.0 -- 2026-10-02 -- The question mark that explains a share pattern: memory.key_pattern (components/HelpTip.js).
  *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
@@ -57,7 +58,7 @@ import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { List, Row, Name, Desc, Cell, Doors, Panel } from '/components/List.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Loud, Actions, Chevron } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Facts } from '/components/Facts.js';
@@ -341,10 +342,10 @@ export function SharingGroupsSection({ showToast, initial, inRow }) {
     const groupShares = sharesOf(group.id);
 
     // The whole row opens and closes (a click anywhere but inside its panel, Enter on its name); the
-    // ▶/▼ before the name says which it is, as main's expand icon did.
+    // The chevron before the name (right while closed, down while open) says which it is, as main's expand icon did.
     return html`
       <${Row} key=${group.id} open=${isExpanded} onToggle=${() => setExpandedId(isExpanded ? null : group.id)}>
-        <${Name} before=${html`<span aria-hidden="true">${isExpanded ? '▼' : '▶'}</span>`}>${group.name}<//>
+        <${Name} before=${html`<${Chevron} small down=${isExpanded} />`}>${group.name}<//>
         <${Desc}>${group.description || ''}<//>
         <${Doors}>
           <${Mark} tone="dim">${memberCount} ${t('profile.access.sgMembers') || 'members'}<//>

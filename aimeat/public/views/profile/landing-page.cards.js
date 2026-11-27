@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-27 — Continue's kind marks (folder, app, people, note), an agent without an avatar (agent),
+ *     the next job (clock) and the promo's dismiss (close) draw Glyph marks instead of emoji.
  *   2026-11-26 — WaitingForYou draws the home's waiting list (views/home/waiting-band.js WaitingRows)
  *     from the read the top bar and the side menu count from, and keeps no list of its own: the bar
  *     said three while this listed one, because it read the organisms' items alone.
@@ -105,7 +107,7 @@ import { List, Row, Name, Desc, Num, Cell, Group } from '/components/List.js';
 import { Folds, FoldRow } from '/components/Folds.js';
 import { Mark, Marks, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Action, Icon } from '/components/Action.js';
+import { Action, Icon, Glyph } from '/components/Action.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { Row as Line, Split, Space } from '/components/Layout.js';
 import { useHomeState } from '/views/surface/home-state.js';
@@ -141,7 +143,8 @@ export function WaitingForYou({ data }) {
 
 /* "Continue" — the last opened things across types (workspace / app / organism), with real
  * display names. Backed by /js/recents.js (device-local). Renders nothing when empty. */
-const RECENT_ICONS = { workspace: '🗂', app: '▦', organism: '🏢', board: '📋' };
+const RECENT_GLYPHS = { workspace: 'folder', app: 'app', organism: 'people', board: 'note' };
+const recentMark = (type) => (RECENT_GLYPHS[type] ? html`<${Glyph} name=${RECENT_GLYPHS[type]} />` : '•');
 export function ContinueCard() {
   const [items] = useState(() => listRecents(5));
   if (!items.length) return null;
@@ -154,7 +157,7 @@ export function ContinueCard() {
     <${Card} tone="panel" title=${t('profile.landing.continueTitle') || 'Continue'}>
       <${Folds}>
         ${items.map((it) => html`
-          <${FoldRow} key=${it.type + it.id} num=${RECENT_ICONS[it.type] || '•'} name=${it.label}
+          <${FoldRow} key=${it.type + it.id} num=${recentMark(it.type)} name=${it.label}
             right=${relTime(it.at)} onClick=${() => openItem(it)} />`)}
       <//>
     <//>
@@ -213,9 +216,9 @@ export function AgentsCard({ owner, initialAgents }) {
       note=${activeToday > 0 ? (t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday)) : null}>
       <${Folds}>
         ${agents.slice(0, 3).map(a => html`
-          <${FoldRow} key=${a.gaii || a.name} num=${avatarOf(a) ? html`<${AgentAvatar} agent=${a} size="small" />` : '🤖'} name=${a.display_name || a.name} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
+          <${FoldRow} key=${a.gaii || a.name} num=${avatarOf(a) ? html`<${AgentAvatar} agent=${a} size="small" />` : html`<${Glyph} name="agent" />`} name=${a.display_name || a.name} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
         ${nextJob ? html`
-          <${FoldRow} key="nextjob" num="⏰" name=${nextJob.name || nextJob.id || ''}
+          <${FoldRow} key="nextjob" num=${html`<${Glyph} name="clock" />`} name=${nextJob.name || nextJob.id || ''}
             right=${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}
             onClick=${() => openProfileTab('scheduler')} />` : null}
       <//>
@@ -577,7 +580,7 @@ export function CortexSection({ switchTab, onDismiss, appCount = 0 }) {
   const appsDone = !!journey?.stages?.find((s) => s.id === 'apps')?.done;
   if (!appsDone && appCount < 3) return null;
   const dismiss = html`<${Icon} small label=${t('profile.landing.promoDismiss') || 'Hide'}
-    onClick=${(e) => { e.stopPropagation(); onDismiss?.(); }}>✕<//>`;
+    onClick=${(e) => { e.stopPropagation(); onDismiss?.(); }}><${Glyph} name="close" /><//>`;
   return html`
     <${Box} marks=${html`<${Label}>${t('profile.landing.cortexSectionTitle')}<//>`} end=${dismiss}>
       <${CardGrid} cols="two">

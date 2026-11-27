@@ -33,6 +33,15 @@
  *        html`<${Action} small copy=${ref} copiedLabel=${t('x.copied')}>${t('x.copyRef')}<//>`
  *        html`<${Actions}>…<//>`
  * @version-history
+ *   v1.18.0 — 2026-11-27 — Chevron `down`, `up` and `small`: one drawn disclosure mark for every
+ *     part that opens in place (down while open, right while closed), replacing the ▼ ▾ ▸ ▶ ▲ ⌄ ⌃
+ *     letters; `left` and the right default are unchanged. Glyph: the drawn expand, shrink, more,
+ *     refresh and download marks that replace ⤢ ⤡ ⋯ ↻ ⤓ ⬇ in icon controls. Additive.
+ *   v1.17.0 — 2026-11-27 — Glyph: the drawn close, star, star-filled, mic, attach, speaker, pause,
+ *     link, external, calendar, image, music, video, agent, person, people, app, lock, key, bell,
+ *     warning, info, edit, mail, chart, copy, chat, folder, upload, clock and note marks that replace emoji in
+ *     icon controls and status marks across Settings & Controls, the home and the components;
+ *     Glyph `label` names a mark that is the only signal of a state. Additive.
  *   v1.16.0 — 2026-11-27 — Chevron: the drawn mark of a fold control (the Settings menu, the
  *     messenger's list). Glyph: the drawn archive, delete and search marks that replace emoji in
  *     icon controls. Additive.
@@ -174,12 +183,18 @@ export function Icon({ small, pressed, label, title, copy, copiedLabel, onCopied
 /**
  * The mark of a fold control (added 2026-11-27 for the Settings menu and the messenger's list): a
  * chevron that points the way the folded part moves, drawn so a theme's colour reaches it.
- * @param {{ left?: boolean }} props
+ * `down` and `up` (added v1.18.0): the disclosure mark of a part that opens in place, down while it
+ * is open and right (the default) while it is closed; up only where the control collapses upward.
+ * `small` draws it at 12px for a mark set in small letters (a menu group, a heading's caret).
+ * @param {{ left?: boolean, down?: boolean, up?: boolean, small?: boolean }} props
  */
-export function Chevron({ left }) {
-    return html`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"
+export function Chevron({ left, down, up, small }) {
+    const size = small ? 12 : 16;
+    const path = up ? html`<path d="M3 10.5l5-5 5 5" />` : down ? html`<path d="M3 5.5l5 5 5-5" />`
+      : left ? html`<path d="M10 3 5 8l5 5" />` : html`<path d="M6 3l5 5-5 5" />`;
+    return html`<svg viewBox="0 0 16 16" width=${size} height=${size} aria-hidden="true" focusable="false"
       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      ${left ? html`<path d="M10 3 5 8l5 5" />` : html`<path d="M6 3l5 5-5 5" />`}</svg>`;
+      ${path}</svg>`;
 }
 
 /** The drawn marks of an Icon (added 2026-11-27): an emoji in a control is not drawn by the theme and
@@ -192,11 +207,50 @@ const MARKS = {
     shield: html`<path d="M8 1.8 13 3.6v4.2c0 3-2.2 5.3-5 6.4-2.8-1.1-5-3.4-5-6.4V3.6Z" />`,
     cart: html`<path d="M1.8 2.5h2l1.6 7.5h7l1.4-5.3H4.6" /><circle cx="6.5" cy="13" r="1" /><circle cx="11.5" cy="13" r="1" />`,
     file: html`<path d="M4 1.8h5l3 3v9.4H4Z" /><path d="M9 1.8v3h3" />`,
+    close: html`<path d="M4 4l8 8M12 4l-8 8" />`,
+    star: html`<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6Z" />`,
+    'star-filled': html`<path fill="currentColor" d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6Z" />`,
+    mic: html`<rect x="6" y="1.8" width="4" height="8" rx="2" /><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0" /><path d="M8 12v2.2M5.8 14.2h4.4" />`,
+    attach: html`<path d="M13 7.5 8.2 12.3a3 3 0 0 1-4.3-4.3l5.1-5.1a2 2 0 0 1 2.9 2.9L6.8 10.9a1 1 0 0 1-1.5-1.5L9.8 5" />`,
+    speaker: html`<path d="M2.5 6v4H5l3.5 3V3L5 6Z" /><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9" />`,
+    pause: html`<path d="M5.5 3.5v9M10.5 3.5v9" />`,
+    link: html`<path d="M6.8 9.2a2.8 2.8 0 0 0 4 0l2-2a2.8 2.8 0 0 0-4-4l-.9.9" /><path d="M9.2 6.8a2.8 2.8 0 0 0-4 0l-2 2a2.8 2.8 0 0 0 4 4l.9-.9" />`,
+    external: html`<path d="M9.5 2.5h4v4" /><path d="M13.5 2.5 7.5 8.5" /><path d="M12 9.5v4H2.5V4h4" />`,
+    calendar: html`<path d="M2.5 3.5h11v10h-11z" /><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" />`,
+    image: html`<path d="M2 3h12v10H2z" /><circle cx="5.8" cy="6.5" r="1.2" /><path d="M2 11.5 5.5 8l3 3 2-2 3.5 3.5" />`,
+    music: html`<path d="M6 12V3.5l7-1.5v8.5" /><circle cx="4.5" cy="12" r="1.5" /><circle cx="11.5" cy="10.5" r="1.5" />`,
+    video: html`<path d="M1.8 4h9v8h-9z" /><path d="M10.8 7 14.2 5v6l-3.4-2" />`,
+    agent: html`<rect x="3" y="5" width="10" height="8" rx="1.5" /><path d="M8 2.5V5" /><path d="M6 8.5v1.2M10 8.5v1.2" />`,
+    person: html`<circle cx="8" cy="5.5" r="2.7" /><path d="M2.8 14a5.2 5.2 0 0 1 10.4 0" />`,
+    people: html`<circle cx="6" cy="5.5" r="2.3" /><path d="M1.8 13.5a4.2 4.2 0 0 1 8.4 0" /><path d="M10.2 3.4a2.3 2.3 0 0 1 0 4.4M11.8 9.8a4.2 4.2 0 0 1 2.4 3.7" />`,
+    app: html`<path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z" />`,
+    lock: html`<path d="M3 7h10v7H3z" /><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" />`,
+    key: html`<circle cx="5" cy="11" r="2.8" /><path d="M7 9 13.5 2.5M11 5l2 2M12.5 3.5 14 5" />`,
+    bell: html`<path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1.2 1.3H2.8Z" /><path d="M6.5 14.5h3" />`,
+    warning: html`<path d="M8 2 14.5 13.5h-13Z" /><path d="M8 6.5v3.2M8 11.6v.1" />`,
+    info: html`<circle cx="8" cy="8" r="6" /><path d="M8 7.2v4M8 4.9v.1" />`,
+    edit: html`<path d="M10.5 2.5l3 3-8 8H2.5v-3Z" /><path d="M9 4l3 3" />`,
+    mail: html`<path d="M1.8 3.5h12.4v9H1.8z" /><path d="M1.8 4 8 9l6.2-5" />`,
+    chart: html`<path d="M2.5 13.5h11" /><path d="M4.5 13.5V8M8 13.5V4M11.5 13.5V6.5" />`,
+    copy: html`<path d="M5.5 5.5h8v8h-8z" /><path d="M10.5 5.5v-3h-8v8h3" />`,
+    chat: html`<path d="M2.5 3h11v8H7l-3 2.5V11H2.5Z" />`,
+    folder: html`<path d="M1.8 4h4.5l1.5 1.5h6.4v7.5H1.8Z" />`,
+    upload: html`<path d="M8 11V2.5M4.5 6 8 2.5 11.5 6" /><path d="M2.5 11v2.5h11V11" />`,
+    clock: html`<circle cx="8" cy="8" r="6" /><path d="M8 4.8V8l2.2 1.6" />`,
+    note: html`<path d="M3 2.5h10v11H3z" /><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />`,
+    expand: html`<path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" />`,
+    shrink: html`<path d="M9.5 2.5v4h4M9.5 6.5l4-4M6.5 13.5v-4h-4M6.5 9.5l-4 4" />`,
+    more: html`<circle cx="3.5" cy="8" r=".9" fill="currentColor" /><circle cx="8" cy="8" r=".9" fill="currentColor" /><circle cx="12.5" cy="8" r=".9" fill="currentColor" />`,
+    refresh: html`<path d="M13 8a5 5 0 1 1-1.5-3.5" /><path d="M13 2.5v3h-3" />`,
+    download: html`<path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5" /><path d="M2.5 13.5h11" />`,
 };
-/** @param {{ name: 'archive'|'trash'|'search'|'restore'|'shield'|'cart'|'file' }} props */
-export function Glyph({ name }) {
-    return html`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"
-      fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${MARKS[name] || null}</svg>`;
+/** @param {{ name: 'archive'|'trash'|'search'|'restore'|'shield'|'cart'|'file'|'close'|'star'|'star-filled'|'mic'|'attach'|'speaker'|'pause'|'link'|'external'|'calendar'|'image'|'music'|'video'|'agent'|'person'|'people'|'app'|'lock'|'key'|'bell'|'warning'|'info'|'edit'|'mail'|'chart'|'copy'|'chat'|'folder'|'upload'|'clock'|'note'|'expand'|'shrink'|'more'|'refresh'|'download', label?: string }} props
+ *  `label` (added v1.17.0): a mark that is the only signal of a state names it for a screen reader
+ *  and the tooltip; without it the mark is hidden from assistive technology. */
+export function Glyph({ name, label }) {
+    return html`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden=${label ? undefined : 'true'} focusable="false"
+      role=${label ? 'img' : undefined} aria-label=${label || undefined}
+      fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${label ? html`<title>${label}</title>` : null}${MARKS[name] || null}</svg>`;
 }
 
 export function Actions({ under, end, chapter, apart, tight, children }) {

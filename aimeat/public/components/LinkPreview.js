@@ -12,6 +12,8 @@
  * @structure extractUrls(text,max) · useSeenInViewport(ref) · LinkPreview({url,onDismiss}) · MessageLinkPreviews({msg})
  * @usage html`<${MessageLinkPreviews} msg=${msg} />`
  * @version-history
+ *   v1.2.2 — 2026-11-27 — The hide button draws the close Glyph instead of the ✕ letter and has an
+ *     accessible name (inbox.linkPreview.hide).
  *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so a
  *     site name, title or description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.2.0 — 2026-09-27 — Draws its own names: .inbox-linkcards is .link-preview-list,
@@ -28,6 +30,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Glyph } from '/components/Action.js';
 import * as unfurl from '/js/services/unfurl.js';
 
 /** True once `ref`'s element has been near the viewport (within 200px) at least once, then stays true.
@@ -105,8 +108,8 @@ export function LinkPreview({ url, onDismiss }) {
           ${meta.description ? html`<span class="link-preview-desc">${meta.description}</span>` : null}
         </span>
       </a>
-      <button class="link-preview-hide" title=${t('inbox.linkPreview.hide')}
-        onClick=${() => onDismiss?.(url)}>✕</button>
+      <button class="link-preview-hide" title=${t('inbox.linkPreview.hide')} aria-label=${t('inbox.linkPreview.hide')}
+        onClick=${() => onDismiss?.(url)}><${Glyph} name="close" /></button>
     </div>`;
 }
 

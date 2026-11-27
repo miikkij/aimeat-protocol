@@ -27,6 +27,9 @@
  *          sending=${sending} onSend=${(recipient, markdown, files, reset) => …} draftKey=${'aimeat.inbox.draft.' + convId} />`
  *   Remount it (a `key` per conversation) so a draft never leaks between threads.
  * @version-history
+ *   2026-11-27 — The bigger-editor tool draws the expand and shrink Glyph marks instead of ⤢ ⤡.
+ *   2026-11-27 — The attach tool, a chip's kind mark (recording, file) and its remove button draw the
+ *     attach, mic and close Glyph marks instead of emoji and the ✕ letter.
  *   2026-11-27 — The thin field grows to 40 % of the window (at most 320px) before it scrolls; it
  *     stopped at 132px. Its height no longer counts the padding twice (an empty field was one line
  *     plus 16px).
@@ -45,7 +48,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
-import { Loud } from '/components/Action.js';
+import { Loud, Glyph } from '/components/Action.js';
 import { fmtClock, VoicePlayer } from '/components/MessageFile.js';
 import { swallowed } from '/js/swallowed.js';
 import { sanitizeEditorHtml } from '/js/editor-html-sanitizer.js';
@@ -320,11 +323,11 @@ export function MessageComposer({
           const isVoice = (f.type || '').startsWith('audio/') && f.durationSeconds;
           return html`<span class=${`poster-composer-chip${isVoice ? ' poster-composer-chip--voice' : ''}`} key=${f.name + i}>
             ${isVoice
-              ? html`<span class="poster-composer-chip-voice">🎤 ${fmtClock(f.durationSeconds)}
+              ? html`<span class="poster-composer-chip-voice"><${Glyph} name="mic" /> ${fmtClock(f.durationSeconds)}
                   <${VoicePlayer} small src=${f.previewUrl} /></span>`
-              : html`<span>📎 ${f.name}</span>`}
+              : html`<span><${Glyph} name="attach" /> ${f.name}</span>`}
             <button type="button" class="poster-composer-chip-x" title=${t('inbox.attachmentRemove')} aria-label=${t('inbox.attachmentRemove')}
-              onClick=${() => removeFile(i)}>✕</button>
+              onClick=${() => removeFile(i)}><${Glyph} name="close" /></button>
           </span>`;
         })}
       </div>` : null}
@@ -347,12 +350,12 @@ export function MessageComposer({
       <div key="bar" class="poster-composer-bar">
         <div class="poster-composer-tools">
           <label class="poster-icon poster-composer-tool" title=${t('inbox.attach')}>
-            📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
+            <${Glyph} name="attach" /><input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
           </label>
           <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="poster-icon poster-composer-tool" plain=${true}
             onRecorded=${addRecording} />
           <button type="button" class=${`poster-icon poster-composer-tool${mode === 'rich' ? ' is-on' : ''}`} title=${bigWord}
-            aria-label=${bigWord} aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}>${mode === 'rich' ? '⤡' : '⤢'}</button>
+            aria-label=${bigWord} aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}><${Glyph} name=${mode === 'rich' ? 'shrink' : 'expand'} /></button>
         </div>
         <${Loud} control disabled=${sending || !recipient} onClick=${submit}>${sending ? t('inbox.sending') : sendLabel}<//>
       </div>

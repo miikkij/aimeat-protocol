@@ -8,6 +8,9 @@
  * @structure ParticipantsPanel
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
+ *   v1.16.1 — 2026-11-27 — An agent with no avatar draws the agent Glyph before its name instead of
+ *     an emoji (an emoji avatar its owner chose stays); the panel's name, the contract agents'
+ *     heading and chips, the retired mark and the access rows drop their emoji.
  *   v1.16.0 — 2026-10-19 — A participant agent's chip starts with the agent's own avatar when it has one (its emoji, or its picture through AgentAvatar), 🤖 otherwise.
  *   v1.15.1 — 2026-09-26 — The creator and a contributor's role are green again, as main drew them
  *     (.badge-success: Mark tone="fine"; fix pass).
@@ -55,7 +58,7 @@ import { ContactPicker } from '/components/ContactPicker.js';
 import { Box } from '/components/Box.js';
 import { People, Person, AgentChips, AgentChip } from '/components/People.js';
 import { List, Row as ListRow, Name, Doors } from '/components/List.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Select } from '/components/Select.js';
@@ -65,11 +68,13 @@ import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 
-/** The sign before an agent's name in its chip: its own avatar when it has one, 🤖 otherwise. */
+/** The sign before an agent's name in its chip: its own avatar when it has one (the emoji its owner
+ *  chose is data and stays), the drawn agent Glyph otherwise. */
 function agentSign(a) {
   const av = avatarOf(a);
   if (av?.kind === 'svg') return html`<${AgentAvatar} avatar=${av} size="small" />`;
-  return `${av?.kind === 'emoji' ? av.emoji : '🤖'} `;
+  if (av?.kind === 'emoji') return `${av.emoji} `;
+  return html`<${Glyph} name="agent" /> `;
 }
 
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
@@ -198,13 +203,13 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     const retiredAt = allRetired ? engs.filter(e => e?.state === 'retired').map(e => e.retiredAt).filter(Boolean).sort().slice(-1)[0] : null;
     return html`
       <${AgentChip} own key=${a.gaii} title=${a.gaii}>
-        ${'📜 '}${a.display_name || a.name}
+        ${a.display_name || a.name}
         ${legacyActive ? html`
           <${Mark} kind="status" tone="fine" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}<//>
           <${Action} small disabled=${retireBusy === `${a.gaii}:*`} title=${retireHint}
             onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}<//>`
           : allRetired ? html`
-          <${Mark} kind="status" tone="off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace: its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}<//>
+          <${Mark} kind="status" tone="off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace: its loop skips it. Bring it back to let it work here again.'}>${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}<//>
           <${Action} small disabled=${adoptBusy === `${a.gaii}:*`}
             onClick=${() => readoptAll(a)}>${adoptBusy === `${a.gaii}:*` ? '…' : (t('organisms.bringBack') || 'Bring back')}<//>`
           : actions.map(c => {
@@ -230,12 +235,12 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   };
 
   return html`
-    <${Box} name=${html`${'👥 '}${t('organisms.participants') || 'Who works here'}`}
+    <${Box} name=${t('organisms.participants') || 'Who works here'}
       end=${html`<${Action} small onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
       ${show ? html`
         ${contractAgents.length ? html`
           <${Box}>
-            <${SubHeading}>${'📜 '}${t('organisms.contractAgents') || 'Your contract agents'}<//>
+            <${SubHeading}>${t('organisms.contractAgents') || 'Your contract agents'}<//>
             <${HeadDesc}>${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}<//>
             <${AgentChips}>${contractAgents.map(contractChip)}<//>
           <//>` : null}
@@ -259,7 +264,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
             <${SubHeading}>${t('organisms.manageAccess') || 'Manage who can work here'}<//>
             ${pending.length || members.length ? html`<${List} cols="name-doors" keepCols>
               ${pending.map(r => html`<${ListRow} key=${'req-' + r.requester}>
-                <${Name} after=${html` <${Note} kind="meta" inline>${t('organisms.requestedAccess') || 'requested access'}<//>`}>${'🙋 '}${(r.requester)}<//>
+                <${Name} after=${html` <${Note} kind="meta" inline>${t('organisms.requestedAccess') || 'requested access'}<//>`}>${(r.requester)}<//>
                 <${Doors}>
                   <${Action} small row disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}<//>
                   <${Action} small row disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}<//>
@@ -267,7 +272,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
                 <//>
               <//>`)}
               ${members.map(m => html`<${ListRow} key=${'mem-' + m.owner}>
-                <${Name} tag=${html`<${Mark} tone=${m.role === 'contributor' ? 'fine' : undefined}>${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}<//>`}>${'👤 '}${(m.owner)}<//>
+                <${Name} tag=${html`<${Mark} tone=${m.role === 'contributor' ? 'fine' : undefined}>${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}<//>`}>${(m.owner)}<//>
                 <${Doors}>
                   ${m.role === 'viewer'
                     ? html`<${Action} small row disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}<//>`

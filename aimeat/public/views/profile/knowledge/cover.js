@@ -14,6 +14,7 @@
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · libraryList · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.22.1 -- 2026-11-27 -- The public library links draw the external Glyph after their words instead of ↗.
  *   v1.22.0 -- 2026-11-27 -- Usability pass: the packages stay first and open; the organisms' packages
  *     are drawn only when an organism holds one; "Make a package" and the public library are rows that
  *     open in place (the first open while there is no package or a pasted one waits), numbered after
@@ -79,7 +80,7 @@ import { TextArea } from '/components/TextField.js';
 import { Check } from '/components/Check.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Glyph } from '/components/Action.js';
 import { List, Row, Name, Desc, Cell, Doors, Group } from '/components/List.js';
 import { Hint } from '/components/Hint.js';
 import { PageStart } from '/components/PageStart.js';
@@ -125,7 +126,7 @@ function renderCover(ctx) {
   // One loud action: "Make a package", except while a pasted package waits, when its own import is it.
   const actions = html`
     <${Loud} quiet=${!!ctx.importPreview} onClick=${toMake}>${c('make')}<//>
-    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('library')} ↗<//><//>`;
+    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('library')} <${Glyph} name="external" /><//><//>`;
   // A section with nothing in it is not drawn; the numbers are given after the filter, so a hidden
   // section leaves no gap.
   const parts = [
@@ -245,7 +246,7 @@ function libraryList(ctx) {
 function secLibrary(ctx, num, list, open) {
   const clonable = list.filter(p => p.sharing?.allow_clone !== false);
   return html`<${Section} fold id="kp-library" num=${num} title=${c('secLibrary')} sub=${c('secLibrarySub', { n: list.length, k: clonable.length })} open=${open} onToggle=${() => ctx.setFold('library', !open)}>
-    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('openLibrary')} ↗<//><//>
+    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('openLibrary')} <${Glyph} name="external" /><//><//>
     <${List} cols="name-kind-count-state-doors" keepCols loading=${ctx.discoverLoading && t('common.loading')} empty=${c('noneLibrary')}>
       ${list.slice(0, 8).map(p => {
         const cl = p.sharing?.allow_clone !== false;

@@ -24,6 +24,8 @@
  *          <${SideMenuTitle} mark="📚">My Apps<//>
  *          <${SideMenuGroup} role="tablist"><${SideMenuItem} tab tally active count=${12} onClick=${…}>Your apps<//><//><//>`
  * @version-history
+ *   v1.4.1 — 2026-11-27 — A group's fold mark is the small down Chevron instead of the ▼ letter;
+ *     side-menu.css still turns it 180° while the group is open.
  *   v1.4.0 — 2026-11-26 — SideMenuHome's `count`: how many things wait for the person on the home, as
  *     the coral count. The pin is a drawn mark (inline SVG) instead of an emoji, so it takes the
  *     theme's colours; it has a name for a screen reader.
@@ -39,6 +41,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -118,7 +121,7 @@ export function SideMenuGroup({ title, collapsed, onToggle, role, label, childre
     <div class="side-menu-group" role=${role} aria-label=${label}>
       ${onToggle ? html`
         <button class="side-menu-group-title side-menu-group-toggle" onClick=${onToggle}>
-          <span class=${`side-menu-chevron ${collapsed ? '' : 'side-menu-chevron--open'}`}>▼</span> ${title}
+          <span class=${`side-menu-chevron ${collapsed ? '' : 'side-menu-chevron--open'}`} aria-hidden="true"><${Chevron} small down /></span> ${title}
         </button>` : titled ? html`<div class="side-menu-group-title">${title}</div>` : null}
       ${!collapsed && children}
     </div>`;

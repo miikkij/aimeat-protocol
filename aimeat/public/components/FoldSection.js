@@ -16,6 +16,8 @@
  *     roads under Connect)
  * @usage html`<${FoldSection} id="sec-map" num="04" title="Map" sub="12 spaces" open=${o} onToggle=${…}>…<//>`
  * @version-history
+ *   v1.5.1 — 2026-11-27 — The fold's mark is the drawn Chevron (right while closed, down while open)
+ *     instead of the arrow letters.
  *   v1.5.0 — 2026-11-26 — A fold whose number has a part ("01.2") and that stands beside its parent
  *     is marked `og-sec--sub`, as PageSection marks its own: it continues the section before it.
  *   v1.4.0 — 2026-09-26 — `inner`: a fold inside a part without its number (the Agents page's
@@ -33,6 +35,7 @@ import { h } from 'preact';
 import { useContext } from 'preact/hooks';
 import htm from 'htm';
 import { InSection } from '/components/PageSection.js';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -45,7 +48,7 @@ export function FoldSection({ id, num, title, sub, lead, clip, wrap, inner, open
   return html`
     <section class=${`og-sec og-fold-sec ${open ? 'is-open' : ''}${wrap ? ' og-fold-sec--wrap' : ''}${inner ? ' og-fold-sec--inner' : ''}${part ? ' og-sec--sub' : ''}`} id=${id}>
       <button type="button" class="og-fold og-fold--toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
-        <i>${num}</i><span>${title}</span>${sub ? html`<span class=${clip ? 'og-fold-r og-fold-r--clip' : 'og-fold-r'}>${sub}</span>` : null}<span class="og-fold-arrow">${open ? '↓' : '→'}</span>
+        <i>${num}</i><span>${title}</span>${sub ? html`<span class=${clip ? 'og-fold-r og-fold-r--clip' : 'og-fold-r'}>${sub}</span>` : null}<span class="og-fold-arrow"><${Chevron} small down=${open} /></span>
       </button>
       ${lead ? html`<p class="og-lead">${lead}</p>` : null}
       ${open ? html`<div class="og-fold-body">${children}</div>` : null}

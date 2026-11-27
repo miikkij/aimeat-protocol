@@ -34,6 +34,9 @@
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  *   html`<${CardMenu} word=${x('action.backups')} framed actions=${[{ label: x('backup.exportAll'), run: exportAll }]} />`
  * @version-history
+ *   v1.6.3 — 2026-11-27 — The dots button draws the more Glyph (three drawn dots) instead of the ⋯ sign.
+ *   v1.6.2 — 2026-11-27 — An action's optional `key` keys its row when its label is markup (a drawn
+ *     Glyph before the words); without it the label keys the row, as before. Additive.
  *   v1.6.1 — 2026-09-27 — The framed list stands 6px off its words (the old .backup-menu), appcat parity.
  *   v1.6.0 — 2026-09-27 — `word` (the menu opens from words drawn as the action link, in their line),
  *     `framed` (the list in the poster frame) and `disabled`, for appcat's "Backups and imports"
@@ -56,6 +59,7 @@ import { h } from 'preact';
 import { useState, useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { Glyph } from '/components/Action.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -63,7 +67,8 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 export function CardMenu({
   /** 'off' | 'open' | 'working' — the colour of the dots. */
   state = 'off',
-  /** [{ label, run, done, danger }] — done shows a tick for a moment, for copy; danger is the menu row's danger tone. */
+  /** [{ label, run, done, danger, key }] — done shows a tick for a moment, for copy; danger is the menu row's danger tone;
+   *  key names a row whose label is markup rather than a string (a drawn mark before the words). */
   actions = [],
   /** What the dots are, for a screen reader and the tooltip. */
   label = null,
@@ -172,12 +177,12 @@ export function CardMenu({
             class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
             aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint} disabled=${disabled}
             onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
-            <span aria-hidden="true">⋯</span>
+            <${Glyph} name="more" />
           </button>`}
       ${open && html`
         <div class=${'card-menu-list' + (framed ? ' card-menu-list--framed' : '')} role="menu" ref=${listRef}>
           ${actions.map((a, i) => a.divider ? html`<div class="card-menu-sep" role="separator" key=${'sep' + i}></div>` : html`
-            <button type="button" role="menuitem" key=${a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
+            <button type="button" role="menuitem" key=${a.key ?? a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
               onClick=${(e) => { stop(e); run(a, i); }}>
               ${flash === i ? (a.doneLabel ?? tr('cardMenu.done', 'Done')) : a.label}
             </button>`)}

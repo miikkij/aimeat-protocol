@@ -32,6 +32,7 @@
  *        html`<${FileDrop} button=${'+ ' + t('x.upload')} accept=".md,.json" onFiles=${([f]) => upload(f)} />`
  *        html`<${FileDrop} hidden accept=".zip" inputRef=${fileRef} onFiles=${([f]) => doImport(f)} />`
  * @version-history
+ *   v1.2.1 — 2026-11-27 — A chosen file's remove draws the close Glyph instead of the ✕ letter.
  *   v1.2.0 — 2026-09-27 — `ink` with `chosen` "" keeps the chosen line's room (appcat parity); additive.
  *   v1.1.0 — 2026-09-27 — The drop area's app-catalogue face for appcat's Add dialog: `ink`, `mark`,
  *     `browseLabel` and `chosen` (the old page's #drop-zone); additive, file-drop.css.
@@ -44,7 +45,7 @@ import { h } from 'preact';
 import { useState, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { Action, Icon } from '/components/Action.js';
+import { Action, Icon, Glyph } from '/components/Action.js';
 import { TextField } from '/components/TextField.js';
 import { useFieldIds, inField } from '/components/Field.js';
 
@@ -116,7 +117,7 @@ export function FileDrop(props) {
                 ? html`<${TextField} value=${item.key} ariaLabel=${item.file.name} onInput=${(v) => onRename(i, v)} />`
                 : html`<span class="file-drop-name">${item.key || item.file.name}</span>`}
               <span class="file-drop-size">${Math.round(item.file.size / 1024)} KB</span>
-              ${onRemove ? html`<${Icon} small label=${removeLabel || t('field.remove')} onClick=${() => onRemove(i)}>✕<//>` : null}
+              ${onRemove ? html`<${Icon} small label=${removeLabel || t('field.remove')} onClick=${() => onRemove(i)}><${Glyph} name="close" /><//>` : null}
             </div>`)}
         </div>` : null}
     </div>`;

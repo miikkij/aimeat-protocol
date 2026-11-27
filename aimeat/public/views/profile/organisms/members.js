@@ -10,6 +10,8 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-11-27 — A join request's lead draws the person Glyph instead of a raised-hand emoji; the
+ *     member menu's Make admin, Edit access and Make owner too drop their emoji icons.
  *   2026-11-20 — A member's role badge is in the reader's language (organisms.roleAdminShort, roleMemberShort);
  *     it showed the stored word, so a Finnish page read "member".
  *   2026-11-19 — A member's row names the agents that may write the apps' protected data past the
@@ -60,7 +62,7 @@ const roleWord = (role) => (role === 'admin' ? t('organisms.roleAdminShort')
 import { t } from '/js/i18n.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { List, Row as ListRow, Lead, Name, Doors, Group } from '/components/List.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Field } from '/components/Field.js';
@@ -275,7 +277,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         <${List} cols="mark-name-doors" keepCols>
           ${pending.map(r => html`
             <${ListRow} key=${r.id} rail="warn">
-              <${Lead} text=${'🙋'} />
+              <${Lead} picture=${html`<${Glyph} name="person" />`} />
               <${Name} meta=${`${r.via?.label
                   ? t('organisms.asksAccessTo', { label: r.via.label })
                   : (t('organisms.wantsToJoin') || 'wants to join')}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}`}
@@ -301,10 +303,10 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
             (isCreator && m.ghii !== ghii && ownerCount > 1)
               && { label: t('organisms.removeOwner') || 'Remove owner', danger: true, onClick: () => removeOwner(m.ghii) },
           ].filter(Boolean) : (m.ghii !== ghii ? [
-            m.role === 'member' && { label: t('organisms.makeAdmin') || 'Make admin', icon: '⭐', onClick: () => makeAdmin(m.ghii) },
+            m.role === 'member' && { label: t('organisms.makeAdmin') || 'Make admin', onClick: () => makeAdmin(m.ghii) },
             (isCreator && m.role === 'admin') && { label: t('organisms.removeAdmin') || 'Remove admin', onClick: () => demoteAdmin(m.ghii) },
-            wsOptions.length > 0 && { label: t('organisms.editAccess') || 'Edit access', icon: '🔑', onClick: () => setAccessEditFor(f => f === bare ? null : bare) },
-            isCreator && { label: t('organisms.addOwner') || 'Make owner too', icon: '👑', onClick: () => addOwner(m.ghii) },
+            wsOptions.length > 0 && { label: t('organisms.editAccess') || 'Edit access', onClick: () => setAccessEditFor(f => f === bare ? null : bare) },
+            isCreator && { label: t('organisms.addOwner') || 'Make owner too', onClick: () => addOwner(m.ghii) },
             isCreator && { label: t('organisms.makeCreator') || 'Transfer and step back', onClick: () => transfer(m.ghii) },
             { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => remove(m.ghii, false) },
             { label: t('organisms.block') || 'Block', danger: true, onClick: () => remove(m.ghii, true) },

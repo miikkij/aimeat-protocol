@@ -26,6 +26,7 @@
  *        html`<${Composer} tone="message" recipient=${peer} sendLabel=${t('inbox.reply')} sending=${sending}
  *          onSend=${(recipient, markdown, files, reset) => …} draftKey=${key} focusNonce=${n} />`
  * @version-history
+ *   v1.5.0 — 2026-11-27 — The attach button draws the attach Glyph instead of the paperclip emoji.
  *   v1.4.0 — 2026-11-01 — The attach button has an accessible name ("Liitä tiedosto"), as the
  *     microphone already had; the paperclip itself is hidden from screen readers (review of v33).
  *   v1.3.0 — 2026-09-26 — The chat's row takes `placeholder`, `sendLabel`, `sending`, `inputRef` and
@@ -43,6 +44,7 @@ import { useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
+import { Glyph } from '/components/Action.js';
 import { MessageComposer } from '/components/MessageComposer.js';
 
 const html = htm.bind(h);
@@ -138,7 +140,7 @@ export function ChatComposer({ value, onInput, onSend, onStop, onSpeak, onAttach
                         onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
                     <button type="button" class="poster-icon poster-composer-tool" disabled=${disabled}
                         title=${tr('chat.attachTitle', 'Attach a file')} aria-label=${tr('chat.attachTitle', 'Attach a file')}
-                        onClick=${() => fileRef.current?.click()}><span aria-hidden="true">📎</span></button>` : ''}
+                        onClick=${() => fileRef.current?.click()}><${Glyph} name="attach" /></button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
                         className="poster-icon poster-composer-tool" plain=${true} onRecorded=${(file) => onSpeak(file)} />` : ''}

@@ -15,6 +15,7 @@
  * @structure renderBoardsView · expiresSoon · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.18.2 -- 2026-11-27 -- The app guide link draws the external Glyph after its words instead of ↗.
  *   v1.18.1 -- 2026-11-27 -- The new board form asks who posts only for a shared or public board.
  *   v1.18.0 -- 2026-11-27 -- Usability pass: the followed boards stay first and open; the newest notices
  *     are drawn only when the followed boards have some; others' public boards are a row that says how
@@ -72,7 +73,7 @@ import { renderNotice } from './notice.js';
 import { Hint } from '/components/Hint.js';
 import { Note } from '/components/Note.js';
 import { Code } from '/components/Mark.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Loud, Actions, Glyph } from '/components/Action.js';
 import { Tab, Tabs } from '/components/Tabs.js';
 import { More } from '/components/List.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -250,7 +251,7 @@ function secApp(ctx) {
       <${Stack} gap="medium">
         <${Note}>${c('appText')}<//>
         <${Code} block>${SDK_EXAMPLE}<//>
-        <${Actions}><${Action} small onClick=${copyExample}>${c('copyExample')}<//><${Action} small soft onClick=${openGuide}>${c('appGuide')} ↗<//><//>
+        <${Actions}><${Action} small onClick=${copyExample}>${c('copyExample')}<//><${Action} small soft onClick=${openGuide}>${c('appGuide')} <${Glyph} name="external" /><//><//>
       <//>
     <//>`;
 }

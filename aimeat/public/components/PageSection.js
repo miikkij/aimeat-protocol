@@ -9,6 +9,8 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-11-27 — The list headline's fold button draws the Chevron (down; page-section.css still turns
+ *     it 180° while the list is open) instead of the ▼ letter.
  *   2026-11-26 — A section whose number has a part ("02.1") and that stands beside its parent is
  *     marked `og-sec--sub`: page-section.css draws it as a continuation of the section before it. A
  *     page with eight sections of one weight then reads as its three or four whole-numbered ones.
@@ -45,6 +47,7 @@
 import { h, createContext } from 'preact';
 import { useContext } from 'preact/hooks';
 import htm from 'htm';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -113,7 +116,7 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
         <div class=${`og-sec-h og-sec-h--band${folds ? ' og-sec-h--folds' : ''}${spaced ? ' og-sec-h--spaced' : ''}`} onClick=${folds ? onFold : undefined}>
           <h2 class="poster-section-title"><span>${title}</span>${count !== null && count !== undefined && count !== '' ? html`<small>${saidApart()}${count}</small>` : null}</h2>
           ${folds ? html`<button type="button" class=${`og-sec-fold${folded ? ' og-sec-fold--shut' : ''}`} aria-expanded=${folded ? 'false' : 'true'}
-            aria-label=${foldLabel} title=${foldLabel} onClick=${(e) => { e.stopPropagation(); onFold(e); }}>▼</button>` : null}
+            aria-label=${foldLabel} title=${foldLabel} onClick=${(e) => { e.stopPropagation(); onFold(e); }}><${Chevron} down /></button>` : null}
         </div>
         ${folds && folded ? null : children}${footLine}
       </section>`;

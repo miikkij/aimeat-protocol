@@ -10,6 +10,9 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.26.1 -- 2026-11-27 -- No emoji: How editing works here and Restructure say their words alone;
+ *     a shared document's open link draws the external Glyph after its word (organisms.openLink
+ *     dropped its ↗).
  *   v2.26.0 -- 2026-10-18 -- The settings show the workspace's classification, and the organism's creator
  *     or an admin changes it there, while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v2.25.1 -- 2026-10-18 -- The share panel: a space's page count is words at the hint's size in the language's plural form ("2 documents"), whether a password is set is a sentence at the hint's size (both were under 11px), and its strings lose their emoji and em-dashes ("🔗", "🔒", "📣", "🔑").
@@ -71,7 +74,7 @@ import { t, tn } from '/js/i18n.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { Box, SettingBox } from '/components/Box.js';
 import { Card } from '/components/Card.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Loud, Actions, Glyph } from '/components/Action.js';
 import { Mark, Label } from '/components/Mark.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { shareAudienceOf } from '/js/audience.js';
@@ -173,12 +176,12 @@ export function renderSettingsPanel(ctx) {
       <${Split}>
         <${Label} block>${t('organisms.formProcess') || 'Process'}<//>
         ${ws.manifest ? html`
-          <${Box} name=${'🔄 ' + (t('organisms.editFlow') || 'How editing works here')}
+          <${Box} name=${t('organisms.editFlow') || 'How editing works here'}
             end=${html`<${Action} small expanded=${showFlow} onClick=${() => setShowFlow(s => !s)}>${showFlow ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
             ${showFlow ? html`<${Mermaid} chart=${orgService.buildEditFlowMermaid(ws.manifest, gateOn)} />` : null}
           <//>` : null}
         <${Action} small expanded=${showRegenerate} onClick=${() => setShowRegenerate(s => !s)}>
-          ${showRegenerate ? (t('organisms.cancel') || 'Cancel') : (t('organisms.restructure') || '✨ Restructure / add types with AI')}
+          ${showRegenerate ? (t('organisms.cancel') || 'Cancel') : (t('organisms.restructure') || 'Restructure / add types with AI')}
         <//>
         ${showRegenerate ? html`<${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
           onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${showRegenerate}
@@ -246,7 +249,7 @@ export function renderShareTab(ctx) {
                                   <${AudienceBadge} audience=${shareAudienceOf(share.access, orgId)} />
                                   ${share.until?.[`${ot.name}/${d.id}`] ? html`<${Mark}>${(t('htmlPage.shareEnds') || 'ends {date}').replace('{date}', fmtDate(share.until[`${ot.name}/${d.id}`]))}<//>
                                     <${Action} small disabled=${shareBusy} onClick=${() => patchShare({ until: { [`${ot.name}/${d.id}`]: new Date(Date.now() + SHARE_EXTEND_DAYS * 86_400_000).toISOString() } })}>${t('htmlPage.shareExtend')}<//>` : null}
-                                  <${Action} small href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} newTab>${t('organisms.openLink') || 'open ↗'}<//>` : null}<//>
+                                  <${Action} small href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} newTab>${t('organisms.openLink') || 'open'} <${Glyph} name="external" /><//>` : null}<//>
                               <//>`;
                           })}
                         <//>`}

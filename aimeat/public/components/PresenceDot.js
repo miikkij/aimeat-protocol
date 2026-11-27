@@ -18,6 +18,8 @@
  *   html`<${PresenceDot} ghii=${peerGhii} />`            // list dot (self-fetch)
  *   html`<${PresenceDot} status="available" label />`    // controlled + label
  * @version-history
+ *   v1.1.2 — 2026-11-27 — PresenceButton's caret (it says the press opens the presence settings, a
+ *     choice, not a fold) is the small down Chevron instead of the ⌄ letter.
  *   v1.1.1 — 2026-09-27 — The button draws its own class names: .pf-presence-pill-btn →
  *     .presence-button, .pf-presence-pill-caret → .presence-button-caret (a move, same look).
  *   v1.1.0 — 2026-09-26 — PresenceButton: the owner's own presence as a door with its caret (the
@@ -30,6 +32,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { usePresence } from '/js/presence-store.js';
+import { Chevron } from '/components/Action.js';
 
 const LABEL_KEYS = {
   available: 'presence.status.available',
@@ -67,6 +70,6 @@ export function PresenceDot({ ghii, status, size = 'sm', label = false, title })
 export function PresenceButton({ status, title, onClick }) {
   return html`<button type="button" class="presence-button" onClick=${onClick} title=${title}>
     <${PresenceDot} status=${status} size="sm" label=${true} />
-    <span class="presence-button-caret" aria-hidden="true">⌄</span>
+    <span class="presence-button-caret" aria-hidden="true"><${Chevron} small down /></span>
   </button>`;
 }

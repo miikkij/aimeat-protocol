@@ -9,6 +9,8 @@
  * @structure SRC_ICON (internal), SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   v1.13.1 -- 2026-11-27 -- A source's kind mark draws a Glyph (note, file, folder) instead of an
+ *     emoji, the picker's tabs say their words alone, and remove draws the close Glyph.
  *   v1.13.0 -- 2026-10-16 -- A failed read shows the could-not-load note with Retry instead of "No
  *     sources yet"; an add or a remove is saved on top of a strict read (addWorkspaceSources,
  *     removeWorkspaceSource), so a failed read saves nothing (QA audit F6-04).
@@ -44,7 +46,7 @@ import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 import { List, Row as ListRow, Name, Desc, Cell, Doors, SearchLine } from '/components/List.js';
-import { Action, Actions, Icon } from '/components/Action.js';
+import { Action, Actions, Icon, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Box } from '/components/Box.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
@@ -53,7 +55,8 @@ import { fmtBytes } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
 
-const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
+/** The drawn mark of a source's kind in the list's mark column (components/Action.js Glyph). */
+const SRC_ICON = { memory: 'note', storage: 'file', knowledge: 'folder' };
 
 /* Sources: references the workspace draws on — memory entries, storage files, and knowledge
  * packages (own, or external/read-only). Pointers ONLY: nothing is copied or moved; the referenced
@@ -167,7 +170,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
     ${picking ? html`
       <${Box}>
         <${Tabs} tone="filter" kind="view" value=${tab} onSelect=${setTab}
-          items=${['memory', 'storage', 'knowledge'].map(tk => ({ value: tk, label: `${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}` }))} />
+          items=${['memory', 'storage', 'knowledge'].map(tk => ({ value: tk, label: t('organisms.src_' + tk) || tk }))} />
         ${tab !== 'storage' ? html`
           <${Tabs} tone="filter" value=${scope} onSelect=${setScope} items=${[
             { value: 'mine', label: t('organisms.mine') || 'Mine' },
@@ -185,13 +188,13 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
     ${srcLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${List} cols="mark-name-tags-doors" keepCols empty=${t('organisms.noSources') || 'No sources yet'}>
       ${sources.map(s => html`
         <${ListRow} key=${s.id}>
-          <${Cell}>${SRC_ICON[s.type] || '•'}<//>
+          <${Cell}>${SRC_ICON[s.type] ? html`<${Glyph} name=${SRC_ICON[s.type]} />` : '•'}<//>
           <${Name} title=${s.key || s.packageId || ''}>${(String(s.label || s.key || s.packageId || ''))}<//>
           <${Cell} line>
             ${s.external ? html`<${Mark} tone="dim">${t('organisms.external') || 'external'}<//>` : null}
             <${Mark}>${t('organisms.src_' + s.type) || s.type}<//>
           <//>
-          <${Doors}><${Icon} small label=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕<//><//>
+          <${Doors}><${Icon} small label=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}><${Glyph} name="close" /><//><//>
         <//>`)}
     <//>`}`;
 }

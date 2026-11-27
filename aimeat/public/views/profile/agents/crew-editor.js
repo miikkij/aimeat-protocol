@@ -14,6 +14,7 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   v1.18.1 -- 2026-11-27 -- The exchange refine fold draws the Chevron (down while open, right while closed) instead of ▾ ▸.
  *   v1.18.0 -- 2026-10-02 -- The question marks that explain the crew settings: crew.process, crew.llm_profile and
  *     ai.temperature on their fields, crew.delegation, crew.async and crew.memory on their Checks (components/HelpTip.js);
  *     the model profile's grey line goes, the explanation carries it.
@@ -66,7 +67,7 @@ import { Field, Fields, FormActions } from '/components/Field.js';
 import { Box } from '/components/Box.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Action } from '/components/Action.js';
+import { Action, Chevron } from '/components/Action.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { List, Row, Name, Desc, Group } from '/components/List.js';
 import { Split, Stack } from '/components/Layout.js';
@@ -223,7 +224,7 @@ export function ToolMenu({ selected, onChange, runtimeTools, decideTools }) {
         <${List} cols="check-name-desc" keepCols dense>${row(EXCHANGE_BUNDLE)}<//>
         <div>
           <${Action} small expanded=${refine} onClick=${() => setRefine(r => !r)}>
-            ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
+            <${Chevron} small down=${refine} /> ${t(`${K}.tools.exchangeRefine`)}
           <//>
         </div>
         ${refine && html`<${List} cols="check-name-desc" keepCols dense under>${verbs.map(row)}<//>`}

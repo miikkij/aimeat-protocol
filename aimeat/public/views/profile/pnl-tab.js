@@ -11,6 +11,8 @@
  *   designed way (.claude/rules/page-guidance.md): the page's start (PageStart "pnl") and the
  *   title's question mark (concept.pnl).
  * @version-history
+ *   v1.19.1 — 2026-11-27 — The income, expense and outside lists carry a head row (source, entries,
+ *     amount), as every list of columns on a Settings page does.
  *   v1.19.0 — 2026-11-27 — The page leads with where things stand: a figure strip (result before taxes
  *     in the fine or danger tone, income, expenses, VAT payable) from the report it already reads, drawn
  *     only when the period has a booking; the result card it replaces goes. Three sections with the
@@ -92,11 +94,14 @@ function sourceLabel(source) {
   return label === key ? source : label;
 }
 
+/** The head row of a list of result lines: where the money came from or went, how many entries, the sum. */
+const pnlHead = () => [t('profile.pnl.colSource'), t('profile.pnl.colCount'), t('profile.pnl.colAmount')];
+
 /** One side of the result (income or expenses): a tile inside section 01, its lines and their total. */
 function LineTable({ titleKey, lines, totalMinor }) {
   return html`
     <${Card} tone="section" title=${t(titleKey)}>
-      <${List} cols="name-n-n" keepCols empty=${t('profile.pnl.empty')}>
+      <${List} cols="name-n-n" keepCols head=${lines.length ? pnlHead() : null} empty=${t('profile.pnl.empty')}>
         ${lines.length > 0 && html`
             ${lines.map(line => html`
               <${Row} key=${line.source}>
@@ -282,7 +287,7 @@ export function PnlTab({ showToast }) {
 
       ${outside && html`
         <${PageSection} id="pnl-outside" num=${numOf['pnl-outside']} title=${t('profile.pnl.secOutside')}>
-          <${List} cols="name-n-n" keepCols>
+          <${List} cols="name-n-n" keepCols head=${pnlHead()}>
               ${report.transferCount > 0 && html`
                 <${Row} key="transfers">
                   <${Name}>${t('profile.pnl.transfers')}<//>

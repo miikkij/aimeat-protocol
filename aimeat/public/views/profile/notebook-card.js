@@ -15,6 +15,10 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.19.1 -- 2026-11-27 -- No emoji: the New organism and New workspace choices say their words
+ *     alone, an organism the filing will create is marked with a plain +, and the owed-reply aside
+ *     drops its link emoji. Organism and workspace in a filing target are set apart by " / " instead
+ *     of ▸ (a path separator, not a disclosure mark).
  *   v1.19.0 -- 2026-11-27 -- "Suggest filing" on a note is an ordinary action. It was the main action
  *     on every note, so an inbox of three notes showed three main actions beside the page's own
  *     (Capture). The main action inside an opened plan (run a step, file the enriched note) stays.
@@ -396,7 +400,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
 
   const orgLabelFor = (target) => {
     if (target.organismId) return orgNames[target.organismId] || target.organismName || target.organismId;
-    if (target.createNew?.organismName || target.organismName) return `➕ ${target.createNew?.organismName || target.organismName}`;
+    if (target.createNew?.organismName || target.organismName) return `+ ${target.createNew?.organismName || target.organismName}`;
     return t('profile.notebook.distributeDefaultHome');
   };
 
@@ -466,7 +470,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
             <${PlanStep} key=${i} state=${c.include ? undefined : 'skipped'}
               pick=${{ checked: c.include, disabled: busy, onChange: () => toggleChunk(i) }}
               title=${c.title}
-              after=${html`<${Mark}>${orgLabelFor(c)}${c.workspaceName ? ` ▸ ${c.workspaceName}` : ''}<//>`}>
+              after=${html`<${Mark}>${orgLabelFor(c)}${c.workspaceName ? ` / ${c.workspaceName}` : ''}<//>`}>
               <${Box} tone="copy" scroll document><${Markdown} text=${c.markdown} /><//>
             <//>`)}
         <//>
@@ -493,13 +497,13 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
         ${result.suggestion?.reason && html`<${PlanNote}>${result.suggestion.reason}${conf !== null ? ` · ${conf}%` : ''}<//>`}
         <${Fields}>
           <${Select} label=${t('profile.notebook.fieldOrganism')} value=${edit.organismId} onChange=${v => onOrganismChange(v)}
-            options=${[...orgs.map(o => [o.id, o.name]), [NEW, `➕ ${t('profile.notebook.newOrganism')}`]]} />
+            options=${[...orgs.map(o => [o.id, o.name]), [NEW, t('profile.notebook.newOrganism')]]} />
           ${edit.organismId === NEW && html`
             <${TextField} placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
               value=${edit.organismName} onInput=${v => patchEdit({ organismName: v })} />`}
           ${edit.organismId !== NEW && html`
             <${Select} label=${t('profile.notebook.fieldWorkspace')} value=${edit.workspaceId} onChange=${v => onWorkspaceChange(v)}
-              options=${[...workspaces.map(w => [w.id, w.name]), [NEW, `➕ ${t('profile.notebook.newWorkspace')}`]]} />`}
+              options=${[...workspaces.map(w => [w.id, w.name]), [NEW, t('profile.notebook.newWorkspace')]]} />`}
           ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
             <${TextField} placeholder=${t('profile.notebook.newWsNamePlaceholder')}
               value=${edit.workspaceName} onInput=${v => patchEdit({ workspaceName: v })} />`}
@@ -511,7 +515,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
               <${Note} kind="meta" inline>${t('profile.notebook.alternatives')}<//>
               ${result.alternatives.map((alt, i) => html`
                 <${Action} key=${i} small onClick=${() => applyAlternative(alt)}>
-                  ${alt.organismName || '?'}${alt.workspaceName ? ` ▸ ${alt.workspaceName}` : ''}
+                  ${alt.organismName || '?'}${alt.workspaceName ? ` / ${alt.workspaceName}` : ''}
                 <//>`)}
             <//>`}
           <${TextField} label=${t('profile.notebook.fieldTitle')} value=${edit.title} onInput=${v => patchEdit({ title: v })} />
@@ -551,7 +555,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       ${trackMsg && html`
         <${Note} kind="aside" size="small">
           <${Row} gap="medium" justify="between">
-            <${Row} gap="medium"><span>🔗</span><span>${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', trackPeer || '')}</span><//>
+            <${Row} gap="medium"><span>${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', trackPeer || '')}</span><//>
             <${Loud} control onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}<//>
           <//>
         <//>`}

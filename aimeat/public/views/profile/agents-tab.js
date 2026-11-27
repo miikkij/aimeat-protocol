@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.29.2 -- 2026-11-27 -- The platform list's fold draws the Chevron (down while closed, up while
+ *     open, as the ▼ ▲ it replaces).
  *   v4.29.1 -- 2026-11-27 -- A refused permission save keeps the dialog open and answers it the refusal in
  *     the reader's language (scopeRefusalWords), where a toast behind the dialog said nothing. An approval an
  *     operator service's rule refuses says that rule's sentence, and the request leaves the list.
@@ -178,7 +180,7 @@ import { scrollToSection } from '/components/Rail.js';
 import { AllowAlwaysSection } from './agents/allow-always-section.js';
 import { OperatorServicesOff } from './agents/operator-services-off.js';
 import { FigureStrip } from '/components/FigureStrip.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Chevron } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -766,7 +768,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
                   ${takesComputers !== false && html`<${Split} above="large" pad="large">
                     <${Action} small expanded=${platExpand} onClick=${() => setPlatExpand(!platExpand)}>
-                      ${t('profile.agents.noNodejs')} ${platExpand ? '▲' : '▼'}
+                      ${t('profile.agents.noNodejs')} <${Chevron} small up=${platExpand} down=${!platExpand} />
                     <//>
                     ${platExpand && html`
                       <${Tabs} bar kind="view" label=${t('profile.agents.noNodejs')} value=${activePlat} onSelect=${setActivePlat}

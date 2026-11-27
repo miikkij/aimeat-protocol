@@ -5,7 +5,7 @@
  * @description A text shown three ways, as one component: its first line only, its top under a fade
  *   (the peek), or all of it. Peek draws the text in the way the page holds; PeekToggle is the small
  *   icon button that takes it to the next way (line → peek → all → line), its mark saying which way
- *   it goes (⌄ opens more, ⌃ closes); nextPeek(view) is that order. A page passes the text and the
+ *   it goes (the Chevron down opens more, up closes); nextPeek(view) is that order. A page passes the text and the
  *   way and never writes a class. The look is css/components/peek.css (the Notebook note's
  *   .pf-nb-note-text, its --peek fade and .pf-nb-note-line, moved out of css/views/notebook.css
  *   unchanged); the button is components/Action.js Icon.
@@ -18,12 +18,13 @@
  *        html`<${Peek} view=${view} line=${firstLine(text)}><${Markdown} text=${text} /><//>
  *          <${PeekToggle} view=${view} label=${t('profile.notebook.toggleView')} onToggle=${() => setView(nextPeek)} />`
  * @version-history
+ *   v1.0.1 — 2026-11-27 — PeekToggle draws the Chevron (down opens more, up closes) instead of ⌄ ⌃.
  *   v1.0.0 — 2026-09-26 — Initial: the Notebook note's three views as one component, with the look
  *     they had (page group G4, the notebook).
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { Icon } from '/components/Action.js';
+import { Icon, Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -38,7 +39,7 @@ export function Peek({ view = 'peek', line, children }) {
 }
 
 export function PeekToggle({ view, onToggle, label }) {
-  return html`<${Icon} small title=${label} label=${label} onClick=${onToggle}>${view === 'full' ? '⌃' : '⌄'}<//>`;
+  return html`<${Icon} small title=${label} label=${label} onClick=${onToggle}><${Chevron} up=${view === 'full'} down=${view !== 'full'} /><//>`;
 }
 
 export default Peek;

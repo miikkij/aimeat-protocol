@@ -22,6 +22,9 @@
  *   `file.state`: 'expired' (the file is gone), 'pending' (not copied to you yet), or nothing.
  *   A file with no `url` or in the expired state is drawn as its unavailable chip.
  * @version-history
+ *   v1.0.1 — 2026-11-27 — The mark before a file's name draws a Glyph by the file's kind (image,
+ *     file, music, video, attach) instead of an emoji; the download mark is the download Glyph
+ *     (with an accessible name) instead of ⬇; the transcript fold is the small Chevron instead of ▾ ▸.
  *   v1.0.0 — 2026-09-26 — Moved out of views/profile/inbox-tab (AttachmentItem in message-turn.js,
  *     AudioAttachment, TranscriptPanel, fmtClock and stopOtherAudio in voice-parts.js, attachKind and
  *     ATTACH_ICO in helpers.js) into the Message component with the same behaviour; the inbox- class
@@ -33,11 +36,13 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { stop as stopSpeech } from '/js/services/speech-reader.js';
 import { Note } from '/components/Note.js';
+import { Glyph, Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
-/** The mark before a file's name, by what the file is. */
-const FILE_MARK = { image: '🖼', pdf: '📄', markdown: '📄', audio: '🎵', video: '🎬', file: '📎' };
+/** The mark before a file's name, by what the file is: a drawn Glyph (components/Action.js). */
+const FILE_GLYPH = { image: 'image', pdf: 'file', markdown: 'file', audio: 'music', video: 'video', file: 'attach' };
+const fileMark = (kind) => html`<${Glyph} name=${FILE_GLYPH[kind] || 'attach'} />`;
 
 /** How a file is shown: as a thumbnail, played in place, read in the reader, or opened in a tab. */
 export function attachKind(a) {
@@ -108,7 +113,7 @@ export function TranscriptPanel({ file, onTranscribe, canTranscribe }) {
     return html`
       <div class="message-transcript">
         <button type="button" class="message-transcript-toggle" onClick=${() => setOpen((v) => !v)} aria-expanded=${open}>
-          ${open ? '▾' : '▸'} ${t('inbox.transcript')}
+          <${Chevron} small down=${open} /> ${t('inbox.transcript')}
           <span class="message-transcript-src">
             ${tr.by === 'sender' ? t('inbox.transcriptBySender') : t('inbox.transcriptByYou', { model: tr.model || '' })}
           </span>
@@ -150,13 +155,13 @@ export function MessageFile({ file, onOpenText, onTranscribe, canTranscribe }) {
     const status = file.state === 'expired' ? t('inbox.attachmentExpired') : (file.state === 'pending' ? t('inbox.attachmentPending') : null);
     const help = file.state === 'expired' ? t('inbox.attachmentExpiredHelp') : (file.state === 'pending' ? t('inbox.attachmentPendingHelp') : null);
     return html`<div class="message-file message-file--pending" title=${help || undefined}>
-      <span class="message-file-mark">${FILE_MARK[kind]}</span>
+      <span class="message-file-mark">${fileMark(kind)}</span>
       <span class="message-file-name">${name}</span>
       ${status ? html`<span class="message-file-state">${status}</span>` : null}
     </div>`;
   }
 
-  const download = html`<a class="message-file-get" href=${url} download=${name} title=${t('inbox.attachmentDownload')}>⬇</a>`;
+  const download = html`<a class="message-file-get" href=${url} download=${name} title=${t('inbox.attachmentDownload')} aria-label=${t('inbox.attachmentDownload')}><${Glyph} name="download" /></a>`;
 
   if (kind === 'image') {
     return html`<div class="message-file-picture">
@@ -169,7 +174,7 @@ export function MessageFile({ file, onOpenText, onTranscribe, canTranscribe }) {
   if (kind === 'markdown') {
     return html`<div class="message-file">
       <button type="button" class="message-file-open" onClick=${() => onOpenText?.(url, name)} title=${t('inbox.attachmentView')}>
-        <span class="message-file-mark">📄</span><span class="message-file-name">${name}</span>
+        <span class="message-file-mark">${fileMark('markdown')}</span><span class="message-file-name">${name}</span>
       </button>${download}
     </div>`;
   }
@@ -187,7 +192,7 @@ export function MessageFile({ file, onOpenText, onTranscribe, canTranscribe }) {
   // pdf / video / file — let the browser open it in a new tab.
   return html`<div class="message-file">
     <a class="message-file-open" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
-      <span class="message-file-mark">${FILE_MARK[kind]}</span><span class="message-file-name">${name}</span>
+      <span class="message-file-mark">${fileMark(kind)}</span><span class="message-file-name">${name}</span>
     </a>${download}
   </div>`;
 }

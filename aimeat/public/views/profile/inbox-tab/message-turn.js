@@ -11,6 +11,9 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-11-27 — The ⋯ menu's Mark important draws the star Glyph (filled while the message is
+ *     starred) instead of ⭐ ☆; Track a response and Reply with AI drop their emoji; a tracked
+ *     reply's mark draws the link Glyph instead of the link emoji.
  *   2026-11-14 — A message of kind help-question carries the question card (help-card.js), and one of
  *     kind help-status a mark that says it closes a question (Ask someone who knows).
  *   2026-11-07 — "Reply with AI" also in the line under the other side's message, before ⋯, with a
@@ -33,6 +36,7 @@ const html = htm.bind(h);
 
 import { t } from '/js/i18n.js';
 import { Message } from '/components/Message.js';
+import { Glyph } from '/components/Action.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, trackStatusTone, attachKind } from './helpers.js';
 import { reactionItems } from './reactions.js';
@@ -58,10 +62,10 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
   const status = mine ? msg.status : null;
   const menu = [
     onQuote ? { label: `↩ ${t('inbox.quoteReply')}`, run: () => onQuote(msg) } : null,
-    { label: `${starred ? '⭐' : '☆'} ${t('inbox.markImportant')}`, run: () => onStar?.(msg) },
-    { label: `🔗 ${t('inbox.trackResponse')}${trk ? ` — ${trk.text}` : ''}`, run: () => onTrack?.(msg) },
+    { key: 'star', label: html`<${Glyph} name=${starred ? 'star-filled' : 'star'} /> ${t('inbox.markImportant')}`, run: () => onStar?.(msg) },
+    { label: `${t('inbox.trackResponse')}${trk ? ` — ${trk.text}` : ''}`, run: () => onTrack?.(msg) },
     { label: t('inbox.parkToNotebook'), run: () => onPark?.(msg) },
-    { label: `✨ ${t('inbox.ai.replyToMessage')}`, run: () => onReplyAi?.(msg) },
+    { label: t('inbox.ai.replyToMessage'), run: () => onReplyAi?.(msg) },
     onDelete ? { label: t('inbox.deleteMessage'), run: () => onDelete(msg), danger: true } : null,
   ].filter(Boolean);
   // A file not yet copied to the reader says so; an expired one says it is gone.
@@ -76,7 +80,7 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     agentName ? (mine
       ? { text: t('inbox.sentForYouBy', { agent: agentName }), title: t('inbox.sentForYouByTitle'), tone: 'ai' }
       : { text: t('inbox.sentByTheirAgent', { agent: agentName }), title: t('inbox.sentByTheirAgentTitle'), tone: 'ai' }) : null,
-    trk ? { text: `🔗 ${trk.text}`, title: t('inbox.trackResponse'), tone: trackStatusTone(trk.tone) } : null,
+    trk ? { text: html`<${Glyph} name="link" /> ${trk.text}`, title: t('inbox.trackResponse'), tone: trackStatusTone(trk.tone) } : null,
     // That a model wrote this at all, which is a different fact from WHICH model and arrives far more
     // often: an agent's message is stamped whether or not it names one. Absence stays silent on
     // purpose — no record means nothing was claimed.

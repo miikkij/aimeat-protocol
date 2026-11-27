@@ -34,6 +34,7 @@
  *          <${CardPanel}>${content}<//>
  *        <//>`
  * @version-history
+ *   v1.1.1 — 2026-11-27 — The open card's caret is the drawn Chevron (small, down: the card is open) instead of ▼.
  *   v1.1.0 — 2026-10-19 — The card has a heavy line down its left edge, so a person sees where the
  *     opened thing ends; a tab group's name is the thin dark band of the section title (Jouni, 2026-10-19).
  *   v1.0.0 — 2026-09-26 — Initial: the opened agent of the Agents page (agp-card, agp-mast, agp-runs,
@@ -43,6 +44,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { Tabs } from '/components/Tabs.js';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -53,7 +55,7 @@ export function OpenCard({ title, onClose, id, marks, more, side, children }) {
   // The heavy line down the card's left edge (open-card.css) shows how far the opened thing reaches.
   return html`
     <div class="open-card poster-row--thing">
-      <h2 class=${cx('poster-section-title', 'open-card-title', close && 'open-card-title--closes')} onClick=${close}><span class="open-card-caret" aria-hidden="true">▼</span>${title}</h2>
+      <h2 class=${cx('poster-section-title', 'open-card-title', close && 'open-card-title--closes')} onClick=${close}><span class="open-card-caret" aria-hidden="true"><${Chevron} small down /></span>${title}</h2>
       <div class=${cx('open-card-mast', close && 'open-card-mast--closes')} onClick=${close}>
         <div class="open-card-words">
           ${id ? html`<div class="open-card-id" onClick=${stop}>${id}</div>` : null}

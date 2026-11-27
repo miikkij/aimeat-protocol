@@ -7,6 +7,9 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-11-27 — statusTick draws the clock and warning Glyph marks for a queued or failed
+ *     message instead of emoji; quoteSnippet writes an image as the word [image]
+ *     (inbox.quoteImage) instead of the picture emoji.
  *   v1.9.0 — 2026-10-19 — A recipient suggestion for your own agent shows its shown name (agentLabel).
  *   v1.8.0 — 2026-09-26 — The Toast UI loader, the big editor's height and the attachment rule moved
  *     into the components that use them (components/MessageComposer.js, MessageFile.js); attachKind
@@ -37,6 +40,11 @@ import { swallowed } from '/js/swallowed.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { firstLine } from '../notebook-helpers.js';
 import { agentLabel } from '/js/services/agents.js';
+import { h } from 'preact';
+import htm from 'htm';
+import { Glyph } from '/components/Action.js';
+
+const html = htm.bind(h);
 
 /** 📓 on a message: copy it straight into the notebook for later processing (no AI step), keeping the
  *  source link + reply intent so it can be replied to or filed from there. */
@@ -194,9 +202,14 @@ export function groupConversations(conversations) {
 
 // WhatsApp-style ticks: sent = one ✓; delivered (reached the recipient's mailbox, incl. an agent's) =
 // two ✓✓ (grey); read (read receipt — humans send one, agents don't yet) = two ✓✓ coloured via
-// inbox-tick--read; queued (cross-node, peer unreachable) = a clock.
-const TICK = { sent: '✓', delivered: '✓✓', read: '✓✓', queued: '🕒', failed: '⚠', undeliverable: '⚠' };
-export function statusTick(status) { return TICK[status] || ''; }
+// inbox-tick--read; queued (cross-node, peer unreachable) = a clock; failed = the warning mark. The
+// clock and the warning are drawn Glyph marks (components/Action.js), not emoji.
+const TICK = { sent: '✓', delivered: '✓✓', read: '✓✓' };
+const TICK_GLYPH = { queued: 'clock', failed: 'warning', undeliverable: 'warning' };
+export function statusTick(status) {
+  if (TICK_GLYPH[status]) return html`<${Glyph} name=${TICK_GLYPH[status]} />`;
+  return TICK[status] || '';
+}
 
 export function timeShort(s) {
   const d = new Date(s);
@@ -258,7 +271,7 @@ export function prepareBody(body, urlMap, expiredIds) {
 /** One-line plain-text excerpt of a message body for a reply-quote (images/code/markdown marks stripped). */
 export function quoteSnippet(body, max = 140) {
   const s = String(body || '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '🖼')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, `[${t('inbox.quoteImage')}]`)
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/[*_`>#]+/g, '')
     .replace(/\s+/g, ' ')

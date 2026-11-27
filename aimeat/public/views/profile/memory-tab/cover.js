@@ -17,6 +17,8 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.36.2 -- 2026-11-27 -- The files list and the who-else-sees list carry a head row (file, size; key,
+ *     visibility), as every list of columns on a Settings page does.
  *   v1.36.1 -- 2026-11-27 -- The last change and the change list bend the verb to the writer: Finnish
  *     read "sinä kirjoitti", built from separate words.
  *   v1.36.0 -- 2026-11-27 -- A key space row names its newest record by its title (recordName, read by
@@ -340,7 +342,7 @@ function placeOfFile(f) {
 
 function fileRows(ctx, files) {
   const { NODE_URL, setPreviewFile, handleDownloadFile, handleDeleteFile, showToast } = ctx;
-  return html`<${List} cols="mark-name-meta-doors" keepCols empty=${t('profile.files.empty') || 'No files yet.'}>${files.map(f => {
+  return html`<${List} cols="mark-name-meta-doors" keepCols head=${files.length ? ['', c('colFile', 'File'), c('colSize', 'Size'), ''] : null} empty=${t('profile.files.empty') || 'No files yet.'}>${files.map(f => {
     const key = f.key || f.name;
     const cat = fileCategory(f.mime_type, key);
     const isImage = String(f.mime_type || '').startsWith('image');
@@ -534,7 +536,7 @@ function renderCover(ctx) {
 
       ${draws.rest ? html`<${Section} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
         doors=${html`<${Action} small soft onClick=${() => openTab('access')}>${t('profile.tabs.access') || 'Access'} →<//>`}>
-        <${List} cols="name-kind-doors" keepCols empty=${c('none', 'Nobody but you and your agents.')}>${seenRows}<//>
+        <${List} cols="name-kind-doors" keepCols head=${seenRows.length ? [c('colKey', 'Key'), c('colVisibility', 'Visibility'), ''] : null} empty=${c('none', 'Nobody but you and your agents.')}>${seenRows}<//>
       <//>` : null}
     <//>`;
 }

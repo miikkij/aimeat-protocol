@@ -9,6 +9,8 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   2026-11-27 — An agent without an avatar draws the agent Glyph in the avatar's frame instead of an
+ *     emoji (agentLead); the contract tag and the picker's contract word drop their scroll emoji.
  *   2026-10-19 — The picker (listAgents) and the attached agents stand in alphabetical order of the name shown.
  *   2026-10-19 — An attached agent of the viewer's own shows its own avatar in place of the 🤖 mark (leadProps); the others keep 🤖.
  *   2026-09-28 — The description says when the organism admits only the agents listed here (agentAccess).
@@ -43,7 +45,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { List, Row as ListRow, Lead, Name, Doors } from '/components/List.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
@@ -57,6 +59,12 @@ import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/servic
 import { relTime } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
 import { compare } from '/js/format.js';
+
+/** An agent's lead: its own avatar when it has one, otherwise the drawn agent Glyph in the avatar's frame. */
+function agentLead(own) {
+  const lp = leadProps(own, '');
+  return lp.picture || lp.text ? lp : { ...lp, text: undefined, picture: html`<${Glyph} name="agent" />` };
+}
 
 /**
  * Agents tab — attached agents listed first; "+ Attach agent" opens a picker of the user's OWN
@@ -134,7 +142,7 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
               <${Row} wrap>
                 <${Select} fit value=${pick} onChange=${setPick} ariaLabel=${t('organisms.pickAgent') || 'Choose one of your agents…'}
                   placeholder=${t('organisms.pickAgent') || 'Choose one of your agents…'}
-                  options=${pickable.map(a => [a.gaii, (a.display_name || a.name) + (offersWorkspaceContract(a) ? ` · 📜 ${t('organisms.contractTag') || 'contract'}` : '')])} />
+                  options=${pickable.map(a => [a.gaii, (a.display_name || a.name) + (offersWorkspaceContract(a) ? ` · ${t('organisms.contractTag') || 'contract'}` : '')])} />
                 <${Action} small disabled=${busy || !pick} onClick=${() => attach(pick)}>${t('organisms.attach') || 'Attach'}<//>
               <//>` : html`
               <${HeadDesc}>${t('organisms.noOwnAgentsLeft') || 'All your agents are already attached (or you have none yet).'}<//>`)}
@@ -155,11 +163,11 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
           const act = acted[p.name];
           return html`
             <${ListRow} key=${'ag-' + g}>
-              <${Lead} ...${{ ...leadProps(own, '🤖'), agent: false }} />
+              <${Lead} ...${{ ...agentLead(own), agent: false }} />
               <${Name} title=${g}
                 tag=${[
                   p.node ? html`<${Mark} key="node">${(p.node)}<//>` : null,
-                  own && offersWorkspaceContract(own) ? html`<${Mark} key="contract" tone="fine" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${'📜 '}${t('organisms.contractTag') || 'contract'}<//>` : null,
+                  own && offersWorkspaceContract(own) ? html`<${Mark} key="contract" tone="fine" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${t('organisms.contractTag') || 'contract'}<//>` : null,
                 ]}
                 meta=${html`${(p.owner ? `${p.name}#${p.owner}` : g)}${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
                   : (own?.last_seen ? html` · ${t('organisms.lastActive') || 'last active'} ${relTime(own.last_seen)}` : null)}`}>

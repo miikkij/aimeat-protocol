@@ -33,6 +33,7 @@
  *        html`<${Message} tone="comment" reply who=${author} whoNote=${['reply']} time=${when} body=${text} plain
  *          actions=${html`<${Action} small onClick=${…}>Reply<//>`} />`
  * @version-history
+ *   v1.3.1 — 2026-11-27 — Copy under a message draws the copy Glyph instead of the ⧉ sign.
  *   v1.3.0 — 2026-11-07 — `aiReply` ({ label, title, run }): "Reply with AI" in the line under a
  *     message, before ⋯, with a spark icon and a tooltip that says what it does (Jouni: people did not
  *     find it behind ⋯). Additive; a page that passes no `aiReply` draws what it drew.
@@ -55,7 +56,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { CardMenu } from '/components/CardMenu.js';
-import { Action } from '/components/Action.js';
+import { Action, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { MessageFiles } from '/components/MessageFile.js';
 import { MessageQuestions } from '/components/MessageQuestions.js';
@@ -221,7 +222,7 @@ export function Message({
         ${/* The raw text the sender wrote: that is what pastes usefully into an AI chat or a
               document; the drawn words' presigned picture addresses are short-lived. */''}
         ${copy !== undefined && copy !== null ? html`<${Action} tone="text" copy=${String(copy)} copiedLabel="✓"
-          copiedTitle=${t('common.copied')} title=${copyLabel} ariaLabel=${copyLabel}>⧉<//>` : null}
+          copiedTitle=${t('common.copied')} title=${copyLabel} ariaLabel=${copyLabel}><${Glyph} name="copy" /><//>` : null}
         ${listen ? html`<${Listen} id=${listen.id} text=${listen.text} />` : null}
         ${reactions ? html`<${Action} tone="text" pressed=${picking} title=${t('inbox.react.add')} ariaLabel=${t('inbox.react.add')}
           onClick=${() => setPicking((p) => !p)}>${t('inbox.react.add')}<//>` : null}

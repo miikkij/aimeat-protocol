@@ -10,6 +10,10 @@
  *   Drawn by components/Stars.js (give: onPick; show: value, `row`); its own class names only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.6.0 — 2026-11-27 — The star is the drawn star Glyph (components/Action.js) instead of the ★
+ *     letter: sized 1em so each cut keeps its size, a given star filled with currentColor, a star not
+ *     given its stroke in --text-dim (the text-stroke outline does not reach an SVG); the hover rules
+ *     fill and empty the drawn star the same way.
  *   v1.5.0 — 2026-09-27 — The component's own class names (.op-stars → .stars, .op-star → .stars-star,
  *     .op-stars--shown → .stars--shown, .op-stars--row → .stars--row); every declaration and selector
  *     shape is kept (Jouni: components draw only their own class names, a move). The rating row's
@@ -26,11 +30,16 @@
 .stars { display: inline-flex; }
 .stars-star { background: none; border: 0; padding: 0 .1rem; cursor: pointer; font-size: 1.4rem; line-height: 1; color: var(--text-dim); }
 .stars-star.on { color: var(--text); }
+/* The star is the drawn star Glyph (an outline) at the letters' size; a given star is filled. */
+.stars-star svg { display: block; width: 1em; height: 1em; }
+.stars-star.on svg { fill: currentColor; }
 /* A star not given is its outline only, so 4 of 5 reads at a glance (Jouni, 2026-09-26). */
-.stars-star:not(.on) { color: transparent; -webkit-text-stroke: 1px var(--text-dim); }
+.stars-star:not(.on) { color: var(--text-dim); }
 /* To give: the pointer on a star shows the rating it would give, dark up to that star. */
 .stars:not(.stars--shown):hover .stars-star:not(:disabled) { color: var(--text); }
+.stars:not(.stars--shown):hover .stars-star:not(:disabled) svg { fill: currentColor; }
 .stars:not(.stars--shown) .stars-star:not(:disabled):hover ~ .stars-star { color: var(--text-dim); }
+.stars:not(.stars--shown) .stars-star:not(:disabled):hover ~ .stars-star svg { fill: none; }
 /* Shown: a rating read in a line. */
 .stars--shown .stars-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
 /* The row cut: the shown stars small enough that five fit beside a status in a 7rem column. */

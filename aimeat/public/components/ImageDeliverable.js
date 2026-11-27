@@ -22,6 +22,7 @@
  *   import { detectImage, ImageView, DeliverableBody } from '/components/ImageDeliverable.js';
  *   const desc = detectImage(value, 'prompt'); desc && html`<${ImageView} desc=${desc} />`;
  * @version-history
+ *   v1.0.1 -- 2026-11-27 -- The failed line drops its warning emoji; the words stand alone.
  *   v1.0.0 -- 2026-06-13 -- Initial: shared image deliverable detector + renderer across the four
  *     agent surfaces (task result, memory, offers/inbox, workflow run). Pairs with the new
  *     deliverable.format:"image" offer field. See AIMEAT Development note doc-jjif4rs.
@@ -171,7 +172,7 @@ export function ImageView({ desc }) {
     };
   }, [url, authed]);
 
-  if (failed) return html`<div class="imgd imgd--fail" title=${alt}>⚠ ${t('imageDeliverable.failed')}</div>`;
+  if (failed) return html`<div class="imgd imgd--fail" title=${alt}>${t('imageDeliverable.failed')}</div>`;
   if (!src) return html`<div class="imgd imgd--loading">${t('imageDeliverable.loading')}</div>`;
   // For authed images the href opens the same blob; for anon, the original URL.
   const href = authed ? src : url;

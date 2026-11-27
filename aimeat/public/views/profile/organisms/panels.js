@@ -9,6 +9,7 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   v1.16.1 -- 2026-11-27 -- The board preview's Copy ID draws the copy Glyph instead of the clipboard emoji.
  *   v1.16.0 -- 2026-11-26 -- IncomingInvitations takes `id`, `num` and `onCount`: the Organisms page
  *     numbers its sections and lists them in its contents rail, so it is told how many invitations
  *     there are. With a number the section is the kit's numbered section, with its count. Additive.
@@ -53,7 +54,7 @@ import { t } from '/js/i18n.js';
 import { BoardNotice } from '/components/BoardNotice.js';
 import { PageSection } from '/components/PageSection.js';
 import { List, Row as ListRow, Name, Doors, Group, SearchLine } from '/components/List.js';
-import { Action, Icon } from '/components/Action.js';
+import { Action, Icon, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { HeadDesc } from '/components/SubHeading.js';
@@ -202,7 +203,7 @@ export function BoardPreview({ boardId, showToast }) {
     <${Split}>
       <${Row} align="start" gap="medium">
         <${HeadDesc}>${t('organisms.boardPreviewDesc') || 'Latest messages on this organism’s board.'}<//>
-        <${Icon} small title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} label=${t('organisms.copyId') || 'Copy ID'} onClick=${copyId}>${'📋'}<//>
+        <${Icon} small title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} label=${t('organisms.copyId') || 'Copy ID'} onClick=${copyId}><${Glyph} name="copy" /><//>
         <${Action} small onClick=${() => openTab('boards')}>${t('organisms.openBoardsTab') || 'Open in Boards'}<//>
       <//>
       ${posts === null ? html`<${Note} kind="loading" />`

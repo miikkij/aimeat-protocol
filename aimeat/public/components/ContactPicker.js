@@ -13,6 +13,8 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.2.4 — 2026-11-27 — A suggestion's kind mark (person, agent, app, mail) draws the Glyph marks
+ *     instead of emoji.
  *   v1.2.3 — 2026-11-14 — The field is marked data-find, so js/find-field-guard.js keeps the
  *     browser's own autofill (the owner's sign-in name) out of it.
  *   v1.2.2 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
@@ -35,11 +37,12 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Glyph } from '/components/Action.js';
 import * as contactsService from '/js/services/contacts.js';
 import { swallowed } from '/js/swallowed.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩', mail: '✉' };
+const KIND_ICON = { ghii: 'person', gaii: 'agent', geai: 'app', mail: 'mail' };
 
 /**
  * Identity picker input. Controlled: `value`/`onChange(text)` mirror a plain input, so hosts keep
@@ -147,14 +150,14 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
           ${suggestions.map((s, i) => html`
             <button type="button" class="contact-picker-item ${i === hi ? 'contact-picker-item-hi' : ''}" key=${s.id}
               onMouseDown=${(e) => { e.preventDefault(); pick(s); }}>
-              <span class="contact-picker-item-icon" aria-hidden="true">${KIND_ICON[s.kind] || '👤'}</span>
+              <span class="contact-picker-item-icon" aria-hidden="true"><${Glyph} name=${KIND_ICON[s.kind] || 'person'} /></span>
               <span class="contact-picker-item-label">${s.label}</span>
               <span class="contact-picker-item-id">${s.id}</span>
               ${s.source === 'directory' ? html`<span class="contact-picker-item-src">${t('contacts.fromDirectory') || 'directory'}</span>` : null}
             </button>`)}
           ${isEmail ? html`
             <button type="button" class="contact-picker-item contact-picker-item-resolve" onMouseDown=${(e) => { e.preventDefault(); doResolve(); }}>
-              <span class="contact-picker-item-icon" aria-hidden="true">${'✉'}</span>
+              <span class="contact-picker-item-icon" aria-hidden="true"><${Glyph} name="mail" /></span>
               <span class="contact-picker-item-label">${resolveState === 'busy' ? (t('contacts.resolving') || 'Looking up…') : (t('contacts.resolveAction') || 'Look up this email')}</span>
             </button>` : null}
           ${resolveState && resolveState !== 'busy' && !resolveState.found ? html`

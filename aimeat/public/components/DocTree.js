@@ -12,7 +12,7 @@
  *   tokens of css/components/colour-tag.css.
  *   It owns its behaviour: a document is dragged onto a section (or onto "Unsorted") to file it
  *   there, a series opens and closes on its head, a section's name is renamed on a double click or
- *   its ✎ and saved when the field is left or Enter is pressed.
+ *   its edit mark and saved when the field is left or Enter is pressed.
  *
  *   The data:
  *   - sections: [{ id, name, colour, items, children }] (children are sections again).
@@ -30,6 +30,9 @@
  * @structure DocTree(props)
  * @usage html`<${DocTree} sections=${tree} unsorted=${loose} words=${words} onOpen=${open} …>${theOpenDocument}<//>`
  * @version-history
+ *   v1.1.1 — 2026-11-27 — A section's rename and remove draw the edit and close Glyph marks instead
+ *     of the ✎ and ✕ letters; a series' open mark is the small Chevron (down while open, right while
+ *     closed) instead of ▾ ▸.
  *   v1.1.0 — 2026-11-27 — Archive, restore and delete draw the Glyph marks; they were emoji.
  *   v1.0.0 — 2026-09-26 — Initial: the document tree of views/profile/organisms/workspace/doc-space.js as
  *     a component with its own class names (.doc-tree*); the look it had inside a workspace page (the
@@ -40,7 +43,7 @@ import { h } from 'preact';
 import { useRef } from 'preact/hooks';
 import htm from 'htm';
 import { ColorPicker, colourClass } from '/components/ColorPicker.js';
-import { Icon, Glyph } from '/components/Action.js';
+import { Icon, Glyph, Chevron } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
@@ -89,7 +92,7 @@ export function DocTree(props) {
     return html`
       <div class="doc-tree-series" key=${'ser-' + it.key}>
         <button type="button" class="doc-tree-series-head" aria-expanded=${it.open ? 'true' : 'false'} onClick=${() => onSeries?.(it.key, !it.open)}>
-          <span class="doc-tree-arrow" aria-hidden="true">${it.open ? '▾' : '▸'}</span>
+          <span class="doc-tree-arrow" aria-hidden="true"><${Chevron} small down=${!!it.open} /></span>
           <span class="doc-tree-series-name">${it.name}</span>
           <${Mark} kind="count" tone="tally">${it.parts.length}<//>
           ${it.draft ? draft : null}
@@ -107,10 +110,10 @@ export function DocTree(props) {
               value=${sec.name} onInput=${(v) => onName?.(sec.id, v)} onBlur=${() => onNameDone?.()}
               onEnter=${(v, e) => e.currentTarget.blur()} /></span>`
           : html`<span class="doc-tree-sec-name sub-heading" onDblClick=${() => onRename?.(sec.id)}>${sec.name || words.unnamed}</span>`}
-        <${Icon} small label=${words.rename} onClick=${() => onRename?.(sec.id)}>✎<//>
+        <${Icon} small label=${words.rename} onClick=${() => onRename?.(sec.id)}><${Glyph} name="edit" /><//>
         <${Icon} small label=${words.newDocHere} onClick=${() => onNewDoc?.(sec.id)}>+<//>
         <${Icon} small label=${words.addSub} onClick=${() => onAddSub?.(sec.id)}>⊕<//>
-        <${Icon} small label=${words.remove} onClick=${() => onRemoveSection?.(sec.id)}>✕<//>
+        <${Icon} small label=${words.remove} onClick=${() => onRemoveSection?.(sec.id)}><${Glyph} name="close" /><//>
       </div>
       ${renderItems(sec.items)}
       ${(sec.children || []).map(renderSection)}

@@ -22,6 +22,8 @@
  *     ```
  *   Optional `owner: <gaii>` reads another identity's PUBLIC key via /v1/memory/:gaii/:key.
  * @version-history
+ *   v1.0.1 — 2026-11-27 — The error note drops its lock emoji; the message stands alone. The refresh
+ *     button draws the refresh Glyph instead of ↻ and has an accessible name.
  *   v1.0.0 — 2026-07-02 — Initial: live data embeds for organism/workspace documents.
  */
 import { h } from 'preact';
@@ -29,6 +31,7 @@ import { useEffect, useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { apiGet } from '/js/api.js';
 import { tOr } from '/js/i18n.js';
+import { Glyph } from '/components/Action.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -131,7 +134,7 @@ export function MemoryEmbed({ spec: rawSpec }) {
   const spec = parseEmbedSpec(rawSpec);
   let body;
   if (state.status === 'loading') body = html`<div class="md-mem-note">${tOr('markdown.embed.loading', 'Loading…')}</div>`;
-  else if (state.status === 'error') body = html`<div class="md-mem-note md-mem-err">🔒 ${state.msg}</div>`;
+  else if (state.status === 'error') body = html`<div class="md-mem-note md-mem-err">${state.msg}</div>`;
   else if (state.value == null) body = html`<div class="md-mem-note">${tOr('markdown.embed.empty', '(empty)')}</div>`;
   else {
     const view = pickView(spec, state.value);
@@ -146,7 +149,7 @@ export function MemoryEmbed({ spec: rawSpec }) {
       <div class="md-mem-head">
         <span class="md-mem-title">${spec.title || spec.key || 'aimeat-memory'}</span>
         ${state.updatedAt ? html`<span class="md-mem-upd">${fmtDateTime(state.updatedAt)}</span>` : null}
-        <button type="button" class="md-mem-refresh" title=${tOr('markdown.embed.refresh', 'Refresh')} onClick=${load}>↻</button>
+        <button type="button" class="md-mem-refresh" title=${tOr('markdown.embed.refresh', 'Refresh')} aria-label=${tOr('markdown.embed.refresh', 'Refresh')} onClick=${load}><${Glyph} name="refresh" /></button>
       </div>
       ${body}
     </div>

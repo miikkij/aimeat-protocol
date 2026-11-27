@@ -9,6 +9,8 @@
  * @structure gotoEvent, openOvRec, gotoHit, renderWsSearchResults, openOvDoc, ovAddNew, renderObjectives
  * @usage import { gotoEvent, renderObjectives } from '/views/profile/organisms/workspace/overview.js';
  * @version-history
+ *   v2.7.1 — 2026-11-27 — A measure that meets its target ends with ✓ and one that misses it with ✗,
+ *     instead of the check and warning emoji.
  *   v2.7.0 — 2026-09-26 — Every part is a library component that takes data: a search's hits are a
  *     List per space under its Group heading with the tally count (the name opens the hit, the snippet
  *     under it); the objectives stand under their Group heading, each in the Object box with its
@@ -111,7 +113,7 @@ export function renderObjectives(ctx) {
               const val = (k.current === null || k.current === undefined) ? '—' : String(k.current);
               return {
                 key: k.name || ki, k: k.name,
-                v: `${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}`,
+                v: `${val}${unit}${ok === true ? ' ✓' : ok === false ? ' ✗' : ''}`,
                 sub: tgt || k.computed === false ? html`${tgt ? html`<span>${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}${tgt && k.computed === false ? ' · ' : null}${k.computed === false ? html`<span title=${t('organisms.kpiDeclaredHint') || 'Self-reported, not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}` : undefined,
               };
             })} />` : null}

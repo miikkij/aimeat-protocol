@@ -23,6 +23,7 @@
  *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.22.2 -- 2026-11-27 -- The OpenRouter key and credits links draw the external Glyph after their words instead of ↗.
  *   v3.22.1 -- 2026-10-13 -- The 410 switch is legacyOr in js/services/ai-connection.js, shared with the other screens of
  *     the connection. On the provider path a removal reads the connection again, since a retired one can stay.
  *   v3.22.0 -- 2026-10-12 -- On node 4.0.0 (the old route answers 410) the panel works on the owner's provider
@@ -101,7 +102,7 @@ import { AiAppsBudgetPanel } from './openrouter/budget-panel.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { Box } from '/components/Box.js';
 import { Card } from '/components/Card.js';
-import { Action, Actions, Loud } from '/components/Action.js';
+import { Action, Actions, Loud, Glyph } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
@@ -457,8 +458,8 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
                 ${connMsg && html`<${Note} kind="message" error=${connMsg.error}>${connMsg.text}<//>`}
                 ${isOpenRouter && html`
                   <${Actions}>
-                    <${Action} small soft href="https://openrouter.ai/keys" newTab>${t('profile.openrouter.getKeyLink')} ↗<//>
-                    <${Action} small soft href="https://openrouter.ai/credits" newTab>${t('profile.openrouter.creditsLink')} ↗<//>
+                    <${Action} small soft href="https://openrouter.ai/keys" newTab>${t('profile.openrouter.getKeyLink')} <${Glyph} name="external" /><//>
+                    <${Action} small soft href="https://openrouter.ai/credits" newTab>${t('profile.openrouter.creditsLink')} <${Glyph} name="external" /><//>
                   <//>`}
               <//>
             <//>

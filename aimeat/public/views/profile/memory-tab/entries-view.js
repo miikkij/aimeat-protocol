@@ -8,6 +8,8 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.5.1 -- 2026-11-27 -- The rules box's close and the search field's clear draw the close Glyph
+ *     instead of the ✕ letter; Clear selection and Clear search say their words alone.
  *   v2.5.0 -- 2026-11-27 -- No emoji in a control: a key group's search and delete Icons draw the
  *     Glyph marks (search, trash); the Archived filter, the bulk "Add to collection", "Copy value" and the
  *     key rules button and heading say their word alone. The key-rules Icon draws the shield Glyph and each row's
@@ -242,7 +244,7 @@ export function renderEntries(ctx) {
       <${Stack}>
         <${Line} justify="between">
           <${SubHeading} inline>${rulesWord}<//>
-          <${Icon} small label=${t('common.close')} onClick=${() => setKeyRulesPopover(null)}>✕<//>
+          <${Icon} small label=${t('common.close')} onClick=${() => setKeyRulesPopover(null)}><${Glyph} name="close" /><//>
         <//>
         <${Note} kind="meta">${visLabel} ${t('knowledge.visibility.' + keyRulesPopover.visibility) || keyRulesPopover.visibility}<//>
         ${keyRulesPopover.rules.length === 0
@@ -392,7 +394,7 @@ export function renderEntries(ctx) {
       <${SearchLine} beside text value=${searchInput} placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
         onInput=${e => setSearchInput(e.target.value)} onEnter=${() => runServerSearch(searchInput, searchScopePrefix)}>
         <${Action} small disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}<//>
-        ${searchResults !== null ? html`<${Icon} small label=${t('profile.memory.searchClear') || 'Clear search'} onClick=${clearServerSearch}>✕<//>` : null}
+        ${searchResults !== null ? html`<${Icon} small label=${t('profile.memory.searchClear') || 'Clear search'} onClick=${clearServerSearch}><${Glyph} name="close" /><//>` : null}
       <//>
       <${SearchLine} beside text value=${filterText} placeholder=${t('profile.memory.filterType')}
         onInput=${e => setFilterText(e.target.value)} onClear=${() => setFilterText('')} />
@@ -428,7 +430,7 @@ export function renderEntries(ctx) {
           <${Action} small onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}<//>
           <${Action} small onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>${t('profile.memory.cartAddSelected') || 'Add to collection'}<//>
           <${Action} small tone="danger" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}<//>
-          <${Action} small onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}<//>
+          <${Action} small onClick=${() => setSelectedKeys(new Set())}>${t('profile.memory.bulkClear') || 'Clear selection'}<//>
         <//>
       <//>
     ` : null}
@@ -436,7 +438,7 @@ export function renderEntries(ctx) {
       ? html`
           <${Line} justify="between" below="small">
             <${Note} kind="meta" inline>${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${searchScopePrefix}` : ''}<//>
-            <${Action} small onClick=${clearServerSearch}>✕ ${t('profile.memory.searchClear') || 'Clear search'}<//>
+            <${Action} small onClick=${clearServerSearch}>${t('profile.memory.searchClear') || 'Clear search'}<//>
           <//>
           <${List} cols="check-name-size-when-mark-doors" keepCols empty=${t('profile.memory.searchEmpty') || 'No matches'}>
             ${sortEntries(searchResults, sortBy).map(m => renderRow(m, groupOfKey(m.key)))}

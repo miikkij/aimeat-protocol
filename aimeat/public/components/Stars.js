@@ -17,6 +17,8 @@
  * @usage html`<${Stars} value=${task.rating.stars} />` ·
  *        html`<${Stars} value=${stars} onPick=${setStars} label=${t('x.rate')} />`
  * @version-history
+ *   v1.3.0 — 2026-11-27 — Each star is the drawn star Glyph instead of the ★ letter; rating-stars.css
+ *     fills a given star and draws the others as outlines.
  *   v1.2.0 — 2026-09-27 — The stars draw their own class names (.op-stars → .stars, .op-star →
  *     .stars-star, .op-stars--shown → .stars--shown, .op-stars--row → .stars--row); every rule keeps its
  *     value (Jouni: components draw only their own class names, a move).
@@ -27,6 +29,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { Glyph } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -37,11 +40,11 @@ export function Stars({ value, onPick, row, disabled, label }) {
   if (typeof onPick === 'function') {
     return html`<span class="stars" role="radiogroup" aria-label=${label}>
       ${FIVE.map((i) => html`<button type="button" key=${i} class=${cx('stars-star', i <= n && 'on')} disabled=${disabled}
-        aria-label=${String(i)} title=${String(i)} aria-pressed=${i <= n ? 'true' : 'false'} onClick=${() => onPick(i)}>★</button>`)}
+        aria-label=${String(i)} title=${String(i)} aria-pressed=${i <= n ? 'true' : 'false'} onClick=${() => onPick(i)}><${Glyph} name="star" /></button>`)}
     </span>`;
   }
   return html`<span class=${cx('stars', 'stars--shown', row && 'stars--row')} role="img" aria-label=${`${n}/5`}>
-    ${FIVE.map((i) => html`<span key=${i} class=${cx('stars-star', i <= n && 'on')} aria-hidden="true">★</span>`)}
+    ${FIVE.map((i) => html`<span key=${i} class=${cx('stars-star', i <= n && 'on')} aria-hidden="true"><${Glyph} name="star" /></span>`)}
   </span>`;
 }
 

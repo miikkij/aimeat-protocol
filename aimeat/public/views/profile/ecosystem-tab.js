@@ -12,6 +12,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.29.1 -- 2026-11-27 -- An app row's open mark draws the Chevron (down while open, right while closed) instead of ▼ ▶.
  *   v3.29.0 -- 2026-11-27 -- With nothing connected and nothing waiting the strip is not drawn (FigureStrip hideZeros) and the list says in one empty line how an app gets here (it replaces the two empty notes); an app that waits comes first in the list and a disconnected one last; the one-entry contents rail goes.
  *   v3.28.0 -- 2026-11-27 -- The page leads with where things stand: a figure strip (connected apps, requests that wait, when an app was last here) from the lists it already reads, then the apps as section 01 (eco-apps) with the contents rail. Approving a waiting request is the page's one loud action; the emoji before an app's name goes (no emoji in the interface). No control was removed.
  *   v3.27.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: a waiting request's access level (ecosystem.grantLevel), and on the app's card the publish cadence, the guidance delivery, the trigger key (ecosystem-tab.automation.js) and the event picker (ecosystem-tab.cards.js) (.claude/rules/page-guidance.md).
@@ -174,7 +175,7 @@ import { PageSection } from '/components/PageSection.js';
 import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Folds } from '/components/Folds.js';
-import { Action, Loud, Icon, Actions } from '/components/Action.js';
+import { Action, Loud, Icon, Actions, Chevron } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Select } from '/components/Select.js';
@@ -422,7 +423,7 @@ export default function EcosystemTab({ onStats, showToast }) {
               <${Doors}>
                 <${Mark} kind="status" tone=${appStatusTone(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}<//>
                 <${Mark} kind="time">${app.last_seen ? timeAgo(app.last_seen) : ''}<//>
-                <${Icon} small>${isOpen ? '▼' : '▶'}<//>
+                <${Icon} small><${Chevron} down=${isOpen} /><//>
               <//>
             <//>`;
         })}<//>

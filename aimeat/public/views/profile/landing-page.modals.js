@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.10.1 — 2026-11-27 — The avatar preview with no avatar typed draws the person Glyph instead of
+ *     a smiling emoji; an avatar the person typed is shown as typed.
  *   v1.10.0 — 2026-10-27 — A refused profile save shows each field's message under that field (WithFieldErrors, js/field-errors.js); a message for a field the dialog does not draw goes to the toast (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.9.0 — 2026-09-26 — Every part is a kit component (the dialogs' fields TextField, TextArea, Select, Check, Choice and Field in a Stack; the picture's preview MastheadPreview; the password's eye TextField secret with its Show and Hide words, kept as main had it; the requirements the List's small cut with Tick; the presence button PresenceButton; Note, Action, Loud): this file writes no class (page group G8).
  *   v1.8.0 — 2026-09-26 — The overview's head is the home's head, the Masthead (components/Masthead.js); the head's own rules go, the address line and the marks keep theirs. The account dialog's preview of your picture is framed as the head frames it (.poster-frame); its size stays (a unification: Jouni's decision "Person head").
@@ -49,7 +51,7 @@ import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.
 import { List, Row, Tick, Cell } from '/components/List.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Glyph } from '/components/Action.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 
 /* ───── Edit Profile Modal ───── */
@@ -145,7 +147,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
             <${TextField} name="avatar" label=${t('profile.landing.editAvatar')} value=${fields.avatar}
               placeholder=${t('profile.landing.editAvatarPlaceholder')} maxLength=${50}
               onInput=${(v) => set('avatar', v)}
-              actions=${html`<${MastheadPreview}>${fields.avatar || '🙂'}<//>`} />
+              actions=${html`<${MastheadPreview}>${fields.avatar || html`<${Glyph} name="person" />`}<//>`} />
             <${Select} name="locale" label=${t('profile.landing.editLocale')} value=${fields.locale} onChange=${(v) => set('locale', v)}
               options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]}
               hint=${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'} />

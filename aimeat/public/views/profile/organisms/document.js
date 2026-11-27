@@ -9,6 +9,8 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   2026-11-27 — The image upload button drops its camera emoji; its words stand alone. Open in its
+ *     own window draws the external Glyph instead of the ⧉ sign (it opens a new window, not a copy).
  *   2026-10-31 — The editor sanitizes HTML with js/editor-html-sanitizer.js instead of the DOMPurify
  *     2.3.3 bundled in Toast UI, so another member's raw HTML reaches the Markdown preview as plain
  *     inert markup (secaudit2026oct31w2 round 10).
@@ -66,7 +68,7 @@ import { DocView, DocSplit } from '/components/DocView.js';
 import { sanitizeEditorHtml } from '/js/editor-html-sanitizer.js';
 import { Facts } from '/components/Facts.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud, Icon, Glyph } from '/components/Action.js';
 import { Box } from '/components/Box.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -169,7 +171,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
       ]} />` : null}
     <${Action} small onClick=${onEdit}>${t('organisms.edit') || 'Edit'}<//>
     ${page._draft ? html`<${Loud} control onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>` : null}
-    ${onPopOut ? html`<${Icon} small label=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}<//>` : null}`;
+    ${onPopOut ? html`<${Icon} small label=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}><${Glyph} name="external" /><//>` : null}`;
   const facts = (created || savedAt || publishedAt) ? html`<${Facts} rows=${[
     created && { k: t('organisms.createdAt') || 'Created', v: dt(created) },
     savedAt && { k: t('organisms.lastSaved') || 'Last saved', v: dt(savedAt) },
@@ -333,7 +335,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     <${Stack} above="small" below="small">
       <${TextField} placeholder=${titleWords} ariaLabel=${titleWords} value=${title} onInput=${setTitle} />
       <${Line} wrap gap="small">
-        <${FileDrop} button=${'📷 ' + (t('organisms.insertImage') || 'Upload image from file')} accept="image/*" onFiles=${([f]) => insertFromFile(f)} />
+        <${FileDrop} button=${t('organisms.insertImage') || 'Upload image from file'} accept="image/*" onFiles=${([f]) => insertFromFile(f)} />
         <${Note} inline>${t('organisms.orPaste') || '…or paste / drag an image into the editor'}<//>
       <//>
       ${images.length ? html`

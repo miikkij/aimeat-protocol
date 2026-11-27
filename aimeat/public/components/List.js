@@ -100,6 +100,8 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.18.4 — 2026-11-27 — A foldable group heading draws the drawn Chevron instead of the arrow letters.
+ *   v1.18.3 — 2026-11-27 — SearchLine's clear button draws the close Glyph instead of the ✕ letter.
  *   v1.18.2 — 2026-11-14 — SearchLine's field is a find field the browser's autofill cannot fill
  *     (data-find, typedByPerson; js/find-field-guard.js): Edge on Android wrote the owner's sign-in
  *     name into the App Catalog search, whose field is type="text".
@@ -192,7 +194,7 @@
 import { h, createContext, Fragment } from 'preact';
 import { useContext } from 'preact/hooks';
 import htm from 'htm';
-import { Actions } from '/components/Action.js';
+import { Actions, Glyph, Chevron } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { CardMenu } from '/components/CardMenu.js';
@@ -495,7 +497,7 @@ export function Group({ title, count, folded, onFold, foldLabel, doors, quiet, w
     <div class=${cx('poster-day-title list-group-head', quiet && 'poster-day-title--quiet', headFolds && 'list-group-head--folds', apart && 'list-group-head--apart')}
       onClick=${headFolds ? onFold : undefined} onDragOver=${onDragOver} onDrop=${onDrop}>
       ${foldable ? html`<button type="button" class="poster-icon poster-icon--small" title=${foldLabel} aria-label=${foldLabel}
-        aria-expanded=${folded ? 'false' : 'true'} onClick=${headFolds ? (e) => { e.stopPropagation(); onFold(e); } : onFold}>${folded ? '→' : '↓'}</button>` : null}
+        aria-expanded=${folded ? 'false' : 'true'} onClick=${headFolds ? (e) => { e.stopPropagation(); onFold(e); } : onFold}><${Chevron} small down=${!folded} /></button>` : null}
       <span class="list-group-title">${title}</span>
       ${count !== undefined && count !== null ? html`<${Mark} kind="count" tone="tally">${count}<//>` : null}
       ${doors ? html`<span class="list-group-doors" onClick=${stop}>${doors}</span>` : null}
@@ -542,7 +544,7 @@ export function SearchLine({ value, onInput, onEnter, onClear, placeholder, labe
       autocomplete="off" data-find data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
       spellcheck=${big ? false : undefined}
       autofocus=${autofocus} onInput=${onInput ? (e) => { if (typedByPerson(e, value ?? '')) onInput(e); } : undefined} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
-    ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}>✕</button>` : null}
+    ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}><${Glyph} name="close" /></button>` : null}
     ${children}
     ${note !== undefined && note !== null && note !== '' ? html`<small>${note}</small>` : null}
   </div>`;

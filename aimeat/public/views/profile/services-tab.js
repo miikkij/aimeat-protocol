@@ -6,6 +6,7 @@
  *   explains itself the designed way (.claude/rules/page-guidance.md): the page's start (PageStart
  *   "actions") and the title's question mark (concept.service).
  * @version-history
+ *   v1.23.1 -- 2026-11-27 -- A service row's open mark draws the Chevron (down while open, right while closed) instead of ▼ ▶.
  *   v1.23.0 -- 2026-11-27 -- Settings usability pass: the two view tabs become sections beside the
  *     contents rail. 01 My services (svc-mine) is open and first, with the publish form opening in
  *     place over the list; 02 Catalogue (svc-catalogue) is one row that says what it holds and reads
@@ -83,7 +84,7 @@ import { scrollToSection } from '/components/Rail.js';
 import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud, Icon, Chevron } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Card } from '/components/Card.js';
 import { Fields, FormActions } from '/components/Field.js';
@@ -132,7 +133,7 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
           ${category && html`<${Mark}>${category}<//>`}
           <${Mark}>${priceAndPacing(svc, t)}<//>
         <//>
-        <${Icon} small expanded=${!!expanded}>${expanded ? '▼' : '▶'}<//>
+        <${Icon} small expanded=${!!expanded}><${Chevron} down=${!!expanded} /><//>
       <//>
       ${expanded && html`
         <${Panel} doors=${actions}>

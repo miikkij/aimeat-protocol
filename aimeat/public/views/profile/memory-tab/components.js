@@ -8,6 +8,8 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.4.1 -- 2026-11-27 -- A collection row's remove draws the close Glyph instead of the ✕ letter;
+ *     Open in new tab draws the external Glyph after its words instead of ↗.
  *   v2.4.0 -- 2026-11-27 -- No emoji before a word in a control: the collection's heading and "Copy URL
  *     list" and the two downloads say their word alone. A collection row's mark is the file Glyph
  *     for a file and the word "entry" (as the Lead's letters) for a record, which has no Glyph.
@@ -201,7 +203,7 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
                 ? html`<${Lead} label=${t('profile.memory.cover.kindFile')}><${Glyph} name="file" /><//>`
                 : html`<${Lead} text=${t('profile.memory.cover.kindEntry')} label=${t('profile.memory.cover.kindEntry')} />`}
               <${Name} title=${it.key}>${it.label || it.key}<//>
-              <${Doors}><${Icon} small label=${removeWords} onClick=${() => onRemove(idOf(it))}>✕<//><//>
+              <${Doors}><${Icon} small label=${removeWords} onClick=${() => onRemove(idOf(it))}><${Glyph} name="close" /><//><//>
             <//>`)}
         <//>
         <${Actions}>
@@ -304,7 +306,7 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
       noneLabel=${t('profile.files.noPreview') || 'No preview for this file type: download it instead'}
       onClose=${onClose}
       doors=${html`
-        <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗<//>
+        <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} <${Glyph} name="external" /><//>
         <${Action} onClick=${() => onDownload(file)}>${t('profile.files.download')}<//>`}>
       <${FileFacts} file=${file} />
     <//>`;

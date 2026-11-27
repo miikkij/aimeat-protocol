@@ -15,6 +15,8 @@
  * @structure renderCover · lettersSub · secAddress · addressBody · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.25.1 -- 2026-11-27 -- The mailboxes list carries a head row (mailbox, what your agent does, state), as
+ *     every list of columns on a Settings page does.
  *   v1.25.0 -- 2026-11-27 -- A mailbox that needs a new sign-in has "Connect again" as its row's main action, the
  *     same connect round its service's Connect starts; Remove stays beside it in the quiet tone. Such a mailbox
  *     is read from the server's own status, 'needs_reauth' (js/connection-wait.js needsSignIn): the page tested
@@ -236,7 +238,7 @@ function secMailboxes(ctx, num, first) {
     .sort((a, b) => (mailboxRank(a) - mailboxRank(b)) || (a.i - b.i));
   return html`
     <${PageSection} id="em-mailboxes" num=${num} title=${c('secMailboxes')} count=${c('secMailboxesSub')} first=${first}>
-      <${List} cols="mark-name-desc-doors" keepCols empty=${c('noProviders')}>
+      <${List} cols="mark-name-desc-doors" keepCols head=${rows.length ? ['', c('colMailbox'), c('colAgentDoes'), c('colState')] : null} empty=${c('noProviders')}>
         ${rows.map(({ p, conn }) => {
           const deleg = conn && (ctx.delegations[conn.id] || []).length;
           return html`

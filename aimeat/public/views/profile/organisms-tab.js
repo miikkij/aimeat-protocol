@@ -19,6 +19,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.42.2 -- 2026-11-27 -- An organism's counts (workspaces, members, agents) draw the folder,
+ *     people and agent Glyph marks instead of emoji; Import says its word alone.
  *   v2.42.1 -- 2026-11-27 -- A shared place's menu says its actions in words; each carried an emoji.
  *   v2.42.0 -- 2026-11-26 -- The list page leads with where things stand: a figure strip (the shared
  *     places the person is in, what waits for them there, the archived ones, the ones to discover),
@@ -117,7 +119,7 @@ import { useWaiting } from '/views/home/waiting-data.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { List, Row as ListRow, Lead, Name, Cell, Stats, Stat, Doors, Group, SearchLine } from '/components/List.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Glyph } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Facts } from '/components/Facts.js';
@@ -570,10 +572,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               and still holds its place. */ ''}
         <${Stats}>
           ${isMine && wsCounts[org.id] !== undefined
-            ? html`<${Stat} icon=${'📁'} title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${wsCounts[org.id]}<//>`
+            ? html`<${Stat} icon=${html`<${Glyph} name="folder" />`} title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${wsCounts[org.id]}<//>`
             : html`<${Stat} />`}
-          <${Stat} icon=${'👥'} title=${t('organisms.members') || 'Members'}>${org.member_count ?? (org.members || []).length}<//>
-          <${Stat} icon=${'🤖'} title=${t('organisms.attachedAgents') || 'Attached agents'}>${(org.agentGaiis || []).length}<//>
+          <${Stat} icon=${html`<${Glyph} name="people" />`} title=${t('organisms.members') || 'Members'}>${org.member_count ?? (org.members || []).length}<//>
+          <${Stat} icon=${html`<${Glyph} name="agent" />`} title=${t('organisms.attachedAgents') || 'Attached agents'}>${(org.agentGaiis || []).length}<//>
           ${org.createdAt
             ? html`<${Stat} date title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}<//>`
             : html`<${Stat} date />`}
@@ -801,7 +803,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             ['name', t('organisms.sortName') || 'Name A–Z'],
             ['newest', t('organisms.sortNewest') || 'Newest first'],
           ]} />` : null}
-      <${Action} small disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import'}<//>
+      <${Action} small disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${t('organisms.importOrg') || 'Import'}<//>
       <${Loud} control onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}<//>`}>
     ${(() => {
       // Active organisms drive the working list; archived ones move into a collapsed "Archived"

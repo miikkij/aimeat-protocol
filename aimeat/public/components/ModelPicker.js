@@ -34,6 +34,7 @@
  *          searchLabel=${x('searchModels', { n: pool.length })} … />`
  *        html`<${ModelPicker} label=${t('profile.openrouter.model.default')} value=${model} onChange=${setModel} models=${models} />`
  * @version-history
+ *   v1.1.1 — 2026-11-27 — A model row's link to its own page draws the external Glyph instead of ↗.
  *   v1.1.0 — 2026-11-20 — ModelPicker takes `notInListLabel`, `customLabel` and `customHint`: a page
  *     whose list is the models the person may use says so (the AI page's provider models). Without
  *     them the words are the classic settings' as before.
@@ -45,7 +46,7 @@ import { h } from 'preact';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { Action, Icon } from '/components/Action.js';
+import { Action, Icon, Glyph } from '/components/Action.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
@@ -76,7 +77,7 @@ function Row({ m, d, on, taken, disabled, onPick }) {
         <span class="model-picker-price">${d.price || ''}</span>
         <span class="model-picker-ctx">${d.context || ''}</span>
       </button>
-      ${d.href ? html`<${Icon} small href=${d.href} newTab label=${d.hrefLabel}>↗<//>` : null}
+      ${d.href ? html`<${Icon} small href=${d.href} newTab label=${d.hrefLabel}><${Glyph} name="external" /><//>` : null}
     </li>`;
 }
 

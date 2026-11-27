@@ -15,6 +15,8 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.25.1 -- 2026-11-27 -- The upcoming and rare run lists carry a head row (when, run, who runs it,
+ *     starts in), as every list of columns on a Settings page does.
  *   v1.25.0 -- 2026-11-27 -- The person's schedules (sc-all, the register) are section 01, a schedule whose last run
  *     failed at its top; what fires next, the week's rhythm and the rest follow, numbered after the filter. The
  *     continuous and the rarer schedules are FoldSection rows that say how many (or how many failed, or when the next
@@ -196,9 +198,11 @@ function renderCover(ctx) {
 }
 
 /* ── 01 What fires next ────────────────────────────────────────────────────────────────────── */
+/** The head row of a list of runs: when, which run, who runs it, how long until it starts. */
+const runHead = () => [c('colWhen'), c('colRun'), c('colWho'), c('colIn')];
 function agendaRows(ctx, list) {
   const nowMs = Date.now();
-  return html`<${List} cols="when-name-who-in" keepCols>
+  return html`<${List} cols="when-name-who-in" keepCols head=${list.length ? runHead() : null}>
     ${list.map((o, i) => html`
       <${Row} key=${i}>
         <${Cell}><${Figure} small n=${hhmm(o.at)} sub=${dayLabel(o.at)} /><//>
@@ -272,7 +276,7 @@ function secRare(ctx, n) {
   const sub = ctx.occLoading ? t('profile.scheduler.cal.loading')
     : list.length ? c('rareSub', { n: list.length, d: fmtDate(new Date(list[0].nextRunAt), { day: 'numeric', month: 'numeric' }) }) : c('secRareSub');
   return html`<${FoldSection} id="sc-rare" num=${n} title=${c('secRare')} sub=${sub} open=${ctx.rareOpen} onToggle=${() => ctx.setRareOpen(v => !v)}>
-    <${List} cols="when-name-who-in" keepCols empty=${c('noneRare')}>
+    <${List} cols="when-name-who-in" keepCols head=${list.length ? runHead() : null} empty=${c('noneRare')}>
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
         <${Row} key=${s.id}>
           <${Cell}><${Figure} small n=${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })} sub=${`${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}`} /><//>

@@ -25,6 +25,8 @@
  * @usage html`<${Folds}>${events.map((e) => html`<${FoldRow} key=${e.id} num=${rel(e.at)} who=${e.actor} verb=${x('edited')} name=${e.title} onClick=${() => go(e)} />`)}<//>`
  *        html`<${FoldRow} kind="toggle" name=${x('addManual')} right=${x('addManualSub')} open=${f.open} onClick=${() => setOpen(!f.open)} />`
  * @version-history
+ *   v1.1.1 — 2026-11-27 — A row that opens draws the drawn Chevron (right while closed, down while open)
+ *     instead of the arrow letters, as every fold on a Settings page does.
  *   v1.1.0 — 2026-09-26 — FoldRow `doors`: a row's own actions beside its button, shown on hover and
  *     focus, as main's memory key groups showed their search and delete (additive, page group G3).
  *   v1.0.0 — 2026-09-26 — Initial: the og-fold rows the pages wrote by hand, as data (component plan C9).
@@ -32,6 +34,7 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -57,7 +60,7 @@ export function FoldRow({ kind, num, who, verb, name, isKey, right, open, done, 
     onClick?.(e);
   };
   const k = kind || (onClick || keeps || onToggle ? 'event' : 'row');
-  const arrow = opens ? html`<span class="og-fold-arrow">${isOpen ? '↓' : '→'}</span>` : null;
+  const arrow = opens ? html`<span class="og-fold-arrow"><${Chevron} small down=${isOpen} /></span>` : null;
   const parts = html`
     ${shown(num) ? html`<i>${num}</i>` : null}
     ${shown(who) ? html`<span class="og-fold-who">${who}</span>` : null}

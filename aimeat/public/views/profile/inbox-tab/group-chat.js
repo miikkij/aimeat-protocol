@@ -11,6 +11,7 @@
  * @structure isChatGroup · useGroupChat · GroupComposePane · GroupMembersStrip · GroupInvitations
  * @usage const group = useGroupChat({ showToast, loadLists, activeConv, openConversation, confirm, goIdle });
  * @version-history
+ *   v1.0.1 — 2026-11-27 — A member chip's remove mark is the Tag's default ✗ instead of ✕.
  *   v1.0.0 — 2026-10-21 — Initial.
  */
 import { h } from 'preact';
@@ -177,7 +178,7 @@ export function GroupComposePane({ showToast, sending: outerSending, onOpened, p
           <${TextField} placeholder=${t('inbox.group.namePlaceholder')} value=${name} onInput=${setName} />
           ${members.length ? html`<${Marks}>
             ${members.map(m => html`<${Mark} key=${m} onRemove=${() => setMembers(members.filter(x => x !== m))}
-              removeLabel=${t('inbox.group.remove')} removeGlyph="✕">${peerDisplay(m)}<//>`)}
+              removeLabel=${t('inbox.group.remove')}>${peerDisplay(m)}<//>`)}
           <//>` : null}
           <${Line}>
             <${ContactPicker} value=${input} onChange=${setInput} onSubmit=${add} valueMode="full"

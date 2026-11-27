@@ -9,6 +9,8 @@
  *   TurnError({ message, onRetry, fixHref, choices, onFreeModel })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.5.2 — 2026-11-27 — A turn's copy draws the copy Glyph instead of the ⧉ sign.
+ *   v1.5.1 — 2026-11-27 — A turn's file link draws the file Glyph instead of the page emoji.
  *   v1.5.0 — 2026-11-02 — A saved agent turn with no words, work or cards reads chatTurn.noAnswer, the
  *     sentence the node now saves in such a turn, instead of drawing nothing.
  *   v1.4.1 — 2026-10-31 — A saved turn's work log is drawn as ended (WorkLog `ended`).
@@ -29,6 +31,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { speak, stop as stopSpeaking, isSpeechSupported, textToParagraphs } from '/js/services/speech-reader.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Glyph } from '/components/Action.js';
 import { ImageView } from '/components/ImageDeliverable.js';
 import { time as fmtTime } from '/js/format.js';
 import { WorkLog } from '/components/WorkLog.js';
@@ -87,7 +90,7 @@ export function Turn({ turn: saved, id }) {
                                 ? html`<${ImageView} key=${key}
                                     desc=${{ url: `/v1/storage/${encodeURIComponent(key)}`, alt: key }} />`
                                 : html`<a class="poster-turn-file" key=${key} target="_blank" rel="noopener noreferrer"
-                                    href=${`/v1/storage/${encodeURIComponent(key)}`}>📄 ${key.split('/').pop()}</a>`))}
+                                    href=${`/v1/storage/${encodeURIComponent(key)}`}><${Glyph} name="file" /> ${key.split('/').pop()}</a>`))}
                         </div>`;
                 })()}
                 ${mine
@@ -102,7 +105,7 @@ export function Turn({ turn: saved, id }) {
                 <!-- The RAW markdown, which is what pastes usefully into an editor or another chat.
                      Same control and same behaviour as the message bubbles in the inbox. -->
                 ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="poster-action poster-action--text poster-turn-copy"
-                    label="⧉" copiedLabel="✓"
+                    label=${html`<${Glyph} name="copy" />`} copiedLabel="✓"
                     title=${tr('chat.copyTurn', 'Copy this message')} copiedTitle=${t('common.copied')}
                     ariaLabel=${tr('chat.copyTurn', 'Copy this message')} />` : ''}
                 ${!mine && turn.text && isSpeechSupported() ? html`

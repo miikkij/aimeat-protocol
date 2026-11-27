@@ -23,6 +23,7 @@
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
  *   html`<${PromptCard} loud=${!copied} quiet=${copied} label=… prompt=… copyLabel=… />`
  * @version-history
+ *   2026-11-27: The More menu button draws the down Chevron instead of the ▾ letter.
  *   2026-09-27: `loud` and `quiet` name the copy's weight (the loud action or the action link), so a
  *     page passes a meaning instead of a class; `className` stays for the callers that pass one
  *     (additive, page group G9).
@@ -38,6 +39,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Chevron } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -111,7 +113,7 @@ export function PromptCard({
             <button type="button" class="poster-icon poster-icon--small poster-prompt-more"
               aria-expanded=${open}
               aria-label=${tr('prompt.more', 'More')}
-              onClick=${(e) => { stop(e); setOpen(v => !v); }}>▾</button>`}
+              onClick=${(e) => { stop(e); setOpen(v => !v); }}><${Chevron} down /></button>`}
         </div>
       </div>
 

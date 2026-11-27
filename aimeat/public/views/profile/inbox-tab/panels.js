@@ -7,6 +7,10 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.20.1 — 2026-11-27 — No emoji: the announcement note, the Tracked and Results heads and Open
+ *     record keep their words alone; Open conversation draws the chat Glyph; a sent broadcast's row
+ *     draws the chart Glyph (a poll) or the mail Glyph (a message); a recipient chip's remove mark is
+ *     the Tag's default ✗.
  *   v2.20.0 — 2026-10-26 — Each message gets the thread's `reactions` (its marks and "React"); not in
  *     a thread one of the person's agents had, whose copies are the agent's.
  *   v2.19.0 — 2026-10-21 — A group chat's head shows the group's name, its picture and its members, with
@@ -85,7 +89,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getSession, getGhii } from '/js/services/auth.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud, Icon, Glyph } from '/components/Action.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Message, Thread, ThreadDay, ThreadTop, flashMessage } from '/components/Message.js';
@@ -213,7 +217,7 @@ export function ThreadPanel({
           ? html`<${CommandBar} commands=${agentCommands} onPick=${(c) =>
               (Array.isArray(c.params) && c.params.length) ? setCmdFill(c) : insertCommand(c, {})} />` : null)}
       ${isAnnouncement
-        ? html`<${PaneNote}>📢 ${t('inbox.announcementNote')}<//>`
+        ? html`<${PaneNote}>${t('inbox.announcementNote')}<//>`
         : html`${replyQuote ? html`<${ReplyBar} label=${`↩ ${t('inbox.replyingTo')} ${quoteSender(replyQuote)}`}
             text=${quoteSnippet(replyQuote.body)} onJump=${() => jumpTo(replyQuote.id)}
             cancelLabel=${t('inbox.quoteCancel')} onCancel=${() => setReplyQuote?.(null)} />` : null}
@@ -243,7 +247,7 @@ export function renderBroadcastForm({
             : html`<${PollBuilder} questions=${bcQuestions} setQuestions=${setBcQuestions} />`}
           ${bcRecipients.length ? html`<${Marks}>
             ${bcRecipients.map(r => html`<${Mark} key=${r} onRemove=${() => removeBcRecipient(r)}
-              removeLabel=${t('inbox.bcRemove')} removeGlyph="✕">${peerName(r)}<//>`)}
+              removeLabel=${t('inbox.bcRemove')}>${peerName(r)}<//>`)}
           <//>` : null}
           <${TextField} list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
             value=${bcInput} onInput=${setBcInput} onEnter=${() => addBcRecipient()}
@@ -269,7 +273,7 @@ export function TrackedPanel({ activeTracked, doneCount, openRecord, openTracked
   };
   return html`
     <${Pane} page>
-      <${PaneHead} name=${html`🔗 ${t('inbox.trackedTitle')} ${activeTracked.length ? html`<${Mark} kind="count" tone="waiting">${activeTracked.length}<//>` : ''}`} />
+      <${PaneHead} name=${html`${t('inbox.trackedTitle')} ${activeTracked.length ? html`<${Mark} kind="count" tone="waiting">${activeTracked.length}<//>` : ''}`} />
       <${PaneScroll}>
         <${List} cols="name-doors" keepCols empty=${activeTracked.length === 0 ? (doneCount ? t('inbox.trackedAllDone') : t('inbox.trackedEmpty')) : null}>
           ${activeTracked.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(tr => {
@@ -281,10 +285,10 @@ export function TrackedPanel({ activeTracked, doneCount, openRecord, openTracked
                   · ${tr.response?.mode === 'auto' ? t('inbox.trackModeAuto') : t('inbox.trackModeApprove')}
                   ${tr.tracking?.lastError ? html` · <${Tinted} tone="danger">${tr.tracking.lastError}<//>` : null}`}>${tr.title || t('inbox.trackResponse')}<//>
               <${Doors}>
-                ${tr.references?.organismId ? html`<${Action} onClick=${() => openRecord(tr)}>📄 ${t('inbox.trackOpenRecord')}<//>` : null}
+                ${tr.references?.organismId ? html`<${Action} onClick=${() => openRecord(tr)}>${t('inbox.trackOpenRecord')}<//>` : null}
                 ${tr.state === 'awaiting-approval'
                   ? html`<${Loud} control onClick=${() => openTracked(tr)}>${t('inbox.trackApprove')}<//>`
-                  : html`<${Icon} small label=${t('inbox.trackedOpenConvo')} onClick=${() => openTracked(tr)}>💬<//>`}
+                  : html`<${Icon} small label=${t('inbox.trackedOpenConvo')} onClick=${() => openTracked(tr)}><${Glyph} name="chat" /><//>`}
                 <${Action} onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}<//>
               <//>
             <//>`;
@@ -298,11 +302,11 @@ export function TrackedPanel({ activeTracked, doneCount, openRecord, openTracked
 export function ResultsPanel({ resultsId, recentBroadcasts, results, openResults, setResultsId, setResults }) {
   if (!resultsId) {
     return html`<${Pane} page>
-      <${PaneHead} name=${`📊 ${t('inbox.resultsTitle')}`} />
+      <${PaneHead} name=${t('inbox.resultsTitle')} />
       <${PaneScroll}>
         ${recentBroadcasts.length === 0 ? html`<${Note} kind="quiet">${t('inbox.resultsEmpty')}<//>` : null}
         ${recentBroadcasts.length > 0 ? html`<${ConversationRows}>${recentBroadcasts.map(b => html`
-          <${ConversationRow} key=${b.id} title=${`${b.type === 'poll' ? '📊' : '📨'} ${b.title}`}
+          <${ConversationRow} key=${b.id} title=${html`<${Glyph} name=${b.type === 'poll' ? 'chart' : 'mail'} /> ${b.title}`}
             date=${b.createdAt ? stampShort(b.createdAt) : ''} dateTitle=${b.createdAt ? stampFull(b.createdAt) : ''}
             onOpen=${() => openResults(b.id)} />`)}<//>` : null}
       <//>
@@ -313,7 +317,7 @@ export function ResultsPanel({ resultsId, recentBroadcasts, results, openResults
   const tallies = isPoll ? tallyPoll(r.interactive, r.recipients || []) : [];
   return html`<${Pane} page>
     <${PaneHead} before=${html`<${Icon} small label=${t('inbox.back')} onClick=${() => { setResultsId(null); setResults(null); }}>←<//>`}
-      name=${`📊 ${t('inbox.resultsTitle')}`} />
+      name=${t('inbox.resultsTitle')} />
     <${PaneScroll}>
       ${!r ? html`<${Note} kind="quiet">…<//>` : html`
         <${Note} kind="meta">

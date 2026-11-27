@@ -19,6 +19,8 @@
  *          <//>
  *        <//>`
  * @version-history
+ *   v1.0.1 — 2026-11-27 — The person mark draws the person Glyph instead of an emoji; the globe
+ *     emoji before another node's name is removed, the name stands alone.
  *   v1.0.0 — 2026-09-26 — Initial: the People panel's persons and agent chips of
  *     views/profile/organisms/participants-panel.js as a component (page group G2a).
  */
@@ -26,6 +28,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { Box } from '/components/Box.js';
 import { Mark } from '/components/Mark.js';
+import { Glyph } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -41,9 +44,9 @@ export function Person({ name, marks, node, count, countTitle, children }) {
   const hasAgents = Array.isArray(agents) ? agents.length > 0 : !!agents;
   return html`<${Box} packed>
     <div class="people-line">
-      <span>${'👤 '}<strong>${name}</strong></span>
+      <span><${Glyph} name="person" /> <strong>${name}</strong></span>
       ${marks}
-      ${shown(node) ? html`<span class="people-node">${'🌐 '}${node}</span>` : null}
+      ${shown(node) ? html`<span class="people-node">${node}</span>` : null}
       ${shown(count) ? html`<${Mark} kind="count" tone="tally" title=${countTitle}>${count}<//>` : null}
     </div>
     ${hasAgents ? html`<${AgentChips}>${agents}<//>` : null}

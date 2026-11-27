@@ -12,6 +12,8 @@
  * @structure VoiceRecorder (control) · useRecorder (state machine)
  * @usage <${VoiceRecorder} maxSeconds=${300} onRecorded=${(file, seconds) => …} />
  * @version-history
+ *   v1.2.1 — 2026-11-27 — The record button and the discard button draw the mic and close Glyph
+ *     marks instead of the microphone emoji and the ✕ letter.
  *   v1.2.0 — 2026-09-26 — `small`: the idle button in the small action link's look, so a Settings page
  *     names a meaning instead of passing .poster-action classes (additive, page group G4).
  *   v1.1.0 — 2026-09-24 — `plain`: the host draws the idle button (the composer's icon button).
@@ -22,6 +24,7 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Glyph } from '/components/Action.js';
 import { startRecording, isRecordingSupported, fmtDuration } from '/js/services/audio-recorder.js';
 
 /**
@@ -109,7 +112,7 @@ export function VoiceRecorder({ onRecorded, maxSeconds = 300, disabled = false, 
           ${state === 'finishing' ? '…' : t('voice.stop')}
         </button>
         <button type="button" class="btn-ghost btn-sm vr-cancel" disabled=${state === 'finishing'}
-                onClick=${discard} title=${t('voice.cancel')} aria-label=${t('voice.cancel')}>✕</button>
+                onClick=${discard} title=${t('voice.cancel')} aria-label=${t('voice.cancel')}><${Glyph} name="close" /></button>
         ${capped ? html`<span class="vr-note">${t('voice.capped', { n: maxSeconds })}</span>` : null}
       </span>`;
   }
@@ -118,7 +121,7 @@ export function VoiceRecorder({ onRecorded, maxSeconds = 300, disabled = false, 
     <span class="vr-wrap">
       <button type="button" class=${plain ? className : `vr-btn${small ? ' poster-action poster-action--small' : ''}${className ? ` ${className}` : ''}`} disabled=${disabled || state === 'starting'}
               onClick=${begin} title=${t('voice.record')} aria-label=${t('voice.record')}>
-        <span class="vr-ico" aria-hidden="true">🎤</span>${label ? html`<span class="vr-label">${label}</span>` : null}
+        <span class="vr-ico" aria-hidden="true"><${Glyph} name="mic" /></span>${label ? html`<span class="vr-label">${label}</span>` : null}
       </button>
       ${error ? html`<span class="vr-error">${error}</span>` : null}
     </span>`;

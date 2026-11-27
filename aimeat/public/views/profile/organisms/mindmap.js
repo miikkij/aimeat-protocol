@@ -15,6 +15,10 @@
  *   buildOrganismMindmap / buildWorkspaceMindmap (chart-type aware, used here + by the timeline)
  * @usage import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
  * @version-history
+ *   v1.10.0 — 2026-11-27 — No emoji in the map: a member node is the rounded shape (flowchart stadium,
+ *     mindmap rounded square) and an agent node the hexagon, with no sign before the name (an emoji
+ *     avatar the agent's owner chose still leads its name); the mindmap's heat mark is one to three
+ *     dots instead of coloured emoji, and a click strips the dots.
  *   v1.9.0 — 2026-10-19 — An agent node with an emoji avatar starts with that emoji in place of 🤖, and a
  *     click on it still resolves; an SVG avatar keeps 🤖, because the map's labels are Mermaid text.
  *   v1.8.0 — 2026-09-26 — The map is the library's MindMap (components/MindMap.js: its options row, the
@@ -52,12 +56,14 @@ function mmLabel(s) {
   return String(s ?? '').replace(/["\n\r]/g, ' ').replace(/[<>|{}[\]()]/g, '').trim().slice(0, 48) || '—';
 }
 
-/** The sign before an agent node's label: the agent's emoji avatar when it has one, 🤖 otherwise.
- *  Mermaid renders text labels under strict security, so an SVG avatar keeps the 🤖 sign. */
-function agentSign(a) {
+/** An agent node's words: the agent's emoji avatar before its name when it has one (the emoji its
+ *  owner chose is data), the name alone otherwise. The node's shape (a hexagon, a member's is rounded)
+ *  says agent or person: Mermaid renders text labels under strict security, so no drawn mark fits. */
+function agentText(a, clean) {
   const av = a && a.avatar;
   const emoji = av && av.kind === 'emoji' ? mmLabel(av.emoji).slice(0, 16) : '';
-  return emoji && emoji !== '—' ? emoji : '🤖';
+  const name = clean(a.name || a.gaii);
+  return emoji && emoji !== '—' ? `${emoji} ${name}` : name;
 }
 
 function heatBucket(n) {
@@ -121,8 +127,8 @@ function buildOrgFlowchart(graph, opts) {
     }
   });
   if (opts.showUsers) {
-    (graph.members || []).forEach((m, i) => lines.push(`  org --> mem${i}["👤 ${mmdLabel(m.name)}"]`));
-    (graph.agents || []).forEach((a, i) => lines.push(`  org --> ag${i}["${agentSign(a)} ${mmdLabel(a.name || a.gaii)}"]`));
+    (graph.members || []).forEach((m, i) => lines.push(`  org --> mem${i}(["${mmdLabel(m.name)}"])`));
+    (graph.agents || []).forEach((a, i) => lines.push(`  org --> ag${i}{{"${agentText(a, mmdLabel)}"}}`));
   }
   return lines.concat(flowchartHeatLines(heat)).join('\n');
 }
@@ -144,9 +150,9 @@ function buildWsFlowchart(node, opts) {
 
 /* ── Mindmap builders (radial) — labels resolve clicks by text. Mermaid's mindmap does NOT support
  *    the `:::class` node-class syntax (it renders it as literal text), so the heatmap is shown with a
- *    trailing marker emoji instead of a coloured shape. ── */
+ *    trailing run of one to three dots (more dots, more activity) instead of a coloured shape. ── */
 
-const HEAT_MARK = { 1: '🟢', 2: '🔶', 3: '🔥' };
+const HEAT_MARK = { 1: '•', 2: '••', 3: '•••' };
 function heatMark(opts, n) { if (!opts.heatmap) return ''; const b = heatBucket(n); return b ? ` ${HEAT_MARK[b]}` : ''; }
 
 function buildOrgMindmap(graph, opts) {
@@ -163,8 +169,8 @@ function buildOrgMindmap(graph, opts) {
     }
   });
   if (opts.showUsers) {
-    (graph.members || []).forEach((m) => lines.push(`    👤 ${mmLabel(m.name)}`));
-    (graph.agents || []).forEach((a) => lines.push(`    ${agentSign(a)} ${mmLabel(a.name || a.gaii)}`));
+    (graph.members || []).forEach((m, i) => lines.push(`    mem${i}(${mmLabel(m.name)})`));
+    (graph.agents || []).forEach((a, i) => lines.push(`    ag${i}{{${agentText(a, mmLabel)}}}`));
   }
   return lines.join('\n');
 }
@@ -213,22 +219,22 @@ function resolveFlowchartClick(scope, graph, domId) {
  *  has it (mindmap can't disambiguate a repeated space name across workspaces — opens that workspace
  *  on the matched space tab). */
 function resolveMindmapClick(scope, graph, text) {
-  // Strip the activity suffix (everything after the first " · "), a leading user/agent emoji, and a
-  // trailing heat marker. The heat mark is appended with just a leading space (no " · "), so at the
-  // "+ Spaces" level — where space nodes carry no count separator — it would otherwise stay glued to
-  // the name and break the exact match below.
+  // Strip the activity suffix (everything after the first " · ") and a trailing heat marker. The heat
+  // mark is appended with just a leading space (no " · "), so at the "+ Spaces" level — where space
+  // nodes carry no count separator — it would otherwise stay glued to the name and break the exact
+  // match below. A member or agent node carries no sign before its name; its shape says which it is.
   const label = String(text || '').trim()
     .split(' · ')[0]
-    .replace(/\s*[🟢🔶🔥]\s*$/u, '')
+    .replace(/\s*•{1,3}\s*$/u, '')
     .trim();
-  const core = label.replace(/^👤\s*|^🤖\s*/, '').trim();
+  const core = label;
   if (!core) return null;
   if (scope === 'organism') {
     for (const w of (graph.workspaces || [])) if (w.name === core) return { type: 'workspace', wsId: w.id };
     for (const w of (graph.workspaces || [])) for (const sp of (w.spaces || [])) if (sp.name === core) return { type: 'space', wsId: w.id, space: sp.name };
     // An agent node starts with its emoji avatar when it has one, so its label is matched whole.
     if ((graph.members || []).some(m => m.name === core) || (graph.agents || []).some(a => (a.name || a.gaii) === core
-      || `${agentSign(a)} ${mmLabel(a.name || a.gaii)}` === label)) return { type: 'members' };
+      || agentText(a, mmLabel) === label)) return { type: 'members' };
     return null;
   }
   for (const sp of (graph.spaces || [])) if (sp.name === core) return { type: 'space', space: sp.name };

@@ -13,6 +13,7 @@
  * @structure HtmlPageView · HtmlPageEditor
  * @usage import { HtmlPageView, HtmlPageEditor } from '/views/profile/organisms/html-page.js';
  * @version-history
+ *   v1.1.1 — 2026-11-27 — Open in its own window draws the external Glyph instead of the ⧉ sign.
  *   v1.1.0 — 2026-10-16 — The frame shows the page's AI label and its writer (members only). The
  *     editor's "An AI made this page", saved as the page's provenance declaration.
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
@@ -24,7 +25,7 @@ import { t } from '/js/i18n.js';
 import { DocView } from '/components/DocView.js';
 import { Facts } from '/components/Facts.js';
 import { Tabs } from '/components/Tabs.js';
-import { Action, Loud, Icon } from '/components/Action.js';
+import { Action, Loud, Icon, Glyph } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { FileDrop } from '/components/FileDrop.js';
@@ -80,7 +81,7 @@ export function HtmlPageView({ orgId, wsId, space, page, busy, lastOpened, onEdi
       ]} />` : null}
     <${Action} small onClick=${onEdit}>${t('organisms.edit') || 'Edit'}<//>
     ${page._draft ? html`<${Loud} control onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>` : null}
-    ${onPopOut ? html`<${Icon} small label=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}<//>` : null}`;
+    ${onPopOut ? html`<${Icon} small label=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}><${Glyph} name="external" /><//>` : null}`;
   const facts = html`<${Facts} rows=${[
     { k: t('htmlPage.kind'), v: t('htmlPage.kindValue') },
     created && { k: t('organisms.createdAt') || 'Created', v: dt(created) },

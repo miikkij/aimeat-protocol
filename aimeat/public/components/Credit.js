@@ -7,6 +7,7 @@
  * @structure GooseCredit({ model, open })
  * @usage html`<${GooseCredit} model=${status.model} />`
  * @version-history
+ *   v1.2.1 — 2026-11-27 — The goose emoji before "Powered by goose" is removed; the words stand alone.
  *   v1.2.0 — 2026-10-31 — The credit and the model name sit behind one "What answers here" toggle
  *     (v27 P7); the model left the status line for it.
  *   v1.1.0 — 2026-09-24 — The link is the action link's more tone (Jouni's decision "Small link").
@@ -39,7 +40,6 @@ export function GooseCredit({ model, open = false } = {}) {
             <div class="poster-credit-body">
                 ${model && html`<span class="poster-turn-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${model}</span>`}
                 <a class="poster-action poster-action--more poster-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
-                    <span class="poster-credit-mark" aria-hidden="true">🪿</span>
                     <span>${tr('chat.poweredBy', 'Powered by goose')}</span>
                 </a>
             </div>

@@ -37,6 +37,8 @@
  *          rail=${html`<${Rail} …/>`} bodyRef=${ref}>…<//>`
  *        html`<${Overlay} fill title=${name} onClose=${close} link=${{ href: '/', label: t('x.cta'), mark: '⚡' }}><iframe …></iframe><//>`
  * @version-history
+ *   v1.3.1 — 2026-11-27 — The close button and the pencil draw the close and edit Glyph marks
+ *     instead of the ✕ letter and the pencil emoji.
  *   v1.3.0 — 2026-10-18 — `belowBar`: the layer leaves the site's top bar in reach (the app catalogue's
  *     detail view covered LOGOUT and SIGN IN until it was closed; Jouni, 2026-10-18). Additive.
  *   v1.2.0 — 2026-09-27 — `smallWords`: the small action links at the catalogue's .78rem in the body
@@ -52,6 +54,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { Glyph } from '/components/Action.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -73,11 +76,11 @@ export function Overlay({ label, title, glyph, onEdit, editLabel, back, link, to
   return html`
     <div class=${cx('overlay', fill && 'overlay--fill', normalLeading && 'overlay--normal-leading', smallWords && 'overlay--small-words', belowBar && 'overlay--below-bar')} role="region" aria-label=${name}>
       <div class="overlay-bar">
-        <button type="button" class="overlay-close" title=${close} aria-label=${close} onClick=${onClose}>✕</button>
+        <button type="button" class="overlay-close" title=${close} aria-label=${close} onClick=${onClose}><${Glyph} name="close" /></button>
         <span class="overlay-title">
           ${glyph !== undefined && glyph !== null && glyph !== '' ? html`<span class="overlay-glyph" aria-hidden="true">${glyph}</span>` : null}
           ${title}
-          ${onEdit ? html`<button type="button" class="overlay-edit" title=${editLabel} aria-label=${editLabel} onClick=${onEdit}>✏️</button>` : null}
+          ${onEdit ? html`<button type="button" class="overlay-edit" title=${editLabel} aria-label=${editLabel} onClick=${onEdit}><${Glyph} name="edit" /></button>` : null}
         </span>
         ${link ? html`<a class="overlay-link" href=${link.href} target="_blank" rel="noopener" title=${link.title || undefined}>${link.mark
           ? html`<span class="overlay-link-mark">${link.mark}</span>` : null}<span>${link.label}</span></a>` : null}

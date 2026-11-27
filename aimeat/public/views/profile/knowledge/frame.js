@@ -10,6 +10,7 @@
  * @structure c · words · pkgId · statsOf · groupOf · packageHead · packageRow · crumb · pageLinks · renderPage · entryText
  * @usage import { renderPage, packageRow, packageHead, statsOf } from './frame.js';
  * @version-history
+ *   v1.12.2 -- 2026-11-27 -- The rail's public library item draws the external Glyph as its count instead of ↗.
  *   v1.12.1 -- 2026-11-27 -- ctWord shows a kind with no word as the node sent it; t() answers the
  *     key for a missing word, so a row showed "knowledge.contentTypes.appdev".
  *   v1.12.0 -- 2026-11-27 -- pageLinks names the Organisms page too: the cover's organisms section, which
@@ -40,7 +41,7 @@ import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Action, Actions } from '/components/Action.js';
+import { Action, Actions, Glyph } from '/components/Action.js';
 import { Row, Name, Desc, When, Doors } from '/components/List.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 
@@ -140,13 +141,13 @@ export function crumb(ctx, parts) {
 }
 
 /**
- * The rail's sibling pages, as data: the public library (a new window, ↗), Discover and Organisms.
+ * The rail's sibling pages, as data: the public library (a new window, the external mark), Discover and Organisms.
  * Organisms stands here because the cover draws its organisms' section (and that section's link to
  * the Organisms page) only when an organism holds a package.
  */
 export function pageLinks() {
   return [
-    { onClick: () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener'), label: c('library'), count: '↗' },
+    { onClick: () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener'), label: c('library'), count: html`<${Glyph} name="external" />` },
     { tab: 'discover', label: t('discover.title') },
     { tab: 'organisms', label: t('profile.tabs.organisms') },
   ];
