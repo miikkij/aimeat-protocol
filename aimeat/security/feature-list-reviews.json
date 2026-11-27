@@ -168,7 +168,7 @@
       "digest": "sha256:d873015ecdc8ca651ee32d7d"
     },
     "9. AI on the node": {
-      "reviewedOn": "2026-11-26",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/tool-catalog/definitions/living.ts",
         "aimeat/src/tool-catalog/definitions/calibrator.ts",
@@ -194,7 +194,7 @@
         "aimeat/src/tool-catalog/definitions/ai-models.ts",
         "aimeat/src/tool-catalog/definitions/decide.ts"
       ],
-      "digest": "sha256:c98275d7e73889d9ded3a09c"
+      "digest": "sha256:971a873f9e2cfef7c14ae308"
     },
     "10. Apps": {
       "reviewedOn": "2026-11-27",
@@ -932,7 +932,7 @@
       "aimeat/src/routes/ai-decide.ts": "a24ebb94effd126a",
       "aimeat/src/routes/ai-decide-rules.ts": "b365b7b7be6079ea",
       "aimeat/src/routes/ai-jobs.ts": "e63ac7114ec0946d",
-      "aimeat/src/routes/calibrator.ts": "9bf7f23b12fb6919",
+      "aimeat/src/routes/calibrator.ts": "32cddc001776de08",
       "aimeat/src/routes/living.ts": "e1a23e862add5ae0",
       "aimeat/src/tool-catalog/definitions/ai-models.ts": "483ec4bb385c5321",
       "aimeat/src/tool-catalog/definitions/decide.ts": "597e5c74f1e42574"
