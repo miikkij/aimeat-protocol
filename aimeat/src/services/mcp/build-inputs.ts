@@ -17,6 +17,8 @@
  *   means the instructions say what they always said.
  * @structure readBuildInputs(storage, config, owner, cached) · BUILD_INPUTS_TTL_MS · clearBuildInputs()
  * @version-history
+ *   v1.3.0 — 2026-11-27 — A person who has a situation picture gets its paragraph before the
+ *     contexts (services/situation/index-line.ts), in the same cached value.
  *   v1.2.0 — 2026-11-14 — The teams the owner is in follow the contexts (services/team/index-line.ts),
  *     in the same cached value, so a member's AI knows its teams on the first turn.
  *   v1.1.0 — 2026-11-08 — The owner's context index, for a session that reads memory, cached per
@@ -57,7 +59,7 @@ const contextsByReader = new Map<string, { at: number; value: string | null }>()
 /** The owner's contexts, then the teams they are in: one block of the instructions. */
 async function contextAndTeamLines(storage: Storage, config: AimeatConfig, owner: string, reader: BuildReader, now: number): Promise<string | null> {
     const [situation, contexts, teams] = await Promise.all([
-        situationIndexLine(storage, config, owner, reader.agentSession),
+        situationIndexLine(storage, config, owner, reader.agentSession, reader.content),
         contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content),
         teamIndexLine(storage, owner),
     ]);

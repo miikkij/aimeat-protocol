@@ -1484,6 +1484,12 @@
       },
       "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
     },
+    "src/services/situation/index-line.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27: the person's own situation.now record, read to decide whether one fixed paragraph goes into the MCP instructions of that person's own connecting AI. Only the record's presence and visibility are used; no string of its content is written anywhere. The caller passes the connecting principal's classification reader, and the row goes through presentMemories before the paragraph is written, so a picture classified away from AI is not named; a private one is left out for an agent, and a session without memory:read gets no paragraph."
+    },
     "src/services/contribution-proofs.ts": {
       "reads": {
         "getMemory": 1

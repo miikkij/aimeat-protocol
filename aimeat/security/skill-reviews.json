@@ -68,7 +68,7 @@
       "digest": "sha256:b6ee458c6d631fcc933942fc"
     },
     "node:aimeat-context": {
-      "reviewedOn": "2026-11-15",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/services/context/index-line.ts",
         "aimeat/src/services/mcp/build-inputs.ts",
@@ -76,7 +76,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:a63ab3aed359325610ac7a46"
+      "digest": "sha256:0a8e451f5e480c425b9a222a"
     },
     "node:aimeat-goal-recipes": {
       "reviewedOn": "2026-11-22",
@@ -1024,7 +1024,7 @@
     },
     "node:aimeat-context": {
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
-      "aimeat/src/services/mcp/build-inputs.ts": "987085f802fa5e80",
+      "aimeat/src/services/mcp/build-inputs.ts": "90e8d9b1ac1006ce",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/services/context/check.ts": "f0768afe110e859c",
       "aimeat/src/services/memory-versions/history.ts": "fd78285b47179edd"

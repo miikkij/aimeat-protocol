@@ -23,19 +23,24 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { presentMemories } from '../classification/present-memory.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export const SITUATION_NOW_KEY = 'situation.now';
 
 const LINE = 'This person has a situation picture: what is open for them, what they promised, what they wait for from others, and what their team knows about their work. It is one record under their memory key situation.now, kept up to date by an engine that acts as their own agent. Read it (aimeat_memory_read, owner_scope true) before you answer when they ask where things stand, and when they start work on a matter or name a person or a project; then bring up only the lines that concern it. Its lines are proposals, not the person\'s own words. When the person says a line is done, wrong or not theirs, record it as the skill situated-ai says (aimeat_skill_get), so the picture corrects itself. When a line names someone who knows the matter, or the person wants to ask a colleague, find and ask through aimeat_help_find and aimeat_help_ask when this node offers them, not through a direct message: that question reaches the colleague\'s own AI, and the answer can be kept for the next person.';
 
 /** The paragraph for one person, or null when they have no picture or the store cannot be read. */
-export async function situationIndexLine(storage: Storage, config: AimeatConfig, owner: string | undefined, agentSession = true): Promise<string | null> {
+export async function situationIndexLine(storage: Storage, config: AimeatConfig, owner: string | undefined, agentSession = true, reader?: ContentReader): Promise<string | null> {
     if (!owner) return null;
     try {
         const row = await storage.getMemory(`${owner}@${config.nodeId}`, SITUATION_NOW_KEY);
         if (!row) return null;
         // An agent reads the record only when its visibility lets every agent of the owner read it.
         if (agentSession && row.visibility === 'private') return null;
+        // The connecting AI's classification reader decides, as for any memory read: a picture the
+        // person classified away from AI is not named to it. Only the record's presence is used.
+        if (reader && (await presentMemories(reader, [row])).length === 0) return null;
         return LINE;
     } catch (err) {
         logger.warn('situation index: unread, instructions unchanged', { owner, error: String(err) });
