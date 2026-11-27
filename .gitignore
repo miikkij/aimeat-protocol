@@ -122,6 +122,9 @@ Desktop.ini
 # Development artifacts (never commit)
 *.development.json
 aimeat/data/debug/
+# A person's data export waiting for its download (AIMEAT_EXPORT_DIR's default, services/owner-export/):
+# their whole account as ZIP files, never source, also when a node runs from a git checkout.
+aimeat/data/exports/
 generator_phase*.txt
 debug_*.md
 debug_*.txt
