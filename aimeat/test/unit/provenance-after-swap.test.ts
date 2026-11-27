@@ -13,9 +13,10 @@
  * @structure
  *   - the document edit (appendToDocument): six lost swaps, then one that lands
  *   - PUT /v1/memory/:key through the real memory router: one lost swap, then one that lands
- *   - PATCH /v1/memory/:key through the real memory router: six lost swaps, then one that lands
+ *   - PATCH /v1/memory/:key through the real memory router: MAX_MERGE_ATTEMPTS lost swaps, then one that lands
  * @usage cd aimeat && pnpm exec vitest run test/unit/provenance-after-swap.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-27 — The PATCH case counts MAX_MERGE_ATTEMPTS lost swaps, not a literal six.
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, N2). Failed on the old code first.
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
@@ -26,6 +27,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace/doc-edit.js';
 import { memoryRouter } from '../../src/routes/memory.js';
+import { MAX_MERGE_ATTEMPTS } from '../../src/services/memory-patch/patch.js';
 
 const ORG = '7c2a1e4b-3d5f-4a6b-8c9d-0e1f2a3b4c5d';
 const WS = 'ws-swapprov1';
@@ -153,7 +155,7 @@ describe('PUT /v1/memory/:key stores its provenance record only once its swap la
 });
 
 describe('PATCH /v1/memory/:key stores its provenance record only once its swap lands', () => {
-  it('six lost swaps answer 409 and store no record; the patch that lands stores one', async () => {
+  it('every lost swap answers 409 and stores no record; the patch that lands stores one', async () => {
     await put('swap.patch', AGENT, { a: 1 });
     const app = memoryApp();
     const before = await provenanceCount();
@@ -162,7 +164,7 @@ describe('PATCH /v1/memory/:key stores its provenance record only once its swap 
     const lost = await call(app, 'PATCH', '/v1/memory/swap.patch', { patch: { b: 2 } });
     expect(lost.status).toBe(409);
     expect(lost.body.error?.code).toBe('VERSION_CONFLICT');
-    expect(swap).toHaveBeenCalledTimes(6);
+    expect(swap).toHaveBeenCalledTimes(MAX_MERGE_ATTEMPTS);
     expect(await provenanceCount()).toBe(before);
 
     swap.mockRestore();
