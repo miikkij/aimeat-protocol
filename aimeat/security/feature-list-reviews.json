@@ -89,7 +89,7 @@
       "digest": "sha256:1506c1a2e60746f369c41320"
     },
     "5. Memory, files and search": {
-      "reviewedOn": "2026-11-23",
+      "reviewedOn": "2026-11-27",
       "watches": [
         "aimeat/src/routes/memory.ts",
         "aimeat/src/routes/memory/history.ts",
@@ -103,7 +103,7 @@
         "aimeat/src/routes/content.ts",
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:4610951cc82a67fd257b52dc"
+      "digest": "sha256:96e6b13d89f9adad0ca2e860"
     },
     "6. Organisms, workspaces and knowledge": {
       "reviewedOn": "2026-11-26",
@@ -146,7 +146,7 @@
         "aimeat/src/routes/connect-tunnel.ts",
         "aimeat/src/services/basic-agents.ts"
       ],
-      "digest": "sha256:ed8f9714ec9dde04ee6ba866"
+      "digest": "sha256:22e937b19f00947892081e3d"
     },
     "8. Automation: schedules, workflows and extensions": {
       "reviewedOn": "2026-11-25",
@@ -270,7 +270,7 @@
         "aimeat/src/services/moderation",
         "aimeat/src/tool-catalog/definitions/moderation.ts"
       ],
-      "digest": "sha256:333ba9a61c149fae2fc99060"
+      "digest": "sha256:bd1b2ff85788ff7babdab734"
     },
     "14. Economy, marketplace and payments": {
       "reviewedOn": "2026-11-25",
@@ -809,7 +809,7 @@
       "aimeat/src/routes/memory/history.ts": "2f1601e58a86e606",
       "aimeat/src/routes/memory-hands.ts": "f1a6339a62d0a7d3",
       "aimeat/src/routes/storage-files.ts": "1537a9981a819a71",
-      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "68d428753b656d0e",
+      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "552d1373e6437499",
       "aimeat/src/services/memory-bin-sweep.ts": "d6e51fe4277e7639",
       "aimeat/src/services/schema-lock-rule.ts": "cdd24287062eb450",
       "aimeat/src/services/librarian.ts": "894ec75b73852978",
@@ -861,7 +861,7 @@
       "aimeat/src/services/agent/stop.ts": "6b1365970a010a81",
       "aimeat/src/services/agent/proposals.ts": "03c261b1f6c08f3f",
       "aimeat/src/services/task/start-op.ts": "4be59ac3ec83da86",
-      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "68d428753b656d0e",
+      "aimeat/src/tool-catalog/definitions/schedules-tasks-memory.ts": "552d1373e6437499",
       "aimeat/src/tool-catalog/definitions/goals.ts": "15966fd2c695c2ed",
       "aimeat/src/tool-catalog/definitions/crew.ts": "3c76fad00f358240",
       "aimeat/src/routes/agent-tasks/completion.ts": "1740131b010fd4c2",
@@ -1008,7 +1008,7 @@
       "aimeat/src/tool-catalog/definitions/broadcast-summary.ts": "a95f488c0bf00ab2"
     },
     "13. Notifications, boards and live updates": {
-      "aimeat/src/tool-catalog/definitions/boards.ts": "a64c23cf652df9c2",
+      "aimeat/src/tool-catalog/definitions/boards.ts": "6e8dc2c250567e77",
       "aimeat/src/routes/sse.ts": "0f01fd2ebf196f02",
       "aimeat/src/routes/public-events.ts": "bd514bff5b83336d",
       "aimeat/src/routes/boards.ts": "0cfddea6507fe8e6",
