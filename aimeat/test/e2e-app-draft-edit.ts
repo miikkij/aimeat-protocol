@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft-edit
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A seed from a shipped genre: the draft is the genre byte for byte and is
+ *     changed in place; an unknown template, a component, two sources and another owner are refused.
  *   v1.0.0 — 2026-08-16 — initial: chunked build + publish, seed-then-edit round trip, uniqueness
  *     and lost-update refusals, bounded reads, cross-owner 403.
  */
@@ -25,6 +27,7 @@ const ownerAName = `dedita${Date.now() % 100000}`;
 const ownerBName = `deditb${Date.now() % 100000}`;
 const APP = 'pong-edit.html';
 const COPY = 'pong-copy.html';
+const FORK = 'genre-fork.html';
 
 let passed = 0;
 let failed = 0;
@@ -166,6 +169,34 @@ await test('Seeding under a different filename copies the app', async () => {
     assert(body.data?.seeded_from === APP, `seeded_from names the source, got ${body.data?.seeded_from}`);
     const read = await json(`/v1/apps/${ownerAName}/${COPY}/draft`, aAuthed());
     assert(read.body.data?.manifest?.name === 'Pong', 'the source manifest came along');
+});
+
+await test('Seeding from a genre the node ships puts the whole genre in the slot, and a replacement changes it', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${FORK}/draft/seed`, aAuthed({
+        method: 'POST', body: JSON.stringify({ template: 'genre-workbench' }),
+    }));
+    assert(status === 200, `seed-from-template status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.seeded_from === 'template:genre-workbench', `seeded_from names the template, got ${body.data?.seeded_from}`);
+    const shipped = String((await json('/v1/app-templates/genre-workbench')).body?.data?.template?.content ?? '');
+    const read = await json(`/v1/apps/${ownerAName}/${FORK}/draft`, aAuthed());
+    const text = Buffer.from(read.body.data.content, 'base64').toString('utf8');
+    assert(shipped.length > 20000 && text === shipped, `the draft is the shipped genre, byte for byte: ${text.length} against ${shipped.length}`);
+    const title = /<title>([^<]*)<\/title>/.exec(shipped)![0];
+    const rep = await json(`/v1/apps/${ownerAName}/${FORK}/draft/replace`, aAuthed({
+        method: 'POST', body: JSON.stringify({ old_string: title, new_string: '<title>Tool shed</title>' }),
+    }));
+    assert(rep.status === 200 && rep.body.data?.replacements === 1, `the builder changes the fork in place: ${rep.status} ${JSON.stringify(rep.body?.error ?? rep.body?.data?.replacements)}`);
+});
+
+await test('A template that does not ship, a template beside a source app, and another owner are refused', async () => {
+    const none = await json(`/v1/apps/${ownerAName}/${FORK}/draft/seed`, aAuthed({ method: 'POST', body: JSON.stringify({ template: 'genre-nonesuch' }) }));
+    assert(none.status === 404 && none.body.error?.code === 'NOT_FOUND' && String(none.body.error?.message).includes('genre-workbench'), `an unknown template is 404 and the ones that ship are named: ${none.status} ${none.body.error?.message}`);
+    const piece = await json(`/v1/apps/${ownerAName}/${FORK}/draft/seed`, aAuthed({ method: 'POST', body: JSON.stringify({ template: 'comp-data-table' }) }));
+    assert(piece.status === 404, `a component is not a page to start from: ${piece.status}`);
+    const both = await json(`/v1/apps/${ownerAName}/${FORK}/draft/seed`, aAuthed({ method: 'POST', body: JSON.stringify({ template: 'genre-workbench', from_filename: APP }) }));
+    assert(both.status === 400 && both.body.error?.code === 'INVALID_INPUT', `two sources are refused: ${both.status} ${both.body.error?.code}`);
+    const other = await json(`/v1/apps/${ownerAName}/${FORK}/draft/seed`, bAuthed({ method: 'POST', body: JSON.stringify({ template: 'genre-workbench' }) }));
+    assert(other.status === 403 || other.status === 404, `owner B may not seed owner A's draft: ${other.status}`);
 });
 
 // ── Phase 3: the refusals ──
@@ -316,6 +347,7 @@ console.log('\nCleanup');
 await test('Discard the drafts and delete the apps', async () => {
     await json(`/v1/apps/${ownerAName}/${APP}/draft`, aAuthed({ method: 'DELETE' }));
     await json(`/v1/apps/${ownerAName}/${COPY}/draft`, aAuthed({ method: 'DELETE' }));
+    await json(`/v1/apps/${ownerAName}/${FORK}/draft`, aAuthed({ method: 'DELETE' }));
     await json(`/v1/apps/${ownerAName}/${APP}`, aAuthed({ method: 'DELETE' }));
     const gone = await json(`/v1/apps/${ownerAName}/${APP}/draft`, aAuthed());
     assert(gone.status === 404, `the draft is gone, got ${gone.status}`);

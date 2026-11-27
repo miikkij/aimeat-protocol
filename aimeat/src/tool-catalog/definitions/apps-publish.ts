@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-27 — aimeat_app_draft_seed takes `template`: a genre or a shell the node ships as the source.
  *   2026-11-20 — The app is named without `.html` in every example (services/app/app-ref.ts).
  *   2026-11-19 — spec_token names the Atelier specification only; the Classic one is retired.
  *   2026-11-15 — aimeat_app_fork takes access_code, the code of a source app behind one (E2E audit M093).
@@ -284,7 +285,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_draft_seed',
-        description: 'Copy a published app\'s source into its draft slot, server-side, so you can continue an app you already shipped. This is the missing first step when someone asks you to change a live app: aimeat_app_get returns the manifest and NOT the source, so without this there is nothing to edit. The bytes never pass through your context. Seed, then read and replace the parts you need, then aimeat_app_draft_publish. Seeding under a different filename copies the app, manifest and all.',
+        description: 'Copy a published app\'s source into its draft slot, server-side, so you can continue an app you already shipped. This is the missing first step when someone asks you to change a live app: aimeat_app_get returns the manifest and NOT the source, so without this there is nothing to edit. The bytes never pass through your context. Seed, then read and replace the parts you need, then aimeat_app_draft_publish. Seeding under a different filename copies the app, manifest and all. With `template` it copies a genre or a shell this node ships instead (genre-workbench, shell-atelier): THE WAY TO FORK A GENRE for a new app, because the genre\'s 30 to 40 kB then never pass through your output. Seed, change the words, the sources and what the app adds with aimeat_app_draft_replace, publish.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Seed App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -295,6 +296,7 @@ export const appPublishTools = [
             filename: { type: 'string', required: true, description: 'The draft slot to write into.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.', zod: z.number().int().min(1) },
+            template: { type: 'string', description: 'In place of from_filename and version: the id of a genre or a shell this node ships (aimeat_app_template_list names them, e.g. "genre-workbench", "shell-atelier"). Its page is copied into the draft slot.', zod: z.string().min(1).max(80) },
             ...DRAFT_NOTICE_INPUT,
         },
     },

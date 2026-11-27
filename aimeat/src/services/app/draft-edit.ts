@@ -29,6 +29,8 @@
  *   });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.3.0 — 2026-11-27 — seedAppDraft takes `fromTemplate`: a genre or a shell the node ships is
+ *     copied into the slot, so a fork of a genre is made on the node and changed in place.
  *   v1.2.0 — 2026-10-19 — A write and a replace carry the draft's display version forward, so a version
  *     stated with aimeat_app_draft_save survives the edits after it (wish-the-app-draft-tools-can-set-the-display-version).
  *   v1.1.0 — 2026-10-18 — A write and a replace carry the draft's notice (what it is changing) forward,
@@ -45,6 +47,7 @@ import type { PublishAppRefusal } from './publish.js';
 import {
   stageAppDraft, type DraftManifestRequest, type StagedAppDraft,
 } from './lifecycle.js';
+import { getAppTemplates } from '../../data/app-templates.js';
 
 /** The owner whose draft slot is being edited, already resolved from the principal at the door. */
 export interface AppDraftEditScope {
@@ -103,6 +106,11 @@ export interface SeedAppDraftInput extends AppDraftEditScope {
   fromFilename?: string;
   /** Which published version. Defaults to the newest. */
   version?: number;
+  /**
+   * A template the node ships (a genre or a shell, `genre-workbench`, `shell-atelier`) to copy from
+   * in place of a published app: how a build forks a genre without the genre passing through the model.
+   */
+  fromTemplate?: string;
   /** What the new draft will change (services/app/news.ts draftNoticeFrom). Undefined keeps the slot's. */
   draftNotice?: AppDraftNotice | null;
 }
@@ -341,6 +349,7 @@ export async function seedAppDraft(
   storage: Storage, config: AimeatConfig, input: SeedAppDraftInput,
 ): Promise<SeededAppDraft | PublishAppRefusal> {
   const { ownerName, ownerGhii, filename } = input;
+  if (input.fromTemplate !== undefined) return seedAppDraftFromTemplate(storage, config, input, input.fromTemplate);
   const from = input.fromFilename ?? filename;
   for (const targetFilename of new Set([filename, from])) {
     const target = await resolveAppTarget(storage, config, {
@@ -380,4 +389,42 @@ export async function seedAppDraft(
   if ('refusal' in staged) return staged;
 
   return { ...staged, seededFrom: from, seededVersion: live.versionNumber };
+}
+
+/** The template kinds a draft may start from: a whole page a build changes, not a piece of one. */
+const SEED_TEMPLATE_KINDS = new Set(['genre', 'app-shell']);
+
+/**
+ * Copy a shipped template's page into the draft slot. A build on the finest level starts by
+ * forking a genre, and a genre is 30 to 40 kB: measured on five builds on 2026-11-27, four wrote
+ * the whole page out again through the model, the genre's own text included. Seeded here, the
+ * builder changes the words, the sources and what the app adds with replaceInAppDraft, and the
+ * genre itself never passes through its output.
+ */
+async function seedAppDraftFromTemplate(
+  storage: Storage, config: AimeatConfig, input: SeedAppDraftInput, templateId: string,
+): Promise<SeededAppDraft | PublishAppRefusal> {
+  const { ownerName, ownerGhii, filename } = input;
+  if (input.fromFilename !== undefined || input.version !== undefined) {
+    return refuse(400, 'INVALID_INPUT', 'template names what to copy: leave from_filename and version out.');
+  }
+  const target = await resolveAppTarget(storage, config, {
+    callerOwner: bareOwner(input.callerGaii), requestedOwner: ownerName, filename, act: 'draft',
+  });
+  if (!target.ok) return { refusal: target };
+  if (target.ownerGhii !== ownerGhii) return refuse(403, 'FORBIDDEN', 'Source owner does not match the authorized app bucket.');
+  const template = getAppTemplates().find(t => t.id === templateId);
+  if (!template || !SEED_TEMPLATE_KINDS.has(template.kind)) {
+    const ids = getAppTemplates().filter(t => SEED_TEMPLATE_KINDS.has(t.kind)).map(t => t.id);
+    return refuse(404, 'NOT_FOUND', `No genre or shell "${templateId}" ships with this node. The ones that do: ${ids.join(', ')}. A genre that grew out of somebody's app is read with aimeat_app_template_get.`);
+  }
+  // The name is the caller's to give with the first replace or at publish: a template's own title
+  // is the genre's name, not the app's.
+  const staged = await stageAppDraft(storage, config, {
+    ownerName, ownerGhii, filename,
+    data: Buffer.from(template.content, 'utf8'),
+    requested: { mimeType: 'text/html', draftNotice: input.draftNotice },
+  });
+  if ('refusal' in staged) return staged;
+  return { ...staged, seededFrom: `template:${template.id}`, seededVersion: 0 };
 }

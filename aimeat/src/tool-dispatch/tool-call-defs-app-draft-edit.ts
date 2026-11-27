@@ -16,6 +16,7 @@
  * @usage
  *   import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
  * @version-history
+ *   2026-11-27 -- aimeat_app_draft_seed forwards `template`.
  *   2026-10-18 -- aimeat_image_generate takes `reference_images` and `mask` (Comicland v3 A-1, A-2).
  *   2026-10-18 -- aimeat_app_draft_write and aimeat_app_draft_seed forward `notice` (DRAFT_NOTICE_PARAM).
  *   2026-09-28 -- aimeat_image_generate takes `role`, the AI role the call runs as.
@@ -112,6 +113,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             owner: { type: 'string', description: 'Whose catalogue the app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.' },
+            template: { type: 'string', description: 'In place of from_filename and version: the id of a genre or a shell this node ships, whose page is copied into the draft slot.' },
             notice: DRAFT_NOTICE_PARAM,
         },
         handler: ({ client, config }, input) => {
@@ -119,6 +121,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             const body: JsonObject = {};
             const from = optionalString(input, 'from_filename'); if (from) body.from_filename = from;
             const version = optionalNumber(input, 'version'); if (version !== undefined) body.version = version;
+            const template = optionalString(input, 'template'); if (template) body.template = template;
             draftNoticeBody(input, body);
             return client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft/seed`, body);
         },

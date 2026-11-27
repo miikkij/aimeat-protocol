@@ -97,7 +97,7 @@
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:7f2be2ffacd486dbcd2a4ca8"
+      "digest": "sha256:45bca02790bb650256229d74"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-15",
@@ -218,7 +218,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:0f9bab9a1403e6b129378bd1"
+      "digest": "sha256:6eaf3ec18dad14b6cff423e6"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:b56ac59821c2d1a4d588cb28",
+      "digest": "sha256:d24690e6520705e2851060df",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -729,7 +729,7 @@
       "aimeat/src/services/app/spec-gate.ts": "95bb1883f65b8ebb"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "277528437408c5a7",
+      "aimeat/src/services/builder/atelier-prompt.ts": "f895d7ce94258a52",
       "aimeat/src/services/builder/atelier-layers.ts": "de2eb1a20631506d",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "68c0e5a7e6d5edc9",
       "aimeat/src/services/design-book/component.ts": "12d4355f129e437f"
@@ -842,7 +842,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "50d092613627005e",
       "aimeat/src/routes/app-templates.ts": "960dd944924d2601",
-      "aimeat/src/services/builder/atelier-prompt.ts": "277528437408c5a7",
+      "aimeat/src/services/builder/atelier-prompt.ts": "f895d7ce94258a52",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
       "aimeat/src/services/app/publish.ts": "d60e8864bf0adbe6",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
@@ -1046,7 +1046,7 @@
     },
     "node:aimeat-find-my-app": {
       "aimeat/src/mcp/apps.ts": "649c0744d606db11",
-      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "b5f0f65b06e21760",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "fe5938f7a46b5409",
       "aimeat/src/services/usage/usage-read.ts": "84149fb8bd919615",
       "aimeat/public/views/appcat.js": "e6f1676f8eef7d07"
     },

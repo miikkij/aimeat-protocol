@@ -46831,6 +46831,15 @@ paths:
                 from_filename:
                   type: string
                   description: The published app to copy from. Defaults to filename.
+                template:
+                  type: string
+                  maxLength: 80
+                  description: >
+                    In place of from_filename and version: the id of a genre or a shell this node ships
+                    (`genre-workbench`, `shell-atelier`; GET /v1/app-templates lists them). Its page is
+                    copied into the draft slot, so a new app forks a genre without the genre passing
+                    through the builder. 404 for an id that is not a shipped genre or shell, 400 when
+                    from_filename or version is sent beside it. `seeded_from` answers `template:<id>`.
                 version:
                   type: integer
                   description: Which published version. Defaults to the newest.

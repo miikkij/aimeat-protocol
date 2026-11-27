@@ -29,7 +29,9 @@
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
  *   v1.52.0 — 2026-11-27 — The interview: one line for an order that already carries its answers
- *     and says to decide (no questions, no drawn layouts, the plan written once). Additive.
+ *     and says to decide (no questions, no drawn layouts, the plan written once). The genre fork:
+ *     one sentence that the fork is made on the node (aimeat_app_draft_seed with `template`) and
+ *     changed in place. Both additive.
  *   v1.51.0 — 2026-11-27 — "The frame, the moments and the owner's templates" (atelier-moments.ts,
  *     part `screens`) after "The phone and the desktop": optional for the builder, and no existing
  *     sentence changes (wish-atelier-contextual-templates-pyynt-lohko-ask).
@@ -399,7 +401,9 @@ function composeBody(config: AimeatConfig): string {
     + 'register, never from the bare shell: list the genres with `GET ' + base
     + '/v1/designbook?kind=genre`, fork the one that has the page\'s register with `GET ' + base
     + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
-    + 'below has the menu). Every Atelier app declares the register it committed to — '
+    + 'below has the menu). FORK ON THE NODE, NEVER BY RETYPING: `aimeat_app_draft_seed { filename, template: "genre-<id>" }` '
+    + 'puts the genre (or `shell-atelier`) in your draft; change it with `aimeat_app_draft_replace`, then `aimeat_app_draft_publish`. '
+    + 'Every Atelier app declares the register it committed to — '
     + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already has, '
     + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
     + 'an Atelier app that names none. A `proto` or `plain` page is the one exception: it starts '

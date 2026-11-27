@@ -21,6 +21,7 @@
  *   import { registerAppDraftEditTools } from './apps-draft-edit.js';
  *   registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-27 — aimeat_app_draft_seed passes `template` to seedAppDraft.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_app_draft_write and aimeat_app_draft_seed take `notice`: what the draft changes.
@@ -191,7 +192,7 @@ export function registerAppDraftEditTools(
             inputSchema: zodShapeFor('aimeat_app_draft_seed'),
             annotations: annotationsFor('aimeat_app_draft_seed'),
         },
-        async ({ filename, owner, from_filename, version, notice }) => {
+        async ({ filename, owner, from_filename, version, template, notice }) => {
             const agentGaii = getAgentGaii();
             const draftNotice = draftNoticeFrom(notice, agentGaii);
             if (draftNotice && 'refusal' in draftNotice) return fail(`INVALID_INPUT: ${draftNotice.refusal}`);
@@ -205,6 +206,7 @@ export function registerAppDraftEditTools(
                     ownerName: scope.ownerName,
                     ownerGhii: scope.ownerGhii,
                     filename, fromFilename: from_filename, version, draftNotice,
+                    ...(typeof template === 'string' ? { fromTemplate: template } : {}),
                 });
                 if ('refusal' in out) return fail(refusalMessage(out.refusal));
                 logger.info(`App draft seeded via MCP: ${filename}`, { by: agentGaii, from: out.seededFrom });

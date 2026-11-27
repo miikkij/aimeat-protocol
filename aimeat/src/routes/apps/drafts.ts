@@ -6,6 +6,7 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.13.0 -- 2026-11-27 -- POST .../draft/seed takes `template`: a shipped genre or shell as the source.
  *   v2.12.0 -- 2026-11-20 -- A new draft named without an extension is stored as `name.html`, and
  *     seed's `from_filename` takes the app's name without `.html` (services/app/app-ref.ts).
  *   v2.11.2 -- 2026-11-13 -- POST .../publish-draft reads the draft and asks the roadmap question through
@@ -364,6 +365,8 @@ export function registerDraftRoutes(
             fromFilename: typeof from_filename === 'string' ? from_filename : undefined,
             version,
             draftNotice,
+            // A genre or a shell the node ships, in place of a published app (services/app/draft-edit.ts).
+            ...(typeof req.body?.template === 'string' ? { fromTemplate: req.body.template } : {}),
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(
