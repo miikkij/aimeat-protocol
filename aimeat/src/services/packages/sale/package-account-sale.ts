@@ -35,6 +35,8 @@
  *   const out = await setAccountPrice({ storage, config }, { owner }, groupId, { price, state, preview });
  *   const rows = await listForSale(storage, { category: 'paneeli' });
  * @version-history
+ *   2026-11-27 — The sales view and a refund are the author's only while the account that holds the
+ *     author name was registered before the sale's first price (isSaleAuthor; secaudit2026nov26).
  *   2026-11-10 — The refund notice opens the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-10-31 — Initial (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  */
@@ -52,8 +54,9 @@ import {
     NS_PACKAGE_ACCOUNT_SALES, saleKey, parseSale, readAccountSale, currentPrice, activePurchase,
     type AccountSale, type AccountSaleState, type AccountPurchase,
 } from './package-account-entitlement.js';
+import { nameHeldSince } from '../../account/instance.js';
 
-type Fail = { ok: false; status: number; code: string; message: string };
+type Fail ={ ok: false; status: number; code: string; message: string };
 const fail = (status: number, code: string, message: string): Fail => ({ ok: false, status, code, message });
 
 /** The highest price an author may set: one million in micro-units of the currency. */
@@ -260,6 +263,16 @@ export async function purchasesOf(storage: Storage, buyer: string): Promise<Arra
     return out;
 }
 
+/**
+ * Whether `owner` is the sale's author: the name matches, and the account that holds it now was
+ * registered before the sale's first price. A sale an older erasure left names its author by the
+ * released name, which the next holder of the name must not take over (secaudit2026nov26); the
+ * erasure gives the sale the pseudonym from now on (package-erasure.ts).
+ */
+async function isSaleAuthor(storage: Storage, sale: AccountSale, owner: string): Promise<boolean> {
+    return sale.author === owner && nameHeldSince(storage, owner, sale.prices[0]?.createdAt);
+}
+
 /** The author's view of their sale: the sale, every price, and every purchase. */
 export async function salesOf(
     storage: Storage, caller: { owner: string }, groupId: string,
@@ -271,7 +284,7 @@ export async function salesOf(
         if (latest.author !== caller.owner) return fail(403, 'FORBIDDEN', 'Only the package\'s author reads its sales.');
         return { ok: true, view: { group_id: groupId, on_sale: false, sales: [], totals: {} } };
     }
-    if (sale.author !== caller.owner) return fail(403, 'FORBIDDEN', 'Only the package\'s author reads its sales.');
+    if (!await isSaleAuthor(storage, sale, caller.owner)) return fail(403, 'FORBIDDEN', 'Only the package\'s author reads its sales.');
     const rows: Array<Record<string, unknown>> = [];
     const totals: Record<string, number> = {};
     for (const p of sale.purchases) {
@@ -319,7 +332,7 @@ export async function refundPurchase(
     const { storage, config } = deps;
     const sale = await readAccountSale(storage, groupId);
     if (!sale) return fail(404, 'NOT_FOUND', `${groupId} is not sold here.`);
-    if (sale.author !== caller.owner) return fail(403, 'FORBIDDEN', 'Only the package\'s author refunds its sales.');
+    if (!await isSaleAuthor(storage, sale, caller.owner)) return fail(403, 'FORBIDDEN', 'Only the package\'s author refunds its sales.');
     const p = sale.purchases.find(x => x.order === order);
     if (!p) return fail(404, 'NOT_FOUND', `No purchase of ${groupId} with order ${order}.`);
     if (p.state === 'refunded') return fail(409, 'ALREADY_REFUNDED', 'This purchase was refunded already.');

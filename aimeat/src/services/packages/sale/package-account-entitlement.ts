@@ -32,11 +32,14 @@
  *   const sale = await readAccountSale(storage, groupId);
  *   if (sale && await activePurchase(storage, sale, 'bob')) { ... }
  * @version-history
+ *   v1.1.0 — 2026-11-27 — activePurchase: a purchase made before the account that holds the buyer name
+ *     now was registered is not that account's (services/account/instance.ts; secaudit2026nov26).
  *   v1.0.0 — 2026-10-31 — Initial (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  */
 import type { Storage } from '../../../storage/interface.js';
 import { updateRecord, UNCHANGED } from '../../record-cas.js';
 import { ANONYMOUS_ACCOUNT } from '../../../auth/anonymous-principal.js';
+import { nameHeldSince } from '../../account/instance.js';
 
 /** The system namespace of the account sales. No `@`, so no principal can address it. */
 export const NS_PACKAGE_ACCOUNT_SALES = 'package-account-sales';
@@ -114,6 +117,10 @@ export async function activePurchase(storage: Storage, sale: AccountSale, buyer:
     if (!buyer || buyer.includes('@') || buyer === ANONYMOUS_ACCOUNT) return null;
     const p = latestPurchaseOf(sale, buyer);
     if (!p || p.state !== 'paid') return null;
+    // A buyer name an older erasure left on the purchase: the account that holds the name now was
+    // registered after the purchase, so the purchase is not theirs (secaudit2026nov26). The erasure
+    // gives the purchase the pseudonym from now on (package-erasure.ts).
+    if (!await nameHeldSince(storage, buyer, p.boughtAt)) return null;
     if (p.confirmed) return p;
     const order = await storage.getMemory(p.sellerGhii, `commerce.order.${p.order}`);
     if ((order?.value as { status?: string } | undefined)?.status !== 'completed') return null;

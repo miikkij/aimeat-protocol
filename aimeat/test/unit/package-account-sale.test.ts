@@ -7,6 +7,8 @@
  *   read refusals answer only for a group that is sold.
  * @usage pnpm exec vitest run test/unit/package-account-sale.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The store answers owner rows; a purchase older than the account that holds
+ *     the buyer name now does not count (secaudit2026nov26).
  *   v1.0.0 — 2026-10-31 — Initial (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  */
 import { describe, it, expect } from 'vitest';
@@ -17,11 +19,16 @@ import {
 } from '../../src/services/packages/sale/package-account-entitlement.js';
 import { listingOf } from '../../src/services/packages/sale/package-account-sale.js';
 
-/** A memory store with the conditional writes the record helper uses. */
-function memStorage(): Storage & { put(owner: string, key: string, value: unknown): void } {
+/**
+ * A memory store with the conditional writes the record helper uses, and the owner rows the
+ * purchase check reads: `owners` maps an account name to when it was registered (bob before his
+ * purchase by default).
+ */
+function memStorage(owners: Record<string, string> = { bob: '2026-10-01T00:00:00Z', alice: '2026-10-01T00:00:00Z' }): Storage & { put(owner: string, key: string, value: unknown): void } {
     const rows = new Map<string, MemoryRecord>();
     const id = (o: string, k: string) => `${o}\u0000${k}`;
     const s = {
+        async getOwner(name: string) { return owners[name] ? { name, createdAt: owners[name] } : null; },
         async getMemory(o: string, k: string) { return rows.get(id(o, k)) ?? null; },
         async setMemory(r: MemoryRecord) { rows.set(id(r.ownerGaii, r.key), r); },
         async createMemoryIfAbsent(r: MemoryRecord) { if (rows.has(id(r.ownerGaii, r.key))) return false; rows.set(id(r.ownerGaii, r.key), r); return true; },
@@ -58,6 +65,17 @@ describe('activePurchase', () => {
         expect(await activePurchase(st, (await readAccountSale(st, GROUP))!, 'bob')).toBeNull();
         st.put(SELLER, 'commerce.order.cs_1', { status: 'completing' });
         expect(await activePurchase(st, (await readAccountSale(st, GROUP))!, 'bob')).toBeNull();
+    });
+
+    // secaudit2026nov26: an erased buyer's name is released for reuse; a purchase an older erasure
+    // left under the name is not the purchase of the account that registered the name afterwards.
+    it('a purchase made before the account that holds the buyer name now was registered does not count', async () => {
+        const st = memStorage({ bob: '2026-11-15T00:00:00Z' });
+        st.put(NS_PACKAGE_ACCOUNT_SALES, saleKey(GROUP), sale([paid('cs_1', { confirmed: true })]));
+        expect(await activePurchase(st, (await readAccountSale(st, GROUP))!, 'bob')).toBeNull();
+        const gone = memStorage({});
+        gone.put(NS_PACKAGE_ACCOUNT_SALES, saleKey(GROUP), sale([paid('cs_1', { confirmed: true })]));
+        expect(await activePurchase(gone, (await readAccountSale(gone, GROUP))!, 'bob')).toBeNull();
     });
 
     it('counts once the seller\'s copy of the order is completed, and marks it confirmed', async () => {

@@ -11,9 +11,11 @@
  *   (services/name-bound-grants-erasure.ts); this check covers the entries an older erasure left: an
  *   account registered after the record named it is a later holder of the name, not the person the
  *   record is about (secaudit2026oct26).
- * @structure heldSince(storage, ghii, at)
+ * @structure heldSince(storage, ghii, at) · nameHeldSince(storage, name, at)
  * @usage if (!await heldSince(storage, approval.ghii, approval.verifiedAt)) return unverified;
  * @version-history
+ *   v1.1.0 -- 2026-11-27 -- nameHeldSince, for a record that names the account by its bare name: the
+ *     package sales and purchases an older erasure left (secaudit2026nov26).
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26: beneficiary-release, accountant-access and
  *     compliance-agreements counterparty name reuse).
  */
@@ -30,6 +32,14 @@ export async function heldSince(storage: Storage, ghii: string, at: string | nul
   // An identity of another node names no account here (localAccountOf answers null for it).
   const name = localAccountOf(ghii);
   if (!name) return false;
+  return nameHeldSince(storage, name, at);
+}
+
+/**
+ * heldSince for a record that names the account by its bare name on this node (a package sale's
+ * author, a purchase's buyer): the same answer, from the same owner row.
+ */
+export async function nameHeldSince(storage: Storage, name: string, at: string | null | undefined): Promise<boolean> {
   const owner = await storage.getOwner(name);
   if (!owner) return false;
   const named = Date.parse(at ?? '');

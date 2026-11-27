@@ -29,6 +29,8 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   2026-11-27 — A bundle brings a package only when the bundle version and the package have the same
+ *     author column, not only the same author text in their group ids (secaudit2026nov26).
  *   2026-11-25 — The grants of a package group are stored in shards with an index, through
  *     package-grant-shards.ts: the one record outgrew the 1024 kB value cap at about 2,088 installs
  *     (Jouni, 2026-11-24, package sale decision part b). An older single record is read as before and
@@ -292,6 +294,7 @@ export async function entitlementOf(storage: Storage, groupId: string, nodeId: s
     const own = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
     if (own) return own;
     const author = groupId.split('::')[1];
+    const packageAuthor = await authorOfGroup(storage, groupId);
     for (const { groupId: held, entitlement } of await entitledGroupsOf(storage, nodeId)) {
         if (held === groupId || held.split('::')[1] !== author) continue;
         // The bundle version the node may have: a package added to the bundle after its updates
@@ -299,9 +302,20 @@ export async function entitlementOf(storage: Storage, groupId: string, nodeId: s
         const until = entitlement.updatesUntil ? Date.parse(entitlement.updatesUntil) : Infinity;
         const pkg = (await channelVersions(storage, held, entitlement)).find(v => Date.parse(v.createdAt) <= until);
         const bundle = pkg ? bundleOfPackage(pkg) : null;
-        if (bundle?.ok && bundle.value.packages.some(p => p.groupId === groupId)) return entitlement;
+        if (bundle?.ok && pkg!.author === packageAuthor && bundle.value.packages.some(p => p.groupId === groupId)) return entitlement;
     }
     return null;
+}
+
+/**
+ * The author column of the group's versions. The group id holds the author's name as text, and an
+ * erased account's name is released for reuse: the column takes the erasure's pseudonym
+ * (storage/erased-account-records.ts) and the id does not, so a bundle of an erased author must not
+ * bring a package that the next holder of the name made under a group id the bundle lists
+ * (secaudit2026nov26).
+ */
+async function authorOfGroup(storage: Storage, groupId: string): Promise<string | undefined> {
+    return (await storage.listVersions(groupId, 1, 0)).versions[0]?.author;
 }
 
 /** The versions on the entitlement's channel, newest first; only `version` when it names one. */
@@ -328,12 +342,13 @@ async function channelVersions(
  */
 async function updatesEndedInBundle(storage: Storage, groupId: string, nodeId: string): Promise<boolean> {
     const author = groupId.split('::')[1];
+    const packageAuthor = await authorOfGroup(storage, groupId);
     for (const { groupId: held, entitlement } of await entitledGroupsOf(storage, nodeId)) {
         if (held === groupId || held.split('::')[1] !== author || !entitlement.updatesUntil) continue;
         if (Date.parse(entitlement.updatesUntil) > Date.now()) continue;
         for (const v of await channelVersions(storage, held, entitlement)) {
             const bundle = bundleOfPackage(v);
-            if (bundle?.ok && bundle.value.packages.some(p => p.groupId === groupId)) return true;
+            if (bundle?.ok && v.author === packageAuthor && bundle.value.packages.some(p => p.groupId === groupId)) return true;
         }
     }
     return false;

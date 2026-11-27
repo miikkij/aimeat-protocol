@@ -31,6 +31,8 @@
  * @usage
  *   for (const rule of ERASED_ACCOUNT_RECORDS) { … rule.pg or rule.sqlite, rule.column, rule.action }
  * @version-history
+ *   v1.4.0 — 2026-11-27 — Package.author, pseudonymised: the next holder of an account name is no
+ *     longer the author of the erased person's packages (secaudit2026nov26).
  *   v1.3.0 — 2026-11-08 — The person's receiver principals (`receiver:<name>/<receiver>@<node>`), found
  *     in the row and classification-audit columns a receiver writes, are pseudonymised like the
  *     agents (RECEIVER_PRINCIPAL_COLUMNS, receiverPrincipalPatterns; secaudit2026nov08b round 15).
@@ -90,6 +92,11 @@ export const ERASED_ACCOUNT_RECORDS: readonly ErasedAccountRecordRule[] = [
   { pg: 'Conversation', sqlite: 'conversations', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'Organism', sqlite: 'organisms', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'Package', sqlite: 'packages', column: 'authorGhii', action: 'pseudonymise' },
+  // The bare author name beside it, which every decision on a package compares with the caller's
+  // account name: reading a private one, a new version, status, grants, price, sales and refunds
+  // (secaudit2026nov26). packageGroupId keeps the name as text: it is the group's address on other
+  // nodes, and nothing reads authorship from it.
+  { pg: 'Package', sqlite: 'packages', column: 'author', action: 'pseudonymise' },
   { pg: 'TemplateDiscussion', sqlite: 'template_discussions', column: 'authorGhii', action: 'pseudonymise' },
   { pg: 'TemplateReview', sqlite: 'template_reviews', column: 'authorGhii', action: 'pseudonymise' },
   // An installation is the account's own.

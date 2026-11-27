@@ -21,6 +21,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-account-sale
  * @version-history
+ *   v1.1.0 — 2026-11-27 — Test 14: the next holder of an erased buyer's or author's name is neither
+ *     (secaudit2026nov26).
  *   v1.0.0 — 2026-10-31 — Initial.
  */
 import { ownerSignIn } from './helpers/owner-login.js';
@@ -316,6 +318,37 @@ await test('13. An ended sale is not listed and cannot be bought; B, who bought 
     assert(c.status === 404, `C after the end: ${show(c)}`);
     const pub = await json(`/v1/packages/${encodeURIComponent(second)}`, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ visibility: 'members' }) });
     assert(pub.status === 200, `share after the end: ${show(pub)}`);
+});
+
+// secaudit2026nov26: an erased account's name is released for reuse, and the package records named
+// the author and the buyer by that name, so the next person to register it published versions into the
+// erased author's group and read what the erased buyer had paid for.
+await test('14. FAILURE: whoever registers an erased buyer\'s or author\'s name is neither the buyer nor the author', async () => {
+    const priv = await json(`/v1/packages/${encodeURIComponent(second)}`, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ visibility: 'private' }) });
+    assert(priv.status === 200, `private again: ${show(priv)}`);
+    const before = await json(`/v1/packages/${encodeURIComponent(second)}`, { headers: auth(B.token) });
+    assert(before.status === 200 && before.body.data.entitled === true, `B before the erasure: ${show(before)}`);
+
+    const eraseB = await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });
+    assert(eraseB.status === 200, `erase B: ${show(eraseB)}`);
+    const nextB = await mkOwner('b');
+    assert(nextB.name === B.name, 'the same name again');
+    const asNextB = await json(`/v1/packages/${encodeURIComponent(second)}`, { headers: auth(nextB.token) });
+    assert(asNextB.status === 404, `the next holder of B's name reads B's purchase: ${show(asNextB)}`);
+
+    const eraseA = await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(eraseA.status === 200, `erase A: ${show(eraseA)}`);
+    const nextA = await mkOwner('a');
+    assert(nextA.name === A.name, 'the same name again');
+    const version = await json(`/v1/packages/${encodeURIComponent(group)}/versions`, {
+        method: 'POST', headers: auth(nextA.token),
+        body: JSON.stringify({ version: '9.0.0', components: [{ id: 'ui', type: 'app', label: 'Template app', content: APP_HTML }] }),
+    });
+    assert(version.status === 403, `the next holder of A's name adds a version to A's package: ${show(version)}`);
+    const sales = await json(`/v1/packages/${encodeURIComponent(group)}/sales`, { headers: auth(nextA.token) });
+    assert(sales.status === 403, `the next holder of A's name reads A's sales: ${show(sales)}`);
+    const read = await json(`/v1/packages/${encodeURIComponent(second)}`, { headers: auth(nextA.token) });
+    assert(read.status === 404, `the next holder of A's name reads A's private package: ${show(read)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

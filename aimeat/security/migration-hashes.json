@@ -138,6 +138,7 @@
     "0134_task_start_app_waits.sql": "9b270b2e4fbcf66855ba361214e19a7c58cb8f0ab0e2629d293a8dddcf1107d9",
     "0135_value_signals.sql": "5c787e8134eb11c39a245dd353b9cd48a6a82759ec7d70b4fa742d8aceaf70de",
     "0136_data_daily.sql": "5525ea0267d097b589c18c99ff125f728597c95f70333b246ba8e1534af08bc7",
-    "0137_usage_answer_size.sql": "12dc2ae36c59b8fe9f28ec7286f94657b0998b243d427e102aea59ef106e63a9"
+    "0137_usage_answer_size.sql": "12dc2ae36c59b8fe9f28ec7286f94657b0998b243d427e102aea59ef106e63a9",
+    "0138_package_author_after_erasure.sql": "3262b48cf46a22436ec0f342af58b1c0db6ac25491029e7cb69b2da3210a6879"
   }
 }

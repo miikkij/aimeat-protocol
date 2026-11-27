@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name, config) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name, config);
  * @version-history
+ *   2026-11-27 — Step package_records: the person's package sales and purchases take the pseudonym,
+ *     their seller list and node subscriptions go (secaudit2026nov26).
  *   2026-11-26 — The person's line leaves every operator service's ledger (step operator_service_lines),
  *     and the operators are told that a covered account is gone.
  *   2026-11-20 — holdValueSignalsForErasure joins the write buffers held for the erasure.
@@ -189,6 +191,7 @@ import type { AimeatConfig } from '../../config.js';
 import { eraseAppPlansOf } from '../app/plan.js';
 import { eraseAppRoadmapsOf } from '../app/roadmap.js';
 import { revokeEntitlementsOfAccount } from '../entitlement/erasure.js';
+import { erasePackageRecordsOf } from '../packages/sale/package-erasure.js';
 import { uninstallExtension } from '../extension/lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from '../compliance/docs.js';
 import { eraseNameBoundGrants } from '../name-bound-grants-erasure.js';
@@ -602,6 +605,15 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string,
       const c = await revokeEntitlementsOfAccount(storage, name, nodeId);
       const n = c.asConsumer + c.asProvider;
       return n ? `entitlements:${n}` : null;
+    }, deletionLog, storage);
+
+    // The package sale records that name the person by the released name: their sales and purchases
+    // take the pseudonym, their seller list and node subscriptions go (services/packages/sale/
+    // package-erasure.ts). The package rows' author column is in the storage rule list (secaudit2026nov26).
+    await step('package_records', async () => {
+      const c = await erasePackageRecordsOf(storage, { name, identities: [ghii, ...agents.map(a => a.gaii)] }, logPseudonym);
+      const n = c.sales + c.purchases + c.sellerLists + c.subscriptions + c.holders + c.requests;
+      return n ? `package_records:${n}` : null;
     }, deletionLog, storage);
 
     // The operator's beneficiary approval, the accountant grants other owners gave the person, and the

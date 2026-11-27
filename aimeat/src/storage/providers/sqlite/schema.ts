@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-11-27 — A package an earlier erasure left with its author's released name takes the
+ *     pseudonym its authorGhii already holds (migration 0138, secaudit2026nov26).
  *   2026-11-19 — finance_vouchers.paymentMethod and its partial index (migration 0133).
  *   2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129).
  *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0122).
@@ -264,6 +266,11 @@ export function initializeSchema(db: Database.Database): void {
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");
+
+  // An erasure before 2026-11-27 left the author's released name in packages.author beside the
+  // pseudonym in authorGhii, so the next holder of the name was the author (migration 0138 says why).
+  // The pseudonym in authorGhii is the evidence; the author takes it. Idempotent.
+  db.exec("UPDATE packages SET author = authorGhii WHERE authorGhii LIKE 'erased:%' AND author NOT LIKE 'erased:%'");
 
   // Federation Mesh Phase 1 — peer policy fields
   safeAddColumn('federation_peers', 'shareCatalogue', 'INTEGER NOT NULL DEFAULT 1');
