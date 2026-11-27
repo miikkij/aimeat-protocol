@@ -84827,9 +84827,10 @@ paths:
                                   criteria_evidence: [{ id, evidence }], running?, app_version?, started_at?,
                                   finished_at? }. The request that starts a run waits about 25 seconds for it. A
                                   longer run goes on on the node for up to eight minutes and this answers
-                                  `running: true` with `ran: false` and no scenarios: the same request again reads
-                                  the finished run, and starts no new one while the app's version and its
-                                  scenarios are unchanged. Each run of a size and theme signs in as a throwaway
+                                  `running: true` with `ran: false` and no scenarios: the same request again waits
+                                  up to 45 seconds for the run, reads it when it has ended, runs no playtest of
+                                  its own (the one taken at the start is answered), and starts no new run while
+                                  the app's version and its scenarios are unchanged. Each run of a size and theme signs in as a throwaway
                                   member of its own.
                               artifact:
                                 type: object

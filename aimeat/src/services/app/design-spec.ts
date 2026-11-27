@@ -97,6 +97,8 @@ export interface AppScenarioRunNote {
   finishedAt?: string;
   /** The run's answer, as playtest-scenarios.ts gives it; present when the run is done. */
   result?: unknown;
+  /** The audit's own playtest of the same version, taken when the run started, so a later read does not run it again. */
+  playtest?: unknown;
 }
 
 /** What the manifest carries, so a listing never has to load the prose. */

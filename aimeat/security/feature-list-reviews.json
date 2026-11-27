@@ -217,7 +217,7 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:b06323d7ddba45b36cacc808"
+      "digest": "sha256:e13f8596c8bd372af14c4c4b"
     },
     "11. Served libraries and the Design Book": {
       "reviewedOn": "2026-11-27",
@@ -940,7 +940,7 @@
     "10. Apps": {
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
       "aimeat/src/routes/apps/read.ts": "accd2534f58f083c",
-      "aimeat/src/tool-catalog/definitions/app-manage.ts": "a4e9da191db0bbdf",
+      "aimeat/src/tool-catalog/definitions/app-manage.ts": "17d273e04ab96aa2",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "fe5938f7a46b5409",
       "aimeat/src/services/app/fork-gate.ts": "532f9095f35a4de8",
       "aimeat/src/services/design-book/grown-genre.ts": "0d632fb12ce38db0",
@@ -949,7 +949,7 @@
       "aimeat/src/services/app/read-gate.ts": "4a22e372eb36d6f8",
       "aimeat/src/services/app/members.ts": "f39a62bf9fd14079",
       "aimeat/src/services/app/roadmap.ts": "23b742f8e1fb7a18",
-      "aimeat/src/services/app/design-spec.ts": "9733e984b87b25db",
+      "aimeat/src/services/app/design-spec.ts": "c0943f756b7847f3",
       "aimeat/src/services/app/dev-grant.ts": "73824af1eaaaaa2e",
       "aimeat/src/services/app/visitors.ts": "05abcbde702aa99c",
       "aimeat/src/routes/apps-backup.ts": "853b79dce1939659",

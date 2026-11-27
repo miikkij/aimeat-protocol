@@ -451,8 +451,9 @@ at all of them marks the criteria it names as evidenced by itself (\`criteria_ev
 \`criteria_set\` is owed for those. Write the criteria first: a scenario names them. Every run
 of a size and theme is on an account of its own that holds nothing. A short run is answered in the
 same call. A longer one goes on on the node for up to eight minutes and the answer says
-\`running\`: ask for the same audit again in about a minute, which reads the finished run and starts
-nothing new while the app's version and its scenarios are unchanged. \`freshness\` says in one
+\`running\`: ask for the same audit again at once, which waits up to 45 seconds for the run, reads it
+when it has ended and starts nothing new while the app's version and its scenarios are unchanged.
+Change the app or the scenarios only after you have the run's answer. \`freshness\` says in one
 answer what beside the app has fallen behind it: the spec, criteria evidenced at an older version, the
 data map, and a bound skill whose calls the app's tools now refuse.
 

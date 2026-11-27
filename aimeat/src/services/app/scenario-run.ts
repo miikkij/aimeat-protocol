@@ -36,8 +36,15 @@ import { runAppScenarios, type ScenarioRunResult } from './playtest-scenarios.js
 import type { AppScenario } from './scenarios.js';
 import type { HeadlessBrowser } from '../screenshot-capture.js';
 
-/** How long the call that starts a run waits for it before it answers "running". */
+/** How long the call that starts a run waits for it before it answers "running": the audit's own playtest took up to 17 seconds of the caller's minute before it. */
 const INLINE_WAIT_MS = 25_000;
+/**
+ * How long a later call waits for a run that is under way. Such a call runs no playtest of its own
+ * (the one taken at the start is kept with the run), so it has most of the caller's minute. A call
+ * that answered "running" at once made five builds ask 17 times for 13 runs.
+ */
+const READ_WAIT_MS = 45_000;
+const READ_EVERY_MS = 2_000;
 /** The whole run in the background: ten scenarios of thirty seconds a run, four at a time, and room. */
 const BACKGROUND_DEADLINE_MS = 8 * 60_000;
 /** A `running` note older than this belongs to a run whose node stopped: the next call starts again. */
@@ -55,6 +62,17 @@ export interface ScenarioRunAnswer extends ScenarioRunResult {
   finished_at?: string;
 }
 
+/**
+ * The audit's own playtest that was taken when the run of `scenarios` on this version started, when
+ * the node has such a run: the audit then answers it and runs no browser of its own.
+ */
+export async function keptPlaytestFor(
+  storage: Storage, app: { ownerName: string; filename: string; appVersion: number }, scenarios: readonly AppScenario[],
+): Promise<unknown | undefined> {
+  const note = (await readAppDesignSpec(storage, `${app.ownerName}/${app.filename}`))?.scenarioRun;
+  return note?.key === scenarioRunKey(app.appVersion, scenarios) ? note.playtest : undefined;
+}
+
 /** Names one run: the app's version and the scenarios as they are. A change of either is a new run. */
 export function scenarioRunKey(appVersion: number, scenarios: readonly AppScenario[]): string {
   return createHash('sha256').update(JSON.stringify([appVersion, scenarios])).digest('hex').slice(0, 24);
@@ -62,8 +80,8 @@ export function scenarioRunKey(appVersion: number, scenarios: readonly AppScenar
 
 const runningAnswer = (note: AppScenarioRunNote): ScenarioRunAnswer => ({
   ran: false, running: true, app_version: note.appVersion, started_at: note.startedAt,
-  reason: `The scenarios are running on this node, started ${note.startedAt}. Ask for the audit with the playtest again in about a minute: `
-    + 'the same call answers the finished run, and starts nothing new while the app\'s version and its scenarios are unchanged.',
+  reason: `The scenarios are running on this node, started ${note.startedAt}. Ask for the audit with the playtest again: `
+    + 'the same call waits up to 45 seconds for the run and answers it when it has ended, and starts nothing new while the app\'s version and its scenarios are unchanged.',
   member: 'Not known until the run ends.', scenarios: [], criteria_evidence: [],
 });
 
@@ -77,22 +95,35 @@ export async function scenarioRunFor(
   app: { ownerName: string; filename: string; html: string; appName: string; appVersion: number },
   scenarios: readonly AppScenario[],
   takeSlot: () => { release(): void } | { reason: string },
-  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; inlineWaitMs?: number } = {},
+  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; inlineWaitMs?: number; readWaitMs?: number; playtest?: unknown } = {},
 ): Promise<ScenarioRunAnswer> {
   const appId = `${app.ownerName}/${app.filename}`;
   const now = opts.now ?? Date.now;
   const key = scenarioRunKey(app.appVersion, scenarios);
-  const note = (await readAppDesignSpec(storage, appId))?.scenarioRun;
+  const done = (n: AppScenarioRunNote): ScenarioRunAnswer =>
+    ({ ...(n.result as ScenarioRunResult), app_version: n.appVersion, started_at: n.startedAt, ...(n.finishedAt ? { finished_at: n.finishedAt } : {}) });
+  let note = (await readAppDesignSpec(storage, appId))?.scenarioRun;
   if (note?.key === key) {
-    if (note.state === 'done' && note.result) {
-      return { ...(note.result as ScenarioRunResult), app_version: note.appVersion, started_at: note.startedAt, ...(note.finishedAt ? { finished_at: note.finishedAt } : {}) };
+    if (note.state === 'done' && note.result) return done(note);
+    if (note.state === 'running' && now() - Date.parse(note.startedAt) < RUNNING_NOTE_MAX_MS) {
+      // The run is under way: wait for it here, so one later call reads the result where three did.
+      const until = now() + (opts.readWaitMs ?? READ_WAIT_MS);
+      while (now() < until) {
+        await new Promise<void>((resolve) => { setTimeout(resolve, READ_EVERY_MS); });
+        note = (await readAppDesignSpec(storage, appId))?.scenarioRun;
+        if (note?.key !== key) break;
+        if (note.state === 'done' && note.result) return done(note);
+      }
+      if (note?.key === key) return runningAnswer(note);
     }
-    if (note.state === 'running' && now() - Date.parse(note.startedAt) < RUNNING_NOTE_MAX_MS) return runningAnswer(note);
   }
 
   const slot = takeSlot();
   if ('reason' in slot) return { ran: false, reason: slot.reason, member: 'Not started.', scenarios: [], criteria_evidence: [] };
-  const started: AppScenarioRunNote = { key, appVersion: app.appVersion, state: 'running', startedAt: new Date(now()).toISOString() };
+  const started: AppScenarioRunNote = {
+    key, appVersion: app.appVersion, state: 'running', startedAt: new Date(now()).toISOString(),
+    ...(opts.playtest !== undefined ? { playtest: opts.playtest } : {}),
+  };
   if (await writeAppScenarioRun(storage, appId, started) === null) {
     slot.release();
     return { ran: false, reason: 'The app has no design spec to keep the run beside: write it with spec_set first.', member: 'Not started.', scenarios: [], criteria_evidence: [] };

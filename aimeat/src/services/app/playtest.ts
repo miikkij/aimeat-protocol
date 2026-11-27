@@ -56,7 +56,7 @@ import { serveDocumentOnce, type HeadlessRoutable } from '../headless/network.js
 import { lintAppArtifact, type AppArtifactLintResult } from './artifact-lint.js';
 import { logger } from '../../utils/logger.js';
 import { readAppDesignSpec } from './design-spec.js';
-import { scenarioRunFor, type ScenarioRunAnswer } from './scenario-run.js';
+import { keptPlaytestFor, scenarioRunFor, type ScenarioRunAnswer } from './scenario-run.js';
 
 /** The phone the app has to work on, and the desktop it has to survive being stretched to. */
 const MOBILE = { width: 390, height: 844 };
@@ -685,15 +685,21 @@ export async function auditAppWithPlaytest(
   if (!record?.data) return null;
   const html = Buffer.from(record.data).toString('utf8');
   const artifact = await lintAppArtifact(html, config);
-  const playtest = await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
   // The builder's own scenarios. A run that starts takes the slot and the hourly count every
   // playtest takes; reading a run that is under way or finished takes neither (scenario-run.ts).
   const scenarios = (await readAppDesignSpec(storage, `${app.ownerName}/${app.filename}`))?.scenarios ?? [];
-  if (scenarios.length === 0) return { artifact, playtest };
+  if (scenarios.length === 0) {
+    return { artifact, playtest: await runAppPlaytest(storage, config, app.ownerName, app.filename, { html }) };
+  }
+  // A call that reads a run already started for this version answers the playtest taken then: the
+  // bytes are the same, and running it again cost every such call 10 to 17 seconds and a slot.
+  const target = { ownerName: app.ownerName, filename: app.filename, appVersion: record.versionNumber };
+  const kept = await keptPlaytestFor(storage, target, scenarios) as AppPlaytestResult | undefined;
+  const playtest = kept ?? await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
   const run = await scenarioRunFor(
     storage, config,
-    { ownerName: app.ownerName, filename: app.filename, html, appName: record.manifest?.name ?? app.filename, appVersion: record.versionNumber },
-    scenarios, () => takePlaytestSlot(app.ownerName),
+    { ...target, html, appName: record.manifest?.name ?? app.filename },
+    scenarios, () => takePlaytestSlot(app.ownerName), { playtest },
   );
   return { artifact, playtest, scenarios: run };
 }
