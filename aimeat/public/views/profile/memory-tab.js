@@ -5,6 +5,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.8.0 -- 2026-11-27 -- The cover's records are named by title: useSpaceTitles
+ *     (memory-tab/space-titles.js) reads the value of each drawn row's newest record once per version
+ *     when it is small, and ctx.titleFor gives the cover the title.
  *   v3.7.0 — 2026-11-10 — Files a page at a time from the server: the mount asks for the first 12
  *     (files_limit, the content text files left out), "show more" reads 50 more (loadMoreFiles), and
  *     a change reads again as many as are shown (loadFiles).
@@ -128,7 +131,8 @@ const FILES_FIRST = 12;
 const FILES_MORE = 50;
 import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
-import { renderMemoryView } from './memory-tab/cover.js';
+import { renderMemoryView, coverLatestRows } from './memory-tab/cover.js';
+import { useSpaceTitles } from './memory-tab/space-titles.js';
 import { useKeyPages, prefixOf, todayFrom } from './memory-tab/key-pages.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState } from '/js/load-state.js';
@@ -186,6 +190,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // The cover and a key space read the server's summary and pages (memory-tab/key-pages.js); the
   // whole key list is read only once a part of the page needs every key (fullList, loadFull).
   const pages = useKeyPages({ onStats, setMemQuota });
+  // The cover names a key space's newest record by its title (memory-tab/space-titles.js).
+  const spaceTitles = useSpaceTitles();
   const [fullList, setFullList] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);   // true once "Load all contents" pulls values
   const [valueCache, setValueCache] = useState({});       // key → value (lazy-fetched in meta mode)
@@ -801,7 +807,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     session, showToast, confirm, NODE_URL, loadMemories, currentGhii,
     memFailed: memLoad.failed, filesFailed: filesLoad.failed, loadFiles,
     // the poster face
-    view, pickView, spaceSort, setSpaceSort: pickSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
+    view, pickView, titleFor: spaceTitles.titleFor, spaceSort, setSpaceSort: pickSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
     staleAll, setStaleAll: showAllStale, moreOpen, fullList, keyPages: pages, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,
     // entries
     memories, valueOf, valueCopyText, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,
@@ -825,6 +831,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setDiscoverSearch, selectedPeer, remoteEntries, browseMode, discoverSearch, discoverLoading, discoverError,
     discoverEntries, expandedDiscover, copyingKeys, remotePeers, browseLoading, browseError, pullingKeys,
   };
+
+  // The titles of the records the cover draws; want() reads each once per version, so every render may ask.
+  useEffect(() => { if (view.kind === 'cover') spaceTitles.want(coverLatestRows(ctx)); });
 
   return html`
     ${session.federated ? html`

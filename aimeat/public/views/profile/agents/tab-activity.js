@@ -5,6 +5,10 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.22.0 -- 2026-11-27 -- A log line names the task it belongs to by its title (the event's
+ *     taskTitle, which the route already sends), and the event's type is a word in the person's
+ *     language (typeWord), where it was the raw value (started, memory_write). A memory_write or
+ *     app_publish line names the record or app the node recorded (details.item) by its title.
  *   v1.21.0 -- 2026-09-26 -- Onto the components: the figures are the FigureStrip (lead), governance a
  *     section Card with the Facts (the warn tone for policy issues), the dots the StatusDot, the filter
  *     row the Tabs (filter tone), the log the TimelineList (scroll) with its kind as a Mark (coral for
@@ -47,7 +51,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { getActivity, getActivityLog, getActivityOverview } from '/js/services/agent-activity.js';
 import { getDirectives } from '/js/services/agent-directives.js';
 import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.js';
@@ -96,6 +100,26 @@ function eventCategory(event) {
   if (type.includes('message') || type.includes('msg')) return 'messages';
   if (type.includes('approve') || type.includes('scope') || type.includes('permission') || type.includes('governance') || type.includes('policy') || type.includes('readiness') || type.includes('override')) return 'governance';
   return 'system';
+}
+
+/**
+ * An event's type in the person's language (profile.agents.detail.activity.type.<type>): the task
+ * lifecycle, the item kinds an agent reports it changed (memory_write, app_publish,
+ * extension_install) and the onboarding steps. A type the page has no word for shows as sent.
+ */
+function typeWord(type) {
+  if (!type) return '-';
+  return tOr(`profile.agents.detail.activity.type.${type}`, type);
+}
+
+/**
+ * What a memory_write or app_publish event changed, as the node recorded it (details.item, from
+ * services/agent/task-event-item.ts): the record's or the app's title, else its key or app name.
+ */
+function itemName(ev) {
+  const item = ev?.details?.item;
+  if (!item || typeof item !== 'object') return '';
+  return String(item.title || item.key || item.app || '');
 }
 
 /**
@@ -287,7 +311,7 @@ export default function TabActivity({ agent, agentName }) {
         return html`
           <${TimelineRow} key=${ev.id || i} category=${dotOf(cat, evType)}
             when=${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}
-            text=${html`<${Mark} tone=${trouble ? 'coral' : undefined}>${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}<//> ${ev.type || ev.event || '-'}${ev.message ? `: ${ev.message}` : ''}`} />
+            text=${html`<${Mark} tone=${trouble ? 'coral' : undefined}>${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}<//> ${ev.taskTitle ? html`<b>${ev.taskTitle}</b> · ` : null}${typeWord(ev.type || ev.event)}${itemName(ev) ? html` <b>${itemName(ev)}</b>` : null}${ev.message ? `: ${ev.message}` : ''}`} />
         `;
       })}<//>`}
 

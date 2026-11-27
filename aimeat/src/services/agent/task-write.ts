@@ -42,6 +42,9 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-27 — recordTaskEvent() adds `details.item` to a memory_write or app_publish event whose
+ *     details name the record (`key`) or the app (`app`): the key or filename and its title, read by
+ *     the node from the task's agent and owner (task-event-item.ts). Additive; the agent's fields stay.
  *   2026-11-21 — createTask() names the body's fields the create schema does not take (ignoredFields),
  *     which the parse had stripped without a word.
  *   2026-11-13 — commissionFingerprint and isUniqueViolation come from services/agent-tasks/commission-dedupe.ts,
@@ -83,6 +86,7 @@ import {
 import { notifyTaskWaiting, alreadyWaitingWithPlan } from '../task/start-notice.js';
 import { commissionFingerprint, isUniqueViolation } from '../agent-tasks/commission-dedupe.js';
 import { resumeIfStalled } from '../task/resume.js';
+import { taskEventItem } from './task-event-item.js';
 import { resolveTaskFileInputs } from '../task/files.js';
 import type { FileRefAccessor } from '../file-refs.js';
 import { recordTaskStarted } from '../activity-recorder.js';
@@ -356,12 +360,18 @@ export async function recordTaskEvent(
     const input = parsed.data;
 
     const now = new Date().toISOString();
+    // A memory_write or app_publish whose details name the record (`key`) or the app (`app`) gets
+    // `details.item` from the node: the key or filename and its title, read from the task's own
+    // principals (services/agent/task-event-item.ts). Additive: every field the agent sent stays,
+    // and only `item` is the node's own.
+    const item = await taskEventItem(storage, task, input.type, input.details);
+    const details = item ? { ...(input.details ?? {}), item } : input.details;
     const event = await storage.appendTaskEvent({
         id: randomUUID(),
         taskId: task.id,
         type: input.type,
         message: input.message,
-        details: input.details,
+        details,
         timestamp: now,
     });
 

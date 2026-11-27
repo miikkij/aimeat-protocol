@@ -71246,7 +71246,7 @@ paths:
                   maxLength: 4096
                 details:
                   type: object
-                  description: Free-form event details. A `telemetry` object (ai_calls, tokens_in, tokens_out, duration_seconds) is added to the task's totals.
+                  description: Free-form event details. A `telemetry` object (ai_calls, tokens_in, tokens_out, duration_seconds) is added to the task's totals. On a `memory_write` event, `key` names the record written; on an `app_publish` event, `app` names the app (its filename or its name). The node then stores `item` beside the given fields, { kind ('memory' or 'app'), key or app, title }, with the title it reads from the record (its title, name, subject, label, heading or headline field, or a text's first line) or the app's name, from the task's agent and owner only; GET /v1/agents/{name}/activity/log returns it in the event's `details`. An `item` the caller sends is replaced.
       responses:
         '201':
           description: Event added

@@ -8,6 +8,9 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.4.0 -- 2026-11-27 -- No emoji before a word in a control: the collection's heading and "Copy URL
+ *     list" and the two downloads say their word alone. A collection row's mark is the file Glyph
+ *     for a file and the word "entry" (as the Lead's letters) for a record, which has no Glyph.
  *   v2.3.0 -- 2026-10-30 -- The upload form's "Where to keep it", when the person may choose a store
  *     (GET /v1/file-store `choices`): the first answer is where new files go now and sends no store
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -72,7 +75,7 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { listWorkspaces, addWorkspaceSources } from '/js/services/organisms.js';
 import { Modal } from '/components/Modal.js';
 import { FilePreview } from '/components/FilePreview.js';
-import { Action, Loud, Icon, Actions } from '/components/Action.js';
+import { Action, Loud, Icon, Actions, Glyph } from '/components/Action.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Tinted } from '/components/Figure.js';
@@ -188,21 +191,23 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
 
   return html`
     <${Box}>
-      <${Group} title=${html`🛒 ${title} <${Mark} kind="count" tone="waiting">${cart.length}<//>`}
+      <${Group} title=${html`${title} <${Mark} kind="count" tone="waiting">${cart.length}<//>`}
         onFold=${() => setOpen(o => !o)} folded=${!open} foldLabel=${title} wholeHead
         doors=${html`<${Action} small onClick=${onClear}>${t('profile.memory.cartClear') || 'Clear'}<//>`}>
         <${List} cols="mark-name-doors" keepCols scroll>
           ${cart.map(it => html`
             <${Row} key=${idOf(it)}>
-              <${Lead}>${it.kind === 'file' ? '📎' : '🧠'}<//>
+              ${it.kind === 'file'
+                ? html`<${Lead} label=${t('profile.memory.cover.kindFile')}><${Glyph} name="file" /><//>`
+                : html`<${Lead} text=${t('profile.memory.cover.kindEntry')} label=${t('profile.memory.cover.kindEntry')} />`}
               <${Name} title=${it.key}>${it.label || it.key}<//>
               <${Doors}><${Icon} small label=${removeWords} onClick=${() => onRemove(idOf(it))}>✕<//><//>
             <//>`)}
         <//>
         <${Actions}>
-          <${Action} small copy=${urlList} onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')}>${'📋 ' + (t('profile.memory.cartCopyUrls') || 'Copy URL list')}<//>
-          <${Action} small onClick=${downloadText}>⬇ ${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}<//>
-          <${Action} small disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : '⬇ ' + (t('profile.memory.cartDownloadZip') || 'Download ZIP')}<//>
+          <${Action} small copy=${urlList} onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')}>${t('profile.memory.cartCopyUrls') || 'Copy URL list'}<//>
+          <${Action} small onClick=${downloadText}>${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}<//>
+          <${Action} small disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : (t('profile.memory.cartDownloadZip') || 'Download ZIP')}<//>
           <${Action} small expanded=${sendOpen} onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}<//>
         <//>
         ${sendOpen ? html`<${Split}>${sendLine}<//>` : null}
@@ -364,7 +369,7 @@ export function FileUploadForm({ onUpload, onCancel }) {
   return html`
     <${Fields}>
       <${FileDrop} multiple items=${fileItems} onFiles=${addFiles} onRename=${updateKey} onRemove=${removeFile}
-        iconOf=${(f) => fileIcon(f.type)} />
+        iconOf=${() => fileIcon()} />
       <${Select} label=${t('profile.files.visLabel')} value=${vis} onChange=${setVis} options=${visOptions} />
       ${storeOptions ? html`
         <${Select} label=${t('profile.files.storeLabel')} hint=${t('profile.files.storeHint')} value=${store} onChange=${setStore} options=${storeOptions} />` : null}

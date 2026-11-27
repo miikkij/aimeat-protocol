@@ -9,6 +9,11 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.14.0 -- 2026-11-27 -- A board's row says what is inside before it is opened: its notice count
+ *     from the board list (posts) with who posts under it (postersOf: the first two posters and how
+ *     many more), and the newest notice by its title with who and when. A board whose notices are not
+ *     read yet shows its count and the time of its newest notice (last_post_at) instead of a loading
+ *     line that never ended (the public boards and every followed board past the twelfth read none).
  *   v1.13.0 -- 2026-10-18 -- A board's row says who can read it with the AudienceBadge (Private for a board of chosen members too, "<organism> members", Public) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.12.0 -- 2026-10-08 -- A notice's row hands its ai_provenance block to BoardNotice, which shows
  *     the AI label when one is owed (aiprov D10).
@@ -92,7 +97,7 @@ export function followedOf(boards, subs, session) {
   return { followed, others, isMine: mine, isSubscribed: (b) => subbed.has(bid(b)) };
 }
 
-/** One line under a board's name: an organism's discussion, own, or the keeper. */
+/** One line under a board's name: a shared place's board, own, or the keeper. */
 export function boardSub(ctx, b) {
   const parts = [];
   if (String(bid(b)).startsWith('org-')) parts.push(c('organismBoard'));
@@ -103,20 +108,40 @@ export function boardSub(ctx, b) {
   return parts.join(' · ');
 }
 
-/** Rows of a boards table: name and its line, visibility, notices, latest, a door. */
+/**
+ * Who posts on a board, from the notices the page has read of it: the first two posters by name and
+ * how many more ("alice, bob +2"). Empty when nothing is read yet.
+ */
+export function postersOf(page) {
+  const names = [];
+  for (const p of page?.posts || []) { const w = who(p.author_gaii).label; if (w && !names.includes(w)) names.push(w); }
+  if (!names.length) return '';
+  return names.length > 2 ? c('postersMore', { names: names.slice(0, 2).join(', '), n: names.length - 2 }) : names.join(', ');
+}
+
+/**
+ * Rows of a boards table: name and its line, visibility, notices with who posts them, the newest
+ * notice by its title with who and when, a door. The count and the time of the newest notice come
+ * from the board list (posts, last_post_at); the title and the posters from the notices the page has
+ * read of the board (a full page for a followed board, the newest three for the others, read once
+ * when the row is drawn: boards-tab.js). A board whose notices are not read yet shows its count and
+ * time, never a loading line that does not end.
+ */
 export function boardRows(ctx, list, door, { head = false } = {}) {
   const row = (b) => {
     const id = bid(b);
     const page = ctx.pages[id];
-    const n = page ? page.posts.length : null;
+    const n = typeof b.posts === 'number' ? b.posts : page ? page.posts.length : null;
     const latest = page?.posts[0];
+    const lastAt = latest?.created_at || b.last_post_at || null;
+    const posters = postersOf(page);
     const open = () => ctx.pickView({ kind: 'board', id });
     return html`
       <${Row} key=${id}>
         <${Name} onOpen=${open} meta=${boardSub(ctx, b)} clip>${b.name}<//>
         <${Desc}><${AudienceBadge} value=${b.visibility} /><//>
-        <${Desc} faint=${!n}>${n === null ? html`<${Note} kind="loading" inline>${t('common.loading')}<//>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}<//>
-        <${Desc} faint=${!latest}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}<//>
+        <${Desc} faint=${!n} sub=${n && posters ? posters : undefined}>${n === null ? html`<${Note} kind="loading" inline>${t('common.loading')}<//>` : n ? html`<b>${n}</b> ${c('noticesWord', { n })}` : c('noNotices')}<//>
+        <${Desc} faint=${!lastAt} clip sub=${latest ? `${who(latest.author_gaii).label} · ${rel(latest.created_at)}` : undefined}>${latest ? html`<b>${latest.title || c('untitled')}</b>` : lastAt ? rel(lastAt) : '·'}<//>
         <${Doors}>${door(b)}<//>
       <//>`;
   };

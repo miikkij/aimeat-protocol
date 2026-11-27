@@ -7,6 +7,8 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.23.1 -- 2026-11-27 -- The triage "Keep" action says its word alone; the star before it is gone
+ *     (no emoji in the interface).
  *   v2.23.0 — 2026-10-04 — A declined task shows the agent's reason under its title, in the neutral
  *     tone: a refusal, not an error.
  *   v2.22.0 — 2026-10-02 — A queued task with a plan says in words that it waits for the owner's OK.
@@ -516,7 +518,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
           <${Row} wrap justify="between" gap="large" above="large">
             <${Actions}>
               ${task.triage !== 'kept' && html`
-                <${Action} small onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}<//>
+                <${Action} small onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>${t('profile.agents.tasks.triage.keep')}<//>
               `}
               ${task.triage !== 'archived' && html`
                 <${Action} small onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}<//>

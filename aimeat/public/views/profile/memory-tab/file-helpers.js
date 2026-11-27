@@ -6,6 +6,8 @@
  *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
  *   memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-11-27 -- fileIcon and categoryIcon return the drawn file mark (Glyph "file") in
+ *     place of an emoji per kind: no emoji in the interface.
  *   v1.3.0 — 2026-10-30 — uploadFilesPresigned(…, store): the store the person picked; a store refusal in
  *     their words (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.3.0 — 2026-11-10 — CONTENT_TEXT_PREFIX, for the paged file reads that leave those files out.
@@ -13,10 +15,15 @@
  *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
+import { h } from 'preact';
+import htm from 'htm';
+import { Glyph } from '/components/Action.js';
 import * as memoryService from '/js/services/memory.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
 import { refusalWords } from '../storage/store-words.js';
+
+const html = htm.bind(h);
 
 /**
  * The files a person stored, without the content class pipeline's own text files
@@ -33,10 +40,12 @@ export function userFiles(list) {
 /** The key prefix of those text files, which the paged reads ask the server to leave out. */
 export const CONTENT_TEXT_PREFIX = 'contentclass-text/';
 
-export function fileIcon(type) {
-  if (type?.startsWith('image')) return '\u{1F5BC}️';
-  if (type?.includes('pdf')) return '\u{1F4C4}';
-  return '\u{1F4CE}';
+/**
+ * The mark before a file in the upload list: the drawn file mark (components/Action.js Glyph) for
+ * every kind, since an emoji in the interface is not drawn by the theme.
+ */
+export function fileIcon() {
+  return html`<${Glyph} name="file" />`;
 }
 
 // Extensions treated as text when the upload's mime is a generic octet-stream.
@@ -65,15 +74,9 @@ export function fileCategory(mime, key) {
   return 'other';
 }
 
-export function categoryIcon(cat) {
-  switch (cat) {
-    case 'image': return '\u{1F5BC}️';
-    case 'pdf': return '\u{1F4C4}';
-    case 'video': return '\u{1F3AC}';
-    case 'audio': return '\u{1F3B5}';
-    case 'text': return '\u{1F4DD}';
-    default: return '\u{1F4CE}';
-  }
+/** A file category's mark: the drawn file mark for every category (no emoji in the interface). */
+export function categoryIcon() {
+  return html`<${Glyph} name="file" />`;
 }
 
 // Authenticated blob fetch — browser <img>/<video>/<a> can't attach the JWT, so private files

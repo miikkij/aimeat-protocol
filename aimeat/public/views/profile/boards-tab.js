@@ -12,6 +12,9 @@
  *   import BoardsTab from './boards-tab.js';
  *   html`<${BoardsTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v2.2.0 -- 2026-11-27 -- Every board row the cover draws without a page of notices (a followed board
+ *     past the twelfth, a public board while its fold is open) reads its newest three notices once per
+ *     newest notice (last_post_at), so the row names the newest notice by title and who posts there.
  *   v2.1.1 — 2026-10-18 — The render bag carries showToast, for a board's classification line (plan doc-mvdipuyqraas, L4.4).
  *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Taulujen sivu", direction A): the
@@ -119,6 +122,29 @@ export default function BoardsTab({ session, showToast }) {
   const loadRef = useRef(loadAll);
   loadRef.current = loadAll;
   useEffect(() => onLiveUpdate(['boards'], () => loadRef.current({ showSpinner: false })), []);
+
+  // A row on the cover names the board's newest notice by its title and who posts there. The first
+  // twelve followed boards have a page of notices from loadAll; every other row the cover draws (a
+  // followed board past the twelfth, a public board while its fold is open) reads its newest three,
+  // once per newest notice: the board list's last_post_at says when a row's read is out of date, so a
+  // live update reads again only the boards that got a new notice. No timer.
+  const peeked = useRef(new Map());   // board id → the last_post_at its peek read
+  const publicOpen = folds.public ?? !followed.length;
+  useEffect(() => {
+    if (view.kind !== 'cover' || loading) return;
+    const drawn = [...followed, ...(publicOpen ? (publicAll ? others : others.slice(0, 8)) : [])];
+    for (const b of drawn) {
+      const id = bid(b);
+      const at = b.last_post_at || '';
+      if (!b.posts || !at) continue;
+      const newest = (pg) => pg?.posts[0]?.created_at || '';
+      if (newest(pages[id]) >= at || peeked.current.get(id) === at) continue;
+      peeked.current.set(id, at);
+      boardsService.listPostsPage(id, { limit: 3 }).then(
+        (pg) => setPages(prev => (newest(prev[id]) >= at ? prev : { ...prev, [id]: pg })),
+        (err) => swallowed('boards-tab: newest notices', err));
+    }
+  });   // every render: `peeked` makes a row read once per newest notice
 
   const loadNotice = useCallback(async (boardId, postId) => {
     try {

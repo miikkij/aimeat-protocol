@@ -8,6 +8,10 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.5.0 -- 2026-11-27 -- No emoji in a control: a key group's search and delete Icons draw the
+ *     Glyph marks (search, trash); the Archived filter, the bulk "Add to collection", "Copy value" and the
+ *     key rules button and heading say their word alone. The key-rules Icon draws the shield Glyph and each row's
+ *     collection Icon the cart Glyph.
  *   v2.4.0 -- 2026-11-08 -- The import's conflict drop-down in the tools line has its question mark beside it: memory.importMode (components/HelpTip.js).
  *   v2.3.1 -- 2026-11-05 -- The expanded row's visibility menu offers "group" only on a record already at it, like the other menus: this menu names no group.
  *   v2.3.0 -- 2026-10-18 -- A key's visibility tag is the AudienceBadge: who can read it in words (Private, "<organism> members", Signed-in, Public), still the button that opens the picker (plan doc-mvcn6c7e4e5q, V6.4).
@@ -79,7 +83,7 @@ import { AudienceBadge } from '/components/AudienceBadge.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
-import { Action, Loud, Icon, Actions } from '/components/Action.js';
+import { Action, Loud, Icon, Actions, Glyph } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Meter, Tinted } from '/components/Figure.js';
@@ -237,7 +241,7 @@ export function renderEntries(ctx) {
     <${Note} kind="aside" size="small">
       <${Stack}>
         <${Line} justify="between">
-          <${SubHeading} inline>\u{1F6E1}️ ${rulesWord}<//>
+          <${SubHeading} inline>${rulesWord}<//>
           <${Icon} small label=${t('common.close')} onClick=${() => setKeyRulesPopover(null)}>✕<//>
         <//>
         <${Note} kind="meta">${visLabel} ${t('knowledge.visibility.' + keyRulesPopover.visibility) || keyRulesPopover.visibility}<//>
@@ -278,7 +282,7 @@ export function renderEntries(ctx) {
             ${t('tags.editTags') || 'Edit tags'}
           <//>
           <${Action} small expanded=${keyRulesPopover?.key === m.key} onClick=${() => { if (keyRulesPopover?.key === m.key) setKeyRulesPopover(null); else loadKeyPerms(m.key); }}>
-            \u{1F6E1}️ ${rulesWord}
+            ${rulesWord}
           <//>
           <${Action} small expanded=${sharePanelFor === m.key} onClick=${() => { if (sharePanelFor === m.key) setSharePanelFor(null); else openSharePanel(m.key); }}>
             ${t('profile.memory.shShareThis')}
@@ -294,7 +298,7 @@ export function renderEntries(ctx) {
           <${Actions}>
             <${Action} small onClick=${() => setEditModal({ key: m.key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null })}>${t('profile.memory.editBtn')}<//>
             ${v !== undefined ? html`<${Action} small copy=${valueCopyText(m)}
-              onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')}>${'\u{1F4CB} ' + (t('profile.memory.copyValue') || 'Copy value')}<//>` : null}
+              onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')}>${t('profile.memory.copyValue') || 'Copy value'}<//>` : null}
             ${fedConsents[m.key]
               ? html`<${Action} small disabled=${togglingFed === m.key} onClick=${() => handleStopSharing(m.key)}>
                   ${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}
@@ -343,13 +347,13 @@ export function renderEntries(ctx) {
             <${Mark} title=${t('profile.memory.shSharedWith').replace('{names}', via.map(x => x.name).join(', '))}>
               ${t('profile.memory.shSharedBadge')} · ${via.length}
             <//>` : null}
-          ${keyHasRules(m.key) ? html`<${Icon} small label=${rulesWord} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️<//>` : null}
+          ${keyHasRules(m.key) ? html`<${Icon} small label=${rulesWord} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}><${Glyph} name="shield" /><//>` : null}
           ${fedConsents[m.key] ? html`<${Mark}>${t('profile.memory.syncedToFederation')}<//>` : null}
         <//>
         <${Doors}>
           <${Icon} small pressed=${carried}
             label=${carried ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}
-            onClick=${(e) => { e.stopPropagation(); toggleCartItem(memCartItem(m)); }}>🛒<//>
+            onClick=${(e) => { e.stopPropagation(); toggleCartItem(memCartItem(m)); }}><${Glyph} name="cart" /><//>
         <//>
       <//>`;
   };
@@ -395,7 +399,7 @@ export function renderEntries(ctx) {
       <${Tabs} tone="fold" kind="view" value=${memArchived ? 'archived' : 'active'} onSelect=${(v) => setMemArchived(v === 'archived')}
         items=${[
           { value: 'active', label: t('profile.memory.viewActive') || 'Active' },
-          { value: 'archived', label: '🗄️ ' + (t('profile.memory.viewArchived') || 'Archived') },
+          { value: 'archived', label: t('profile.memory.viewArchived') || 'Archived' },
         ]} />
     <//>
     <${Line} justify="between" wrap gap="medium" below="large">
@@ -422,7 +426,7 @@ export function renderEntries(ctx) {
                 tab or the row's own share panel — not a per-record loop dressed up as a bulk edit. */''}
           <${Select} fit ariaLabel=${visLabel} value=${bulkVis} onChange=${setBulkVis} options=${visWords(VIS_OPTIONS.filter(v => v !== 'group'))} />
           <${Action} small onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}<//>
-          <${Action} small onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>🛒 ${t('profile.memory.cartAddSelected') || 'Add to collection'}<//>
+          <${Action} small onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>${t('profile.memory.cartAddSelected') || 'Add to collection'}<//>
           <${Action} small tone="danger" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}<//>
           <${Action} small onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}<//>
         <//>
@@ -449,9 +453,9 @@ export function renderEntries(ctx) {
                   right=${`${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}${g.kind === 'organism' && orgNames[g.uuid] ? ` · ${shortTok(g.uuid)}` : ''}`}
                   doors=${groupPrefix ? html`
                     <${Icon} small label=${t('profile.memory.searchInGroup') || 'Search in this group'}
-                      onClick=${() => { setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}>🔍<//>
+                      onClick=${() => { setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}><${Glyph} name="search" /><//>
                     <${Icon} small label=${t('profile.memory.deleteGroup') || 'Delete group'}
-                      onClick=${() => deleteGroup(g, g.items.length)}>🗑️<//>` : null} />
+                      onClick=${() => deleteGroup(g, g.items.length)}><${Glyph} name="trash" /><//>` : null} />
                 ${!collapsed ? html`<${List} cols="check-name-size-when-mark-doors" keepCols under>${g.items.map(m => renderRow(m, g))}<//>` : null}
               <//>
             `;

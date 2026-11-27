@@ -9,6 +9,8 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   v1.12.1 -- 2026-11-27 -- An offered contract's Mark says its name alone; the scroll emoji before it
+ *     is gone (no emoji in the interface).
  *   v1.12.0 -- 2026-09-26 -- Onto the components: the cards are section Cards in a CardGrid, the offers
  *     a row of Marks, each engagement list a Group heading over a List (a retired row faded), the
  *     states Marks, the lines the Note. The file writes no class any more.
@@ -100,7 +102,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
       <${Card} tone="section" title=${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}>
         <${HeadDesc}>${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}<//>
         ${advertises || capabilities.length
-          ? html`<${Marks}>${(capabilities.length ? capabilities : ['']).map(c => html`<${Mark} key=${c}>${'📜 '}${c || (t('organisms.bareContract') || 'contract')}<//>`)}<//>`
+          ? html`<${Marks}>${(capabilities.length ? capabilities : ['']).map(c => html`<${Mark} key=${c}>${c || (t('organisms.bareContract') || 'contract')}<//>`)}<//>`
           : html`<${Note} kind="quiet">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}<//>`}
       <//>
 

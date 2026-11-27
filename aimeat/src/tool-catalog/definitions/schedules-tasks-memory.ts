@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-27 — aimeat_task_event's details say what names the changed item: { key } on memory_write,
+ *     { app } on app_publish (the node adds details.item with its title).
  *   2026-11-19 — aimeat_agent_task_start_set takes task_start_app_waits, and task_start may be left
  *     out to change only that (feature audit 2026-11-19, item 2.1).
  *   2026-11-14 — aimeat_task_event takes revision_requested, as POST …/tasks/:id/event does
@@ -493,7 +495,7 @@ export const schedulesTasksMemoryTools = [
                 'revision_requested',
             ]) },
             message: { type: 'string', required: true, description: 'Event message.' },
-            details: { type: 'object', description: 'Optional event details.' },
+            details: { type: 'object', description: 'Optional event details. For memory_write give { key } (the record you wrote), for app_publish { app } (the app\'s filename or name): the owner\'s activity log then names it by its title.' },
         },
     },
     {

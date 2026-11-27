@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-27 -- aimeat_task_event's details say what names the changed item: { key } on memory_write,
+ *     { app } on app_publish (the node adds details.item with its title).
  *   2026-11-19 -- aimeat_handbook_get's tier text: the Atelier specification and its platform sections, no Classic tier.
  *   2026-11-19 -- aimeat_agent_task_start_set sends task_start only when it is given, so a call with neither field reaches the route, which refuses it.
  *   2026-11-19 -- aimeat_agent_task_start_set forwards task_start_app_waits, and sends task_start only when given with it.
@@ -642,7 +644,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             type: { type: 'string', required: true, description: 'Event type.' },
             message: { type: 'string', required: true, description: 'Event message.' },
-            details: { type: 'object', description: 'Optional event details.' },
+            details: { type: 'object', description: 'Optional event details. For memory_write give { key } (the record you wrote), for app_publish { app } (the app\'s filename or name): the owner\'s activity log then names it by its title.' },
         },
         handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/event`, {
             type: requiredString(input, 'type'),

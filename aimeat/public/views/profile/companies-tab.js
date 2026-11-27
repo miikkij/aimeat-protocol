@@ -11,6 +11,8 @@
  * @structure CompaniesTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'companies'.
  * @version-history
+ *   v2.3.0 -- 2026-11-27 -- organismName names a linked shared place the person is not a member of by
+ *     a word (companypage.rowPlaceUnknown), never by its id.
  *   v2.2.0 — 2026-11-08 — ctx.loaded says the list has been read once, so the cover's start
  *     (PageStart "companies") stays folded while it loads and folds for good once a company exists.
  *   v2.1.0 — 2026-10-16 — The menu find opens one company here (useOpenItem, js/open-item.js).
@@ -248,7 +250,8 @@ export default function CompaniesTab({ showToast, session }) {
       finally { setBusy(false); }
     }, { danger: true });
   }
-  const organismName = (id) => organisms.find((o) => o.id === id)?.name || id;
+  // A shared place the person is not a member of is not in the list: it is named by a word, never by its id.
+  const organismName = (id) => organisms.find((o) => o.id === id)?.name || c('rowPlaceUnknown');
 
   /* ── the sending identity ── */
 

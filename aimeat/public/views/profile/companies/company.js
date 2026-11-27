@@ -11,6 +11,9 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.17.0 -- 2026-11-27 -- Who may act counts the linked shared place's members (member_count from
+ *     the organisms the page already read) where it said "team"; the words for the link say shared
+ *     place, the page title's word for the same thing, in every language.
  *   v1.16.0 -- 2026-11-08 -- The E-invoice operator (its field and its Facts row's name) and the SMTP
  *     "TLS on connect" check open their explanations (help company.einvoiceOperator, company.smtpTls),
  *     written from what the finance and company SMTP services do with each.
@@ -74,10 +77,13 @@ export function renderCompany(ctx) {
   const facts = factsOf(co);
   const x = ctx.extras[co.id] || {};
   const host = co.address ? co.address.replace(/^https?:\/\//, '') : co.slug;
+  // Who may act: the linked shared place's member count when the page has read it, else its word.
+  const place = co.organismId ? (ctx.organisms || []).find((o) => o.id === co.organismId) : null;
+  const actorsN = !co.organismId ? 1 : place?.member_count ?? c('actorsMany');
   const sections = [
     { id: 'co-facts', num: '01', label: c('secFacts'), count: `${facts.done}/${facts.total}` },
     { id: 'co-front', num: '02', label: c('secFront'), count: '' },
-    { id: 'co-actors', num: '03', label: c('secActorsShort'), count: co.organismId ? c('actorsMany') : 1 },
+    { id: 'co-actors', num: '03', label: c('secActorsShort'), count: actorsN },
     { id: 'co-events', num: '04', label: c('secEventsShort'), count: (x.inv ?? 0) + (x.sent ?? 0) },
     { id: 'co-smtp', num: '05', label: t('profile.companies.smtpTitle'), count: '' },
     { id: 'co-chat', num: '06', label: c('chatTitle'), count: '' },
@@ -88,7 +94,7 @@ export function renderCompany(ctx) {
       sub: facts.missing.length ? c('stripFactsMissing', { list: facts.missing.slice(0, 2).map(([w]) => fieldLabel(w)).join(', ') }) : c('stripFactsDone') },
     { key: 'inv', n: x.inv ?? 0, label: c('stripInvoices'), sub: c('stripInvoicesSub') },
     { key: 'sent', n: x.sent ?? 0, label: c('stripSentOne'), sub: co.organismId ? c('stripSentOneSub') : c('stripSentNoBook') },
-    { key: 'actors', n: co.organismId ? c('actorsMany') : 1, label: c('stripActors'), sub: co.organismId ? c('actorsOrganism', { name: ctx.organismName(co.organismId) }) : c('actorsYou') },
+    { key: 'actors', n: actorsN, label: c('stripActors'), sub: co.organismId ? c('actorsOrganism', { name: ctx.organismName(co.organismId) }) : c('actorsYou') },
   ]} />`;
 
   return html`

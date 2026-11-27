@@ -11,6 +11,12 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.14.0 -- 2026-11-27 -- A company row says what is inside before it is opened: its description
+ *     under the name, the app its address serves by title (or the redirect's host), and who works in
+ *     its name (the linked shared place by its name and member count, or only you) with the invoices
+ *     of this year and the messages sent. All from what the page already reads. The row no longer
+ *     says whose server the mail leaves from; the company's own page says it in its head and in the
+ *     sending identity row.
  *   v1.13.0 -- 2026-11-27 -- Usability pass on the person's three situations. The strip takes hideZeros
  *     (no band of zeros before the first company) and holds its place while the list loads; a company
  *     whose address does not answer or whose invoice details are missing comes first in the list, its
@@ -45,7 +51,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -120,24 +126,64 @@ export function renderCover(ctx) {
     <//>`;
 }
 
+/**
+ * What the company's address serves, by name: the app by its title (from the apps the page already
+ * read), the redirect by its host. A kind with nothing to name says only the kind.
+ */
+function frontOf(ctx, co, host) {
+  const kind = co.frontPage?.kind || 'none';
+  const target = co.frontPage?.target || '';
+  if (kind === 'app' && target) {
+    const app = (ctx.apps || []).find((a) => `${a.owner}/${a.filename}` === target);
+    return app ? (app.name || app.filename) : '';
+  }
+  if (kind === 'redirect' && target) return host(target);
+  return '';
+}
+
+/**
+ * Who works in the company's name and what has happened in it, in one short line: the linked shared
+ * place by its name with its member count (from the organisms the page already read; never its id),
+ * or only you; then the invoices of this year and the messages sent, when there are any.
+ */
+function whoWorks(ctx, co, x) {
+  const place = co.organismId ? (ctx.organisms || []).find((o) => o.id === co.organismId) : null;
+  const who = !co.organismId ? c('actorsYou')
+    : place ? tn('companypage.rowPlace', Number(place.member_count) || 0, { name: place.name })
+      : c('rowPlaceUnknown');
+  const books = [
+    x.inv ? tn('companypage.rowInvoices', x.inv) : null,
+    x.sent ? tn('companypage.rowSent', x.sent) : null,
+  ].filter(Boolean).join(', ');
+  return books ? `${who} · ${books}` : who;
+}
+
+/**
+ * A company row says what is inside before it is opened: its purpose (the description), what its
+ * address serves by name, whether its details are complete, and who works in its name with what has
+ * happened there. Everything comes from what the page already read; no read per row.
+ */
 function secRows(ctx, rows) {
   const host = (u) => u.replace(/^https?:\/\//, '');
   return html`
     <${PageSection} id="co-rows" num="01" title=${c('secRows')} count=${rows.length} first>
       <${List} cols="mark-name-kind-state-doors" keepCols empty=${c('emptyRows')} loading=${ctx.loaded ? false : t('common.loading')}
         head=${rows.length ? ['', c('colCompany'), c('colFront'), c('colState'), ''] : null}>
-          ${rows.map(({ co, facts, x }) => html`
+          ${rows.map(({ co, facts, x }) => {
+            const front = frontOf(ctx, co, host);
+            return html`
             <${Row} key=${co.id}>
               <${Lead} text=${initials(co.name)} />
-              <${Name} attention=${ctx.addr[co.id] === false} meta=${co.address ? host(co.address) : co.slug}>${co.name}<//>
-              <${Who} sub=${ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : ''}>
-                <b>${kindWord(co.frontPage?.kind)}</b>${co.frontPage?.kind === 'redirect' && co.frontPage.target ? html`<small>${host(co.frontPage.target)}</small>` : null}
+              <${Name} attention=${ctx.addr[co.id] === false} meta=${co.address ? host(co.address) : co.slug} desc=${co.description || null}>${co.name}<//>
+              <${Who} clip sub=${ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : ''}>
+                <b>${kindWord(co.frontPage?.kind)}</b>${front ? html`<small>${front}</small>` : null}
               <//>
-              <${Who} sub=${[x.smtpSet ? c('senderOwn') : c('senderShared'), co.organismId ? c('withOrganism') : c('noOrganism')].join(' · ')}>
+              <${Who} clip sub=${whoWorks(ctx, co, x)}>
                 ${facts.done < facts.total ? html`<${Mark} kind="status" tone="attention">${c('factsShort', { n: `${facts.done}/${facts.total}` })}<//>` : html`<b>${c('factsDone')}</b>`}
               <//>
               <${Doors}><${Action} small row onClick=${() => ctx.open(co.id)}>${c('open')}<//><//>
-            <//>`)}
+            <//>`;
+          })}
       <//>
       ${rows.length ? html`<${Hint}>${c('rowsHint')}<//>` : null}
     <//>`;
