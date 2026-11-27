@@ -415,6 +415,8 @@ const iam = {
           id: m.owner, role: m.role || null,
           level: typeof m.level === 'number' ? m.level : null,
           since: m.since || null, grants: m.offerings || [],
+          // A bought membership: paid until when, and whether it renews (the owner's view only).
+          ...(m.paid && m.paid.until ? { paid: { until: m.paid.until, renews: !!m.paid.renews } } : {}),
         })),
       };
     }

@@ -304,6 +304,8 @@ export function mountMemberAdmin(iam, opts) {
         // same word twice and, at 390px, costs a whole row per member for nothing.
         (!sel && m.role) ? el('span', { cls: cls('aim-iam-badge'), text: m.role }) : null,
         m.since ? el('span', { cls: cls('aim-iam-muted'), text: fmtDate(m.since) }) : null,
+        // A bought membership says how far it is paid and whether it renews.
+        m.paid ? el('span', { cls: cls('aim-iam-muted'), text: S(m.paid.renews ? 'paidRenews' : 'paidEnds', { d: fmtDate(m.paid.until) }) }) : null,
         grantCell(m.id),
         usageCell(m.id),
         sel,

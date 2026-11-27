@@ -265,6 +265,8 @@
       buyDone: "You are a member until {d}.",
       buyGuestDone: "The membership is paid. Open the message sent to your email address to continue.",
       buyCancelled: "The payment was cancelled. Nothing was charged.",
+      paidRenews: "paid until {d}, renews",
+      paidEnds: "paid until {d}, renewal stopped",
       notOwner: "Only the owner manages members.",
       failed: "That did not go through.",
       failedWith: "That did not go through: {why}",
@@ -350,6 +352,8 @@
       buyDone: "Olet jäsen {d} asti.",
       buyGuestDone: "Jäsenyys on maksettu. Jatka avaamalla sähköpostiisi tullut viesti.",
       buyCancelled: "Maksu peruttiin. Mitään ei veloitettu.",
+      paidRenews: "maksettu {d} asti, uusinta päällä",
+      paidEnds: "maksettu {d} asti, uusinta peruttu",
       notOwner: "Vain omistaja hallinnoi jäseniä.",
       failed: "Se ei mennyt läpi.",
       failedWith: "Se ei mennyt läpi: {why}",
@@ -435,6 +439,8 @@
       buyDone: "Eres miembro hasta el {d}.",
       buyGuestDone: "La membresía está pagada. Abre el mensaje que llegó a tu correo para continuar.",
       buyCancelled: "Se canceló el pago. No se cobró nada.",
+      paidRenews: "pagado hasta el {d}, se renueva",
+      paidEnds: "pagado hasta el {d}, renovación detenida",
       notOwner: "Solo el propietario administra a los miembros.",
       failed: "No se pudo completar.",
       failedWith: "No se pudo completar: {why}",
@@ -865,6 +871,8 @@
           // same word twice and, at 390px, costs a whole row per member for nothing.
           !sel && m.role ? el("span", { cls: cls("aim-iam-badge"), text: m.role }) : null,
           m.since ? el("span", { cls: cls("aim-iam-muted"), text: fmtDate(m.since) }) : null,
+          // A bought membership says how far it is paid and whether it renews.
+          m.paid ? el("span", { cls: cls("aim-iam-muted"), text: S(m.paid.renews ? "paidRenews" : "paidEnds", { d: fmtDate(m.paid.until) }) }) : null,
           grantCell(m.id),
           usageCell(m.id),
           sel,
@@ -1632,7 +1640,9 @@
             role: m.role || null,
             level: typeof m.level === "number" ? m.level : null,
             since: m.since || null,
-            grants: m.offerings || []
+            grants: m.offerings || [],
+            // A bought membership: paid until when, and whether it renews (the owner's view only).
+            ...m.paid && m.paid.until ? { paid: { until: m.paid.until, renews: !!m.paid.renews } } : {}
           }))
         };
       }
