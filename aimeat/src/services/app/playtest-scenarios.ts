@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Run the builder's own scenarios (services/app/scenarios.ts) on a published app in the
  *   node's headless browser: each scenario at every size of the one size matrix and in both themes,
- *   signed in as a throwaway member (services/app/playtest-member.ts) unless it says otherwise. The
+ *   signed in as a throwaway member (services/app/playtest-member.ts) unless it says otherwise. Every
+ *   run of one size and theme has a member of its own, so each starts from an account that holds
+ *   nothing: with one member for the whole run, a scenario that began from the app's empty state
+ *   passed at the first size and failed at the seven after it, on what the first had saved. The
  *   answer is pass or fail per scenario and per size and theme, the step that failed, the console
  *   errors and the node's own failed answers, and for every scenario that passed everywhere one
  *   evidence line per criterion it names, ready for criteria_set.
@@ -18,11 +21,17 @@
  *   token is a throwaway account's, for this one app, valid for minutes, and the account is erased
  *   when the run ends, so a page that leaks it leaks nothing.
  *
- *   THE BOUNDS. One browser for the run, at most SCENARIOS_MAX scenarios and SCENARIO_STEPS_MAX steps
- *   each, a step waits at most 5 s, and the whole run stops at RUN_DEADLINE_MS: what did not run is
- *   named as not run, never as passed.
+ *   THE BOUNDS. One browser for the run with RUNS_AT_ONCE pages in it at a time, at most
+ *   SCENARIOS_MAX scenarios and SCENARIO_STEPS_MAX steps each, a step waits at most 5 s, and the
+ *   whole run stops at RUN_DEADLINE_MS: what did not run is named as not run, never as passed, and
+ *   what did run is still answered. The deadline is what an MCP client's wait leaves: a client that
+ *   waits 60 seconds for a tool got no answer at all from a run that was allowed 170.
  * @structure runAppScenarios(storage, config, app, scenarios, opts) · ScenarioRunResult
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A member per run of one size and theme, four runs at a time, and a
+ *     deadline of 35 seconds with the finished runs answered when it passes
+ *     (wish-rakentajan-skenaarioajo-vastaa-mcp-kutsun-aikana-ja-jokainen). Measured on five builds
+ *     that day: every audit of an app with scenarios ended in the client's 60-second timeout.
  *   v1.0.0 — 2026-11-26 — Initial (wish-builder-scenarios-in-the-playtest-signed-in-four-widths-both).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -32,12 +41,18 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { parseAppScopes } from '../protected-resource.js';
 import { MAX_RESOURCE_BYTES, serveDocumentOnce, type HeadlessRoute } from '../headless/network.js';
-import { NO_HEADLESS_BROWSER, withHeadlessContext, type HeadlessBrowser } from '../screenshot-capture.js';
+import { HeadlessDeadlineError, NO_HEADLESS_BROWSER, withHeadlessContext, type HeadlessBrowser } from '../screenshot-capture.js';
 import { makePlaytestMember, type PlaytestMember } from './playtest-member.js';
 import { SCENARIO_SIZES, SCENARIO_THEMES, type AppScenario, type ScenarioStep } from './scenarios.js';
 
-/** The whole run: launch, every scenario at every size and theme, and the close. */
-const RUN_DEADLINE_MS = 170_000;
+/**
+ * The whole run: launch, every scenario at every size and theme, and the close. An MCP client waits
+ * 60 seconds for a tool's answer, and the audit's own playtest (10 to 17 seconds, measured) runs
+ * before this, so the two together have to end inside that minute.
+ */
+const RUN_DEADLINE_MS = 35_000;
+/** Runs of one size and theme in the browser at the same time. */
+const RUNS_AT_ONCE = 4;
 const STEP_DEFAULT_MS = 3000;
 const BOOT_SETTLE_MS = 800;
 const MAX_QUOTED = 5;
@@ -227,38 +242,72 @@ export async function runAppScenarios(
   const url = `${origin}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
   const now = opts.now ?? Date.now;
   const needsMember = scenarios.some(s => s.signed_in);
-  let member: PlaytestMember | null = null;
+  const memberOf = { id: `${app.ownerName}/${app.filename}`, name: app.appName, origin, scopes: parseAppScopes(app.html) };
+  // Every member a run made, so each is erased whichever way the run ends.
+  const made: PlaytestMember[] = [];
+  // The first member says whether this node can make one at all; the first signed-in run uses it.
+  let spare: PlaytestMember | null = null;
+  let canSignIn = false;
   let memberLine = 'No scenario asks to be signed in.';
   if (needsMember) {
-    const made = await makePlaytestMember(storage, config, {
-      id: `${app.ownerName}/${app.filename}`, name: app.appName, origin, scopes: parseAppScopes(app.html),
-    });
-    if ('reason' in made) memberLine = made.reason;
-    else { member = made; memberLine = 'Signed in as a throwaway member account made for this run and erased after it.'; }
+    const first = await makePlaytestMember(storage, config, memberOf);
+    if ('reason' in first) memberLine = first.reason;
+    else {
+      spare = first; made.push(first); canSignIn = true;
+      memberLine = 'Each run signed in as a throwaway member account of its own, made for that run and erased after it.';
+    }
   }
-  const results: ScenarioResult[] = scenarios.map(s => ({ id: s.id, name: s.name, criteria: s.criteria, signed_in: s.signed_in && !!member, ok: false, runs: [], not_run: [] }));
+  /** A member nobody has used: each run starts from an account that holds nothing. */
+  const freshMember = async (): Promise<PlaytestMember | null> => {
+    if (spare) { const m = spare; spare = null; return m; }
+    const next = await makePlaytestMember(storage, config, memberOf);
+    if ('reason' in next) return null;
+    made.push(next);
+    return next;
+  };
+  const results: ScenarioResult[] = scenarios.map(s => ({ id: s.id, name: s.name, criteria: s.criteria, signed_in: s.signed_in && canSignIn, ok: false, runs: [], not_run: [] }));
+  // One job per scenario, size and theme, in the order the answer lists them.
+  const jobs = scenarios.flatMap((scenario, i) => SCENARIO_SIZES.flatMap(size => SCENARIO_THEMES.map(theme => ({ scenario, i, size, theme, run: null as ScenarioRun | null }))));
+  let cutShort = false;
   try {
-    const endsAt = now() + RUN_DEADLINE_MS - 10_000;
+    // New runs stop early enough for the ones in the browser to end before the deadline closes it.
+    const endsAt = now() + RUN_DEADLINE_MS - 8_000;
     const out = await withHeadlessContext(config, SCENARIO_SIZES[0], async (ctx) => {
-      for (const [i, scenario] of scenarios.entries()) {
-        for (const size of SCENARIO_SIZES) {
-          for (const theme of SCENARIO_THEMES) {
-            if (now() > endsAt) { results[i].not_run.push(`${size.width}x${size.height} ${theme}`); continue; }
-            results[i].runs.push(await runOnce(ctx, config, app.html, url, origin, scenario, size, theme, member));
+      let next = 0;
+      const worker = async (): Promise<void> => {
+        for (;;) {
+          const job = jobs[next++];
+          if (!job || now() > endsAt) return;
+          const member = job.scenario.signed_in && canSignIn ? await freshMember() : null;
+          try {
+            job.run = await runOnce(ctx, config, app.html, url, origin, job.scenario, job.size, job.theme, member);
+          } finally {
+            await member?.erase();
           }
         }
-      }
+      };
+      await Promise.all(Array.from({ length: RUNS_AT_ONCE }, worker));
       return true;
     }, { deadlineMs: RUN_DEADLINE_MS, ...(opts.launch ? { launch: opts.launch } : {}) });
     if (out === null) return { ran: false, reason: NO_HEADLESS_BROWSER, member: memberLine, scenarios: [], criteria_evidence: [] };
   } catch (err) {
-    return {
-      ran: false, reason: `The scenarios did not finish: ${(err as Error)?.message ?? 'unknown error'}.`,
-      member: memberLine, scenarios: results, criteria_evidence: [],
-    };
+    // The deadline closed the browser under the runs still in it: what finished is answered, and
+    // the rest is named as not run. Any other failure is the run's own, and nothing is claimed.
+    if (!(err instanceof HeadlessDeadlineError)) {
+      return {
+        ran: false, reason: `The scenarios did not finish: ${(err as Error)?.message ?? 'unknown error'}.`,
+        member: memberLine, scenarios: results, criteria_evidence: [],
+      };
+    }
+    cutShort = true;
   } finally {
-    await member?.erase();
+    await Promise.all(made.map(m => m.erase()));
   }
+  for (const job of jobs) {
+    if (job.run) results[job.i].runs.push(job.run);
+    else results[job.i].not_run.push(`${job.size.width}x${job.size.height} ${job.theme}`);
+  }
+  const notRun = results.reduce((n, r) => n + r.not_run.length, 0);
   for (const r of results) r.ok = r.not_run.length === 0 && r.runs.length > 0 && r.runs.every(x => x.ok);
   const evidence: Array<{ id: string; evidence: string }> = [];
   for (const r of results.filter(x => x.ok)) {
@@ -266,5 +315,10 @@ export async function runAppScenarios(
       evidence.push({ id: c, evidence: `Playtest scenario "${r.id}" passed ${r.signed_in ? 'signed in' : 'signed out'} at ${SCENARIO_SIZES.length} sizes in both themes (${new Date(now()).toISOString().slice(0, 10)}).` });
     }
   }
-  return { ran: true, member: memberLine, scenarios: results, criteria_evidence: evidence };
+  // The answer still says what ran. What did not fit is named, with the two ways to make it fit.
+  const reason = notRun > 0
+    ? `${notRun} run(s) of size and theme did not ${cutShort ? 'finish' : 'start'} within the ${Math.round(RUN_DEADLINE_MS / 1000)} seconds a scenario run gets; each is listed under not_run. `
+      + 'Fewer scenarios, fewer steps or shorter waits fit: a step that waits for something that never comes costs its whole wait at every size and theme.'
+    : undefined;
+  return { ran: true, ...(reason ? { reason } : {}), member: memberLine, scenarios: results, criteria_evidence: evidence };
 }

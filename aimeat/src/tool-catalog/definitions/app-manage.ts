@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-27 — scenarios_set says what a scenario run gets (an account per size and theme, 35
+ *     seconds) and that a scenario's criteria must exist first.
  *   2026-11-27 — `choices` names `frame` and `moments`, and a value takes 400 characters for the
  *     moments list (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   2026-11-26 — scenarios_set and the `scenarios` field: the builder's playtest scenarios
@@ -322,7 +324,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
     spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
     scenarios_set: { fields: F(['filename', 'scenarios'], ['owner', 'expected_revision']), scope: 'app:write',
-        summary: 'write the app\'s playtest scenarios, the whole list (read it first with spec, where it is design_spec.scenarios): steps the node\'s own browser runs on the published app, signed in as a throwaway member it makes and erases, at four sizes (390x844, 1280x900, 1280x460, 1920x1080) and both themes. Each scenario names the acceptance criteria it proves. audit { playtest: true } runs them and answers pass or fail per size and theme, the step that failed, and evidence lines for criteria_set. Use it when you have no browser of your own. The spec must exist first' },
+        summary: 'write the app\'s playtest scenarios, the whole list (read it first with spec, where it is design_spec.scenarios): steps the node\'s own browser runs on the published app, signed in as a throwaway member it makes and erases, at four sizes (390x844, 1280x900, 1280x460, 1920x1080) and both themes. Each scenario names the acceptance criteria it proves. audit { playtest: true } runs them and answers pass or fail per size and theme, the step that failed, and evidence lines for criteria_set. Each run of a size and theme is on an account of its own that holds nothing, and the whole run has 35 seconds for all scenarios at all eight, four at a time: keep a scenario to a few steps, and what did not fit is listed as not_run. Use it when you have no browser of your own. The spec and the criteria a scenario names must exist first' },
     freshness: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'what beside the app has fallen behind it, in one answer: the design spec (written against an older version), the acceptance criteria (open, or evidenced at an older version), the data map (missing), and each bound skill whose calls the app\'s tools now refuse. Each item behind says what to do. Read it before you change an app and after you publish one. The owner and everybody who may build the app' },
     criteria_set: { fields: F(['filename', 'criteria'], ['owner', 'expected_revision']), scope: 'app:write',

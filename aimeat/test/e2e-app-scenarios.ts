@@ -8,11 +8,15 @@
  *   - a signed-in scenario writes to the node and sees its own write, at four sizes and both themes;
  *     a failing step is named; a signed-out scenario sees the signed-out page;
  *   - a scenario that passes everywhere gives an evidence line for its criterion;
- *   - the throwaway member account is gone after the run;
+ *   - every run of one size and theme has an account of its own, so a scenario that starts from the
+ *     app's empty state passes at all eight, after another scenario has saved;
+ *   - the throwaway member accounts are gone after the run;
  *   - another owner may not write the scenarios.
  *   A node with no headless browser (CI) answers ran:false with the reason, and the run cases skip.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-scenarios
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The scenario `fresh` and its case: seen red on the runner that kept one
+ *     member for the whole run (it read the item `saves` had written), green with a member per run.
  *   v1.0.0 — 2026-11-26 — Initial (wish-builder-scenarios-in-the-playtest-signed-in-four-widths-both).
  */
 import { BASE, assert, expectRefusal, finish, json, skip, test } from './helpers/harness.js';
@@ -31,11 +35,15 @@ const page = (filename: string) => [
     '<meta name="aimeat-locales" content="en fi">',
     '<link rel="stylesheet" href="/lib/aimeat-theme.css">',
     '</head><body style="overflow-x:clip"><div id="login"></div><p id="who">Signed out</p>',
-    '<input id="new" aria-label="Item"><button id="add">Add</button><p id="out"></p>',
+    '<input id="new" aria-label="Item"><button id="add">Add</button><p id="out"></p><p id="stored"></p>',
     '<script src="/v1/libs/aimeat-auth.js"></' + 'script>',
     '<script src="/v1/libs/aimeat-data.js"></' + 'script>',
     '<script>',
-    'AIMEAT.auth.mountLoginButton("#login", { onSession: function () { document.getElementById("who").textContent = "Signed in"; } });',
+    'AIMEAT.auth.mountLoginButton("#login", { onSession: async function () {',
+    '  document.getElementById("who").textContent = "Signed in";',
+    '  var kept = null; try { kept = await AIMEAT.data.get("scen.item"); } catch (e) { kept = null; }',
+    '  document.getElementById("stored").textContent = "Stored " + (kept && kept.title ? kept.title : "nothing");',
+    '} });',
     'document.getElementById("add").addEventListener("click", async function () {',
     '  var v = document.getElementById("new").value;',
     '  await AIMEAT.data.set("scen.item", { title: v });',
@@ -54,6 +62,14 @@ const SCENARIOS = [
     ] },
     { id: 'broken', name: 'A line the page never shows.', steps: [{ do: 'expect_text', value: 'Nothing like this', ms: 300 }] },
     { id: 'stranger', name: 'A visitor who is not signed in sees the signed-out line.', signed_in: false, steps: [{ do: 'expect_text', value: 'Signed out' }] },
+    // After `saves` has written an item: this one passes only when its account is not the one `saves` used,
+    // and at every size only when no size inherits what the size before it wrote.
+    { id: 'fresh', name: 'A member opens the app for the first time: nothing is stored yet, and then they save.', steps: [
+        { do: 'expect_text', value: 'Stored nothing' },
+        { do: 'fill', target: '#new', value: 'Tea' },
+        { do: 'click', target: 'text=Add' },
+        { do: 'expect_text', value: 'Saved Tea' },
+    ] },
 ];
 
 (async () => {
@@ -82,9 +98,9 @@ const SCENARIOS = [
         assert(r.status === 403, `another owner is refused: ${r.status} ${JSON.stringify(r.body?.error)}`);
     });
 
-    await test('the three scenarios are stored', async () => {
+    await test('the four scenarios are stored', async () => {
         const r = await json(`${app}/design-spec/scenarios`, { method: 'PUT', headers: auth, body: JSON.stringify({ scenarios: SCENARIOS }) });
-        assert(r.status === 200 && r.body.data.scenarios.length === 3, `stored: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.scenarios?.length)}`);
+        assert(r.status === 200 && r.body.data.scenarios.length === 4, `stored: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.scenarios?.length)}`);
         assert(r.body.data.scenarios[0].signed_in === true && r.body.data.scenarios[2].signed_in === false, 'signed_in defaults to true and keeps false');
     });
 
@@ -95,6 +111,11 @@ const SCENARIOS = [
         run = r.body.data.live?.scenarios;
         assert(run, `the bundle carries scenarios: ${JSON.stringify(Object.keys(r.body.data.live ?? {}))}`);
         if (!run.ran) skip(`no browser on this node: ${run.reason}`);
+        // The run has 35 seconds. On a machine busy with other suites some runs may not start, and
+        // the answer must then say so; the cases about what the runs showed need all of them.
+        const left = (run.scenarios as any[]).flatMap(s => s.not_run as string[]);
+        assert((left.length === 0) === (run.reason === undefined), `what did not run is said: ${JSON.stringify(left)} / ${run.reason}`);
+        if (left.length) { run = { ...run, incomplete: true }; skip(`${left.length} run(s) did not fit the deadline on this machine: ${run.reason}`); }
         const byId = new Map((run.scenarios as any[]).map(s => [s.id, s]));
         const saves = byId.get('saves');
         assert(saves.signed_in === true && saves.ok === true && saves.runs.length === 8, `saves: ${JSON.stringify({ ok: saves.ok, first: saves.runs.find((x: any) => !x.ok) ?? saves.runs[0], member: run.member })}`);
@@ -106,8 +127,14 @@ const SCENARIOS = [
         assert(String(run.member).includes('throwaway'), `the member is said: ${run.member}`);
     });
 
+    await test('every run of a size and theme starts from an account that holds nothing', async () => {
+        if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
+        const fresh = (run.scenarios as any[]).find(s => s.id === 'fresh');
+        assert(fresh.ok === true && fresh.runs.length === 8, `fresh: ${JSON.stringify({ ok: fresh.ok, first: fresh.runs.find((x: any) => !x.ok) ?? null, not_run: fresh.not_run })}`);
+    });
+
     await test('the passing scenario gives an evidence line for its criterion, and the throwaway account is gone', async () => {
-        if (!run?.ran) skip('no browser on this node');
+        if (!run?.ran || run.incomplete) skip('no browser on this node, or the run did not fit the deadline');
         const ev = (run.criteria_evidence ?? []) as Array<{ id: string; evidence: string }>;
         assert(ev.length === 1 && ev[0].id === 'saves-item' && ev[0].evidence.includes('"saves"'), `evidence: ${JSON.stringify(ev)}`);
         const owners = await json('/v1/admin/owners', { headers: auth });

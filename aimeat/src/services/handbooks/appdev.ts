@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-27 — The scenarios line says what a run gets: an account of its own per size and theme,
+ *     35 seconds for all of it, and what did not fit as `not_run`.
  *   2026-11-27 — The template tools' line names the `recipe` a template can carry
  *     (models/template-recipe.ts).
  *   2026-11-26 — Playtest scenarios: scenarios_set and audit with playtest (services/app/playtest-scenarios.ts).
@@ -445,7 +447,11 @@ of your own, write playtest scenarios with \`scenarios_set\` (steps: click, fill
 expect_text, expect_visible, expect_absent; each scenario names the criteria it proves) and run them
 with \`audit\` \`{ playtest: true }\`: the node opens the published app signed in as a throwaway member
 at four sizes and both themes, and answers pass or fail per size and theme and \`criteria_evidence\`
-lines to write back with \`criteria_set\`. \`freshness\` says in one
+lines to write back with \`criteria_set\`. Every run of a size and theme is on an account of its own
+that holds nothing, and the whole run has 35 seconds for every scenario at all eight, four at a time:
+write the criteria first, keep a scenario to a few steps, and use \`wait\` only where nothing can be
+expected instead, because each step costs its time eight times. What did not fit is listed as
+\`not_run\`. \`freshness\` says in one
 answer what beside the app has fallen behind it: the spec, criteria evidenced at an older version, the
 data map, and a bound skill whose calls the app's tools now refuse.
 
