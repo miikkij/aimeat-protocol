@@ -2,6 +2,8 @@
   "note": "The scope words each MCP tool and each REST route required when this file was last written (scripts/check-scope-words.ts). A word added to a tool or route listed here needs a keep-working step new in scripts/lib/scope-keep-steps.ts, or an entry under `accepted` with its reason. Written by `pnpm check:scope-words --update`; never edited by hand except `accepted`.",
   "steps": ["migrations.app-tool-invoke-exchange-write.keep","migrations.memory-purge-app-grants","migrations.operator-admin","migrations.rest-scope-gates-4-0-0","migrations.rest-scope-gates-4-0-0.agent-read","migrations.rest-scope-gates-4-0-x.keep-working","migrations.scope-vocabulary-agents","migrations.tool-scope-words-2026-10"],
   "accepted": {
+    "aimeat_eval_run memory:write": "The word replaces ai:use, which left: since 2026-11-27 an eval run spends no AI on the node, because the caller's own AI answers and judges (services/evals/eval-run.ts). A run writes into the eval set, and memory:write is the word the set write (aimeat_eval_set) and a crew trial (aimeat_crew_try) already ask, so every agent that could write the set it runs keeps the tool. An agent that held ai:use without memory:write could run a set its owner wrote; the tool was one day old when the word changed.",
+    "src/routes/evals/evals.ts:POST:/v1/evals/:kind/:name/run memory:write": "Same change as aimeat_eval_run: ai:use left the route because the node calls no model for an eval any more; memory:write is the word PUT /v1/evals/:kind/:name and POST /v1/agents/:name/crew/try ask. The owner in person passes without any word.",
     "src/routes/settings-proactive.ts:GET:/v1/settings/proactive memory:read": "Not a narrowing: no reach is taken away. Until 2026-11-23 this route answered only the account holder in person (requireRole('owner'), then requireOwnerSession), so no agent, app or ecosystem app had reach that a new word could remove. The account holder in person still passes: requireScope lets through, without any word, everyone isOwnerInPerson admits (its bypass tests a subset of that function's conditions). The word admits the new callers, the account's own agents and apps, with the scope that already reads the setting's own memory key (settings.proactive); it is in SHIPPED_DEFAULT_AGENT_SCOPES."
   },
   "tools": {
@@ -273,7 +275,7 @@
     "aimeat_ecosystem_app_list": ["account:security"],
     "aimeat_ecosystem_app_revoke": ["account:security"],
     "aimeat_eval_get": ["memory:read"],
-    "aimeat_eval_run": ["ai:use"],
+    "aimeat_eval_run": ["memory:write"],
     "aimeat_eval_set": ["memory:write"],
     "aimeat_exchange_accept": ["exchange:write"],
     "aimeat_exchange_bid": ["exchange:write"],
@@ -1544,7 +1546,7 @@
     "src/routes/ecosystem-events.ts:POST:/v1/ecosystem/subscriptions": [],
     "src/routes/evals/evals.ts:DELETE:/v1/evals/:kind/:name": ["memory:write"],
     "src/routes/evals/evals.ts:GET:/v1/evals/:kind/:name": ["memory:read"],
-    "src/routes/evals/evals.ts:POST:/v1/evals/:kind/:name/run": ["ai:use"],
+    "src/routes/evals/evals.ts:POST:/v1/evals/:kind/:name/run": ["memory:write"],
     "src/routes/evals/evals.ts:PUT:/v1/evals/:kind/:name": ["memory:write"],
     "src/routes/exchange-agent-work.ts:GET:/v1/exchange/work": ["exchange:read"],
     "src/routes/exchange-agent-work.ts:POST:/v1/exchange/work": ["exchange:write"],

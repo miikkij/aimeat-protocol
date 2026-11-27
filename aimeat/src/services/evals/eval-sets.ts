@@ -12,9 +12,10 @@
  *   demo proves an agent can succeed once. A passing eval suite proves it succeeds reliably."
  *
  *   ONE CASE is an id, a prompt, and one to five expectations, each one of: `contains` (the answer
- *   holds the words, any case), `not_contains`, or `judge` (a rubric a model reads beside the answer
- *   and answers PASS or FAIL). No pattern of the builder's own runs on the node: a regular expression
- *   from outside against model output is a way to stall the process.
+ *   holds the words, any case), `not_contains`, or `judge` (a rubric the caller's own AI reads beside
+ *   the answer and answers true or false; the node calls no model). No pattern of the builder's own
+ *   runs on the node: a regular expression from outside against model output is a way to stall the
+ *   process.
  *
  *   WHERE. One record per set in the account's service namespace (`svc:<owner>@<node>`,
  *   services/service-records.ts), which no principal can write through a memory route, so a score is
@@ -23,9 +24,11 @@
  *   Readable, writable and removable by the account the target belongs to (the owner and the owner's
  *   agents). The newest RUNS_KEPT runs are kept. A set outlives the skill or crew it names, as a test
  *   file outlives a deleted function: the account removes it with removeEvalSet.
- * @structure EvalTarget · EvalCase · EvalRun · EvalSet · checkCases · readEvalSet · writeEvalSet ·
- *   recordEvalRun · removeEvalSet
+ * @structure EvalTarget · EvalCase · EvalRun · EvalSet · checkCases · readEvalSet · updateEvalSet ·
+ *   writeEvalSet · removeEvalSet (a run is changed on the set's version in eval-run.ts)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A run can be open, waiting for the caller's own AI: `awaiting`, `pending`,
+ *     `answered_by` (wish-eval-runs-answered-by-the-caller-s-own-ai-not-by-the-node).
  *   v1.1.0 — 2026-11-26 — The sets moved from a node namespace no one could address into the account's
  *     service namespace, so the account's export and erasure reach them; removeEvalSet.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
@@ -59,17 +62,28 @@ export interface EvalRun {
   id: string;
   at: string;
   by: string;
-  status: 'running' | 'done' | 'failed';
+  /**
+   * running: a crew's trials are being collected on its runtime. open: the run waits for the caller's
+   * own AI (`awaiting` says for what). done or failed: ended.
+   */
+  status: 'running' | 'open' | 'done' | 'failed';
+  /** An open run's wait: the answers to a skill's or pack's cases, or the verdicts on a crew's answers. */
+  awaiting?: 'answers' | 'verdicts';
+  /** A crew's answers, cut, kept only while the caller's AI judges them. */
+  pending?: Array<{ case: string; repeat: number; answer: string }>;
   /** The version of the target the run measured: a crew's revision, a skill's or a pack's version. */
   revision: string;
   repeats: number;
-  /** With the target: the crew, or the model with the skill's or pack's text. */
+  /** With the target: the crew, or the caller's AI with the skill's or pack's text. */
   with?: ArmResult;
-  /** Without it, for a skill or a pack: the same model with nothing, so the score says what the text changes. */
+  /** Without it, for a skill or a pack: the caller's AI with nothing, so the score says what the text changes. */
   without?: ArmResult;
   /** The score of the newest earlier run of another revision, and that revision. */
   previous?: { revision: string; score: number; delta: number };
+  /** The model the caller said answered, as it said it. */
   model?: string;
+  /** The principal that sent the answers or the verdicts. */
+  answered_by?: string;
   error?: string;
   finished_at?: string;
 }
@@ -93,7 +107,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 /** Read a written list of cases: shapes, bounds and unique ids. */
 export function checkCases(input: unknown): { ok: true; cases: EvalCase[] } | { ok: false; message: string } {
   if (!Array.isArray(input) || input.length === 0) return { ok: false, message: 'cases is a list of 1 to 10 { id, prompt, expect: [{ kind, value }] }.' };
-  if (input.length > CASES_MAX) return { ok: false, message: `At most ${CASES_MAX} cases: each run calls a model for every case, repeat and arm.` };
+  if (input.length > CASES_MAX) return { ok: false, message: `At most ${CASES_MAX} cases: each run asks an answer for every case, repeat and arm.` };
   const seen = new Set<string>();
   const out: EvalCase[] = [];
   for (const [i, raw] of input.entries()) {
@@ -153,15 +167,6 @@ export async function writeEvalSet(
     spec: 'aimeat.evalset/1', owner, target, cases, repeats,
     updatedAt: new Date().toISOString(), updatedBy: by, runs: live?.runs ?? [],
   }));
-}
-
-/** Put a run in (new or finished), newest first, keeping RUNS_KEPT. */
-export async function recordEvalRun(storage: Storage, owner: string, target: EvalTarget, run: EvalRun): Promise<void> {
-  await updateEvalSet(storage, owner, target, live => {
-    if (!live) throw new Error('The eval set was removed while it ran.');
-    const others = live.runs.filter(r => r.id !== run.id);
-    return { ...live, runs: [run, ...others].slice(0, RUNS_KEPT) };
-  });
 }
 
 /** Remove the set with its runs. False when the account has no set for this target. */

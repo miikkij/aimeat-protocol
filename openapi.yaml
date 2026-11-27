@@ -28346,10 +28346,12 @@ paths:
       tags: [Agents]
       description: >
         `{ target, cases, repeats, updated_at, runs }`, runs newest first (the newest 10 kept). A run has
-        `revision` (what it measured), `status` (running, done, failed), `with` and, for a skill or a pack,
-        `without` (each `{ score, cases: [{ id, passed, of, failures }] }`; a judge's failure says it is a
-        model's verdict), `previous` (`{ revision, score, delta }` against the newest run of another
-        revision) and `model`. MCP: aimeat_eval_get.
+        `revision` (what it measured), `status` (running: a crew's trials are collected; open: it waits
+        for the caller, `awaiting` answers or verdicts, and a crew's open run lists its answers in
+        `pending`; done; failed), `with` and, for a skill or a pack, `without` (each `{ score, cases:
+        [{ id, passed, of, failures }] }`; a judge's failure says it is the caller's verdict), `previous`
+        (`{ revision, score, delta }` against the newest run of another revision), `model` (as the
+        caller named it) and `answered_by`. MCP: aimeat_eval_get.
       security:
         - BearerAuth: []
       parameters:
@@ -28383,15 +28385,23 @@ paths:
   /v1/evals/{kind}/{name}/run:
     post:
       operationId: evalSetRun
-      summary: Run the eval set, or say what a run costs
+      summary: Start a run of the eval set, finish an open one, or say what a run asks
       tags: [Agents]
       description: >
-        Body `{ dry_run? }`. Runs every case `repeats` times against what the target is now: a crew as a
-        crew trial on the agent's own runtime, a skill or a pack on the account's AI twice, with its text
-        and without. Every model call spends the account's AI allowance, so it needs `ai:use`. With
-        `dry_run: true` it answers `{ model_calls, crew_trials, cases, repeats, arms, revision }` and runs
-        nothing; otherwise 202 with `run_id` and the run goes on in the background (GET the set to read
-        it). One run per set at a time (409 `EVAL_RUNNING`). MCP: aimeat_eval_run.
+        The node calls no model for an eval: the caller's own AI answers and judges. Body `{ dry_run? }`
+        starts a run against what the target is now. For a skill or a pack it answers 201 with `run_id`,
+        status open, the exact `text` of the revision (SKILL.md or the pack's AI text), the `cases` with
+        their judge rubrics and `how`: the caller answers every case `repeats` times with the text as its
+        only instructions (arm with) and with none (arm without), and judges each answer. For a crew it
+        answers 202 and runs each case as a crew trial on the agent's own runtime; with a judge in the set
+        the run then waits open for the caller's verdicts on the crew's answers. Body `{ run_id, results,
+        model? }` finishes an open run: `results` is `[{ case, arm, repeat, answer, verdicts }]`, every
+        case, arm and repeat once (a crew run takes verdicts only); the node grades contains and
+        not_contains, counts the verdicts, keeps no answer, and answers the scores and the change against
+        the revision before. `dry_run: true` answers `{ answers_to_write, verdicts_to_give, crew_trials,
+        cases, repeats, arms, revision }` and starts nothing. A new start closes a run still waiting; a
+        crew run collecting trials blocks it (409 `EVAL_RUNNING`); results for a run that is not open are
+        409 `EVAL_RUN_NOT_OPEN`. Needs memory:write. MCP: aimeat_eval_run.
       security:
         - BearerAuth: []
       parameters:
@@ -28405,9 +28415,25 @@ paths:
               type: object
               properties:
                 dry_run: { type: boolean }
+                run_id: { type: string, maxLength: 40 }
+                model: { type: string, maxLength: 120 }
+                results:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [case, repeat]
+                    properties:
+                      case: { type: string, maxLength: 40 }
+                      arm: { type: string, enum: [with, without] }
+                      repeat: { type: integer, minimum: 1, maximum: 5 }
+                      answer: { type: string, maxLength: 20000 }
+                      verdicts: { type: array, maxItems: 5, items: { type: boolean } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
         '202': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

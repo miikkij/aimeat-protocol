@@ -5,6 +5,7 @@
  * @description The eval set tools on the CLI dispatch (`/local/call/<tool>`) and the connector MCP: a
  *   thin REST proxy over /v1/evals/*, so the node decides everything (services/evals/eval-ops.ts).
  * @version-history
+ *   v1.2.0 — 2026-11-27 — aimeat_eval_run { run_id, results, model } finishes an open run.
  *   v1.1.0 — 2026-11-26 — aimeat_eval_set { remove: true }.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
@@ -31,6 +32,8 @@ export const evalCliTools: ConnectCliToolDefinition[] = [
   {
     // → POST /v1/evals/:kind/:name/run
     name: 'aimeat_eval_run',
-    handler: ({ client }, input) => client.post(`${at(input)}/run`, input.dry_run === true ? { dry_run: true } : {}),
+    // every given field goes on: the node decides (run_id finishes an open run with the caller's results)
+    handler: ({ client }, input) => client.post(`${at(input)}/run`, Object.fromEntries(
+      (['dry_run', 'run_id', 'model', 'results'] as const).filter(k => input[k] !== undefined).map(k => [k, input[k]]))),
   },
 ];

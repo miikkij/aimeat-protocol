@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-11-27 -- Section 3: an eval run calls no model on the node; the caller judges a crew's
+ *     answers when a case has a judge rubric.
  *   2026-11-26 -- Section 3: a stored eval set (aimeat_eval_set, aimeat_eval_run) scores a new
  *     revision against the one before; ask the owner first.
  *   2026-11-24 -- Section 2: the record count of a space is read from the index's \`counts\`; the
@@ -307,8 +309,10 @@ its messages go to the owner unchanged), \`aimeat_crew_try\` (one run with a pro
 stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions stay restorable).
 \`aimeat_crew_draft\` keeps half-finished edits. A try proves one run; a stored eval set proves the
 crew holds up: write its cases once with \`aimeat_eval_set { kind: "crew", name }\`, and after a
-publish run them with \`aimeat_eval_run\`, which scores the new revision against the one before. Ask
-the owner first: every model call spends their AI allowance, and \`dry_run: true\` says how many. \`aimeat_crew_llm_set\` chooses the model for one
+publish run them with \`aimeat_eval_run\`, which scores the new revision against the one before. Each
+case is a trial on the crew's own runtime and model, and \`dry_run: true\` says how many. When a case
+has a \`judge\` rubric, you judge the crew's answers yourself: \`aimeat_eval_get\` shows the run open
+with the answers, and \`aimeat_eval_run { run_id, results }\` sends your verdicts. \`aimeat_crew_llm_set\` chooses the model for one
 agent or the owner's default; \`{kind: "node"}\` makes the crew run its model through this node, so the
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
 only a provider key variable and a public https address. When the owner's model policy leaves a

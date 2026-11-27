@@ -7,6 +7,7 @@
  *   as the caller; the scope word each needs is on its catalog entry (tool-catalog/definitions/evals.ts).
  * @structure registerEvalTools(mcp, storage, config, caller)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — aimeat_eval_run { run_id, results, model } finishes an open run.
  *   v1.1.0 — 2026-11-26 — aimeat_eval_set { remove: true } removes the set (DELETE /v1/evals/:kind/:name).
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
@@ -51,7 +52,8 @@ export function registerEvalTools(mcp: McpServer, storage: Storage, config: Aime
     description: descriptionFor('aimeat_eval_run'), inputSchema: zodShapeFor('aimeat_eval_run'), annotations: annotationsFor('aimeat_eval_run'),
   }, async (args) => {
     const a = args as Record<string, unknown>;
-    const out: Out = await runEvalFor(deps, caller(), s(a.kind), s(a.name), { dry_run: a.dry_run === true });
+    const out: Out = await runEvalFor(deps, caller(), s(a.kind), s(a.name), Object.fromEntries(
+      (['dry_run', 'run_id', 'model', 'results'] as const).filter(k => a[k] !== undefined).map(k => [k, a[k]])));
     if (!out.ok) return toolError(out.code, out.message);
     return ok(out.data);
   });

@@ -6,10 +6,13 @@
  *   - PUT  /v1/evals/:kind/:name        write the cases (memory:write)
  *   - GET  /v1/evals/:kind/:name        the set and its runs (memory:read)
  *   - DELETE /v1/evals/:kind/:name      remove the set with its runs (memory:write)
- *   - POST /v1/evals/:kind/:name/run    start a run, or { dry_run: true } for its cost (ai:use)
+ *   - POST /v1/evals/:kind/:name/run    start a run, { dry_run: true } for what it asks, or
+ *                                       { run_id, results, model? } to finish an open run (memory:write)
  *   The work and the who-may test are in services/evals/eval-ops.ts, which the MCP tools call too.
  * @structure evalsRouter(config, storage)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The run route finishes an open run with the caller's answers and verdicts,
+ *     and asks memory:write: the node calls no model for an eval any more.
  *   v1.1.0 — 2026-11-26 — DELETE removes a set.
  *   v1.0.0 — 2026-11-26 — Initial (wish-stored-eval-sets-for-crews-skills-and-library-packs-scored-p).
  */
@@ -32,7 +35,18 @@ const EvalSetBody = z.object({
   })).max(10),
   repeats: z.number().int().min(1).max(5).optional(),
 });
-const EvalRunBody = z.object({ dry_run: z.boolean().optional() });
+const EvalRunBody = z.object({
+  dry_run: z.boolean().optional(),
+  run_id: safeText(40).optional(),
+  model: safeText(120).optional(),
+  results: z.array(z.object({
+    case: safeText(40),
+    arm: z.enum(['with', 'without']).optional(),
+    repeat: z.number().int().min(1).max(5),
+    answer: z.string().max(20_000).optional(),
+    verdicts: z.array(z.boolean()).max(5).optional(),
+  })).max(100).optional(),
+});
 
 export function evalsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -55,7 +69,7 @@ export function evalsRouter(config: AimeatConfig, storage: Storage): Router {
     const { kind, name } = p(req);
     send(res, await removeEvalFor(deps, callerOf(req, config.nodeId, storage), kind, name));
   });
-  router.post('/v1/evals/:kind/:name/run', requireAuth(), requireScope('ai:use'), validateBody(EvalRunBody, config.nodeId), async (req, res) => {
+  router.post('/v1/evals/:kind/:name/run', requireAuth(), requireScope('memory:write'), validateBody(EvalRunBody, config.nodeId), async (req, res) => {
     const { kind, name } = p(req);
     send(res, await runEvalFor(deps, callerOf(req, config.nodeId, storage), kind, name, req.body));
   });
