@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-27: check:ui-library is no longer `slow`, so the plain check:fast runs it (about 30 s). A view that starts to use a catalogued class makes facts.generated.ts stale; the plain run stayed green and `pnpm ready` refused the work 12 minutes later (Jouni, 2026-11-27).
  *  - 2026-11-22: check:quotes, no tracked file quotes the developer's own words; check:picture-words reads the Markdown a person or an AI reads too.
  *  - 2026-11-22: check:app-catalog leaves FAST_CHECKS with the old /app-catalog.html and its build script.
  *  - 2026-11-21: check:single-entry reads public/ too and holds eight silent-drop rules (docs/pitfalls.md §9, 76 and 79 deleted; §12, 58, 81, 107 and 124 shrunk); check:field-reach reports a connector or CLI parameter no route reads (`unread:`, §44 shrunk).
@@ -99,7 +100,7 @@ export const FAST_CHECKS = [
     { script: 'check:browser-libs', label: 'The portal services and the app libraries call no new route with different parameters; the list only shrinks' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
-    { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh', slow: true },
+    { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh' },
     { script: 'check:theme-tokens', label: 'theme.css holds tokens only; every page that links it links the shell block' },
     { script: 'check:shape-tokens', label: 'A component sheet reads the theme\'s shape values, never a corner, frame, shadow or letter case of its own' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
