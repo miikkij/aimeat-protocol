@@ -680,6 +680,12 @@
       },
       "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
     },
+    "src/services/agent/task-event-item.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-27: the title of the one record an agent's own memory_write event names, read from the task's agent principal or its owner; a record outside the agent's own principal gives its title only when authorizeRead lets that agent read it, so the event shows the agent nothing it could not read. The value is reduced to one title line of at most 120 characters."
+    },
     "src/services/agent/offers-write.ts": {
       "reads": {
         "getMemory": 2

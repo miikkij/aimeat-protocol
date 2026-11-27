@@ -13,7 +13,9 @@
  * @structure titleOfValue(value) · taskEventItem(storage, task, type, details) → TaskEventItem | null
  * @usage const item = await taskEventItem(storage, task, input.type, input.details);
  * @version-history
- *   2026-11-27 -- Initial: the activity line names the record or app an agent wrote by its title.
+ *   2026-11-27 -- Initial: the activity line names the record or app an agent wrote by its title. A
+ *     record in the owner's namespace gives its title only when the agent may read it
+ *     (`agentMayRead`, the caller's authorizeRead); otherwise the event keeps the key alone.
  */
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { appDisplayName, htmlFilenameOf } from '../app/app-ref.js';
@@ -68,6 +70,7 @@ export async function taskEventItem(
     task: Pick<AgentTaskRecord, 'agentGaii' | 'ownerGaii'>,
     type: string,
     details: Record<string, unknown> | undefined,
+    agentMayRead?: (rec: { ownerGaii: string; key: string; visibility: string; groupId?: string; workspaceRef?: string }) => Promise<boolean>,
 ): Promise<TaskEventItem | null> {
     const principals = [task.agentGaii, task.ownerGaii].filter((p, i, all) => !!p && all.indexOf(p) === i);
     if (type === 'memory_write') {
@@ -75,6 +78,16 @@ export async function taskEventItem(
         if (!key) return null;
         for (const p of principals) {
             const rec = await storage.getMemory(p, key);
+            // The key is the agent's own word, and the title lands in an event the agent can read
+            // back. A record outside the agent's own principal gives its title only when the agent
+            // may read that record itself (authorizeRead, agent to owner is not free); without
+            // the check an agent could name any key of its owner and learn its title.
+            if (rec && p !== task.agentGaii && !(agentMayRead && await agentMayRead({
+                ownerGaii: rec.ownerGaii, key: rec.key, visibility: String(rec.visibility),
+                groupId: rec.groupId, workspaceRef: rec.workspaceRef,
+            }))) {
+                return { kind: 'memory', key };
+            }
             if (rec) {
                 const title = titleOfValue(rec.value);
                 return { kind: 'memory', key, ...(title ? { title } : {}) };

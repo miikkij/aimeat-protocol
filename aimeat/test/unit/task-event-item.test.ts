@@ -29,8 +29,8 @@ const now = new Date().toISOString();
 let storage: Storage;
 let client: Client;
 
-const memory = (ownerGaii: string, key: string, value: unknown) => storage.setMemory({
-    key, ownerGaii, value, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+const memory = (ownerGaii: string, key: string, value: unknown, visibility = 'private') => storage.setMemory({
+    key, ownerGaii, value, visibility, tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
 } as never);
 
 beforeAll(async () => {
@@ -42,7 +42,8 @@ beforeAll(async () => {
         status: 'active', createdAt: now, updatedAt: now,
     } as AgentTaskRecord);
     await memory(BOT, 'research.wool', { title: 'Wool suppliers in the Nordics', count: 4 });
-    await memory(ALICE, 'notes.meeting', '# Meeting with Carol\n\nPrices agreed.');
+    await memory(ALICE, 'notes.meeting', '# Meeting with Carol\n\nPrices agreed.', 'public');
+    await memory(ALICE, 'notes.private', { title: 'Alice only' });
     await memory(CAROL, 'notes.secret', { title: 'Carol only' });
     const data = Buffer.from('<html></html>');
     await storage.createApp({
@@ -76,9 +77,16 @@ describe('task event item', () => {
         expect(ev?.details?.item).toEqual({ kind: 'memory', key: 'research.wool', title: 'Wool suppliers in the Nordics' });
     });
 
-    it("reads the owner's record too, a text by its first line", async () => {
+    it("reads the owner's record the agent may read, a text by its first line", async () => {
         const ev = await post('memory_write', 'wrote the minutes', { key: 'notes.meeting' });
         expect(ev?.details?.item).toEqual({ kind: 'memory', key: 'notes.meeting', title: 'Meeting with Carol' });
+    });
+
+    // The key is the agent's own word and the event is readable to the agent: an owner's record the
+    // agent may not read gives no title, or naming a key would read its title past the read check.
+    it("gives no title for an owner's record the agent may not read", async () => {
+        const ev = await post('memory_write', 'named a private key', { key: 'notes.private' });
+        expect(ev?.details?.item).toEqual({ kind: 'memory', key: 'notes.private' });
     });
 
     it("gives no title for another owner's key", async () => {

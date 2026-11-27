@@ -93,6 +93,7 @@ import { recordTaskStarted } from '../activity-recorder.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
 import { nodeContext } from '../node/context.js';
 import { logger } from '../../utils/logger.js';
+import { authorizeRead } from '../access-guard.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -345,7 +346,7 @@ export async function recordTaskEvent(
     body: unknown,
     actor?: string,
 ): Promise<RecordTaskEventResult> {
-    const { storage } = deps;
+    const { storage, config } = deps;
 
     await resumeIfStalled(storage, task, 'agent posted a new event');
     if (task.status !== 'active') {
@@ -364,7 +365,8 @@ export async function recordTaskEvent(
     // `details.item` from the node: the key or filename and its title, read from the task's own
     // principals (services/agent/task-event-item.ts). Additive: every field the agent sent stays,
     // and only `item` is the node's own.
-    const item = await taskEventItem(storage, task, input.type, input.details);
+    const item = await taskEventItem(storage, task, input.type, input.details, async (rec) =>
+        (await authorizeRead(storage, config, { ...rec, accessorGaii: task.agentGaii, resourceKey: rec.key, action: 'read' })).allowed);
     const details = item ? { ...(input.details ?? {}), item } : input.details;
     const event = await storage.appendTaskEvent({
         id: randomUUID(),
