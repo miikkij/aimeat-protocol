@@ -198,13 +198,12 @@ async function auditRun(run: RunEntry, brief: Brief, a: Args): Promise<BenchRun>
     const s = sandboxUp(run.instance);
     const owner = s.owners[0];
     const apps = await api<{ apps: unknown[] }>(s.baseUrl, `/v1/apps?owner=${encodeURIComponent(owner.name)}&limit=200`, owner.token);
-    const hit = (apps.data?.apps ?? []).find(app => JSON.stringify(app).includes(run.marker)) as { filename?: string } | undefined;
+    const hit = (apps.data?.apps ?? []).find(app => JSON.stringify(app).includes(run.marker)) as { filename?: string; open_to?: string; openTo?: string } | undefined;
     if (!hit?.filename) return { ...empty, ...base, ok: false, detail: 'no published app carries the name' };
 
     const path = `/v1/apps/${encodeURIComponent(owner.name)}/${encodeURIComponent(hit.filename)}`;
     const q = await appQuality(s.baseUrl, owner.name, hit.filename, metrics.toolCalls, owner.token);
     const html = await publishedHtml(`${s.baseUrl}${path}?mode=inline`, owner.token).catch(() => '');
-    const proofs = brief.proves.map(p => ({ what: p.what, ok: p.test(html) }));
     const fresh: Envelope<{ behind?: Array<{ item: string; what: string }>; bound_skills?: unknown[] }> = await api(s.baseUrl, `${path}/freshness`, owner.token);
     const versions: Envelope<{ versions?: unknown[] }> = await api(s.baseUrl, `${path}/versions`, owner.token);
     const records: Envelope<{ items?: unknown[] }> = await api(s.baseUrl, '/v1/memory?owner_scope=true&limit=500', owner.token);
@@ -220,6 +219,13 @@ async function auditRun(run: RunEntry, brief: Brief, a: Args): Promise<BenchRun>
             ? { ran: p.ran, ok: p.summary?.ok === true, failed: (p.checks ?? []).filter(c => !c.ok && c.severity === 'must').map(c => `${c.id}: ${c.detail}`), consoleErrors: p.console?.errors?.length ?? 0, ...(p.reason ? { reason: p.reason } : {}) }
             : { ran: false, ok: false, failed: [], consoleErrors: 0, reason: `the audit answered ${live.status}` };
     }
+
+    // After the playtest: a proof may read whether the node's browser saw the app draw signed out.
+    const facts = {
+        openTo: hit.open_to ?? hit.openTo ?? null,
+        signedOutDraws: playtest?.ran ? !playtest.failed.some(f => f.startsWith('boots:')) : null,
+    };
+    const proofs = brief.proves.map(p => ({ what: p.what, ok: p.test(html, facts) }));
 
     const failed = [
         ...(onAtelier(q) ? [] : ['it is not an Atelier app with a register']),

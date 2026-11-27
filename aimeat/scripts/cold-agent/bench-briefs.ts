@@ -18,12 +18,17 @@
  *   must not depend on what the person happened to answer that day, so the order carries the
  *   answers, and ends by saying that nothing more is to be asked.
  *
- *   A brief's `proves` are the facts its pass is read from: patterns over the published page. They
- *   say the page uses the part of the platform the order needs, and nothing about how well.
- * @structure Brief · BRIEFS · briefPrompt()
+ *   A brief's `proves` are the facts its pass is read from: patterns over the published page, and
+ *   for what a page's text cannot say (who may open it, whether it draws signed out) what the node
+ *   says about the app. They say the app uses the part of the platform the order needs, and
+ *   nothing about how well.
+ * @structure AppFacts · Brief · BRIEFS · briefPrompt()
  * @usage
  *   import { BRIEFS, briefPrompt } from './bench-briefs.js';
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A proof also reads the node's facts about the app. The first baseline
+ *     round failed two builds that did what was ordered: a team list kept by an extension, and a
+ *     public page forked from a genre, which has no `requireLogin: false` in its text.
  *   v1.0.0 — 2026-11-27 — Initial.
  */
 import { api } from './tasks.js';
@@ -40,6 +45,14 @@ export interface BriefSetupContext {
     marker: string;
 }
 
+/** What the node says about the published app, for a proof the page's text cannot give. */
+export interface AppFacts {
+    /** Who may open the app, as its settings say: `anyone`, `signed-in` or `organism:<id>`; null when not read. */
+    openTo: string | null;
+    /** Whether the node's own browser saw the app draw with nobody signed in; null when the playtest did not run. */
+    signedOutDraws: boolean | null;
+}
+
 export interface Brief {
     id: string;
     /** The app's name without the run's marker. */
@@ -51,7 +64,7 @@ export interface Brief {
     /** Runs once before the session, for an order that needs something to exist first. Returns the `{org}` name. */
     setup?: (ctx: BriefSetupContext) => Promise<string>;
     /** Facts read from the published page; the brief passes when every one holds. */
-    proves: Array<{ what: string; test: (html: string) => boolean }>;
+    proves: Array<{ what: string; test: (html: string, app: AppFacts) => boolean }>;
 }
 
 const keepsOnNode = (html: string): boolean =>
@@ -88,7 +101,16 @@ export const BRIEFS: Brief[] = [
             }
             return name;
         },
-        proves: [{ what: 'keeps the shared list in an organism workspace', test: html => /\/v1\/libs\/aimeat-organism\.js|AIMEAT\.organism\b|workspacePicker\s*\(/.test(html) }],
+        // Two homes are shared by the team: an organism workspace, and the namespace of an extension
+        // that enforces the board's rule on the node. The first baseline build chose the extension,
+        // and a proof that knew only the workspace failed it.
+        proves: [
+            {
+                what: 'keeps the shared list in a home the team shares: an organism workspace or an extension\'s namespace',
+                test: html => /\/v1\/libs\/aimeat-organism\.js|AIMEAT\.organism\b|workspacePicker\s*\(/.test(html) || /\.data\.action\s*\(|\/v1\/ext\//.test(html),
+            },
+            { what: 'opens only to the organism\'s members', test: (_html, app) => app.openTo === null || app.openTo.startsWith('organism:') },
+        ],
     },
     {
         id: 'map',
@@ -126,7 +148,9 @@ export const BRIEFS: Brief[] = [
         answers: 'Anyone opens the page without signing in. The sign-ups are mine alone to read, and they hold personal data: a name and an e-mail address. '
             + 'The page is its own introduction.',
         proves: [
-            { what: 'opens without signing in', test: html => /requireLogin\s*:\s*false/.test(html) },
+            // Read from the node, not from the page: a page forked from a genre boots without the
+            // shell call whose `requireLogin: false` the first version of this proof looked for.
+            { what: 'opens without signing in', test: (_html, app) => app.openTo === 'anyone' && app.signedOutDraws !== false },
             { what: 'takes the sign-ups through the node\'s public form', test: html => /aimeat-intake/i.test(html) || /AIMEAT\.intake\b|intakeForm\s*\(/.test(html) },
         ],
     },

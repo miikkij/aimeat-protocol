@@ -93,17 +93,23 @@ describe('the briefs', () => {
     });
 
     it('prove the platform part each order needs, and not a page without it', () => {
-        const proves = (id: string, html: string) => BRIEFS.find(b => b.id === id)!.proves.map(p => p.test(html));
+        const unread = { openTo: null, signedOutDraws: null };
+        const proves = (id: string, html: string, app: { openTo: string | null; signedOutDraws: boolean | null } = unread) => BRIEFS.find(b => b.id === id)!.proves.map(p => p.test(html, app));
         expect(proves('list', '<script src="/v1/libs/aimeat-data.js"></script><script>A.data.set("k", 1)</script>')).toEqual([true]);
         expect(proves('list', '<script>localStorage.setItem("k", 1)</script>')).toEqual([false]);
-        expect(proves('team', '<script>AIMEAT.atelier.workspacePicker({ target })</script>')).toEqual([true]);
-        expect(proves('team', '<script src="/v1/libs/aimeat-data.js"></script>')).toEqual([false]);
+        // The team's list is shared in a workspace or in an extension's namespace, and never in each person's own memory.
+        expect(proves('team', '<script>AIMEAT.atelier.workspacePicker({ target })</script>', { openTo: 'organism:abc', signedOutDraws: false })).toEqual([true, true]);
+        expect(proves('team', '<script>AIMEAT.data.action("toolshed", "borrow", { id })</script>', { openTo: 'organism:abc', signedOutDraws: false })).toEqual([true, true]);
+        expect(proves('team', '<script src="/v1/libs/aimeat-data.js"></script><script>AIMEAT.data.set("tools", [])</script>', { openTo: 'anyone', signedOutDraws: true })).toEqual([false, false]);
         expect(proves('map', '<script src="/lib/leaflet/leaflet.js"></script><script src="/v1/libs/aimeat-data.js"></script><script>L.polygon(p); L.polyline(r); A.data.set("k", 1)</script>')).toEqual([true, true, true]);
         expect(proves('map', '<script>AIMEAT.atelier.map({ pins })</script>')).toEqual([true, false, false]);
         expect(proves('game', '<script src="/v1/libs/aimeat-phaser.js"></script><div id="leaderboard"></div>')).toEqual([true, true]);
         expect(proves('game', '<canvas></canvas>')).toEqual([false, false]);
-        expect(proves('page', '<script src="/v1/libs/aimeat-intake.js"></script><script>AIMEAT.atelier.app({ requireLogin: false })</script>')).toEqual([true, true]);
-        expect(proves('page', '<script>AIMEAT.atelier.app({ title: "Open day" })</script>')).toEqual([false, false]);
+        // Whether a page opens signed out is the node's fact: a genre fork has no shell call to read it from.
+        expect(proves('page', '<script src="/v1/libs/aimeat-intake.js"></script><script src="/v1/libs/aimeat-boot.js"></script>', { openTo: 'anyone', signedOutDraws: true })).toEqual([true, true]);
+        expect(proves('page', '<script src="/v1/libs/aimeat-intake.js"></script>', { openTo: 'anyone', signedOutDraws: null })).toEqual([true, true]);
+        expect(proves('page', '<script src="/v1/libs/aimeat-intake.js"></script>', { openTo: 'anyone', signedOutDraws: false })).toEqual([false, true]);
+        expect(proves('page', '<script>AIMEAT.atelier.app({ title: "Open day", requireLogin: false })</script>', { openTo: 'signed-in', signedOutDraws: null })).toEqual([false, false]);
     });
 });
 
