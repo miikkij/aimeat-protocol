@@ -15,6 +15,10 @@
  * @structure useAssessment · secAssessment · strip · areaFacts · dpiaPart · sentences
  * @usage const ra = useAssessment({ org, role, active }); ... secAssessment(ra, num)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The section is a row (Section fold) that says when the assessment was last
+ *     recorded and whether it is due, and opens in place; it opens by itself while the assessment is
+ *     due. "Record as updated today" and "Store the DPIA draft" are ordinary actions in the control
+ *     size: the page has one loud action. Nothing inside changed, and the in-person rule stays.
  *   v1.1.0 — 2026-11-19 — The risk draft shows open with "Copy the draft"; the DPIA shows one risk or
  *     measure per line as the server writes them, says when it is already stored, and loads again
  *     after a save; the figures are stacked so their words line up.
@@ -31,7 +35,7 @@ import { Facts, FactLine } from '/components/Facts.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { TextField } from '/components/TextField.js';
-import { Loud, Actions } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { x, word, errWords, dateWord } from './frame.js';
 
@@ -53,6 +57,8 @@ export function useAssessment({ org, role, active }) {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null);
   const [dpiaMsg, setDpiaMsg] = useState(null);
+  // The row's state: null until the person opens or shuts it, then their choice.
+  const [shown, setShown] = useState(null);
 
   const load = useCallback(async () => {
     if (!org || !may) { setRa(null); setDpia(null); return; }
@@ -61,11 +67,15 @@ export function useAssessment({ org, role, active }) {
       setRa(a?.data || null); setDpia(d?.data || null); setErr('');
     } catch (e) { setErr(errWords(e)); }
   }, [org, may]);
-  useEffect(() => { setRa(null); setDpia(null); setMsg(null); setDpiaMsg(null); load(); }, [load]);
+  useEffect(() => { setRa(null); setDpia(null); setMsg(null); setDpiaMsg(null); setShown(null); load(); }, [load]);
+  // Open by itself while the assessment is due: that needs the person.
+  const open = shown ?? !!ra?.due;
+  const toggle = () => setShown(!open);
 
   /** Record, in person, that the firm's risk assessment was updated today, and where it is. */
   const record = async () => {
-    setBusy('record');
+    // Keep the row open: once recorded it is no longer due, and the message must stay in sight.
+    setBusy('record'); setShown(true);
     try {
       await apiPost(`/v1/kyc/${enc(org)}/risk-assessment/recorded`, ref.trim() ? { ref: ref.trim() } : {});
       setRef(''); setMsg({ text: x('ra.recorded') });
@@ -86,7 +96,7 @@ export function useAssessment({ org, role, active }) {
     setBusy('');
   };
 
-  return { org, may, ra, dpia, err, load, ref, setRef, record, saveDpia, busy, msg, dpiaMsg };
+  return { org, may, ra, dpia, err, load, open, toggle, ref, setRef, record, saveDpia, busy, msg, dpiaMsg };
 }
 
 /** The four figures that matter most, from the facts. */
@@ -164,7 +174,7 @@ function dpiaPart(r) {
     ]} />
     <${Note} kind="hint">${x('dpia.replaceHint')}<//>
     <${Actions} apart>
-      <${Loud} control disabled=${!!r.busy} onClick=${r.saveDpia}>${r.busy === 'dpia' ? x('saving') : x(d.stored ? 'dpia.saveAgain' : 'dpia.save')}<//>
+      <${Action} control disabled=${!!r.busy} onClick=${r.saveDpia}>${r.busy === 'dpia' ? x('saving') : x(d.stored ? 'dpia.saveAgain' : 'dpia.save')}<//>
     <//>
     ${r.dpiaMsg ? html`<${Note} kind="message" error=${!!r.dpiaMsg.error}>${r.dpiaMsg.text}<//>` : null}`;
 }
@@ -179,8 +189,11 @@ export function secAssessment(r, num) {
   const a = r.ra;
   const f = a?.facts;
   const draft = a ? a.sections.map((s) => `${s.title}\n${s.text}`).join('\n\n') : '';
+  // The row's one line: when it was last recorded, and whether it is due.
+  const sub = !a ? (r.err ? '' : '…')
+    : `${a.lastRecordedAt ? x('ra.foldOn', { day: dateWord(a.lastRecordedAt) }) : x('ra.foldNever')}${a.due ? ` · ${x('ra.foldDue')}` : ''}`;
   return html`
-    <${Section} id="kyc-assessment" num=${num} title=${x('secAssessment')} count="">
+    <${Section} fold wrap id="kyc-assessment" num=${num} title=${x('secAssessment')} sub=${sub} open=${r.open} onToggle=${r.toggle}>
       ${r.err ? html`<${Note} kind="quiet">${r.err}<//>` : !a ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
         <${Note} kind="lead">${x('ra.lead')}<//>
         <${Note} kind="state" tone=${a.due ? 'attention' : 'fine'}>
@@ -195,7 +208,7 @@ export function secAssessment(r, num) {
         ${part(x('ra.recordPart'))}
         <${TextField} label=${x('ra.ref')} hint=${x('ra.refHint')} value=${r.ref} onInput=${(v) => r.setRef(v)} />
         <${Actions} apart>
-          <${Loud} control disabled=${!!r.busy} onClick=${r.record}>${r.busy === 'record' ? x('saving') : x('ra.record')}<//>
+          <${Action} small disabled=${!!r.busy} onClick=${r.record}>${r.busy === 'record' ? x('saving') : x('ra.record')}<//>
         <//>
         <${Note} kind="hint">${x('ra.inPerson')}<//>
         ${r.msg ? html`<${Note} kind="message" error=${!!r.msg.error}>${r.msg.text}<//>` : null}

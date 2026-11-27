@@ -9,7 +9,8 @@
  *   chat answer with one set of numbers.
  *
  *   ONE QUESTION AT A TIME, as on the Usage tab: people by where they came from, what the AIs read,
- *   purchases, what AI agents met, what people do on the apps, and the settings. Each part says in
+ *   purchases, what AI agents met and what people do on the apps; the settings are a section of their
+ *   own under the report (a row that says their state and opens in place). Each part says in
  *   one sentence what its numbers are worth, and the page says plainly what it cannot see: the
  *   question a person asked the AI.
  *
@@ -25,6 +26,15 @@
  * @structure PARTS · PERIODS · VisibilityTab (default) · the six parts as small functions
  * @usage Registered in views/profile.js as the `visibility` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.3.0 — 2026-11-27 — The page leads with where things stand: the four figures (people, sent by an
+ *     AI, AI fetches for a person, purchases) stand under the head on every part (SettingsPage strip,
+ *     hideZeros), not only on People. Two sections with the contents rail: 01 the visibility report
+ *     (vis-report) with the part and period choices, and 02 the settings (vis-settings), which leave
+ *     the part bar and become a FoldSection row that says the current state (counting, how many apps
+ *     count clicks, the weekly draft). When an analytics tag loads without a cookie banner the settings
+ *     come first and open, and the row says so; the AI agents and On your apps tabs carry the attention
+ *     mark and the number of findings. With nothing counted, section 01 is one line that says how the
+ *     first count arrives, and the part bar is not drawn. No control was removed.
  *   v1.2.0 — 2026-11-08 — The settings explain themselves (question marks): counting
  *     (aiVisibility.counting), the Clarity and GA4 ids (aiVisibility.clarityId, aiVisibility.ga4Id),
  *     the per-app switch through the heading of the app list (aiVisibility.appBehaviour, one question
@@ -36,11 +46,13 @@
  *   v1.0.0 — 2026-10-09 — Initial (AI visibility, the owner panel for layers A to E), approved by Jouni on the sandbox.
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { PageStart } from '/components/PageStart.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
@@ -58,7 +70,8 @@ import { swallowed } from '/js/swallowed.js';
 // profile.visibility holds the memory visibility words, so this page's text is under profile.aivis.
 const v = (key) => t(`profile.aivis.${key}`);
 
-const PARTS = ['people', 'ai', 'purchases', 'agents', 'apps', 'settings'];
+// The parts of the report the part bar chooses. The settings are their own section (vis-settings).
+const PARTS = ['people', 'ai', 'purchases', 'agents', 'apps'];
 const PERIODS = [7, 30, 90];
 
 const CHANNELS = ['ai', 'search', 'social', 'referral', 'direct', 'internal'];
@@ -79,15 +92,11 @@ const table = (head, rows, empty) => html`
       : html`<${Name} key=${i}>${cell}<//>`))}<//>`} />`;
 
 function People({ r }) {
+  // The channel table lists every channel, so with no person in the period it is its empty line
+  // rather than six rows of zeros.
   return html`
-    <${FigureStrip} lead items=${[
-      { key: 'people', n: r.totals.people, label: v('figPeople') },
-      { key: 'fromAi', n: r.channels.ai, label: v('figFromAi') },
-      { key: 'fetches', n: r.totals.assistant_fetches, label: v('figAssistant') },
-      { key: 'purchases', n: r.totals.purchases, label: v('figPurchases') },
-    ]} />
     <${SubHeading} level=${3} desc=${v('channelsWhy')}>${v('channelsTitle')}<//>
-    ${table([v('colChannel'), v('colPeople')], CHANNELS.map((c) => [v(`ch.${c}`), r.channels[c] ?? 0]), v('empty'))}
+    ${table([v('colChannel'), v('colPeople')], r.totals.people ? CHANNELS.map((c) => [v(`ch.${c}`), r.channels[c] ?? 0]) : [], v('empty'))}
     <${SubHeading} level=${3} desc=${v('referralsWhy')}>${v('referralsTitle')}<//>
     ${table([v('colAi'), v('colPeople')], r.ai_referrals.map((a) => [a.family, a.people]), v('emptyAi'))}
     <${Note} kind="hint" size="note">${v('notSeen')}<//>
@@ -201,6 +210,10 @@ export default function VisibilityTab() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [fixing, setFixing] = useState('');
+  // null until the person opens or closes the settings row: until then it is open only while an
+  // analytics tag loads without a cookie banner.
+  const [settingsOpen, setSettingsOpen] = useState(null);
+  const warnFirst = useRef(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -260,35 +273,98 @@ export default function VisibilityTab() {
     }
   };
 
+  const ready = report && behaviour && settings && bSettings;
+
+  // What needs the person, from what the page already read: the findings on AI agents and on the
+  // apps (the two tabs carry the attention mark and the number), and an analytics tag that loads
+  // without a cookie banner (the settings then come first and open).
+  const agentFindings = ready ? report.agents.findings.length : 0;
+  const appFindings = ready ? behaviour.apps.reduce((n, a) => n + a.findings.length, 0) : 0;
+  const tagsWarning = !!(ready && settings.tags_warning);
+  const settingsShown = settingsOpen ?? tagsWarning;
+  const marked = { agents: agentFindings, apps: appFindings };
+
+  // Nothing counted in the period: no request, no AI agent's call or checkout, no app that reported
+  // a visit. Section 01 is then one line, and the part bar is not drawn (every part would be empty).
+  const nothing = !!ready && report.totals.requests === 0 && behaviour.apps.length === 0
+    && report.agents.tool_calls.length === 0 && report.agents.checkouts.length === 0;
+
+  // The four figures under the head, on every part: the people, those an AI sent, the AI fetches for
+  // a person and the purchases. hideZeros: with none of them the strip is not drawn.
+  const strip = !ready && !error
+    ? html`<${FigureStrip} loading=${4} />`
+    : ready ? html`<${FigureStrip} wrap hideZeros items=${[
+        { key: 'people', n: report.totals.people, label: v('figPeople') },
+        { key: 'fromAi', n: report.channels.ai, label: v('figFromAi') },
+        { key: 'fetches', n: report.totals.assistant_fetches, label: v('figAssistant') },
+        { key: 'purchases', n: report.totals.purchases, label: v('figPurchases') },
+      ]} />` : null;
+
+  // The settings row says the current state in one line: counting, how many apps count clicks and
+  // scrolling, the weekly draft, and first the tag warning when there is one.
+  const appsOn = apps.filter((name) => !(bSettings?.off_apps || []).includes(name)).length;
+  // One short line: a row's state line does not wrap, and four parts ran 100 px past the page at
+  // 1440. With a tag warning the line is the warning alone, the one thing that needs the person;
+  // else counting and the apps. The weekly draft's state is read in the opened row.
+  const settingsState = !ready ? '…' : tagsWarning ? v('stateTagsWarning') : [
+    !settings.node_enabled ? v('stateNodeOff') : settings.enabled ? v('stateCountingOn') : v('stateCountingOff'),
+    apps.length ? t('profile.aivis.stateApps', { on: appsOn, all: apps.length }) : null,
+  ].filter(Boolean).join(' · ');
+
+  // The order: the report first, the settings after it; a tag warning puts the settings first. The
+  // order is decided on the first load only, so a save that raises the warning does not move the
+  // section the person is working in. The numbers and the rail follow the order.
+  if (ready && warnFirst.current === null) warnFirst.current = tagsWarning;
+  const order = warnFirst.current ? ['vis-settings', 'vis-report'] : ['vis-report', 'vis-settings'];
+  const labels = { 'vis-report': v('secReport'), 'vis-settings': v('part.settings') };
+  const shown = order.map((id, i) => ({ id, label: labels[id], num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
+
+  const periodTabs = html`
+    <${Tabs} tone="filter" label=${v('periodLabel')} value=${days} onSelect=${setDays}
+      items=${PERIODS.map((d) => ({ value: d, label: v('days').replace('{n}', d) }))} />`;
   const controls = html`
     <${Line} wrap align="start" justify="between" gap="medium" below="large">
-      <${Tabs} tone="filter" label=${v('partLabel')} value=${part} onSelect=${setPart}
-        items=${PARTS.map((p) => ({ value: p, label: v(`part.${p}`) }))} />
-      ${part === 'settings' ? null : html`
-        <${Tabs} tone="filter" label=${v('periodLabel')} value=${days} onSelect=${setDays}
-          items=${PERIODS.map((d) => ({ value: d, label: v('days').replace('{n}', d) }))} />`}
+      ${nothing ? null : html`
+        <${Tabs} tone="filter" label=${v('partLabel')} value=${part} onSelect=${setPart}
+          items=${PARTS.map((p) => ({ value: p, label: v(`part.${p}`), count: marked[p] || undefined, attention: !!marked[p] }))} />`}
+      ${periodTabs}
     <//>`;
 
-  const ready = report && behaviour && settings && bSettings;
+  const reportSection = html`
+    <${PageSection} key="vis-report" id="vis-report" num=${numOf['vis-report']} first=${order[0] === 'vis-report'} title=${v('secReport')}>
+      ${controls}
+      ${!ready && !error ? html`<${Note} kind="loading">${v('loading')}<//>` : null}
+      ${ready && !report.counting ? html`<${Note} kind="quiet">${v('countingOff')}<//>` : null}
+      ${ready && nothing && report.counting ? html`<${Note} kind="quiet">${t('profile.aivis.emptyAll', { n: days })}<//>` : null}
+      ${ready && !nothing ? html`<${TabPanel} value=${`${part}-${days}`} label=${v(`part.${part}`)}>
+        ${part === 'people' ? html`<${People} r=${report} />` : null}
+        ${part === 'ai' ? html`<${Ai} r=${report} />` : null}
+        ${part === 'purchases' ? html`<${Purchases} r=${report} />` : null}
+        ${part === 'agents' ? html`<${Agents} r=${report} />` : null}
+        ${part === 'apps' ? html`<${Apps} b=${behaviour} onFix=${fix} fixing=${fixing} />` : null}
+      <//>` : null}
+    <//>`;
+
+  // The settings are changed seldom, so they are a row that says their state and opens in place.
+  const settingsSection = html`
+    <${FoldSection} key="vis-settings" id="vis-settings" num=${numOf['vis-settings']} wrap title=${v('part.settings')} sub=${settingsState}
+      open=${settingsShown} onToggle=${() => setSettingsOpen(!settingsShown)}>
+      ${ready ? html`<${Settings} s=${settings} bs=${bSettings} apps=${apps} onSave=${save} />` : null}
+    <//>`;
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.visibility')]}
       title=${v('title')}
       help="concept.ai_visibility"
       desc=${v('intro')}
-      start=${html`<${PageStart} id="visibility" />`}>
-      ${controls}
+      strip=${strip}
+      start=${html`<${PageStart} id="visibility" />`}
+      railTitle=${t('profile.landing.railTitle')}
+      sections=${shown}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${message ? html`<${Note} kind="message">${message}<//>` : null}
-      ${!ready && !error ? html`<${Note} kind="loading">${v('loading')}<//>` : null}
-      ${ready && !report.counting && part !== 'settings' ? html`<${Note} kind="quiet">${v('countingOff')}<//>` : null}
-      ${ready ? html`<${TabPanel} value=${`${part}-${days}`} label=${v(`part.${part}`)}>
-        ${part === 'people' ? html`<${People} r=${report} />` : null}
-        ${part === 'ai' ? html`<${Ai} r=${report} />` : null}
-        ${part === 'purchases' ? html`<${Purchases} r=${report} />` : null}
-        ${part === 'agents' ? html`<${Agents} r=${report} />` : null}
-        ${part === 'apps' ? html`<${Apps} b=${behaviour} onFix=${fix} fixing=${fixing} />` : null}
-        ${part === 'settings' ? html`<${Settings} s=${settings} bs=${bSettings} apps=${apps} onSave=${save} />` : null}
-      <//>` : null}
+      ${order.map((id) => (id === 'vis-report' ? reportSection : settingsSection))}
     <//>`;
 }

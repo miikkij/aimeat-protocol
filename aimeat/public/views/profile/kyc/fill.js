@@ -14,6 +14,8 @@
  * @structure useFill · fillPart · promptOf · cleanAnswer · changesOf
  * @usage const fill = useFill({ org, id, card, reload }); ... fillPart(fill)
  * @version-history
+ *   v1.0.1 — 2026-11-27 — "Save to the card" is an ordinary action in the control size: the page has
+ *     one loud action, "Open a customer". It is still enabled only after "Check" found changes.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
 import { h } from 'preact';
@@ -24,7 +26,7 @@ import { PromptCard } from '/components/PromptCard.js';
 import { PasteBox } from '/components/PasteBox.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Facts } from '/components/Facts.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { x, word, dateWord, errWords, kycApi } from './frame.js';
 
@@ -187,7 +189,7 @@ export function fillPart(f) {
       onInput=${(e) => f.setText(e.currentTarget.value)} />
     <${Actions} apart>
       <${Action} small disabled=${!f.text.trim() || f.busy} onClick=${f.check}>${x('fill.check')}<//>
-      <${Loud} control disabled=${!ch?.changes.length || f.busy} onClick=${f.save}>${f.busy ? x('saving') : x('fill.save')}<//>
+      <${Action} control disabled=${!ch?.changes.length || f.busy} onClick=${f.save}>${f.busy ? x('saving') : x('fill.save')}<//>
     <//>
     ${ch?.changes.length ? html`
       <${Note} kind="hint">${x('fill.changesLead', { n: ch.changes.length })}<//>

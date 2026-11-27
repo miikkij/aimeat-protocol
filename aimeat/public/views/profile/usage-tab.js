@@ -29,6 +29,13 @@
  *   (PageStart id "usage") gives the prompt that has one's own AI read the same reports.
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.12.0 -- 2026-11-27 -- The figures stand under the head (SettingsPage strip), before the report
+ *     bar: where things stand comes before the controls that choose a report. With nothing recorded
+ *     for the chosen report and window the strip is not drawn and the table's one empty line, now
+ *     saying what fills it, is the page. Unpriced, Refused and Failed take the notice tone when they
+ *     are above zero, and in an activity report the rows with a refusal or a failure come first. The
+ *     page stays one report at a time with no numbered sections (see WHY REPORTS above); no control
+ *     was removed.
  *   v1.11.0 -- 2026-11-25 -- The report on tools has the column Largest answer (answer_chars_max of
  *     each tool, in characters), and its column head opens the explanation usage.answerSize. Only
  *     that report has it: the node measures the answer of an MCP tool call and of nothing else.
@@ -169,17 +176,20 @@ export default function UsageTab() {
       />
     <//>` : null;
 
+  // A figure that asks the person to look (calls with no known price, refused or failed calls) takes
+  // the notice tone while it is above zero.
+  const look = (n) => ((Number(n) || 0) > 0 ? 'notice' : undefined);
   const statCards = current.kind === 'spend'
     ? [
         { label: t('profile.usage.statCost'), value: usd(totals?.cost_usd) },
         { label: t('profile.usage.statTokens'), value: compact(totals?.total_tokens) },
         { label: t('profile.usage.statCalls'), value: compact(totals?.calls) },
-        { label: t('profile.usage.statUnpriced'), term: 'usage.unpriced', value: compact(totals?.unpriced_calls) },
+        { label: t('profile.usage.statUnpriced'), term: 'usage.unpriced', value: compact(totals?.unpriced_calls), tone: look(totals?.unpriced_calls) },
       ]
     : [
         { label: t('profile.usage.statCalls'), value: compact(totals?.calls) },
-        { label: t('profile.usage.statRefused'), term: 'usage.refused', value: compact(totals?.refusals) },
-        { label: t('profile.usage.statErrors'), value: compact(totals?.errors) },
+        { label: t('profile.usage.statRefused'), term: 'usage.refused', value: compact(totals?.refusals), tone: look(totals?.refusals) },
+        { label: t('profile.usage.statErrors'), value: compact(totals?.errors), tone: look(totals?.errors) },
         { label: t('profile.usage.statSlowest'), value: ms(totals?.duration_ms_max) },
       ];
 
@@ -201,7 +211,11 @@ export default function UsageTab() {
         ...(withAnswerSize ? [{ label: t('profile.usage.colMaxAnswer'), term: 'usage.answerSize' }] : []),
       ];
 
-  const rows = groups.map(g => (current.kind === 'spend'
+  // In an activity report a row with a refusal or a failure comes first, the rest keep the server's
+  // order (Array.prototype.sort is stable). A spend report keeps its ranking by cost.
+  const troubled = (g) => ((Number(g.refusals) || 0) + (Number(g.errors) || 0) > 0 ? 0 : 1);
+  const ordered = current.kind === 'spend' ? groups : [...groups].sort((a, b) => troubled(a) - troubled(b));
+  const rows = ordered.map(g => (current.kind === 'spend'
     ? [g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
     : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg),
         // A row with no measured answer (a web request, a call from before the measurement) stays empty.
@@ -223,12 +237,25 @@ export default function UsageTab() {
         items=${PERIODS.map(p => ({ value: p, label: t(`profile.usage.period${p}`) }))} />
     <//>`;
 
+  // The figures of the chosen report stand under the head, before the report bar: what a person
+  // comes for (the cost, or the calls and how many were refused) is the first thing on the page.
+  // With nothing recorded (no call in the window) the strip is not drawn, so an empty report is
+  // one line and not a band of zeros (the rule hideZeros states; decided here on the calls, since
+  // the figures are formatted, never a bare 0).
+  const recorded = (Number(totals?.calls) || 0) > 0;
+  const strip = loading && !data
+    ? html`<${FigureStrip} loading=${4} />`
+    : data && recorded
+      ? html`<${FigureStrip} items=${statCards.map(c => ({ key: c.label, n: c.value, tone: c.tone, label: helpWord(c.label, c.term) }))} />`
+      : null;
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.usage')]}
       title=${t('profile.usage.title')}
       help="concept.usage"
       desc=${t('profile.usage.intro')}
+      strip=${strip}
       start=${html`<${PageStart} id="usage" />`}>
       ${controls}
 
@@ -236,7 +263,6 @@ export default function UsageTab() {
       ${loading && !data ? html`<${Note} kind="loading">${t('profile.usage.loading')}<//>` : null}
 
       ${data ? html`<${TabPanel} value=${`${report}-${period}`} label=${t(REPORTS.find(r => r.id === report)?.label || '')}>
-        <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: helpWord(c.label, c.term) }))} />
         ${chart}
         <${List} keepCols cols=${headers.length > 5 ? 'name-n-n-n-n-n' : headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
           head=${headers.map((hd, i) => (i

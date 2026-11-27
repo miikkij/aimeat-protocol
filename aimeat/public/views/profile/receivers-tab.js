@@ -23,6 +23,8 @@
  * @structure ReceiversTab() — state + handlers → renderReceiversView(ctx)
  * @usage registered in profile.js TABS as id 'receivers'.
  * @version-history
+ *   v1.2.0 -- 2026-11-27 -- `newOpen` and `toggleNew` in the ctx bag: the cover's "Making an incoming
+ *     webhook" is a row that opens in place (receivers/cover.js v1.2.0).
  *   v1.1.0 — 2026-11-09 — The key-once dialog carries the example message of its ready commands (the
  *     CSM's, the address's `sample`, or the default) and the switch that adds ?dry_run=true; the test
  *     box starts with the same message (secaudit2026nov08b round 15d).
@@ -91,6 +93,8 @@ export default function ReceiversTab({ session, showToast }) {
   const [busy, setBusy] = useState(false);
   const [csms, setCsms] = useState(null);
   const [pickers, setPickers] = useState({ orgs: null, workspaces: null, spaces: null });
+  // The cover's "Making an incoming webhook" row (receivers/cover.js secNew): closed until opened.
+  const [newOpen, setNewOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -289,6 +293,7 @@ export default function ReceiversTab({ session, showToast }) {
     openCover, openDetail, openCreate: () => openCreate(), setForm, touch, pickOrg, pickWs, submitCreate,
     setTestBody, runDryRun, setCommandsDry, origin: window.location.origin, openDecide, decide, pause, resume, rotate, remove, openExtend, submitExtend,
     reloadDetail: () => (view.kind === 'detail' ? loadDetail(view.name) : null),
+    newOpen, toggleNew: () => setNewOpen((o) => !o),
   };
   return renderReceiversView(ctx);
 }

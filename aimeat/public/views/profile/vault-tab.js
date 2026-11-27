@@ -19,6 +19,8 @@
  * @structure VaultTab() — state + handlers → renderVaultView(ctx)
  * @usage registered in profile.js TABS as id 'vault'.
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The browser key section is a fold row (vault/cover.js), so the page keeps
+ *     whether it is open (deviceOpen) and hands it to the render with its setter.
  *   v1.0.0 — 2026-11-14 — Initial.
  */
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -57,6 +59,8 @@ export default function VaultTab({ session, showToast }) {
   const [orgs, setOrgs] = useState(null);
   const [keys, setKeys] = useState(null);
   const [localKey, setLocalKey] = useState(null);
+  // The browser key section is one row until it is opened (vault/cover.js secDevice).
+  const [deviceOpen, setDeviceOpen] = useState(false);
 
   const load = useCallback(async () => {
     try { setLists(await api.list()); setFailed(false); }
@@ -207,7 +211,7 @@ export default function VaultTab({ session, showToast }) {
   const ctx = {
     nodeId, ownerGhii, lists, failed, reload: load, openId, toggleOpen, detail, detailFailed, orgs, orgName,
     dialog, closeDialog: () => setDialog(null), busy, ConfirmUI, openShare, openAsk, setForm, addPerson, removePerson,
-    submit, revoke, keys, localKey, cryptoReady, registerKey, removeKey,
+    submit, revoke, keys, localKey, cryptoReady, registerKey, removeKey, deviceOpen, setDeviceOpen,
   };
   return renderVaultView(ctx);
 }

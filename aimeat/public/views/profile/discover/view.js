@@ -15,6 +15,11 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.15.0 -- 2026-11-27 -- The cover draws a section only once it holds something (What changed
+ *     last, Places, Bookkeeping) and numbers them after the filter; a scope with nothing in it is the
+ *     search field and one line that says what fills it and how; the head's figures that are zero are
+ *     not drawn; the contents rail lists the sections only when two or more are drawn. Two headings
+ *     are noun phrases (secKinds, secRecent). No control was removed.
  *   v1.14.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart on the cover and the title's question mark concept.discover.
  *   v1.13.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its tags, doors, desk and rail as data; List with its Row, Num, Name, Desc and Doors; Group; More; Tabs; Filter; CardGrid of framed Cards with their lines for the places; Note; Action): the page passes data and writes no class (page group G8).
@@ -86,6 +91,17 @@ function renderCover(ctx) {
   const total = f ? f.total - book : 0;
   const places = f?.places || [];
   const orgs = new Set(places.map(p => p.organismId));
+  // What is drawn: the kinds always (with nothing in the scope, its one line is the page's empty
+  // line); what changed last while it loads or once it holds a row; the places and the bookkeeping
+  // once they hold something. Numbered after the filter, so a hidden section leaves no gap.
+  const recent = ctx.recent[ctx.scope];
+  const shown = [
+    { id: 'dv-kinds', label: c('secKinds'), count: kinds.length },
+    f && kinds.length && (!recent || recent.length) ? { id: 'dv-recent', label: c('secRecent'), count: '' } : null,
+    orgs.size ? { id: 'dv-places', label: c('secPlaces'), count: orgs.size } : null,
+    book ? { id: 'dv-book', label: c('secBook'), count: num(book) } : null,
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map(s => [s.id, s.num]));
   return html`
     <${SettingsPage} name="dv"
       crumb=${crumb(ctx, [])}
@@ -93,8 +109,8 @@ function renderCover(ctx) {
       help="concept.discover"
       start=${html`<${PageStart} id="discover" />`}
       marks=${[
-        { label: c('chipItems', { n: num(total) }) },
-        { label: c('chipKinds', { n: kinds.length }) },
+        total ? { label: c('chipItems', { n: num(total) }) } : null,
+        kinds.length ? { label: c('chipKinds', { n: kinds.length }) } : null,
         orgs.size ? { label: c('chipOrgs', { n: orgs.size }) } : null,
         book ? { label: c('chipBook', { n: num(book) }) } : null,
         ctx.facets.shared?.total ? { label: c('chipShared', { n: num(ctx.facets.shared.total) }), tone: 'coral' } : null,
@@ -106,18 +122,13 @@ function renderCover(ctx) {
       <//>`}
       strip=${desk(ctx)}
       railTitle=${c('railTitle')}
-      sections=${[
-        { id: 'dv-kinds', num: '01', label: c('secKinds'), count: kinds.length },
-        { id: 'dv-recent', num: '02', label: c('secRecent'), count: '' },
-        { id: 'dv-places', num: '03', label: c('secPlaces'), count: orgs.size },
-        { id: 'dv-book', num: '04', label: c('secBook'), count: num(book) },
-      ]}
+      sections=${shown.length > 1 ? shown : undefined}
       pagesLabel=${c('scopes')}
       pages=${scopeItems(ctx, (s) => (ctx.facets[s] ? num(ctx.facets[s].total) : '→'))}>
       ${secKinds(ctx, kinds)}
-      ${secRecent(ctx)}
-      ${secPlaces(ctx, places)}
-      ${secBookkeeping(ctx, book)}
+      ${numOf['dv-recent'] ? secRecent(ctx, numOf['dv-recent']) : null}
+      ${numOf['dv-places'] ? secPlaces(ctx, places, numOf['dv-places']) : null}
+      ${numOf['dv-book'] ? secBookkeeping(ctx, book, numOf['dv-book']) : null}
     <//>`;
 }
 
@@ -130,9 +141,10 @@ function secKinds(ctx, kinds) {
   const f = ctx.facets[ctx.scope];
   const capped = ctx.scope === 'public';
   const browse = (k) => () => ctx.pickView({ kind: 'kind', type: k.value });
-  return html`<${PageSection} id="dv-kinds" num="01" title=${c('secKinds')} count=${c('secKindsSub', { n: kinds.length })} first=${true}>
+  // A scope with nothing in it says what fills it and the one way to fill it, in that scope's words.
+  return html`<${PageSection} id="dv-kinds" num="01" title=${c('secKinds')} count=${kinds.length ? c('secKindsSub', { n: kinds.length }) : ''} first=${true}>
     ${!f ? html`<${Note} kind="loading">${c('loading')}<//>` : html`
-      <${List} cols="n-name-where-doors" keepCols empty=${t('discover.empty')}
+      <${List} cols="n-name-where-doors" keepCols empty=${c('empty.' + (SCOPE_IDS.includes(ctx.scope) ? ctx.scope : 'own'))}
         head=${kinds.length ? ['', c('colKind'), c('colWhere'), ''] : null}>
         ${kinds.map(k => html`
           <${Row} key=${k.value}>
@@ -146,7 +158,7 @@ function secKinds(ctx, kinds) {
 }
 
 /* ── 02 What changed last ──────────────────────────────────────────────────────────────────── */
-function secRecent(ctx) {
+function secRecent(ctx, n) {
   const all = ctx.recent[ctx.scope] || null;
   const filt = ctx.recentType;
   const list = all ? (filt ? all.filter(e => e.type === filt) : all) : [];
@@ -154,7 +166,7 @@ function secRecent(ctx) {
   const present = all ? [...new Set(all.map(e => e.type))] : [];
   const kinds = [{ value: '', key: 'all', label: c('allKinds') }, ...['document', 'knowledge', 'skill', 'decision'].filter(x => present.includes(x)).map(x => ({ value: x, key: x, label: kindName(x) }))];
   const doors = html`<${Tabs} tone="fold" value=${filt || ''} onSelect=${(v) => ctx.setRecentType(v)} items=${kinds} />`;
-  return html`<${PageSection} id="dv-recent" num="02" title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
+  return html`<${PageSection} id="dv-recent" num=${n} title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
     ${!all ? html`<${Note} kind="loading">${c('loadingRecent')}<//>` : !list.length ? html`<${Note} kind="quiet">${c('noneRecent')}<//>` : entryRows(ctx, shown, { head: true })}
     ${list.length > RECENT_ROWS ? html`<${More} onMore=${() => ctx.setRecentOpen(v => !v)} label=${ctx.recentOpen ? c('showFewer') : c('showMore', { n: list.length - RECENT_ROWS })} />` : null}
     <${Hint}>${c('recentHint')}<//>
@@ -162,7 +174,7 @@ function secRecent(ctx) {
 }
 
 /* ── 03 Places ─────────────────────────────────────────────────────────────────────────────── */
-function secPlaces(ctx, places) {
+function secPlaces(ctx, places, n) {
   const byOrg = new Map();
   for (const p of places) {
     let o = byOrg.get(p.organismId);
@@ -174,7 +186,7 @@ function secPlaces(ctx, places) {
     ...o.ws.slice(0, 3).map(w => ({ key: w.workspaceId, label: w.workspace, count: num(w.count) })),
     ...(o.ws.length > 3 ? [{ key: 'more', label: c('moreN', { n: o.ws.length - 3 }), dim: true }] : []),
   ];
-  return html`<${PageSection} id="dv-places" num="03" title=${c('secPlaces')} count=${c('secPlacesSub', { o: orgs.length, w: places.length })}
+  return html`<${PageSection} id="dv-places" num=${n} title=${c('secPlaces')} count=${c('secPlacesSub', { o: orgs.length, w: places.length })}
     doors=${html`<${Action} small soft onClick=${() => ctx.openTab('organisms')}>${t('profile.tabs.organisms')}<//>`}>
     ${!orgs.length ? html`<${Note} kind="quiet">${c('nonePlaces')}<//>` : html`<${CardGrid}>
       ${orgs.map(o => html`<${Card} tone="framed" key=${o.id} name=${o.name} meta=${c('placeSub', { w: o.ws.length, n: num(o.count) })}
@@ -185,8 +197,8 @@ function secPlaces(ctx, places) {
 }
 
 /* ── 04 Bookkeeping ────────────────────────────────────────────────────────────────────────── */
-function secBookkeeping(ctx, book) {
-  return html`<${FoldSection} id="dv-book" num="04" title=${c('secBook')} sub=${c('secBookSub', { n: num(book) })} open=${ctx.bookOpen} onToggle=${() => ctx.setBookOpen(v => !v)}>
+function secBookkeeping(ctx, book, n) {
+  return html`<${FoldSection} id="dv-book" num=${n} title=${c('secBook')} sub=${c('secBookSub', { n: num(book) })} open=${ctx.bookOpen} onToggle=${() => ctx.setBookOpen(v => !v)}>
     <${Hint}>${c('bookHint')}<//>
     <${Actions}>
       <${Action} small onClick=${() => ctx.openTab('memory')}>${t('profile.memory.title')}<//>

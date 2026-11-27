@@ -11,6 +11,8 @@
  *   shape. The row under a page head is .tab-row--bar with .poster-row--thing.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.1 — 2026-11-27 — The row under a page head wraps, as .tab-row does: two long tab names ran
+ *     20px past a 360px page in the AIMEAT theme (Own servers). Its row gap was already written.
  *   v1.4.0 — 2026-09-27 — .tab-row--fill (Tabs fill): the tabs share the row's width, each word
  *     centred, 22px apart (the old app catalogue's Add dialog tabs, .modal-tabs); the line and glyph
  *     tones keep their own padding in a row. appcat parity; additive.
@@ -30,7 +32,7 @@
 .tab-row--filter { display: flex; align-items: stretch; gap: .45rem; margin: .6rem 0 .3rem; }
 /* The row right under a page head (with the heavy rule of .poster-row--thing): the values the
    page's .pf .sub-tabs had in profile-poster.css and profile.css. */
-.tab-row--bar { display: flex; align-items: center; gap: .4rem .9rem; padding: 0; margin-bottom: 1.2rem; }
+.tab-row--bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; padding: 0; margin-bottom: 1.2rem; }
 /* Every tab of a row is the same box whether it is chosen or not, so choosing one does not move the
    row: the chosen tab's padding (poster.css .poster-tab.is-on) is every tab's here. The filter and
    tile tones already keep one padding. The ground and the words change over 150ms, as main's tab

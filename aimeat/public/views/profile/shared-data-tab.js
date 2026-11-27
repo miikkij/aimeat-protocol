@@ -25,6 +25,14 @@
  * @structure SharedDataTab (default) · frame · crumbOf
  * @usage registered in views/profile.js TABS as id 'sharedData'
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A figure strip under the head (every data product and shared package, those
+ *     late or out of date in the notice tone, the named shares, the reads of 30 days) from the view
+ *     the page already reads; not drawn while every figure is zero (FigureStrip hideZeros). With
+ *     nothing shared the page is section 01 with one line that says what fills it; the filters are
+ *     drawn once there is a row to filter, "Shares to people" once there is a share, and "Who reads"
+ *     once someone reads or something is shared beyond the person. The numbers and the contents rail
+ *     follow what is drawn, and one section has no rail. Every section keeps its id; no control was
+ *     removed.
  *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head (folded once the person shares a package or has a product; its button
  *     opens the wizard) and the title's question mark, concept.shared_data. The hint at the foot
@@ -41,13 +49,14 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { PageStart } from '/components/PageStart.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import * as dp from '/js/services/dataproducts.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { ProductPage } from './offers/data-product.js';
 import { DataWizard } from './offers/wizard.js';
 import { d } from './offers/data-model.js';
-import { secFilters, secProducts, secPeople, secReaders, S } from './shared-data/sections.js';
+import { secFilters, secProducts, secPeople, secReaders, rowsOf, rowNeedsLook, S } from './shared-data/sections.js';
 
 /** The crumb of this tab: Profile › Account › Data you share, then the page's own steps. */
 function crumbOf(ctx, parts) {
@@ -135,19 +144,49 @@ export default function SharedDataTab({ session, showToast }) {
   // The start: folded once something is shared or a product exists; its button is the page's wizard.
   const start = html`<${PageStart} id="sharedData" done=${loading ? null : (shared.packages || []).length + products.length > 0}
     action=${{ onClick: () => pickView({ kind: 'wizard' }) }} />`;
+
+  // Where things stand, from the view the page already read: every row of the list (a product, or a
+  // package no product builds), those late or out of date (the notice tone: they need the person),
+  // the live named shares and the reads of the last 30 days. With nothing at all the strip is not
+  // drawn (hideZeros), and the list's one line says what fills the page.
+  const rows = loading ? [] : rowsOf(shared, products);
+  const oldN = rows.filter(rowNeedsLook).length;
+  const people = loading ? [] : (shared.people || []);
+  const readers = loading ? [] : (shared.readers || []);
+  const strip = loading ? (error ? null : html`<${FigureStrip} loading=${4} />`) : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'all', n: rows.length, label: d('list.title') },
+    { key: 'old', n: oldN, tone: oldN ? 'notice' : undefined, label: d('list.filterOld'), sub: oldN ? S('strip.oldSub') : undefined },
+    { key: 'shares', n: people.length, label: S('filter.named') },
+    { key: 'reads', n: shared.reads_30d || 0, label: S('strip.reads') },
+  ]} />`;
+
+  // What is drawn: the data products always (with nothing shared, its one line is the page's empty
+  // line); the shares to people once there is one; who reads once someone read or something is
+  // shared beyond the person (its note says what is not counted). Numbered as drawn; the contents
+  // rail only for two or more.
+  const beyondOwn = (shared?.packages || []).some((p) => p.audience && p.audience !== 'private');
+  const shown = loading ? [] : [
+    { id: 'sd-products', label: d('list.title'), count: rows.length },
+    people.length ? { id: 'sd-people', label: S('people.title'), count: people.length } : null,
+    readers.length || people.length || beyondOwn ? { id: 'sd-readers', label: S('readers.title'), count: readers.length } : null,
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
+  const railed = shown.length > 1;
   return html`
     <${SettingsPage}
       crumb=${crumbOf(ctx, [])}
       title=${S('title')}
       help="concept.shared_data"
       desc=${S('lead')}
+      strip=${strip}
       start=${start}
+      railTitle=${railed ? t('profile.landing.railTitle') : undefined} sections=${railed ? shown : undefined}
       after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${loading ? html`<${Note} kind="loading" />` : html`
-        ${secFilters({ counts: shared.counts || {}, filter, setFilter })}
-        ${secProducts({ ctx, shared, products, filter, orgNames })}
-        ${secPeople({ people: shared.people || [], busy, onEnd: endShare })}
-        ${secReaders({ readers: shared.readers || [] })}`}
+        ${rows.length ? secFilters({ counts: shared.counts || {}, filter, setFilter }) : null}
+        ${secProducts({ ctx, shared, products, filter: rows.length ? filter : 'all', orgNames, num: numOf['sd-products'], empty: rows.length ? undefined : S('emptyAll') })}
+        ${numOf['sd-people'] ? secPeople({ people, busy, onEnd: endShare, num: numOf['sd-people'] }) : null}
+        ${numOf['sd-readers'] ? secReaders({ readers, num: numOf['sd-readers'] }) : null}`}
     <//>`;
 }

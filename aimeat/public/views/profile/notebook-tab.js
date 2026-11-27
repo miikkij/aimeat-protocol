@@ -7,10 +7,19 @@
  *   plus your personal notes), and the per-owner trust toggles. Each captured note's organize workflow
  *   (suggest → enrich → distribute) lives in the NoteCard child (notebook-card.js); shared helpers in
  *   notebook-helpers.js. See docs/internal/design-organism-notebook-and-librarian.md.
+ *   The page leads with the notes: 01 the inbox (the capture box opens in place from its quiet action,
+ *   and stands open while the inbox is empty, since writing is how one begins), 02 the librarian, 03
+ *   the automatic steps as one row that says how many are on.
  * @structure
- *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
+ *   - NotebookTab (default export): strip, inbox list → NoteCard with the capture box, librarian search, automatic steps fold
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.21.0 -- 2026-11-27 -- The inbox is section 01 (nb-inbox) and the capture box opens in place from
+ *     its "Write a note" action (open while the inbox is empty); the librarian is 02 (nb-librarian);
+ *     the three switches are a FoldSection, 03 (nb-auto), whose row says how many are on. A figure
+ *     strip (notes, notes the AI worked on that wait to be filed, the newest note) from the inbox the
+ *     page already reads, with hideZeros; a worked-on note comes first in the list. Search is a quiet
+ *     action, so Capture is the one loud action. Every control stays; "Close" on the capture is new.
  *   v1.20.0 -- 2026-11-09 -- The page's question mark explains the notebook (concept.notebook); it
  *     opened the Knowledge explanation (guidance audit 2026-11-09).
  *   v1.19.0 -- 2026-11-08 -- The three Automate switches each have their question mark (Check `help`:
@@ -77,6 +86,7 @@ import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { Tabs } from '/components/Tabs.js';
 import { List, Row as ListRow, Name, Desc, Who, Doors, SearchLine } from '/components/List.js';
 import { Row, Stack } from '/components/Layout.js';
@@ -93,7 +103,11 @@ import { listOrganisms } from '/js/services/organisms.js';
 import { apiGet } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
 import NoteCard from './notebook-card.js';
-import { INBOX_PREFIX, noteText } from './notebook-helpers.js';
+import { INBOX_PREFIX, noteText, relTime } from './notebook-helpers.js';
+
+/** A note the AI already worked on (its enrichment plan ran at least one step): it waits to be filed. */
+const workedOn = (n) => Array.isArray(n?.value?.enrichments) && n.value.enrichments.length > 0;
+const whenOf = (n) => +new Date(n.updated_at || n.created_at || 0);
 import { swallowed } from '/js/swallowed.js';
 
 export default function NotebookTab({ session, showToast, onStats }) {
@@ -115,6 +129,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const inboxLoad = useLoadState();
   const [autoEnrichKey, setAutoEnrichKey] = useState(null); // the just-captured note to auto-enrich (trust mode)
+  // The capture box: null follows the inbox (open while it is empty), true or false is the person's own press.
+  const [captureOpen, setCaptureOpen] = useState(null);
+  const [autoOpen, setAutoOpen] = useState(false);
 
   // Mount: ONE composite (GET /v1/notebook) seeds the inbox + settings + organism names. Interactive
   // re-fetches (post-capture/delete, live-update) keep using the individual loaders; a composite failure
@@ -191,6 +208,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       if (resp?.ok === false) { showToast(resp.error?.message || t('profile.notebook.saveFailed'), true); return; }
       showToast(t('profile.notebook.saved'));
       setDraft('');
+      setCaptureOpen(null);
       // Trust mode: flag this note so its card auto-runs the planner once it mounts.
       if (settings.autoDetectIntent) setAutoEnrichKey(key);
       await loadInbox();
@@ -270,13 +288,15 @@ export default function NotebookTab({ session, showToast, onStats }) {
     return String(gaii || '').split('@')[0];
   }
 
-  // Filter (text) + sort (date) the inbox for display.
+  // Filter (text) + sort (date) the inbox for display. A note the AI worked on waits to be filed, so
+  // those come first, each group in the chosen date order.
   function visibleInbox() {
     const ft = inboxFilter.trim().toLowerCase();
     const filtered = (inbox || []).filter(n => !ft || noteText(n.value).toLowerCase().includes(ft));
     return filtered.sort((a, b) => {
-      const da = +new Date(a.updated_at || a.created_at || 0), db = +new Date(b.updated_at || b.created_at || 0);
-      return inboxSort === 'old' ? da - db : db - da;
+      const wa = workedOn(a) ? 0 : 1, wb = workedOn(b) ? 0 : 1;
+      if (wa !== wb) return wa - wb;
+      return inboxSort === 'old' ? whenOf(a) - whenOf(b) : whenOf(b) - whenOf(a);
     });
   }
 
@@ -303,49 +323,58 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const setting = (key, words, help) => html`
     <${Check} inline help=${help} checked=${settings[key]} onChange=${() => toggleSetting(key)}>${words}<//>`;
 
+  // The figures, from the inbox the page already read: the notes in it, the ones the AI worked on that
+  // wait to be filed, and when the newest came. With no note the strip is not drawn.
+  const notes = inbox || [];
+  const workedN = notes.filter(workedOn).length;
+  const newest = notes.length ? notes.reduce((a, b) => (whenOf(b) > whenOf(a) ? b : a)) : null;
+  const strip = inbox === null
+    ? (inboxLoad.failed ? null : html`<${FigureStrip} loading=${3} />`)
+    : html`<${FigureStrip} wrap hideZeros items=${[
+      { key: 'notes', n: notes.length, label: t('profile.notebook.stripNotes') },
+      { key: 'worked', n: workedN, tone: workedN ? 'notice' : undefined, label: t('profile.notebook.stripWorked'), sub: workedN ? t('profile.notebook.stripWorkedSub') : undefined },
+      newest
+        ? { key: 'newest', n: relTime(newest.updated_at || newest.created_at), tone: 'coral', label: t('profile.notebook.stripNewest') }
+        : { key: 'newest', n: '·', tone: 'dim', label: t('profile.notebook.stripNewest') },
+    ]} />`;
+
+  // The capture box stands open while the inbox is empty (writing is how one begins), and otherwise
+  // opens from the inbox's quiet action.
+  const empty = inbox !== null && inbox.length === 0;
+  const capturing = captureOpen ?? empty;
+  const onN = ['autoDetectIntent', 'autoRunPlan', 'autoDistribute'].filter(k => settings[k]).length;
+  const sections = [
+    { id: 'nb-inbox', num: '01', label: t('profile.notebook.inboxTitle'), count: inbox ? inbox.length : '' },
+    { id: 'nb-librarian', num: '02', label: t('profile.notebook.librarianTitle') },
+    { id: 'nb-auto', num: '03', label: t('profile.notebook.secAuto') },
+  ];
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.notebook')]}
       title=${t('profile.notebook.title')} help="concept.notebook" desc=${t('profile.notebook.desc')}
+      strip=${strip}
       start=${html`<${PageStart} id="notebook" done=${inbox === null ? null : inbox.length > 0} />`}
+      railTitle=${t('profile.landing.railTitle')} sections=${sections}
       after=${html`<${ConfirmUI} />`}>
 
-    <${Stack} gap="medium" below="section">
-      <${TextArea} rows=${4}
-        placeholder=${t('profile.notebook.capturePlaceholder')}
-        value=${draft} onInput=${setDraft} />
-      <${Row} wrap gap="medium">
-        <${Loud} control disabled=${!draft.trim() || saving} onClick=${handleCapture}>
-          ${saving ? '…' : t('profile.notebook.captureBtn')}
+    ${/* The notes are the page: what the person wrote, and what waits to be filed. The capture box
+          is the way to add one, so it opens in place over the list. */''}
+    <${Section} id="nb-inbox" num="01" first title=${t('profile.notebook.inboxTitle')} count=${inbox ? inbox.length : undefined}
+      doors=${capturing ? null : html`<${Action} small onClick=${() => setCaptureOpen(true)}>${t('profile.notebook.writeNote')}<//>`}>
+    ${capturing ? html`
+      <${Stack} gap="medium" below="section">
+        <${TextArea} rows=${4}
+          placeholder=${t('profile.notebook.capturePlaceholder')}
+          value=${draft} onInput=${setDraft} />
+        <${Row} wrap gap="medium">
+          <${Loud} control disabled=${!draft.trim() || saving} onClick=${handleCapture}>
+            ${saving ? '…' : t('profile.notebook.captureBtn')}
+          <//>
+          ${empty ? null : html`<${Action} small soft onClick=${() => setCaptureOpen(false)}>${t('common.close')}<//>`}
+          <${Note} kind="meta" inline>${t('profile.notebook.captureHint')}<//>
         <//>
-        <${Note} kind="meta" inline>${t('profile.notebook.captureHint')}<//>
-      <//>
-      <${Row} wrap gap="medium">
-        <${Note} kind="meta" inline>${t('profile.notebook.trustTitle')}<//>
-        ${setting('autoDetectIntent', t('profile.notebook.autoDetect'), 'notebook.autoDetect')}
-        ${setting('autoRunPlan', t('profile.notebook.autoRun'), 'notebook.autoRun')}
-        ${setting('autoDistribute', t('profile.notebook.autoDistribute'), 'notebook.autoDistribute')}
-      <//>
-    <//>
-
-    <${Section} band title=${t('profile.notebook.librarianTitle')}>
-      <${Note} kind="lead">${t('profile.notebook.librarianDesc')}<//>
-      <${Tabs} bar kind="view" value=${searchScope} onSelect=${pickScope} items=${[
-        { value: 'own', label: t('profile.notebook.scopeOwn') },
-        { value: 'public', label: t('profile.notebook.scopePublic') },
-      ]} />
-      <${SearchLine} text placeholder=${t('profile.notebook.searchPlaceholder')}
-        value=${query} onInput=${e => setQuery(e.target.value)} onEnter=${handleSearch}>
-        <${Loud} onClick=${handleSearch}>${t('profile.notebook.searchBtn')}<//>
-      <//>
-      ${searching && html`<${Note} kind="loading">${t('profile.notebook.searching')}<//>`}
-      ${!searching && hits !== null && html`
-        ${hits.length > 0 && html`<${Note} kind="meta">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}<//>`}
-        <${List} cols="name-desc-who-doors" apart empty=${t('profile.notebook.noHits')} rows=${hits} render=${renderHit} />
-      `}
-    <//>
-
-    <${Section} band title=${t('profile.notebook.inboxTitle')}>
+      <//>` : null}
     ${inbox === null
       ? (inboxLoad.failed ? html`<${LoadFailed} onRetry=${loadInbox} />` : html`<${Note} kind="loading">${t('profile.notebook.inboxLoading')}<//>`)
       : inbox.length === 0
@@ -366,6 +395,34 @@ export default function NotebookTab({ session, showToast, onStats }) {
           <//>
         `
     }
+    <//>
+
+    <${Section} id="nb-librarian" num="02" title=${t('profile.notebook.librarianTitle')}>
+      <${Note} kind="lead">${t('profile.notebook.librarianDesc')}<//>
+      <${Tabs} bar kind="view" value=${searchScope} onSelect=${pickScope} items=${[
+        { value: 'own', label: t('profile.notebook.scopeOwn') },
+        { value: 'public', label: t('profile.notebook.scopePublic') },
+      ]} />
+      <${SearchLine} text placeholder=${t('profile.notebook.searchPlaceholder')}
+        value=${query} onInput=${e => setQuery(e.target.value)} onEnter=${handleSearch}>
+        <${Action} onClick=${handleSearch}>${t('profile.notebook.searchBtn')}<//>
+      <//>
+      ${searching && html`<${Note} kind="loading">${t('profile.notebook.searching')}<//>`}
+      ${!searching && hits !== null && html`
+        ${hits.length > 0 && html`<${Note} kind="meta">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}<//>`}
+        <${List} cols="name-desc-who-doors" apart empty=${t('profile.notebook.noHits')} rows=${hits} render=${renderHit} />
+      `}
+    <//>
+
+    ${/* Rarely changed: one row that says how many of the three steps run on their own, the switches inside. */''}
+    <${Section} fold id="nb-auto" num="03" title=${t('profile.notebook.secAuto')}
+      sub=${settingsLoaded ? (onN ? t('profile.notebook.autoSubOn', { n: onN }) : t('profile.notebook.autoSubOff')) : '…'}
+      open=${autoOpen} onToggle=${() => setAutoOpen(o => !o)}>
+      <${Row} wrap gap="medium">
+        ${setting('autoDetectIntent', t('profile.notebook.autoDetect'), 'notebook.autoDetect')}
+        ${setting('autoRunPlan', t('profile.notebook.autoRun'), 'notebook.autoRun')}
+        ${setting('autoDistribute', t('profile.notebook.autoDistribute'), 'notebook.autoDistribute')}
+      <//>
     <//>
     <//>
   `;

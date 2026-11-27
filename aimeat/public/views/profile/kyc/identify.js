@@ -12,6 +12,11 @@
  * @structure IdentifyTab() · tokenOf · refusal
  * @usage registered in profile.js TABS as id 'identify' (hidden)
  * @version-history
+ *   v1.0.2 — 2026-11-27 — The two section headings that were sentences are noun phrases ("Identity
+ *     request from …", "Identity given"). The page stays one task with no figure strip and no page
+ *     start: the person arrives from the firm's link, the section says who asks and what it gets, and
+ *     its one loud action is the next step. Nothing else changed: the order of the steps, the
+ *     in-person rule, the retention line before the press and every refusal are as they were.
  *   v1.0.1 — 2026-11-19 — The title's question mark explains the customer's side (concept.kyc_identify:
  *     why a firm asks, what it gets, how long it keeps it), not the firm's duty (concept.kyc).
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
@@ -88,7 +93,7 @@ export default function IdentifyTab() {
   const body = () => {
     if (given) {
       return html`
-        <${Section} id="kyc-id" num="01" title=${x('id.doneTitle')} first=${true}>
+        <${Section} id="kyc-id" num="01" title=${x('id.doneHead')} first=${true}>
           <${Note} kind="state" tone="fine">${x('id.done', { organism: given.organism })}<//>
           <${Facts} rows=${[{ k: x('id.given'), v: sharedWords(given.given) }]} />
           <${Note} kind="hint">${x('id.kept')}<//>
@@ -99,7 +104,7 @@ export default function IdentifyTab() {
     if (!view) return html`<${Note} kind="loading">${x('loading')}<//>`;
     const v = view.verification;
     return html`
-      <${Section} id="kyc-id" num="01" title=${x('id.asks', { organism: view.organism.name })} first=${true}>
+      <${Section} id="kyc-id" num="01" title=${x('id.request', { organism: view.organism.name })} first=${true}>
         <${Note} kind="lead">${x('id.lead', { organism: view.organism.name })}<//>
         <${Facts} rows=${[
           { k: x('id.willGet'), v: sharedWords(view.shared) },

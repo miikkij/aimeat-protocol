@@ -15,6 +15,9 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.19.0 -- 2026-11-27 -- "Suggest filing" on a note is an ordinary action. It was the main action
+ *     on every note, so an inbox of three notes showed three main actions beside the page's own
+ *     (Capture). The main action inside an opened plan (run a step, file the enriched note) stays.
  *   v1.18.0 -- 2026-11-08 -- "Run plan automatically" reads each step's gate: the run stops before a
  *     step that asks first (by default every step that goes to an agent), marks it with a note, and
  *     goes on to the following steps once the person presses Run or Skip on it. Run all steps still
@@ -562,7 +565,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
           <${Action} small disabled=${planning} onClick=${() => handleEnrich()}>
             ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
           <//>
-          <${Loud} control disabled=${sorting} onClick=${() => handleSuggest()}>
+          <${Action} small disabled=${sorting} onClick=${() => handleSuggest()}>
             ${sorting ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
           <//>
           <${Action} small disabled=${distributing} onClick=${() => handleDistribute()}>

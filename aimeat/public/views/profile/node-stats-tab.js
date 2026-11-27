@@ -3,12 +3,21 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing real-time node statistics including uptime,
- *   request counts, tunnel metrics, mailbox stats, and security counters. Not drawn with
- *   SettingsPage (it is the Nodes page's second sub-tab, and the nodeStats tab on its own), so it
- *   explains itself through what it draws (.claude/rules/page-guidance.md): the question mark
- *   concept.node_stats after its heading's words, and the page's start (PageStart id "nodeStats")
- *   under the heading.
+ *   request counts, tunnel metrics, message queue stats, and security counters. It is drawn in two
+ *   places: as the Nodes page's second sub-tab (nodes-tab.js), under the Nodes page head, where it
+ *   explains itself through what it draws (.claude/rules/page-guidance.md: the question mark
+ *   concept.node_stats after its heading's words, and the page's start, PageStart id "nodeStats",
+ *   under the heading); and as the page of its own that ?tab=nodeStats opens, where it draws the
+ *   SettingsPage frame (crumb, title with its question mark, desc, strip, start, contents rail).
  * @version-history
+ *   v1.13.0 -- 2026-11-27 -- The page of its own (?tab=nodeStats) drew no page title and no crumb,
+ *     because the view was written as the Nodes page's sub-tab only; it now draws the SettingsPage
+ *     frame, told apart from the sub-tab by the address. Four figures say where the server stands
+ *     (uptime with the time it started as its line, requests, owners, agents); the rest are sections
+ *     with ids: requests and memory (ns-requests), tunnel (ns-tunnel), message queue (ns-mailbox),
+ *     security (ns-security). A section is drawn once it has something to count, a failed delivery
+ *     and an expired message take the notice tone, server errors lead the status list, and a section
+ *     with a figure that needs a look comes first. No figure was added or removed.
  *   v1.12.0 -- 2026-11-09 -- PageStart gets the page's title and concept, for "Explain this page to
  *     me".
  *   v1.11.0 -- 2026-11-08 -- Owners, Agents and P95 Latency open their explanation
@@ -47,6 +56,8 @@ import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
 import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { PageStart } from '/components/PageStart.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { PageSection } from '/components/PageSection.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
@@ -96,64 +107,122 @@ export default function NodeStatsTab() {
     } catch { setError(true); }
   }
 
-  // Under the Nodes page head (Jouni's decision "Nodes page head") this sub-tab keeps its own name
-  // and line as a level-2 sub-heading: main showed them, and the Nodes head names the page, not it.
-  // The page's question mark after the heading's words, as PageHead draws one after a page title,
-  // and the page's start under the heading (this sub-tab has no SettingsPage head of its own).
+  // This view is drawn in two places: as the Nodes page's second sub-tab (nodes-tab.js, under the
+  // Nodes page head) and as the page of its own that ?tab=nodeStats opens (views/profile.js TABS,
+  // a deep link; the menu no longer lists it). Both pass the same props, so the address tells them
+  // apart. The page of its own draws the Settings page frame: the crumb, the page title with its
+  // question mark, the line under it, the figures and the start, so a person knows where they are.
+  // Under the Nodes page head (Jouni's decision "Nodes page head") the sub-tab keeps its own name and
+  // line as a level-2 sub-heading, the question mark after its words, and its start under it.
+  const own = new URLSearchParams(window.location.search).get('tab') === 'nodeStats';
   const title = t('profile.nodeStats.title');
-  const head = html`
+  const subHead = html`
     <${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${title} <${HelpTip} term="concept.node_stats" label=${title} /><//>
     <${PageStart} id="nodeStats" title=${title} concept="concept.node_stats" />`;
-  if (error) return html`${head}<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
-  if (!data) return html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
   const s = data;
-  const section = (title, items) => html`
-    <${Space} above="section"><${SubHeading} level=${3}>${title}<//><//>
-    <${FigureStrip} lead items=${items} />`;
+
+  // The figures under the head say where the server stands: whether it is up and since when, and how
+  // much it is used. The time it started was a line at the foot of the page and is now the uptime's line.
+  const strip = s ? html`<${FigureStrip} wrap items=${[
+    { key: 'uptime', n: fmtUptime(s.uptime_seconds), label: t('profile.nodeStats.uptime'), sub: `${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}` },
+    fig(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
+    helpFig(t('profile.nodeStats.owners'), s.active_owners || 0, 'nodeStats.owners'),
+    helpFig(t('profile.nodeStats.agents'), s.active_agents || 0, 'nodeStats.agents'),
+  ]} />` : !error ? html`<${FigureStrip} loading=${4} />` : null;
+
+  const frame = (sections, body, withStrip) => html`
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.nodeStats')]}
+      title=${title}
+      help="concept.node_stats"
+      desc=${t('profile.nodeStats.desc')}
+      strip=${withStrip ? strip : null}
+      start=${html`<${PageStart} id="nodeStats" />`}
+      railTitle=${sections.length > 1 ? t('profile.landing.railTitle') : undefined}
+      sections=${sections.length > 1 ? sections : undefined}>
+      ${body}
+    <//>`;
+
+  if (error) {
+    const line = html`<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
+    return own ? frame([], line, false) : html`${subHead}${line}`;
+  }
+  if (!s) {
+    const line = html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
+    return own ? frame([], line, true) : line;
+  }
+
+  const n = (x) => Number(x) || 0;
+  const look = (x) => (n(x) > 0 ? 'notice' : undefined);
+  // A status code's rows: server errors first, then refusals, then the rest, each group by its code.
+  const rank = (code) => (code.startsWith('5') ? 0 : code.startsWith('4') ? 1 : 2);
+  const statusRows = Object.entries(s.requests_by_status || {})
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([code, c]) => ({ k: code, state: codeState(code), v: num(c) }));
+  const serverErrors = Object.entries(s.requests_by_status || {}).some(([code, c]) => code.startsWith('5') && n(c) > 0);
+  const tunnel = s.tunnel;
+  const mailbox = s.mailbox;
+
+  // Each part of the statistics is a section, drawn once it has something to count: a server with no
+  // own server connected has no tunnel figures, and a band of zeros says nothing. A section whose
+  // figure needs a look (a server error, a failed delivery, an expired message) comes first; the
+  // others keep their order. The numbers and the rail follow what is drawn.
+  const parts = [
+    {
+      id: 'ns-requests', label: t('profile.nodeStats.secRequests'), alert: serverErrors,
+      body: html`
+        <${FigureStrip} lead items=${[
+          fig(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
+          fig(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
+        ]} />
+        <${CardGrid} cols="two">
+          <${Card} tone="section" title=${t('profile.nodeStats.requestsByMethod')}>
+            ${s.requests_by_method ? html`<${Facts} rows=${Object.entries(s.requests_by_method).map(([m, c]) => ({ k: m, v: num(c) }))} />` : null}
+          <//>
+          <${Card} tone="section" title=${t('profile.nodeStats.requestsByStatus')}>
+            ${s.requests_by_status ? html`<${Facts} rows=${statusRows} />` : null}
+          <//>
+        <//>`,
+    },
+    tunnel && (n(tunnel.connections_total) + n(tunnel.messages_sent_total) + n(tunnel.messages_received_total) + n(tunnel.delivery_failures_total)) > 0 ? {
+      id: 'ns-tunnel', label: t('profile.nodeStats.tunnelTitle'), alert: n(tunnel.delivery_failures_total) > 0,
+      body: html`<${FigureStrip} lead items=${[
+        { ...fig(t('profile.nodeStats.deliveryFails'), tunnel.delivery_failures_total), tone: look(tunnel.delivery_failures_total) },
+        fig(t('profile.nodeStats.tunnelActive'), tunnel.connections_active),
+        fig(t('profile.nodeStats.tunnelTotal'), tunnel.connections_total),
+        fig(t('profile.nodeStats.msgSent'), num(tunnel.messages_sent_total || 0)),
+        fig(t('profile.nodeStats.msgReceived'), num(tunnel.messages_received_total || 0)),
+        fig(t('profile.nodeStats.latencyAvg'), (tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
+        helpFig(t('profile.nodeStats.latencyP95'), (tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms', 'nodeStats.latencyP95'),
+      ]} />`,
+    } : null,
+    mailbox && (n(mailbox.items_total) + n(mailbox.delivered_total) + n(mailbox.expired_total)) > 0 ? {
+      id: 'ns-mailbox', label: t('profile.nodeStats.mailboxTitle'), alert: n(mailbox.expired_total) > 0,
+      body: html`<${FigureStrip} lead items=${[
+        { ...fig(t('profile.nodeStats.mailboxExpired'), mailbox.expired_total), tone: look(mailbox.expired_total) },
+        fig(t('profile.nodeStats.mailboxItems'), mailbox.items_total),
+        fig(t('profile.nodeStats.mailboxBytes'), fmtBytes(mailbox.bytes_total)),
+        fig(t('profile.nodeStats.mailboxDelivered'), num(mailbox.delivered_total || 0)),
+      ]} />`,
+    } : null,
+    (n(s.auth_failures_total) + n(s.rate_limit_hits_total) + n(s.scope_denials_total)) > 0 ? {
+      id: 'ns-security', label: t('profile.nodeStats.securityTitle'), alert: false,
+      body: html`<${FigureStrip} lead items=${[
+        fig(t('profile.nodeStats.authFailures'), s.auth_failures_total || 0),
+        fig(t('profile.nodeStats.rateLimitHits'), s.rate_limit_hits_total || 0),
+        fig(t('profile.nodeStats.scopeDenials'), s.scope_denials_total || 0),
+      ]} />`,
+    } : null,
+  ].filter(Boolean);
+  const shown = [...parts.filter((p) => p.alert), ...parts.filter((p) => !p.alert)]
+    .map((p, i) => ({ ...p, num: String(i + 1).padStart(2, '0') }));
+  const sections = shown.map((p, i) => html`
+    <${PageSection} key=${p.id} id=${p.id} num=${p.num} first=${i === 0} title=${p.label}>${p.body}<//>`);
+
+  if (own) return frame(shown.map(({ id, label, num: nr }) => ({ id, label, num: nr })), sections, true);
   return html`
-    ${head}
-
-    <${FigureStrip} lead items=${[
-      fig(t('profile.nodeStats.uptime'), fmtUptime(s.uptime_seconds)),
-      fig(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
-      helpFig(t('profile.nodeStats.owners'), s.active_owners || 0, 'nodeStats.owners'),
-      helpFig(t('profile.nodeStats.agents'), s.active_agents || 0, 'nodeStats.agents'),
-      fig(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
-      fig(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
-    ]} />
-
-    <${CardGrid} cols="two">
-      <${Card} tone="section" title=${t('profile.nodeStats.requestsByMethod')}>
-        ${s.requests_by_method ? html`<${Facts} rows=${Object.entries(s.requests_by_method).map(([m, c]) => ({ k: m, v: num(c) }))} />` : null}
-      <//>
-      <${Card} tone="section" title=${t('profile.nodeStats.requestsByStatus')}>
-        ${s.requests_by_status ? html`<${Facts} rows=${Object.entries(s.requests_by_status).map(([code, c]) => ({ k: code, state: codeState(code), v: num(c) }))} />` : null}
-      <//>
-    <//>
-
-    ${s.tunnel ? section(t('profile.nodeStats.tunnelTitle'), [
-      fig(t('profile.nodeStats.tunnelActive'), s.tunnel.connections_active),
-      fig(t('profile.nodeStats.tunnelTotal'), s.tunnel.connections_total),
-      fig(t('profile.nodeStats.msgSent'), num(s.tunnel.messages_sent_total || 0)),
-      fig(t('profile.nodeStats.msgReceived'), num(s.tunnel.messages_received_total || 0)),
-      fig(t('profile.nodeStats.deliveryFails'), s.tunnel.delivery_failures_total),
-      fig(t('profile.nodeStats.latencyAvg'), (s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
-      helpFig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms', 'nodeStats.latencyP95'),
-    ]) : null}
-
-    ${s.mailbox ? section(t('profile.nodeStats.mailboxTitle'), [
-      fig(t('profile.nodeStats.mailboxItems'), s.mailbox.items_total),
-      fig(t('profile.nodeStats.mailboxBytes'), fmtBytes(s.mailbox.bytes_total)),
-      fig(t('profile.nodeStats.mailboxDelivered'), num(s.mailbox.delivered_total || 0)),
-      fig(t('profile.nodeStats.mailboxExpired'), s.mailbox.expired_total),
-    ]) : null}
-
-    ${section(t('profile.nodeStats.securityTitle'), [
-      fig(t('profile.nodeStats.authFailures'), s.auth_failures_total || 0),
-      fig(t('profile.nodeStats.rateLimitHits'), s.rate_limit_hits_total || 0),
-      fig(t('profile.nodeStats.scopeDenials'), s.scope_denials_total || 0),
-    ])}
-
-    <${Space} above="large"><${Note}>${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}<//><//>
+    ${subHead}
+    ${strip}
+    <${Space} above="large">${sections}<//>
   `;
 }

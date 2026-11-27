@@ -12,6 +12,10 @@
  * @structure useSuspicions · secSuspicions · draftOf
  * @usage const su = useSuspicions({ org, role, customers }); ... secSuspicions(su, num)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — A marked case, then a draft, comes first in the officer's list (a stable
+ *     sort), and the page's figure counts them (openCases). "Send to the compliance officers" and
+ *     "Save the draft" are ordinary actions in the control size: the page has one loud action, "Open
+ *     a customer". No field, check or step changed.
  *   v1.1.0 — 2026-11-19 — Browser check: the case names its customer (the names the customers list
  *     read; the id only when the name is not known), and the cases, the transactions, the narrative
  *     and the decision each stand under a rule heading (SubHeading rule) with air above.
@@ -22,7 +26,7 @@ import { useState, useCallback, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { Section } from '/components/Section.js';
 import { List, Row, Name, Who, Cell, When, Doors } from '/components/List.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Actions } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
@@ -140,6 +144,14 @@ export function useSuspicions({ org, role, active }) {
 
 const status = (s) => html`<${Mark} kind="status" tone=${tone('report', s)}>${word('report', s)}<//>`;
 
+/** The cases an officer still decides: marked, or a draft not yet sent or closed. */
+const OPEN_CASE = { marked: 0, draft: 1 };
+/** How many cases wait for the officer's decision; 0 for a caller who does not read the list. */
+export const openCases = (su) => (su.officer && su.list ? su.list.filter((r) => r.status in OPEN_CASE).length : 0);
+/** The cases in the order the officer works them: marked, then draft, then the decided; stable. */
+const byAttention = (list) => list.map((r, i) => [r, i])
+  .sort(([a, i], [b, j]) => ((OPEN_CASE[a.status] ?? 2) - (OPEN_CASE[b.status] ?? 2)) || i - j).map(([r]) => r);
+
 /** The mark form: open to everyone with a role. */
 function markForm(su, customers) {
   const m = su.mark;
@@ -151,7 +163,7 @@ function markForm(su, customers) {
         options=${(customers || []).map((c) => [c.id, c.name])} onChange=${(v) => su.setMark({ customerId: v })} />
       <${TextArea} label=${x('sus.observation')} hint=${x('sus.observationHint')} rows=${4} value=${m.observation} onInput=${(v) => su.setMark({ observation: v })} />
       <${FormActions}>
-        <${Loud} control disabled=${!ready || su.busy === 'mark'} onClick=${su.sendMark}>${su.busy === 'mark' ? x('saving') : x('sus.markSave')}<//>
+        <${Action} control disabled=${!ready || su.busy === 'mark'} onClick=${su.sendMark}>${su.busy === 'mark' ? x('saving') : x('sus.markSave')}<//>
         ${su.markMsg ? html`<${Note} kind="message" error=${!!su.markMsg.error}>${su.markMsg.text}<//>` : null}
       <//>
     <//>`;
@@ -202,7 +214,7 @@ function draftPanel(su, names) {
       <${TextArea} label=${x('sus.narrative')} hint=${x('sus.narrativeHint')} rows=${8} grow value=${d.narrative} readOnly=${locked} onInput=${(v) => su.setDraft({ narrative: v })} />
       ${locked ? null : html`
         <${FormActions}>
-          <${Loud} control disabled=${!!b} onClick=${su.saveDraft}>${b === 'save' ? x('saving') : x('sus.save')}<//>
+          <${Action} control disabled=${!!b} onClick=${su.saveDraft}>${b === 'save' ? x('saving') : x('sus.save')}<//>
           <${Action} small disabled=${!!b} onClick=${su.assist}>${b === 'assist' ? x('sus.assisting') : x('sus.assist')}<//>
         <//>
         <${Note} kind="hint">${x('sus.assistHint')}<//>
@@ -225,7 +237,7 @@ function officerList(su, names) {
     ${su.err ? html`<${Note} kind="quiet">${su.err}<//>` : html`
       <${List} cols="when-name-who-state-doors" keepCols loading=${su.list === null ? x('loading') : false}
         head=${[x('col.when'), x('sus.observation'), x('col.by'), x('col.status'), '']} empty=${x('sus.empty')}>
-        ${(su.list || []).map((r) => html`
+        ${byAttention(su.list || []).map((r) => html`
           <${Row} key=${r.id} selected=${su.openId === r.id} faded=${r.status === 'not-reported'} rail=${r.status === 'marked' ? 'warn' : undefined}>
             <${When}>${dateWord(r.markedAt)}<//>
             <${Name} clip onOpen=${() => su.open(r.id)} meta=${r.reportType || undefined}>${r.observation}<//>

@@ -8,6 +8,7 @@
  *   Nodes sub-tab the page's start (PageStart id "nodes") opens the register form as its action and
  *   folds once a server is registered. The Node stats sub-tab draws its own start and question mark.
  * @version-history
+ *   v1.25.0 -- 2026-11-27 -- On the Nodes sub-tab a figure strip under the head says where the server stands: its connection as a word (fine when connected, warn when not) with when it last connected, and the messages its queue keeps (notice while it has no connection), from the status the list already reads (NodesList hands its list up with onNodes). Not drawn while no server is registered (FigureStrip hideZeros), so an empty page is the list's one line, which now says what fills it and the one way to fill it. The server list's section has the id pn-servers. While the register form is open, Add server is drawn quiet (Loud quiet) and the form's Register is the one loud action. No control was removed.
  *   v1.24.0 -- 2026-11-08 -- The settings a label does not explain get their question mark: the
  *     register form's Server ID (nodes.serverId) and Agent identifiers (nodes.agentIds), and the
  *     Facts rows Tunnel URL (nodes.tunnelUrl) and Mailbox (nodes.mailbox), whose names open the help.
@@ -67,6 +68,7 @@ import { timeAgo } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { Section } from '/components/Section.js';
 import { Tabs, Tab, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
@@ -98,7 +100,7 @@ const factName = (term, words) => html`<${HelpLabel} term=${term} label=${words}
  * sub-tabs — Node stats left the sidebar menu (2026-06-10 sidebar reorg). */
 /* The register form's open state and the server count live in the page wrapper (NodesTab), because
  * the page's start opens the same form and folds once a server is registered. */
-function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm, onCount }) {
+function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm, onCount, onNodes }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
@@ -131,6 +133,7 @@ function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm,
       nodesLoad.ok();
       onStats?.({ nodes: list.length });
       onCount?.(list.length);
+      onNodes?.(list);
     } catch (err) {
       // Neither an empty list nor "0 servers" to the header: a failed load is drawn as one, and the
       // header keeps the figure it had.
@@ -171,8 +174,9 @@ function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm,
   };
 
   return html`
-    <${Section} band title=${t('profile.nodes.title')} first>
-    <${Space} below="large"><${Loud} onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//><//>
+    <${Section} band id="pn-servers" title=${t('profile.nodes.title')} first>
+    ${/* While the register form is open, its Register is the loud action and this one is quiet. */''}
+    <${Space} below="large"><${Loud} quiet=${showNodeForm} onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//><//>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
     ${!nodes ? (nodesLoad.failed ? html`<${LoadFailed} text=${t('profile.nodes.error')} onRetry=${loadData} />` : html`<${LoadingLine} text=${t('profile.nodes.loading')} />`)
       : html`<${List} cols="name-desc-doors" empty=${t('profile.nodes.empty')}>${nodes.map((node, idx) => {
@@ -261,6 +265,26 @@ function NodeForm({ onRegister, onCancel }) {
     <//>`;
 }
 
+/**
+ * Where the person's own server stands, from the status the list already read (GET
+ * /v1/personal/status holds one server per owner, so the list has at most one): its connection as a
+ * word, fine when connected and warn otherwise, with when it last connected; and the messages its
+ * queue keeps for it, in the notice tone while it has no connection. Nothing is drawn before the
+ * list has loaded or while no server is registered (hideZeros: the state is '·' and the queue 0).
+ */
+function serverStrip(nodes) {
+  if (nodes === null) return null;
+  const node = nodes[0];
+  const status = node?.status || 'offline';
+  const queued = node?.mailbox?.items || 0;
+  const away = !!node && status !== 'online' && status !== 'detached';
+  return html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'state', n: node ? (t('profile.nodes.' + status) || status) : '·', tone: !node ? undefined : status === 'online' ? 'word fine' : away ? 'word warn' : 'word',
+      label: t('profile.nodes.stripServer'), sub: node?.last_seen ? `${t('profile.nodes.lastSeen')}: ${timeAgo(node.last_seen)}` : undefined },
+    { key: 'queue', n: queued, tone: queued && away ? 'notice' : undefined, label: t('profile.nodes.stripQueue'), sub: node ? t('profile.nodes.stripQueueSub') : undefined },
+  ]} />`;
+}
+
 /* ── Page wrapper: the Settings head (the crumb, the page's name, the line that says what it is for),
    then the Nodes | Node stats sub-tabs (Node stats merged here from the menu) ── */
 export default function NodesTab(props) {
@@ -268,6 +292,8 @@ export default function NodesTab(props) {
   const [showNodeForm, setShowNodeForm] = useState(false);
   // null until the list has loaded (the start stays folded until the page knows), then the count.
   const [count, setCount] = useState(null);
+  // The servers as the list last read them (null until then), for the figure strip.
+  const [nodes, setNodes] = useState(null);
   // The start belongs to the Nodes sub-tab; the Node stats sub-tab draws its own under its heading.
   const start = sub === 'nodes'
     ? html`<${PageStart} id="nodes" done=${count === null ? null : count > 0} action=${{ onClick: () => setShowNodeForm(true) }} />`
@@ -278,11 +304,12 @@ export default function NodesTab(props) {
       title=${t('profile.tabs.nodes')}
       help="concept.own_server"
       desc=${t('profile.nodes.desc')}
+      strip=${sub === 'nodes' ? serverStrip(nodes) : null}
       start=${start}>
       <${Tabs} bar kind="view" value=${sub} onSelect=${setSub}
         items=${[{ value: 'nodes', label: t('profile.tabs.nodes') }, { value: 'stats', label: t('profile.tabs.nodeStats') }]} />
       <${TabPanel} value=${sub}>${sub === 'nodes'
-        ? html`<${NodesList} ...${props} showNodeForm=${showNodeForm} setShowNodeForm=${setShowNodeForm} onCount=${setCount} />`
+        ? html`<${NodesList} ...${props} showNodeForm=${showNodeForm} setShowNodeForm=${setShowNodeForm} onCount=${setCount} onNodes=${setNodes} />`
         : html`<${NodeStatsTab} ...${props} />`}<//>
     <//>
   `;

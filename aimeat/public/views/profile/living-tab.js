@@ -12,6 +12,7 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.27.0 -- 2026-11-27 -- The list view leads with where things stand: a figure strip (living documents, documents that stopped updating in the notice tone, templates) from the overview it already reads, not drawn while all three are zero (FigureStrip hideZeros). The deployed documents are section 01 (lv-docs) once one exists, a stopped document first in it with its reason on the row; the templates are 01 or 02 (lv-templates), their list before the Author with AI field, and the contents rail is drawn when both sections are. One loud action at a time: Open on a document; Deploy on a template while no document exists; Author with AI while the page holds nothing (Loud quiet otherwise). The empty templates line says what fills the page and the one way to fill it. The emoji before Author with AI and before a pending proposal's title are gone (no emoji in the interface). No control was removed.
  *   v1.26.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: an open
  *     document's cadence (living.cadence, on its word) and a template section's slot id (living.slotId,
  *     beside the field, which has no label of its own) (.claude/rules/page-guidance.md).
@@ -83,6 +84,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { Action, Actions, Loud, Icon } from '/components/Action.js';
@@ -112,6 +114,10 @@ const phaseTone = (phase) => {
   if (/fail|error|cancel|reject/.test(p)) return 'danger';
   return 'attention';
 };
+
+/** A document that stopped updating (the pulse retired it) waits for its owner, so it comes first. */
+const stopped = (inst) => inst.config?.status?.health === 'retired';
+const stoppedFirst = (list) => list.map((x, i) => [x, i]).sort(([a, i], [b, j]) => (Number(stopped(b)) - Number(stopped(a))) || i - j).map(([x]) => x);
 
 export default function LivingTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -486,7 +492,7 @@ export default function LivingTab({ session, showToast }) {
                 <${Box} tone="waiting" doors=${html`
                   <${Action} small disabled=${deciding === sec.slot} onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
                   <${Action} small tone="danger" disabled=${deciding === sec.slot} onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>`}>
-                  <${Note} kind="meta">⏳ ${t('profile.living.pendingTitle')}<//>
+                  <${Note} kind="meta">${t('profile.living.pendingTitle')}<//>
                   <${Box} tone="copy" scroll document><${Markdown} text=${opened.pending[sec.slot].markdown} /><//>
                 <//>`}
               <${TextField} placeholder=${t('profile.living.addSourcePh')} value=${draft(src)} onInput=${v => setDraft(src, v)}
@@ -513,63 +519,106 @@ export default function LivingTab({ session, showToast }) {
   const start = opened ? null : html`<${PageStart} id="living"
     done=${templates === null || instances === null ? null : (templates.length + instances.length) > 0}
     action=${{ onClick: newTemplate }} />`;
+
+  // Where things stand, from the overview the page already read: the deployed documents (and how
+  // many are paused), the ones the pulse stopped (they wait for their owner, so the notice tone),
+  // and the templates. With nothing on the page the strip is not drawn (hideZeros). An opened
+  // document has the page to itself, so the strip is not drawn over it either.
+  const loaded = templates !== null && instances !== null;
+  const docs = stoppedFirst(instances || []);
+  const tpls = templates || [];
+  const stoppedN = docs.filter(stopped).length;
+  const pausedN = docs.filter(i => i.config?.status?.paused).length;
+  const strip = opened ? null : !loaded ? html`<${FigureStrip} loading=${3} />` : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'docs', n: docs.length, label: t('profile.living.stripDocs'), sub: pausedN ? t('profile.living.stripDocsSub', { n: pausedN }) : undefined },
+    { key: 'stopped', n: stoppedN, tone: stoppedN ? 'notice' : undefined, label: t('profile.living.stripStopped'), sub: stoppedN ? t('profile.living.stripStoppedSub') : undefined },
+    { key: 'templates', n: tpls.length, label: t('profile.living.stripTemplates') },
+  ]} />`;
+
+  // What is drawn in the list view: the deployed documents once one exists (what a person comes back
+  // for: open, approve, pause), then the templates, which are always drawn because making one is the
+  // way to begin. Numbered after filtering, so a hidden section leaves no gap; the rail only for two.
+  const listView = !opened && !editing && !deploying;
+  const shown = [
+    docs.length ? { id: 'lv-docs', label: t('profile.living.instancesTitle'), count: docs.length } : null,
+    { id: 'lv-templates', label: t('profile.living.templatesTitle'), count: templates === null ? undefined : tpls.length },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map(s => [s.id, s.num]));
+  const railed = listView && shown.length > 1;
+
+  // One loud action at a time: Open on a document while one exists; Deploy on a template while no
+  // document exists yet; Author with AI while the page holds nothing. The others are drawn quiet
+  // (Loud quiet: the same button, as the action link).
+  const deployQuiet = docs.length > 0;
+  const authorQuiet = docs.length + tpls.length > 0;
+
+  const docsSection = () => html`
+    <${Section} band id="lv-docs" num=${numOf['lv-docs']} first title=${t('profile.living.instancesTitle')} count=${docs.length}>
+      <${Note} kind="lead">${t('profile.living.instancesDesc')}<//>
+      <${List} cols="name-desc-who-doors" apart empty=${t('profile.living.noInstances')}>
+        ${docs.map(inst => html`
+          <${Row} key=${inst.loc.docId}>
+            <${Name}>${inst.config.title}<//>
+            <${Desc}>
+              v${inst.config.status?.version || 1} ·
+              ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
+              ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
+              ${inst.config.status?.paused && html` · <${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
+              ${stopped(inst) && html` · <${Mark} kind="status" tone="danger">${t('profile.living.retired')}${inst.config.status?.retired_reason ? `: ${inst.config.status.retired_reason}` : ''}<//>`}
+            <//>
+            <${Who}><${Mark}>${orgName(inst.loc.orgId)}<//><//>
+            <${Doors}>
+              <${Action} small row onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}<//>
+            <//>
+          <//>`)}
+      <//>
+    <//>`;
+
+  // The templates: the list first (what the person has), then the field that makes a new one. The
+  // lead about Deploy is said once a template exists; with nothing yet, the empty line is the one
+  // line the page says.
+  const templatesSection = () => html`
+    <${Section} band id="lv-templates" num=${numOf['lv-templates']} first=${!docs.length} title=${t('profile.living.templatesTitle')}
+      count=${templates === null ? undefined : tpls.length}>
+      ${tpls.length > 0 && html`<${Note} kind="lead">${t('profile.living.templatesDesc')}<//>`}
+      <${List} cols="name-desc-doors" apart loading=${templates === null ? t('profile.living.loading') : false}
+        empty=${t('profile.living.noTemplates')}>
+        ${tpls.map(tpl => html`
+          <${Row} key=${tpl.id}>
+            <${Name}>${tpl.title || t('profile.living.untitled')}<//>
+            <${Desc}>
+              ${tpl.description && html`<div>${tpl.description}</div>`}
+              <div>${(tpl.template || []).length} ${t('profile.living.sectionsShort')}</div>
+            <//>
+            <${Doors}>
+              <${Loud} control quiet=${deployQuiet} onClick=${() => startDeploy(tpl)}>${t('profile.living.deploy')}<//>
+              <${Action} small row onClick=${() => setEditing({ ...tpl })}>${t('profile.living.edit')}<//>
+              <${Action} small row tone="danger" onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}<//>
+            <//>
+          <//>`)}
+      <//>
+      <${Stack} above="medium" below="medium">
+        <${TextArea} rows=${2} placeholder=${t('profile.living.authorPh')} value=${need} onInput=${v => setNeed(v)} />
+        <${Line}>
+          <${Loud} control quiet=${authorQuiet} disabled=${!need.trim() || authoring} onClick=${handleAuthor}>
+            ${authoring ? t('profile.living.authoring') : t('profile.living.authorBtn')}
+          <//>
+        <//>
+      <//>
+      <${Actions}><${Action} small onClick=${newTemplate}>＋ ${t('profile.living.newTemplate')}<//><//>
+    <//>`;
+
   return html`
     <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.living')]}
-      title=${t('profile.living.title')} help="concept.living_document" desc=${t('profile.living.desc')} start=${start} after=${ConfirmUI}>
+      title=${t('profile.living.title')} help="concept.living_document" desc=${t('profile.living.desc')} strip=${strip} start=${start} after=${ConfirmUI}
+      railTitle=${railed ? t('profile.landing.railTitle') : undefined} sections=${railed ? shown : undefined}>
     ${opened ? renderOpened() : html`
       ${deploying && renderDeploy()}
       ${editing && renderEditor()}
 
-      ${!editing && !deploying && html`
-        <${Section} band title=${t('profile.living.templatesTitle')}>
-          <${Note} kind="lead">${t('profile.living.templatesDesc')}<//>
-          <${Stack} above="medium" below="medium">
-            <${TextArea} rows=${2} placeholder=${t('profile.living.authorPh')} value=${need} onInput=${v => setNeed(v)} />
-            <${Line}>
-              <${Loud} control disabled=${!need.trim() || authoring} onClick=${handleAuthor}>
-                ${authoring ? t('profile.living.authoring') : `✨ ${t('profile.living.authorBtn')}`}
-              <//>
-            <//>
-          <//>
-          <${Actions}><${Action} small onClick=${newTemplate}>＋ ${t('profile.living.newTemplate')}<//><//>
-          <${List} cols="name-desc-doors" apart loading=${templates === null ? t('profile.living.loading') : false}
-            empty=${t('profile.living.noTemplates')}>
-            ${(templates || []).map(tpl => html`
-              <${Row} key=${tpl.id}>
-                <${Name}>${tpl.title || t('profile.living.untitled')}<//>
-                <${Desc}>
-                  ${tpl.description && html`<div>${tpl.description}</div>`}
-                  <div>${(tpl.template || []).length} ${t('profile.living.sectionsShort')}</div>
-                <//>
-                <${Doors}>
-                  <${Loud} control onClick=${() => startDeploy(tpl)}>${t('profile.living.deploy')}<//>
-                  <${Action} small row onClick=${() => setEditing({ ...tpl })}>${t('profile.living.edit')}<//>
-                  <${Action} small row tone="danger" onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}<//>
-                <//>
-              <//>`)}
-          <//>
-        <//>
-
-        <${Section} band title=${t('profile.living.instancesTitle')}>
-          <${Note} kind="lead">${t('profile.living.instancesDesc')}<//>
-          <${List} cols="name-desc-who-doors" apart loading=${instances === null ? t('profile.living.loading') : false}
-            empty=${t('profile.living.noInstances')}>
-            ${(instances || []).map(inst => html`
-              <${Row} key=${inst.loc.docId}>
-                <${Name}>${inst.config.title}<//>
-                <${Desc}>
-                  v${inst.config.status?.version || 1} ·
-                  ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
-                  ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
-                  ${inst.config.status?.paused && html` · <${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
-                <//>
-                <${Who}><${Mark}>${orgName(inst.loc.orgId)}<//><//>
-                <${Doors}>
-                  <${Loud} control onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}<//>
-                <//>
-              <//>`)}
-          <//>
-        <//>
+      ${listView && html`
+        ${numOf['lv-docs'] && docsSection()}
+        ${templatesSection()}
       `}
     `}
     <//>

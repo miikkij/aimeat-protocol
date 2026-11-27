@@ -9,6 +9,10 @@
  * @structure useSettings · secSettings · formOf
  * @usage const st = useSettings({ org, role }); ... secSettings(st, num)
  * @version-history
+ *   v1.2.0 — 2026-11-27 — The section is a row (Section fold) that says in one line how many compliance
+ *     officers, staff and high-risk countries the settings name, and opens in place; it opens by
+ *     itself while no compliance officer is named and the reader may name one. "Save" is an ordinary
+ *     action in the control size: the page has one loud action. No field, limit or check changed.
  *   v1.1.0 — 2026-11-19 — Browser check: the heading's small figure is a count, as in the page's other
  *     sections (the persons named as officers or staff), not the section's number.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
@@ -22,7 +26,7 @@ import { Facts } from '/components/Facts.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { TagInput } from '/components/TagInput.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action } from '/components/Action.js';
 import { x, word, errWords, timeWord, kycApi } from './frame.js';
 
 const html = htm.bind(h);
@@ -50,6 +54,8 @@ export function useSettings({ org, role }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  // The row's state: null until the person opens or shuts it, then their choice.
+  const [shown, setShown] = useState(null);
 
   const load = useCallback(async () => {
     if (!org || !reader) { setSettings(null); return; }
@@ -58,9 +64,13 @@ export function useSettings({ org, role }) {
       setSettings(r.settings); setErr('');
     } catch (e) { setErr(errWords(e)); }
   }, [org, reader]);
-  useEffect(() => { setSettings(null); setFormState(null); load(); }, [load]);
+  useEffect(() => { setSettings(null); setFormState(null); setShown(null); load(); }, [load]);
 
-  const edit = () => { setFormState(formOf(settings)); setMsg(null); };
+  // Open by itself while no compliance officer is named and the reader may name one: that needs them.
+  const open = shown ?? (!!settings && editor && !(settings.officers || []).length);
+  const toggle = () => setShown(!open);
+  // Editing keeps the row open, so the saved message stays in sight after the officers are named.
+  const edit = () => { setFormState(formOf(settings)); setMsg(null); setShown(true); };
   const setForm = (patch) => { setFormState((f) => ({ ...f, ...patch })); setMsg(null); };
   const months = (v, max) => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n >= 1 && n <= max ? n : null; };
   const valid = form ? months(form.low, 60) !== null && months(form.medium, 60) !== null && months(form.high, 12) !== null : false;
@@ -75,7 +85,7 @@ export function useSettings({ org, role }) {
     } catch (e) { setMsg({ text: errWords(e), error: true }); }
     setBusy(false);
   };
-  return { org, role, editor, reader, settings, err, load, form, edit, setForm, cancel: () => setFormState(null), valid, save, busy, msg };
+  return { org, role, editor, reader, settings, err, load, open, toggle, form, edit, setForm, cancel: () => setFormState(null), valid, save, busy, msg };
 }
 
 /** The country codes typed: two letters each, in capitals, each once. */
@@ -112,7 +122,7 @@ function editView(st) {
         min=${1} max=${l === 'high' ? 12 : 60} value=${f[l]} onInput=${(v) => st.setForm({ [l]: v })} />`)}
     <//>
     <${FormActions}>
-      <${Loud} control disabled=${!st.valid || st.busy} onClick=${st.save}>${st.busy ? x('saving') : x('set.save')}<//>
+      <${Action} control disabled=${!st.valid || st.busy} onClick=${st.save}>${st.busy ? x('saving') : x('set.save')}<//>
       <${Action} small soft onClick=${st.cancel}>${x('cancel')}<//>
     <//>`;
 }
@@ -124,9 +134,12 @@ function editView(st) {
  */
 export function secSettings(st, num) {
   if (!st.reader) return null;
+  // The row's one line: counts only, never a person's name.
+  const s = st.settings;
+  const sub = !s ? (st.err ? '' : '…') : !(s.officers || []).length ? x('set.foldNoOfficer')
+    : x('set.foldState', { officers: s.officers.length, staff: (s.staff || []).length, countries: (s.highRiskCountries || []).length });
   return html`
-    <${Section} id="kyc-settings" num=${num} title=${x('secSettings')}
-      count=${st.settings ? String(new Set([...(st.settings.officers || []), ...(st.settings.staff || [])]).size) : ''}>
+    <${Section} fold wrap id="kyc-settings" num=${num} title=${x('secSettings')} sub=${sub} open=${st.open} onToggle=${st.toggle}>
       <${Note} kind="lead">${x('set.lead')}<//>
       ${st.err ? html`<${Note} kind="quiet">${st.err}<//>`
         : !st.settings ? html`<${Note} kind="loading">${x('loading')}<//>`

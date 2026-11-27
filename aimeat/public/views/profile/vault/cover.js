@@ -3,16 +3,28 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Vault page (design canvas "Holvi"): the head says what the page is for and offers the
- *   two actions, Share a secret and Ask for a secret; the page's start (PageStart) gives the sentence
- *   for one's own AI; the title's question mark is concept.secretShares. 01 waiting for you (Pick up),
- *   02 asked of you (Deposit), 03 made by you (its state, its pickups and who may pick it up; Open
- *   shows its terms and its events, Revoke ends it), 04 your organisms' vaults, 05 this browser's key
- *   for end-to-end shares. Pure render over the ctx bag; every part is a library component and the
- *   file writes no class. How the page explains itself: .claude/rules/page-guidance.md.
+ *   two actions, Share a secret and Ask for a secret; the figure strip says what waits for the person
+ *   and what they made; the page's start (PageStart) gives the sentence for one's own AI; the title's
+ *   question mark is concept.secretShares. The sections, numbered in the order they are drawn: waiting
+ *   for you (Pick up) and asked of you (Deposit), each only while it holds something; made by you (its
+ *   state, its pickups and who may pick it up; Open shows its terms and its events, Revoke ends it);
+ *   your organisms' vaults once there is one; this browser's key for end-to-end shares as a fold row
+ *   that says its state. No secret's value is ever drawn here. Pure render over the ctx bag; every
+ *   part is a library component and the file writes no class. How the page explains itself:
+ *   .claude/rules/page-guidance.md.
  * @structure renderVaultView · secForMe · secToFill · secMade · madeRow · sharePanel · secOrganisms ·
  *   secDevice
  * @usage import { renderVaultView } from './vault/cover.js';
  * @version-history
+ *   v1.1.0 — 2026-11-27 — A figure strip under the head (waiting for you and asked of you in the notice
+ *     tone, made by you with how many can still be picked up, the shared places' vaults when there is
+ *     one) from the list the page already reads, replacing the head's three count chips; not drawn
+ *     while every figure is zero (FigureStrip hideZeros). Waiting for you, asked of you and the shared
+ *     places' vaults are drawn only while they hold something, so what needs the person comes first
+ *     and an empty page says one line (the made-by-you empty line); the numbers and the rail follow
+ *     what is drawn, and every section keeps its id. This browser's key is a FoldSection row whose
+ *     detail is its state and whose lead keeps the line that the private key never leaves the
+ *     browser. No control, list or safety line was removed.
  *   v1.0.0 — 2026-11-14 — Initial (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  */
 import { h } from 'preact';
@@ -21,6 +33,8 @@ import { t } from '/js/i18n.js';
 import { date, dateTime, num } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { FigureStrip } from '/components/FigureStrip.js';
 import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Panel } from '/components/List.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -39,34 +53,48 @@ const html = htm.bind(h);
 export function renderVaultView(ctx) {
   const l = ctx.lists;
   const counts = l ? { forMe: l.for_me.length, toFill: l.to_fill.length, made: l.made.length, orgs: l.organisms.length } : null;
-  const marks = counts ? [
-    counts.forMe ? { label: x('chipForMe', { n: num(counts.forMe) }), tone: 'coral' } : null,
-    counts.toFill ? { label: x('chipToFill', { n: num(counts.toFill) }), tone: 'coral' } : null,
-    { label: x('chipMade', { n: num(counts.made) }) },
-  ] : [];
+  // How many of the person's own shares and requests can still be picked up or filled (the rest
+  // ended or were revoked). Counted from the list the page already read; no value is ever shown.
+  const liveMade = l ? l.made.filter((s) => s.status === 'ready' || s.status === 'waiting').length : 0;
   const actions = html`
     <${Loud} onClick=${() => ctx.openShare()}>${x('share')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.openAsk()}>${x('ask')}<//><//>`;
-  const sections = [
-    { id: 'vs-for-me', num: '01', label: x('secForMe'), count: counts ? String(counts.forMe) : '' },
-    { id: 'vs-to-fill', num: '02', label: x('secToFill'), count: counts ? String(counts.toFill) : '' },
-    { id: 'vs-made', num: '03', label: x('secMade'), count: counts ? String(counts.made) : '' },
-    { id: 'vs-organisms', num: '04', label: x('secOrganisms'), count: counts ? String(counts.orgs) : '' },
-    { id: 'vs-device', num: '05', label: x('secDevice'), count: ctx.keys ? String(ctx.keys.length) : '' },
-  ];
+  // Where things stand, under the head: what waits for the person (pick up, deposit) in the notice
+  // tone and first, then what they made, then their shared places' vaults when they hold any. The
+  // head's three chips said the same counts; the strip replaces them. With nothing at all the strip
+  // is not drawn (hideZeros).
+  const strip = !counts ? (ctx.failed ? null : html`<${FigureStrip} loading=${3} />`) : html`<${FigureStrip} wrap hideZeros items=${[
+    { key: 'forMe', n: counts.forMe, tone: counts.forMe ? 'notice' : undefined, label: x('stripForMe'), sub: counts.forMe ? x('stripForMeSub') : undefined },
+    { key: 'toFill', n: counts.toFill, tone: counts.toFill ? 'notice' : undefined, label: x('stripToFill'), sub: counts.toFill ? x('stripToFillSub') : undefined },
+    { key: 'made', n: counts.made, label: x('stripMade'), sub: counts.made ? x('stripMadeSub', { n: num(liveMade) }) : undefined },
+    counts.orgs ? { key: 'orgs', n: counts.orgs, label: x('stripOrganisms') } : null,
+  ]} />`;
+  // What is drawn: what waits for the person and what was asked of them only while it holds
+  // something, and then first; what they made always (with nothing anywhere, its one empty line is
+  // the page's); their shared places' vaults once there is one; this browser's key always, as a row
+  // that says its state. Numbered after filtering, so a hidden section leaves no gap.
+  const shown = [
+    counts?.forMe ? { id: 'vs-for-me', label: x('secForMe'), count: String(counts.forMe) } : null,
+    counts?.toFill ? { id: 'vs-to-fill', label: x('secToFill'), count: String(counts.toFill) } : null,
+    { id: 'vs-made', label: x('secMade'), count: counts ? String(counts.made) : '' },
+    counts?.orgs ? { id: 'vs-organisms', label: x('secOrganisms'), count: String(counts.orgs) } : null,
+    { id: 'vs-device', label: x('secDevice'), count: ctx.keys ? String(ctx.keys.length) : '', open: () => ctx.setDeviceOpen(true) },
+  ].filter(Boolean).map((s, i) => ({ ...s, num: String(i + 1).padStart(2, '0') }));
+  const numOf = Object.fromEntries(shown.map((s) => [s.id, s.num]));
+  const firstId = shown[0].id;
   const start = html`<${PageStart} id="vault" done=${counts ? counts.made > 0 : null}
     action=${{ onClick: () => ctx.openAsk() }} />`;
   return html`
-    <${SettingsPage} name="vs" crumb=${crumb()} title=${t('profile.tabs.vault')} help="concept.secretShares" marks=${marks}
-      desc=${x('lede')} actions=${actions} start=${start}
-      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+    <${SettingsPage} name="vs" crumb=${crumb()} title=${t('profile.tabs.vault')} help="concept.secretShares"
+      desc=${x('lede')} actions=${actions} strip=${strip} start=${start}
+      railTitle=${x('railTitle')} sections=${shown} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />${renderDialogs(ctx)}`}>
       ${ctx.failed ? html`<${Note} kind="quiet">${x('loadFailed')} <${Action} small soft onClick=${() => ctx.reload()}>${x('retry')}<//><//>` : null}
-      ${secForMe(ctx)}
-      ${secToFill(ctx)}
-      ${secMade(ctx)}
-      ${secOrganisms(ctx)}
-      ${secDevice(ctx)}
+      ${numOf['vs-for-me'] ? secForMe(ctx, numOf['vs-for-me'], firstId === 'vs-for-me') : null}
+      ${numOf['vs-to-fill'] ? secToFill(ctx, numOf['vs-to-fill'], firstId === 'vs-to-fill') : null}
+      ${secMade(ctx, numOf['vs-made'], firstId === 'vs-made')}
+      ${numOf['vs-organisms'] ? secOrganisms(ctx, numOf['vs-organisms']) : null}
+      ${secDevice(ctx, numOf['vs-device'])}
     <//>`;
 }
 
@@ -76,10 +104,10 @@ const listBody = (ctx, items, render, opts) => (!ctx.lists
 
 /* ── 01 waiting for you ───────────────────────────────────────────────────────────────────────── */
 
-function secForMe(ctx) {
+function secForMe(ctx, n, first) {
   const items = ctx.lists?.for_me || [];
   return html`
-    <${PageSection} id="vs-for-me" num="01" title=${x('secForMe')} count=${ctx.lists ? num(items.length) : ''} first>
+    <${PageSection} id="vs-for-me" num=${n} title=${x('secForMe')} count=${ctx.lists ? num(items.length) : ''} first=${first}>
       ${listBody(ctx, items, (s) => html`
         <${Row} key=${s.id}>
           <${Name} href=${'/v1/secret-pickup?share=' + encodeURIComponent(s.id)} meta=${`${formatWord(s.format)} · ${protectionWord(s.protection)}`}>${s.name}<//>
@@ -92,10 +120,10 @@ function secForMe(ctx) {
 
 /* ── 02 asked of you ──────────────────────────────────────────────────────────────────────────── */
 
-function secToFill(ctx) {
+function secToFill(ctx, n, first) {
   const items = ctx.lists?.to_fill || [];
   return html`
-    <${PageSection} id="vs-to-fill" num="02" title=${x('secToFill')} count=${ctx.lists ? num(items.length) : ''}>
+    <${PageSection} id="vs-to-fill" num=${n} title=${x('secToFill')} count=${ctx.lists ? num(items.length) : ''} first=${first}>
       ${listBody(ctx, items, (s) => html`
         <${Row} key=${s.id}>
           <${Name} href=${'/v1/secret-deposit?share=' + encodeURIComponent(s.id)} meta=${protectionWord(s.protection)}>${s.name}<//>
@@ -108,10 +136,10 @@ function secToFill(ctx) {
 
 /* ── 03 made by you, 04 your organisms' vaults ────────────────────────────────────────────────── */
 
-function secMade(ctx) {
+function secMade(ctx, n, first) {
   const items = ctx.lists?.made || [];
   return html`
-    <${PageSection} id="vs-made" num="03" title=${x('secMade')} count=${ctx.lists ? num(items.length) : ''}>
+    <${PageSection} id="vs-made" num=${n} title=${x('secMade')} count=${ctx.lists ? num(items.length) : ''} first=${first}>
       ${listBody(ctx, items, (s) => madeRow(ctx, s), {
         cols: 'name-state-who-n-doors', head: [x('col.name'), x('col.state'), x('col.who'), { label: x('col.pickups'), num: true }, ''], empty: x('emptyMade'),
       })}
@@ -119,10 +147,10 @@ function secMade(ctx) {
     <//>`;
 }
 
-function secOrganisms(ctx) {
+function secOrganisms(ctx, n) {
   const items = ctx.lists?.organisms || [];
   return html`
-    <${PageSection} id="vs-organisms" num="04" title=${x('secOrganisms')} count=${ctx.lists ? num(items.length) : ''}>
+    <${PageSection} id="vs-organisms" num=${n} title=${x('secOrganisms')} count=${ctx.lists ? num(items.length) : ''}>
       ${listBody(ctx, items, (s) => madeRow(ctx, s), {
         cols: 'name-state-who-n-doors', head: [x('col.name'), x('col.state'), x('col.who'), { label: x('col.pickups'), num: true }, ''], empty: x('emptyOrganisms'),
       })}
@@ -187,14 +215,19 @@ function sharePanel(ctx, s) {
 
 /* ── 05 this browser's key ────────────────────────────────────────────────────────────────────── */
 
-function secDevice(ctx) {
+/**
+ * This browser's key is a setting made once, so it is one row that says its state (registered, not
+ * registered, a key this browser holds that is not registered) and opens in place. What the key is
+ * for and that its private part never leaves the browser is the row's lead, read while it is shut.
+ */
+function secDevice(ctx, n) {
   const keys = ctx.keys;
   const local = ctx.localKey;
   const here = local && keys ? keys.find((k) => k.key_id === local.keyId) : null;
   const state = !ctx.cryptoReady ? x('device.noCrypto') : here ? x('device.here', { label: here.label }) : local ? x('device.localOnly') : x('device.none');
   return html`
-    <${PageSection} id="vs-device" num="05" title=${x('secDevice')} count=${keys ? num(keys.length) : ''}>
-      <${Note} kind="lead">${x('device.lead')}<//>
+    <${FoldSection} id="vs-device" num=${n} title=${x('secDevice')} sub=${keys ? state : '…'} wrap lead=${x('device.lead')}
+      open=${ctx.deviceOpen} onToggle=${() => ctx.setDeviceOpen(!ctx.deviceOpen)}>
       <${Facts} rows=${[{
         key: 'here', k: x('device.thisBrowser'), v: state, warn: !here,
         action: !ctx.cryptoReady ? null : here

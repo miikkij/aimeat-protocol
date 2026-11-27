@@ -6,9 +6,12 @@
  *   identity was verified (when, how, the eIDAS level it gives, who issued it), and each firm they
  *   gave it to through an identify link (to whom, when, what), with the note that a firm keeps what it
  *   was given for as long as the law says (GET /v1/kyc/me).
- * @structure useMine · secMine · sharedWords
- * @usage const me = useMine(); ... secMine(me, num)
+ * @structure useMine · mineHas · secMine · sharedWords
+ * @usage const me = useMine(); ... mineHas(me) && secMine(me, num, first)
  * @version-history
+ *   v1.1.0 — 2026-11-27 — mineHas: the page draws the section once there is a verification or a
+ *     disclosure; secMine takes `first` (the page's first section has no rule on top). The lists,
+ *     their order and the note on what a firm keeps are unchanged.
  *   v1.0.1 — 2026-11-19 — Both lists stack on a phone (no keepCols), each cell saying its column.
  *   v1.0.0 — 2026-11-19 — Initial (wish-kyc-aml-aimeatiin-suunnitelma-ja-design).
  */
@@ -47,16 +50,24 @@ export function useMine() {
 }
 
 /**
+ * True when the person has a verification or gave one to a firm, or the read failed: the section has
+ * something to show.
+ * @param {ReturnType<typeof useMine>} m
+ */
+export const mineHas = (m) => !!m.err || (!!m.me && ((m.me.verifications || []).length + (m.me.disclosures || []).length) > 0);
+
+/**
  * The section "Your own verification".
  * @param {ReturnType<typeof useMine>} m
  * @param {string} num
+ * @param {boolean} [first] the page's first section: no rule on top
  */
-export function secMine(m, num) {
+export function secMine(m, num, first = false) {
   const me = m.me;
   const ver = me ? [...me.verifications].reverse() : [];
   const dis = me ? [...me.disclosures].reverse() : [];
   return html`
-    <${Section} id="kyc-mine" num=${num} title=${x('secMine')} count=${me ? String(ver.length) : ''}>
+    <${Section} id="kyc-mine" num=${num} title=${x('secMine')} count=${me ? String(ver.length) : ''} first=${first}>
       ${m.err ? html`<${Note} kind="quiet">${m.err}<//>` : !me ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
         <${Note} kind="lead">${x('mine.verLead')}<//>
         <${List} cols="when-name-who" labels head=${[x('col.when'), x('mine.how'), x('mine.issuer')]} empty=${x('mine.noVer')}>

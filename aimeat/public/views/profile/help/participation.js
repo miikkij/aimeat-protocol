@@ -8,8 +8,12 @@
  *   their AI ask for them. One save, PUT /v1/help/me. The design canvas board "Osallistuminen"
  *   (2026-11-14) is the model.
  * @structure Participation · TopicPicker
- * @usage html`<${Participation} me=${me} onSaved=${reload} showToast=${showToast} />` (views/profile/help-tab.js)
+ *   It is one row until it is opened (FoldSection through Section `fold`): the row says the saved
+ *   choice (`sub`), and the page gives its number after its own filter.
+ * @usage html`<${Participation} me=${me} num="04" sub=${words} open=${o} onToggle=${toggle} onSaved=${reload} showToast=${showToast} />` (views/profile/help-tab.js)
  * @version-history
+ *   v1.1.0 -- 2026-11-27 -- A folded section (Section `fold`) that says the saved choice on its row; the
+ *     number, the row's words and the open state come from the page. The form inside is unchanged.
  *   v1.0.0 — 2026-11-14 — Initial (wish-pyyd-apua-nodessa-yhteinen-avunpyynt-v-yl-ihmisille-ja-heid-).
  */
 import { h } from 'preact';
@@ -53,8 +57,8 @@ function TopicPicker({ topics, suggested, onChange }) {
     <//>`;
 }
 
-/** @param {{ me: any, onSaved: () => void, showToast?: (m: string) => void }} props */
-export function Participation({ me, onSaved, showToast }) {
+/** @param {{ me: any, num?: string, sub?: string, open?: boolean, onToggle?: () => void, onSaved: () => void, showToast?: (m: string) => void }} props */
+export function Participation({ me, num, sub, open, onToggle, onSaved, showToast }) {
   const p = me.participant;
   const [form, setForm] = useState(p);
   const [busy, setBusy] = useState(false);
@@ -79,7 +83,7 @@ export function Participation({ me, onSaved, showToast }) {
   };
 
   return html`
-    <${Section} id="hp-me" num="04" title=${x('secMe')}>
+    <${Section} fold id="hp-me" num=${num} title=${x('secMe')} sub=${sub} open=${open} onToggle=${onToggle}>
       <${Stack} gap="section">
         <${Note} kind="lead">${x('meLead')}<//>
 

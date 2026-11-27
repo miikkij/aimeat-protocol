@@ -8,9 +8,12 @@
  *   GET /v1/dataproducts; a package a product builds is one row, a package published without a product
  *   is a row of its own, and a product that has not run yet stands under All only.
  *   Made of the component kit: it passes data and never a class.
- * @structure S · secFilters · secProducts · secPeople · secReaders
- * @usage ${secProducts({ ctx, shared, products, filter, orgNames })}
+ * @structure S · rowsOf · secFilters · secProducts · secPeople · secReaders
+ * @usage ${secProducts({ ctx, shared, products, filter, orgNames, num, empty })}
  * @version-history
+ *   v1.1.0 — 2026-11-27 — The sections take their number from the page (a section that is not drawn
+ *     leaves no gap); a product that is late or out of date comes first in the list (stable); the
+ *     list's empty line can be the page's one empty line; rowsOf is exported for the page's figures.
  *   v1.0.0 — 2026-11-02 — Initial (WP11).
  */
 import { h } from 'preact';
@@ -46,13 +49,19 @@ export function secFilters({ counts, filter, setFilter }) {
     items=${FILTERS.map((f) => ({ value: f, label: S('filter.' + f), count: counts[f] ?? 0 }))} />`;
 }
 
-/** One row per product and per package that no product builds, the newest first. */
-function rowsOf(shared, products) {
+/** True when the row's package is late or out of date: it needs the person. */
+export const rowNeedsLook = (r) => ['late', 'stale'].includes(r.pkg?.freshness?.state);
+
+/**
+ * One row per product and per package that no product builds, in the server's order, with a row
+ * that is late or out of date first (a stable sort, so the order holds within each group).
+ */
+export function rowsOf(shared, products) {
   const pkgs = shared.packages || [];
   const byName = new Map(pkgs.map((p) => [p.name, p]));
   const rows = (products || []).map((p) => ({ name: p.name, product: p, pkg: byName.get(p.name) || null }));
   for (const p of pkgs) if (!rows.some((r) => r.name === p.name)) rows.push({ name: p.name, product: null, pkg: p });
-  return rows;
+  return rows.map((r, i) => [r, i]).sort(([a, i], [b, j]) => (Number(rowNeedsLook(b)) - Number(rowNeedsLook(a))) || i - j).map(([r]) => r);
 }
 
 /** Who may read it, in words, and the line under: where it is read, or who it is shared with. */
@@ -65,13 +74,13 @@ function whoOf(pkg, product, orgNames) {
   return names.length ? { who: names.join(', '), sub: S('who.namedSub') } : { who: S('who.private'), sub: undefined };
 }
 
-export function secProducts({ ctx, shared, products, filter, orgNames }) {
+export function secProducts({ ctx, shared, products, filter, orgNames, num = '01', empty }) {
   const all = rowsOf(shared, products);
   const list = filter === 'all' ? all : all.filter((r) => (r.pkg?.filters || []).includes(filter));
   const doors = html`<${Loud} onClick=${() => ctx.pickView({ kind: 'wizard' })}>${S('make')}<//>`;
-  return html`<${Section} id="sd-products" num="01" title=${d('list.title')} count=${list.length} doors=${doors}>
+  return html`<${Section} id="sd-products" num=${num} title=${d('list.title')} count=${list.length} doors=${doors}>
     <${List} cols="name-who-when-doors" head=${[S('col.product'), S('col.who'), S('col.reads'), '']}
-      empty=${filter === 'all' ? d('list.empty') : S('emptyFilter')} rows=${list} render=${(r) => {
+      empty=${filter === 'all' ? (empty || d('list.empty')) : S('emptyFilter')} rows=${list} render=${(r) => {
         const p = r.pkg;
         const words = wordsOf({ title: r.product?.title || p?.title || r.name, description: p?.description, i18n: p?.i18n });
         const licence = p?.license ? licenceOf({ aimeat: { license: p.license } }) : null;
@@ -101,8 +110,8 @@ export function secProducts({ ctx, shared, products, filter, orgNames }) {
   <//>`;
 }
 
-export function secPeople({ people, busy, onEnd }) {
-  return html`<${Section} id="sd-people" num="02" title=${S('people.title')} count=${people.length} sub=${S('people.sub')}>
+export function secPeople({ people, busy, onEnd, num = '02' }) {
+  return html`<${Section} id="sd-people" num=${num} title=${S('people.title')} count=${people.length} sub=${S('people.sub')}>
     <${List} cols="name-who-when-doors" head=${[S('people.colWho'), S('people.colWhat'), S('people.colUntil'), '']}
       empty=${S('people.empty')} rows=${people} render=${(s) => html`<${Row} key=${s.id}>
         <${Name} meta=${d('party.keyOf.' + (['program', 'person', 'dataspace', 'visitor'].includes(s.party_kind) ? s.party_kind : 'program'))}>${s.party_name}<//>
@@ -119,8 +128,8 @@ export function secPeople({ people, busy, onEnd }) {
 /** The endpoint kinds a reader read through, in words (the read log's `what`). */
 const viaWords = (via) => [...new Set((via || []).map((k) => S('via.' + (['odata', 'file', 'rows', 'descriptor', 'versions', 'odps'].includes(k) ? k : 'other'))))].join(', ');
 
-export function secReaders({ readers }) {
-  return html`<${Section} id="sd-readers" num="03" title=${S('readers.title')} count=${readers.length} sub=${S('readers.sub')}>
+export function secReaders({ readers, num = '03' }) {
+  return html`<${Section} id="sd-readers" num=${num} title=${S('readers.title')} count=${readers.length} sub=${S('readers.sub')}>
     <${List} cols="name-who-when-doors" head=${[S('readers.colWho'), S('readers.colWhat'), S('readers.colLast'), '']}
       empty=${S('readers.empty')} rows=${readers} render=${(r, i) => html`<${Row} key=${`${r.who}|${r.package}|${i}`}>
         <${Name} meta=${viaWords(r.via) || undefined}>${r.who}<//>
