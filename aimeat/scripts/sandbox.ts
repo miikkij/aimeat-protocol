@@ -52,9 +52,10 @@
  *   AIMEAT_SANDBOX_DB_URL=postgresql://u:p@localhost:5432/aimeat_sandbox_x pnpm sandbox
  *                                          # the same node on PostgreSQL, with its own state file
  *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
- *   AIMEAT_SANDBOX_NAME=round1-list pnpm sandbox  # a second sandbox with its own state, port and data
+ *   cd aimeat && pnpm sandbox --name r1-list  # a second sandbox with its own state, port and data;
+ *                                          # --stop, --reset, --status and --print take --name too
  * @version-history
- *   v1.12.0 — 2026-11-27 — AIMEAT_SANDBOX_NAME: a named sandbox beside the worktree's own, with
+ *   v1.12.0 — 2026-11-27 — `--name <name>`: a named sandbox beside the worktree's own, with
  *     `.sandbox-<name>.json`, `.sandbox-<name>.log` and `data/sandbox-<name>.db`. The Atelier build
  *     bench gives each measured build its own node, so one build does not start from another's apps.
  *   v1.11.2 — 2026-11-25 — Header only: a token lasts a day (it said an hour), and `pnpm ready`, not
@@ -134,11 +135,11 @@ const PG_URL = process.env.AIMEAT_SANDBOX_DB_URL ?? '';
  * The Atelier build bench (scripts/cold-agent/bench.ts) gives every measured build one of these,
  * so a build never reads the apps another build left behind.
  */
-const NAME = process.env.AIMEAT_SANDBOX_NAME ?? '';
-if (NAME && (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(NAME) || NAME === 'pg' || NAME === 'machines')) {
-    throw new Error(`AIMEAT_SANDBOX_NAME "${NAME}": lowercase letters, digits and dashes, at most 40, and not "pg" or "machines" (those files exist).`);
+const NAME = process.argv.includes('--name') ? process.argv[process.argv.indexOf('--name') + 1] ?? '' : '';
+if (process.argv.includes('--name') && (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(NAME) || NAME === 'pg' || NAME === 'machines')) {
+    throw new Error(`--name "${NAME}": lowercase letters, digits and dashes, at most 40, and not "pg" or "machines" (those files exist).`);
 }
-if (NAME && PG_URL) throw new Error('AIMEAT_SANDBOX_NAME and AIMEAT_SANDBOX_DB_URL together: a named sandbox runs on SQLite.');
+if (NAME && PG_URL) throw new Error('--name and AIMEAT_SANDBOX_DB_URL together: a named sandbox runs on SQLite.');
 const STATE_FILE = join(AIMEAT, NAME ? `.sandbox-${NAME}.json` : PG_URL ? '.sandbox-pg.json' : '.sandbox.json');
 const LOG_FILE = join(AIMEAT, NAME ? `.sandbox-${NAME}.log` : PG_URL ? '.sandbox-pg.log' : '.sandbox.log');
 /** Extra modules the node is started with (--import), as file URLs. */

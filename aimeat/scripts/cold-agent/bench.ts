@@ -16,7 +16,7 @@
  *   ONE NODE PER BUILD. A builder reads the owner's existing apps first, as the best thing to start
  *   from. On a shared sandbox the second build of a round would start from the first one's app,
  *   and the same brief in the next round from the previous round's. Each build gets a named
- *   sandbox (AIMEAT_SANDBOX_NAME, scripts/sandbox.ts), freshly seeded.
+ *   sandbox (`pnpm sandbox --name`, scripts/sandbox.ts), freshly seeded.
  *
  *   THE ROUND IS COMPARED WITH THE NEXT ONE. Run a round, change the kit or the specification, run
  *   a new round with the same orders in new sessions, and `compare` puts the two side by side.
@@ -35,7 +35,7 @@
  *   cd aimeat && pnpm atelier-bench audit --round r1            # report.md and results.json for the round
  *   cd aimeat && pnpm atelier-bench compare r1 r2               # two rounds side by side
  *   cd aimeat && pnpm atelier-bench stop --round r1             # stop the round's nodes, keep their data
- *   --briefs list,map     only these briefs · --dir <folder>   where rounds are kept (AIMEAT_BENCH_DIR)
+ *   --briefs list,map     only these briefs · --dir <folder>   where rounds are kept (default: aimeat-atelier-bench in the home folder)
  *   --no-playtest         skip the node's own browser run of each app
  * @version-history
  *   v1.0.0 — 2026-11-27 — Initial (wish-atelier-vakiokoe-samat-tilaukset-claude-code-sessioille-j-lj).
@@ -64,7 +64,7 @@ function parseArgs(argv: string[]): Args {
         command: argv[0] ?? '',
         round: get('round') ?? '',
         briefs: get('briefs')?.split(',') ?? null,
-        dir: resolve(get('dir') ?? process.env.AIMEAT_BENCH_DIR ?? join(homedir(), 'aimeat-atelier-bench')),
+        dir: resolve(get('dir') ?? join(homedir(), 'aimeat-atelier-bench')),
         playtest: !argv.includes('--no-playtest'),
         rest: argv.slice(1).filter(a => !a.startsWith('--')),
     };
@@ -80,9 +80,7 @@ function roundName(round: string): string {
 interface SandboxState { port: number; baseUrl: string; owners: { name: string; token: string }[]; agent: { token: string } | null }
 
 function sandbox(name: string, ...flags: string[]): void {
-    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/sandbox.ts', ...flags], {
-        cwd: AIMEAT, encoding: 'utf8', env: { ...process.env, AIMEAT_SANDBOX_NAME: name },
-    });
+    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/sandbox.ts', '--name', name, ...flags], { cwd: AIMEAT, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`the sandbox ${name} did not come up: ${(r.stderr || r.stdout || '').trim().split('\n').slice(-3).join(' ')}`);
 }
 
@@ -90,7 +88,7 @@ function sandbox(name: string, ...flags: string[]): void {
 function sandboxUp(name: string): SandboxState {
     sandbox(name);
     const s = JSON.parse(readFileSync(join(AIMEAT, `.sandbox-${name}.json`), 'utf8')) as SandboxState;
-    if (!s.agent || s.owners.length < 3) throw new Error(`the sandbox ${name} has no agent or fewer than three owners; reset it with AIMEAT_SANDBOX_NAME=${name} pnpm sandbox --reset`);
+    if (!s.agent || s.owners.length < 3) throw new Error(`the sandbox ${name} has no agent or fewer than three owners; reset it with pnpm sandbox --name ${name} --reset`);
     return s;
 }
 
