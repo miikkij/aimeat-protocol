@@ -18,6 +18,7 @@
  *   a pack one this node serves.
  * @structure evalCallerOf · setEvalFor · getEvalFor · removeEvalFor · runEvalFor
  * @version-history
+ *   v1.2.1 — 2026-11-27 — The caller carries its session, which resolveTarget reads a skill as.
  *   v1.2.0 — 2026-11-27 — runEvalFor with run_id finishes an open run; the minted anonymous token is
  *     refused (wish-eval-runs-answered-by-the-caller-s-own-ai-not-by-the-node).
  *   v1.1.0 — 2026-11-26 — removeEvalFor.
@@ -38,7 +39,7 @@ export function evalCallerOf(c: CallerContext): EvalCaller | EvalRefusal {
   if (c.visitor || c.kind === 'app' || c.kind === 'ecosystem' || c.kind === 'anonymous' || isAnonymousPrincipal(c.auth) || !c.ownerGhii) {
     return refuse(403, 'FORBIDDEN', 'Eval sets belong to an account: its owner or one of its agents writes and runs them.');
   }
-  return { principal: c.principal, owner: localAccountName(c.ownerGhii), ownerGhii: c.ownerGhii, scopes: [...(c.scopes ?? [])], roles: [...(c.auth?.roles ?? [])] };
+  return { principal: c.principal, owner: localAccountName(c.ownerGhii), ownerGhii: c.ownerGhii, scopes: [...(c.scopes ?? [])], roles: [...(c.auth?.roles ?? [])], session: c };
 }
 
 function targetOf(kind: string, name: string): EvalTarget | EvalRefusal {

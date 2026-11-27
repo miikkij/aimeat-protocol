@@ -31,6 +31,8 @@
  * @structure packRevision(version, aiDoc) · resolveTarget · gradeAnswer(answer, expect, verdicts) ·
  *   startEvalRun(deps, caller, target, opts) · finishEvalRun(deps, caller, target, body)
  * @version-history
+ *   v2.1.0 — 2026-11-27 — A skill is read as the caller's session, not as the account holder in
+ *     person: an agent gets no SKILL.md its own reading rules hide (secaudit2026nov26).
  *   v2.0.0 — 2026-11-27 — The caller's own AI answers and judges; the node calls no model. A waiting
  *     run is finished with finishEvalRun; a crew with a judge waits for the caller's verdicts.
  *   v1.1.0 — 2026-11-26 — A pack's revision names a hash of its AI text: the served packs have no
@@ -42,6 +44,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { resolveSkillRef } from '../skills.js';
+import type { SkillAccessor } from '../skill/types.js';
+import type { CallerContext } from '../caller-context.js';
+import { readerFor } from '../classification/reader.js';
 import { getLibraryPacks } from '../../data/library-packs.js';
 import { crewTryStart, crewTryWait, resolveCrewAgent, type CrewCaller } from '../crews/ops.js';
 import { readCrewState } from '../crews/def-store.js';
@@ -58,7 +63,8 @@ export function packRevision(version: string | undefined, aiDoc: string): string
 }
 
 export interface EvalDeps { storage: Storage; config: AimeatConfig }
-export interface EvalCaller { principal: string; owner: string; ownerGhii: string; scopes: string[]; roles: string[] }
+/** The account's caller; `session` is the session itself, which a skill is read as (resolveTarget). */
+export interface EvalCaller { principal: string; owner: string; ownerGhii: string; scopes: string[]; roles: string[]; session: CallerContext }
 export type EvalRefusal = { ok: false; status: number; code: string; message: string };
 type Started = { ok: true; status?: number; data: Record<string, unknown> } | EvalRefusal;
 
@@ -74,11 +80,23 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 interface Resolved { revision: string; text?: string; crew?: { name: string; doc: Record<string, unknown> } }
 
+/**
+ * The caller as the skills registry reads it, built as GET /v1/skills/:name builds it (routes/skills.ts
+ * accessorOf): the principal, its reader and its session, so an agent meets its own visibility,
+ * clearance and AI-label rules. Given only the owner name, the registry read the skill as the account
+ * holder in person, and a start handed an agent a SKILL.md those rules hide from it (secaudit2026nov26,
+ * eval-run.ts:resolveTarget:skill-read-as-owner-in-person-for-agent-caller).
+ */
+function skillReaderOf(deps: EvalDeps, caller: EvalCaller): SkillAccessor {
+  const s = caller.session;
+  return { ownerName: caller.owner, sub: s.auth.sub, gaii: caller.principal, reader: readerFor(deps, s.auth), auth: s.auth, caller: s };
+}
+
 /** What the target is now: its revision, and the text or crew a case runs with. Exported for the set's own check. */
 export async function resolveTarget(deps: EvalDeps, caller: EvalCaller, target: EvalTarget): Promise<Resolved | EvalRefusal> {
   if (target.kind === 'skill') {
     try {
-      const skill = await resolveSkillRef(deps.storage, deps.config, target.name, { ownerName: caller.owner });
+      const skill = await resolveSkillRef(deps.storage, deps.config, target.name, skillReaderOf(deps, caller));
       const text = skill.fileContents['SKILL.md'];
       if (!text) return refuse(404, 'NOT_FOUND', `The skill ${target.name} has no SKILL.md to evaluate.`);
       return { revision: skill.version, text };

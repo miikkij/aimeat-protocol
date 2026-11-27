@@ -15,10 +15,13 @@
  *   - a crew's trials run on its own runtime, and the run waits for the caller's verdicts;
  *   - an agent with memory:write runs a set over MCP; one with read access only may not;
  *   - neither the unauthenticated caller nor the token POST /v1/auth/anonymous mints reaches a set;
+ *   - an agent whose clearance hides the skill gets no text from a run, and the owner still does;
  *   - the set is in the owner's data export, and is removed by its owner (REST and MCP), never by an
  *     agent without memory:write or by another owner.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=evals
  * @version-history
+ *   v2.1.0 — 2026-11-27 — A run reads the skill as the agent, not as its owner in person (secaudit2026nov26,
+ *     eval-run.ts:resolveTarget:skill-read-as-owner-in-person-for-agent-caller); red before the fix (201).
  *   v2.0.0 — 2026-11-27 — The caller's own AI answers and judges; the node calls no model
  *     (wish-eval-runs-answered-by-the-caller-s-own-ai-not-by-the-node). The minted anonymous token is
  *     refused (secaudit2026nov26, eval-ops.ts:evalCallerOf:minted-anonymous-token-read-as-agent).
@@ -251,6 +254,31 @@ function resultsFor(start: StartData) {
       assert(!removed.isError && JSON.parse(removed.text).removed === true, `remove over MCP: ${removed.text.slice(0, 300)}`);
       const gone = await callTool(session, 'aimeat_eval_get', { kind: 'pack', name: 'aimeat-data' });
       assert(gone.isError && gone.text.startsWith('NO_EVAL_SET'), `the removed set is gone: ${gone.text.slice(0, 200)}`);
+    });
+
+    // secaudit2026nov26 (eval-run.ts:resolveTarget:skill-read-as-owner-in-person-for-agent-caller): the
+    // skill was read as the account holder in person, so a start handed an agent a SKILL.md its own
+    // reading rules hide from it. The agent now reads the skill as aimeat_skill_get reads it.
+    await test('an agent whose clearance hides the skill gets no text from a run; the owner still does', async () => {
+      const admin = (path: string, value: string) => put('/v1/admin/config', { changes: [{ path, value }] });
+      const on = await admin('classification.mode', 'all');
+      assert(on.status === 200, `classification on: ${on.status} ${JSON.stringify(on.body?.error)}`);
+      try {
+        const label = await put('/v1/classification/label', { kind: 'memory', key: `skills.${SKILL}.manifest`, label: 'luottamuksellinen' });
+        assert(label.status === 200 && label.body.data.applied === true, `label: ${label.status} ${JSON.stringify(label.body?.error ?? label.body?.data)}`);
+        const clr = await connectAgentByDevice(BASE, { owner: alice.name, ownerToken: alice.token, name: 'evalclr', scopes: ['memory:read', 'memory:write'] });
+        const limit = await json('/v1/agents/evalclr/clearance', { method: 'PATCH', headers: auth, body: JSON.stringify({ clearance: 'sisainen' }) });
+        assert(limit.status === 200 && limit.body.data.clearance === 'sisainen', `clearance: ${limit.status} ${JSON.stringify(limit.body?.error ?? limit.body?.data)}`);
+        const h = { Authorization: `Bearer ${clr.token}` };
+        const direct = await json(`/v1/skills/${ref}`, { method: 'GET', headers: h });
+        assert(direct.status !== 200, `the agent's own read of the skill is refused: ${direct.status}`);
+        const run = await json(`/v1/evals/skill/${ref}/run`, { method: 'POST', headers: h, body: '{}' });
+        assert(run.status === 404 && run.body?.error?.code === 'NOT_FOUND' && !JSON.stringify(run.body).includes('Sort however'), `run: ${run.status} ${JSON.stringify(run.body).slice(0, 300)}`);
+        const own = await post(`${at}/run`, {});
+        assert(own.status === 201 && String(own.body.data.text).includes('Sort however'), `the owner's run: ${own.status} ${JSON.stringify(own.body?.error)}`);
+      } finally {
+        await admin('classification.mode', 'off');
+      }
     });
 
     await test('in the whole suite the node asked the owner\'s AI nothing', async () => {
