@@ -39,7 +39,8 @@
  *   connection twice (docs/pitfalls.md section 105). 20000-27999 is handed out by nothing.
  * @structure LANES_PER_SESSION · sessionSlot(basePort) · lanePortFor(basePort, lane) ·
  *   sessionLanePorts(basePort) · suiteOwnPorts(source, lanePort) · acquirePortLocks(ports, owner, opts) ·
- *   releasePortLocks(held) · holdBasePort(port, owner) · basePortHolder(port) · portLockRoot()
+ *   releasePortLocks(held) · portsListenedOn(ports) · holdBasePort(port, owner) · basePortHolder(port) ·
+ *   portLockRoot()
  *   WHY HERE. test/run-e2e-ci.ts uses it, and so does scripts/kill-test-servers.ts, which clears a
  *   session's own lane ports before a run; a script cannot import from test/ without that folder
  *   landing in the build.
@@ -48,6 +49,10 @@
  *   const held = await acquirePortLocks(suiteOwnPorts(src, lanePort), { suite, session });
  *   try { await run(); } finally { releasePortLocks(held); }
  * @version-history
+ *   v1.2.0 — 2026-11-28 — portsListenedOn(ports): which of a suite's own ports something already
+ *     listens on while this run holds their locks, so a program outside the tests is named before the
+ *     suite runs. A print client on 30000 and 30001 had read as a node that never answered, 180 s
+ *     twice per run.
  *   v1.1.1 — 2026-11-15 — The base-port refusal names `--force`: a worktree already has its env
  *     files, and without it test-env-init keeps them and the claimed port is never applied.
  *   v1.1.0 — 2026-10-27 — suiteOwnPorts reads 28000-29999: the suites' fixed ports moved there from
@@ -56,6 +61,7 @@
  *   v1.0.0 — 2026-10-11 — Initial (wish-kaksi-istuntoa-ei-saa-en-samaa-testiporttia).
  */
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -230,6 +236,25 @@ export async function acquirePortLocks(ports: number[], owner: PortLockOwner, op
         }
         await new Promise(r => setTimeout(r, pollMs));
     }
+}
+
+/**
+ * The ports in `ports` that something already listens on. Called while this run holds their locks,
+ * so a hit is never another runner's suite: it is a program outside the tests, or a node a killed
+ * run left behind. Each probe binds the port and closes it at once, before the suite starts.
+ */
+export async function portsListenedOn(ports: number[]): Promise<number[]> {
+    const held: number[] = [];
+    for (const port of ports) {
+        const busy = await new Promise<boolean>((resolve) => {
+            const probe = createServer();
+            probe.once('error', (err: NodeJS.ErrnoException) => resolve(err.code === 'EADDRINUSE' || err.code === 'EACCES'));
+            probe.once('listening', () => probe.close(() => resolve(false)));
+            probe.listen(port);
+        });
+        if (busy) held.push(port);
+    }
+    return held;
 }
 
 /** Give the locks back. Safe to call twice, and with a lock somebody already removed. */

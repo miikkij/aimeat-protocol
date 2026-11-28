@@ -27,6 +27,8 @@
  *     the publish gate on REST and over MCP
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-image-references
  * @version-history
+ *   2026-11-28 — Its own node moves to suitePort block 30100, shared with e2e-mcp-ai-tools: a print
+ *     client held 30000 and 30001, and block 30000 is refused (test/helpers/free-port.ts v2.1.0).
  *   2026-10-27 — Its own node is on suitePort block 30000, out of the range the claims board hands out.
  *   v1.1.0 — 2026-10-21 — 3d: with the gate off (the default) an agent's public picture is public at
  *     once on REST and over MCP. Phase 4, on the same node started again with the publish gate on:
@@ -51,10 +53,10 @@ import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { startFakeAiProvider, imageJson, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
 import { suitePort } from './helpers/free-port.js';
 
-// Its own port, below the lane's E2E port, on an offset no other suite takes.
+// Its own port, below the lane's E2E port, on a suitePort block it shares with e2e-mcp-ai-tools.
 // A suitePort block, not the base port minus 207: that landed in the range the claims board hands out.
 const PORT = process.env.E2E_AI_IMAGE_REFS_PORT
-    ?? String(suitePort(30000, process.env.E2E_BASE ?? `http://localhost:${process.env.AIMEAT_TEST_PORT ?? '40251'}`));
+    ?? String(suitePort(30100,process.env.E2E_BASE ?? `http://localhost:${process.env.AIMEAT_TEST_PORT ?? '40251'}`));
 const BASE = `http://localhost:${PORT}`;
 
 /** A PNG signature and IHDR chunk header: enough for the node's sniffer, and distinct per picture. */

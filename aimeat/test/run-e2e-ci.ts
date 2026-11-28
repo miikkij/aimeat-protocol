@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-28 -- The suitePort blocks start at 30100 (test/helpers/free-port.ts v2.1.0). Comment only.
  *   2026-11-26 -- e2e-stray-agent-faces.ts joins the list (not the guard tier): the copies of an app's agent
  *     face in visitors' memory are one Security page incident, once, on its own node on 28591.
  *   2026-11-26 -- Add e2e-owner-export-job.ts: the data export as a background job of chosen parts.
@@ -2758,7 +2759,7 @@ function listeningPorts(): Set<number> {
         for (const m of out.matchAll(/[:.](\d{4,5})\b/g)) {
             const n = Number(m[1]);
             // 20000-27999 is where a session's own lane ports are computed (scripts/lib/e2e-ports.ts),
-            // 28000-29999 where suites write their own fixed ports, and 30000-32699 the suitePort
+            // 28000-29999 where suites write their own fixed ports, and 30100-32699 the suitePort
             // blocks (test/helpers/free-port.ts). Until 2026-10-27 the fixed ports were 40000-41999.
             if (n >= 20000 && n < 32700) found.add(n);
         }

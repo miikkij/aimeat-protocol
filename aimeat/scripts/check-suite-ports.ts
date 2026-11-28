@@ -22,7 +22,7 @@
  *   but a claim is not a runner, so on 2026-10-27 a session holding 40672 refused e2e-secrets with
  *   EADDRINUSE before its first test, with nothing wrong in the change under test. 28000-29999 is
  *   below the board's floor (it refuses a port under 40251), above the lane ports (20000-27999),
- *   below the suitePort blocks (30000-32699, test/helpers/free-port.ts) and below the ranges the
+ *   below the suitePort blocks (30100-32699, test/helpers/free-port.ts) and below the ranges the
  *   systems hand out by themselves (Linux from 32768, Windows from 49152). Nothing else binds there.
  *
  *   WHY NOT FROM 32768, AND WHY NOT A PORT ASKED OF THE SYSTEM (moved here from docs/pitfalls.md §105
@@ -52,6 +52,7 @@
  *   v2.0.0 — 2026-10-27 — The band moves to 28000-29999 and a fixed port in 40000-41999 is refused:
  *     every suite's ports moved down 12000, out of the range the claims board hands out.
  *   v1.0.0 — 2026-09-09 — Initial, with the nine clashes it found separated onto their own ports.
+ *   2026-11-28 — The suitePort blocks start at 30100 (test/helpers/free-port.ts v2.1.0). No code change.
  *   2026-11-21 — The header carries why a suite's port sits below 32768 and is not asked of the
  *     system (docs/pitfalls.md §105, deleted). No code change.
  */

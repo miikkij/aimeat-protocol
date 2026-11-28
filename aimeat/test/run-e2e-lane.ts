@@ -24,6 +24,8 @@
  * @structure SuiteResult · suiteTimeLimitMs() · NO_RUNNER_NODE_BASE · runLane() · runTest() · endTree()
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.5.0 -- 2026-11-28 -- Before a suite runs, a port of its own that another program listens on is
+ *     named (portsListenedOn), instead of reading 180 s later as a node that never answered.
  *   v1.4.0 -- 2026-11-23 -- LaneOptions.stop (`--stop-on-lost-lane`): a lane that cannot restart its
  *     node stops every lane before its next suite, instead of leaving the others to finish a run that
  *     is red already.
@@ -42,7 +44,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { anonymousModeFor, cleanDatabase, perSuiteCoverageEnv, pinnedEnv, startServer, stopServer, type RunnerTarget } from './run-e2e-server.js';
-import { acquirePortLocks, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
+import { acquirePortLocks, portsListenedOn, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
 import { classify, parseResults } from '../scripts/lib/e2e-results.js';
 import { failedTestLines } from '../scripts/lib/e2e-github-report.js';
 import { discardNodeLogOnClose, nodeLogPath, nodeLogTail } from './helpers/runner-node-log.js';
@@ -224,6 +226,12 @@ export async function runLane(lane: number, targets: RunnerTarget | RunnerTarget
             const held = await acquirePortLocks(ownPorts, { suite: name, session: opts.session }, {
                 onWait: (port, holder) => console.log(`${tag}${name} waits for port ${port}, which ${holder ? `${holder.session} holds for ${holder.suite}` : 'another run holds'}.`),
             });
+            // This run holds those ports' locks, so a listener on one is a program outside the tests or
+            // a node a killed run left behind; the suite would wait for a node that cannot bind.
+            for (const port of await portsListenedOn(held.ports)) {
+                console.log(`${tag}${name}: port ${port} is this suite's own, and another program listens on it, not a test run. `
+                    + `Its node cannot start there; find the program with \`netstat -ano | findstr :${port}\` (Windows) or \`lsof -i :${port}\`.`);
+            }
             const t0 = Date.now();
             let output: string, exitCode: number, timedOut: boolean;
             const baseUrl = !external && !needsNode(name) ? NO_RUNNER_NODE_BASE : undefined;

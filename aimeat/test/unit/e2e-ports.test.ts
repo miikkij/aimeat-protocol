@@ -9,6 +9,8 @@
  *   group here is that case as arithmetic, and the last group is the wait that replaces a collision.
  * @usage pnpm exec vitest run test/unit/e2e-ports.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-28 — portsListenedOn names a suite's own port another program holds; the
+ *     suitePort sample block is 30100, where the blocks now start.
  *   v1.1.0 — 2026-10-27 — A suite's own ports are read from 28000-29999, where they moved out of the
  *     range the claims board hands out.
  *   v1.0.0 — 2026-10-11 — Initial.
@@ -17,9 +19,10 @@ import { describe, expect, it, afterAll } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer, type AddressInfo } from 'node:net';
 import {
     LANES_PER_SESSION, lanePortFor, sessionLanePorts, sessionSlot, suiteOwnPorts,
-    acquirePortLocks, releasePortLocks, holdBasePort, basePortHolder,
+    acquirePortLocks, releasePortLocks, holdBasePort, basePortHolder, portsListenedOn,
 } from '../../scripts/lib/e2e-ports.js';
 
 const root = mkdtempSync(join(tmpdir(), 'aimeat-port-locks-'));
@@ -80,8 +83,8 @@ describe('the ports a suite binds for itself, read from its source', () => {
         for (const base of [40251, 40356, 40499, 40750]) {
             for (const p of sessionLanePorts(base)) expect(p < 28000 || p > 29999, `lane port ${p}`).toBe(true);
         }
-        const blocks = suiteOwnPorts('suitePort(30000, BASE); suitePort(32600, BASE);', 40399);
-        for (const p of blocks) expect(p).toBeGreaterThanOrEqual(30000);
+        const blocks = suiteOwnPorts('suitePort(30100, BASE); suitePort(32600, BASE);', 40399);
+        for (const p of blocks) expect(p).toBeGreaterThanOrEqual(30100);
     });
 
     it('resolves suitePort(block, …) for the lane the suite runs in', () => {
@@ -92,6 +95,18 @@ describe('the ports a suite binds for itself, read from its source', () => {
 
     it('a suite that binds nothing has nothing to lock', () => {
         expect(suiteOwnPorts(`const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';`, 40356)).toEqual([]);
+    });
+});
+
+describe('a suite\'s own port that another program holds', () => {
+    it('is named while something listens on it, and not once it is closed', async () => {
+        // Another program on the port, as a print client held 30000 and 30001 on 2026-11-28.
+        const other = createServer();
+        await new Promise<void>(resolve => other.listen(0, resolve));
+        const port = (other.address() as AddressInfo).port;
+        expect(await portsListenedOn([port])).toEqual([port]);
+        await new Promise<void>(resolve => other.close(() => resolve()));
+        expect(await portsListenedOn([port])).toEqual([]);
     });
 });
 

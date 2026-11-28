@@ -12,25 +12,32 @@
  *   could not bind and the suite talked to the stub (`{"ok":true}` to everything). Nothing hands out
  *   a port below 32768 by itself, so a number there stays free until the suite that owns it binds.
  *
- *   THE BLOCKS. 30000 e2e-ai-image-references, 30100 e2e-mcp-ai-tools, 30200
+ *   WHY NOT 30000. A round number is what other software takes as its default: a print client on a
+ *   developer's machine listens on 30000 and 30001, so lanes 0 and 1 of every run on that machine
+ *   could not start a node on block 30000 (2026-11-27 and 28, e2e-ai-image-references). The blocks
+ *   start at 30100. Two suites may share a block: a lane runs one suite at a time, and another
+ *   session that reaches the same suite waits for the port's lock (scripts/lib/e2e-ports.ts).
+ *
+ *   THE BLOCKS. 30100 e2e-mcp-ai-tools and e2e-ai-image-references, 30200
  *   e2e-mcp-mail-connection-tools, 31000 e2e-capabilities, 31100 e2e-capability-webhook-update, 31200
- *   and 31300 e2e-federation-packages (nodes A and B); the rest are named where they are called. A new
- *   suite takes the next free hundred below 32700. A port that need not vary by lane is a fixed one in
+ *   and 31300 e2e-federation-packages (nodes A and B); the rest are named where they are called. A
+ *   new suite takes a hundred from 30100 to 32600. A port that need not vary by lane is a fixed one in
  *   28000-29999 instead (scripts/check-suite-ports.ts).
  * @usage const port = suitePort(31000, BASE);
  * @version-history
+ *   v2.1.0 — 2026-11-28 — Block 30000 is refused: a program outside the tests held 30000 and 30001.
  *   v2.0.0 — 2026-10-08 — suitePort(block, base) replaces freePort(): a fixed port below the range
  *     the system hands out, because the probe-then-boot window lost to another suite's listen(0).
  *   v1.0.0 — 2026-10-02 — Initial, from e2e-peer-registration-proof.ts's own copy.
  */
 
 /**
- * `block` (a multiple of 100 from 30000 to 32600) plus the last two digits of the lane's port, read
+ * `block` (a multiple of 100 from 30100 to 32600) plus the last two digits of the lane's port, read
  * from the suite's base URL.
  */
 export function suitePort(block: number, base: string): number {
-    if (!Number.isInteger(block) || block % 100 !== 0 || block < 30000 || block > 32600) {
-        throw new Error(`suitePort: block must be a multiple of 100 from 30000 to 32600, got ${block}`);
+    if (!Number.isInteger(block) || block % 100 !== 0 || block < 30100 || block > 32600) {
+        throw new Error(`suitePort: block must be a multiple of 100 from 30100 to 32600, got ${block}`);
     }
     return block + (Number(new URL(base).port || '80') % 100);
 }
