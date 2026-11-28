@@ -229,7 +229,7 @@
         "aimeat/src/routes/themes.ts",
         "aimeat/src/routes/ui-components.ts"
       ],
-      "digest": "sha256:547beed8f79bf1d02c8c0324"
+      "digest": "sha256:e0706d2a4cd198fbaf9203d7"
     },
     "12. Messages, contacts and email": {
       "reviewedOn": "2026-11-26",
@@ -957,7 +957,7 @@
       "aimeat/src/services/dependency-map.ts": "376c0e1e7ccf2e18"
     },
     "11. Served libraries and the Design Book": {
-      "aimeat/src/data/library-packs/cortex.ts": "c3249dd149ece481",
+      "aimeat/src/data/library-packs/cortex.ts": "d632582a0d8a1776",
       "aimeat/src/data/library-packs/sdk-ai.ts": "4889ff3f13bd1a1a",
       "aimeat/src/data/library-packs/sdk-calendar-print.ts": "7ce80495af762d55",
       "aimeat/src/data/library-packs/sdk-datapackage.ts": "7a3d4cea84ada9e1",

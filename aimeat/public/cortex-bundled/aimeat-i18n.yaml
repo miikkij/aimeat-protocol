@@ -11,6 +11,9 @@ metadata:
   visibility: public
 
 spec:
+  # 1.4.2 — Comments only: JSDoc on t, setLocale, getLocale, locales, available, LanguageSwitcher
+  # and fmt's number, date, time and dateTime, which the node serves as the library reference
+  # (build specification sections lib-i18n and lib-fmt). No change in behaviour.
   # 1.4.1 — fmt.useProfile() reads the profile with the app's own aimeat-auth session; the cookie
   # fetch it used answered 401 on every app origin, so the person's settings never arrived. A
   # timeZone the caller names is kept (a UTC-pinned calendar day no longer moves in the person's
@@ -22,7 +25,7 @@ spec:
   # The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder skips one whose stored
   # version matches the bundled manifest, so shipping new library code without moving this line
   # leaves every existing node serving the old file forever.
-  version: "1.4.1"
+  version: "1.4.2"
   license: MIT
   components:
     - type: prompt

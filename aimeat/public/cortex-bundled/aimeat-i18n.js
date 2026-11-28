@@ -26,8 +26,9 @@
  *   AIMEAT.fmt.{use,useProfile,region,timezone,number,date,time,dateTime,relative,money,morsels,
  *               resolvedTimeZone,zoneLabel}
  * @version-history
- *   2026-11-28 — Comments only: t, setLocale, getLocale, locales, available, LanguageSwitcher and
- *     fmt's number, date, time and dateTime have JSDoc. No change in behaviour, so the version stays.
+ *   v1.4.2 — 2026-11-28 — Comments only: t, setLocale, getLocale, locales, available,
+ *     LanguageSwitcher and fmt's number, date, time and dateTime have JSDoc. No change in behaviour;
+ *     the version moves because the file did (test/unit/cortex-bundle-versions.test.ts).
  *   v1.4.1 — 2026-11-05 — fmt.useProfile() reads the profile with the app's own aimeat-auth session
  *     (the cookie fetch answered 401 on every app origin); a timeZone the caller names is kept, so a
  *     UTC-pinned calendar day no longer moves in the person's zone. Codebase analysis 2026-11-03,

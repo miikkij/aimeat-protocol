@@ -31,6 +31,8 @@
  *     only once it becomes a drag, so a real mouse click reaches a button inside the host.
  *   v1.5.2 — 2026-11-25 — aimeat-input 1.2.0: on() and pad() capture a press on a control inside the
  *     element only once it moves, so a real mouse click reaches the control.
+ *   v1.5.3 — 2026-11-28 — aimeat-i18n 1.4.2: JSDoc on its public functions (comments only), which the
+ *     node serves as the library reference.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -536,7 +538,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js"></script>'],
     requires: [],
-    version: '1.4.1',
+    version: '1.4.2',
     license: 'MIT',
     apiSurface: 'AIMEAT.i18n',
     aiDoc: 'AIMEAT.i18n — init(dictionaries), t(key), setLocale/getLocale, locales(), available(), LanguageSwitcher component, apply() over [data-i18n] elements.',
