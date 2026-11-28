@@ -211,14 +211,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-27",
+      "reviewedOn": "2026-11-28",
       "watches": [
         "aimeat/src/services/builder/atelier-prompt.ts",
         "aimeat/src/services/builder/atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:2cc16a54b829af1295e7db48"
+      "digest": "sha256:4a23c1bc17e041297ac7d16f"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -542,7 +542,7 @@
       "digest": "sha256:b5d81d0a5efaeb4ea4bbf922"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-11-27",
+      "reviewedOn": "2026-11-28",
       "watches": [
         "aimeat/src/services/builder/app-layers.ts",
         "aimeat/src/routes/app-templates.ts",
@@ -554,7 +554,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:5777c574d107d46d9dfc2d55",
+      "digest": "sha256:969bcce7289cba0b9c737095",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -729,7 +729,7 @@
       "aimeat/src/services/app/spec-gate.ts": "95bb1883f65b8ebb"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/builder/atelier-prompt.ts": "ef55612fb42370bf",
+      "aimeat/src/services/builder/atelier-prompt.ts": "b2bdc99b827d758e",
       "aimeat/src/services/builder/atelier-layers.ts": "dc5d544bd516761a",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "68c0e5a7e6d5edc9",
       "aimeat/src/services/design-book/component.ts": "12d4355f129e437f"
@@ -842,7 +842,7 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/builder/app-layers.ts": "4b582ff5f8ffa323",
       "aimeat/src/routes/app-templates.ts": "0a8ffcc61866cb38",
-      "aimeat/src/services/builder/atelier-prompt.ts": "ef55612fb42370bf",
+      "aimeat/src/services/builder/atelier-prompt.ts": "b2bdc99b827d758e",
       "aimeat/src/services/builder/app-prompt.ts": "3070b9001df78f02",
       "aimeat/src/services/app/publish.ts": "d60e8864bf0adbe6",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",

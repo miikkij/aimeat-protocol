@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.52.1 — 2026-11-28 — "Data, in short" names the platform sections `lib-auth`, `lib-data`,
+ *     `lib-i18n` and `lib-fmt`: in the first measured round after they shipped, two of five builders
+ *     found them and the other three still searched the libraries' source.
  *   v1.52.0 — 2026-11-27 — The interview: one line for an order that already carries its answers
  *     and says to decide (no questions, no drawn layouts, the plan written once). The genre fork:
  *     one sentence that the fork is made on the node (aimeat_app_draft_seed with `template`) and
@@ -793,7 +796,10 @@ function composeBody(config: AimeatConfig): string {
     + 'platform: the shell gives you the session in `onReady`; private data is '
     + '`AIMEAT.data.set/get` with a `<app-name>.`-prefixed key; one key holds one record a user '
     + 'opens as a unit, never one key per field; read back after writing. Declare the scopes the '
-    + 'app uses in `<meta name="aimeat-scopes">`.\n\n';
+    + 'app uses in `<meta name="aimeat-scopes">`. EVERY FUNCTION OF THE TWO, with the login button\'s '
+    + 'options and the fields of the session (`displayName`, `owner`), is the platform section '
+    + '`lib-auth` and `lib-data` (`aimeat_handbook_get { tier: "build-app-atelier/lib-auth" }`; '
+    + '`lib-i18n` and `lib-fmt` for words and formats): read those, never the libraries\' source.\n\n';
   body += ATELIER_DATA_MAP_STEER + ATELIER_INTRODUCTION_SECTION;
   body += ATELIER_AI_PATH_SECTION;
 
