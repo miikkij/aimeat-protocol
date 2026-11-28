@@ -18,6 +18,8 @@
  * @structure Strip · Waiting · ReviewBox · NewAgreement · Detail · AgreementsSection (default)
  * @usage html`<${AgreementsSection} num="11" onMessage=${(kind, text) => …} />`
  * @version-history
+ *   2026-11-28 — The prompt copy reads common.copyForAi ("Copy the prompt for your AI"), the one name
+ *     of a prompt copy on every page; it read agreements.op.copyForAi ("Copy for your AI").
  *   2026-10-29 — A version signed only in test offers "Make a new version" (secaudit2026oct26 round 8c).
  *   2026-10-27 — The decision on a returned copy names the copy shown (uploadedAt), secaudit2026oct26.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
@@ -44,6 +46,7 @@ import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { useConfirm } from '/components/Modal.js';
 import { A, StatusMark, Steps, Annexes, Obligations, newestOf, inForceOf, dateOf } from '../profile/agreements/parts.js';
+import { t } from '/js/i18n.js';
 
 const html = htm.bind(h);
 
@@ -237,7 +240,7 @@ export default function AgreementsSection({ num, onMessage }) {
   return html`
     <${Section} id="adm-cmp-agreements" num=${num} title=${A('op.title')} doors=${html`
       <${Action} small onClick=${() => setCreating(true)}>${A('new.open')}<//>
-      <${Action} small soft copy=${forAi} copiedLabel=${A('op.copied')}>${A('op.copyForAi')}<//>`}>
+      <${Action} small soft copy=${forAi} copiedLabel=${A('op.copied')}>${t('common.copyForAi')}<//>`}>
       <${Stack} gap="section">
       <${Note} kind="lead">${A('op.lead')}<//>
       ${list ? html`<${Strip} list=${list} gaps=${gaps} />` : html`<${FigureStrip} lead stacked loading=${4} />`}

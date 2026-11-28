@@ -7161,7 +7161,6 @@
       "deletionDone": "Merkitse tiedot poistetuiksi",
       "deletionRecorded": "Poisto kirjattiin.",
       "empty": "Sopimuksia ei vielä ole. Tee ensimmäinen, tai pyydä tekoälyäsi tekemään se.",
-      "copyForAi": "Kopioi tekoälylle",
       "copied": "Kopioitu. Liitä se omaan tekoälykeskusteluusi.",
       "aiPrompt": "Käytä aimeat_compliance_agreement-työkalua. Tee asiakkaalleni käsittelysopimus: action \"create\" ensin dry_run-tilassa, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Näytä minulle missing_measures ja kysy ne minulta, kirjoita ne action \"update\" -toiminnolla, ja lähetä sopimus action \"send\" -toiminnolla, kun sanon kyllä.",
       "next": {

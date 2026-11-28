@@ -6886,7 +6886,7 @@
       "newVersion": "Make a new version", "versionMade": "A new version was drafted.", "inForceFrom": "In force from", "notYet": "not yet",
       "end": "End the agreement", "endTitle": "End the agreement?", "endConfirm": "The agreement with {who} ends now, and their data must be deleted within {days} days.",
       "ended": "The agreement ended.", "deletionDone": "Mark the data deleted", "deletionRecorded": "The deletion was recorded.",
-      "empty": "No agreements yet. Make the first one, or ask your AI to.", "copyForAi": "Copy for your AI", "copied": "Copied. Paste it into your own AI chat.",
+      "empty": "No agreements yet. Make the first one, or ask your AI to.", "copied": "Copied. Paste it into your own AI chat.",
       "aiPrompt": "Use aimeat_compliance_agreement. Make a data processing agreement for my customer: action \"create\" with dry_run first, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Show me the missing_measures and ask me for them, write them with action \"update\", and send it with action \"send\" when I say yes.",
       "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty", "test-signed": "Signed in test only: make a new version" }
     },
