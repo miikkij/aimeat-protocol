@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-28 — criteria_set sends `still_hold`.
  *   2026-11-27 — member_plan_set sends `sale`.
  *   2026-11-26 — scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
  *   2026-11-26 — freshness reaches GET /v1/apps/:owner/:filename/freshness.
@@ -82,6 +83,7 @@ const VALUE: Record<string, unknown> = {
     manage_roles: ['zqxmgr'], sale: { zqxrole: { amount: 4900000, currency: 'EUR', renews: true, stripePrices: ['price_zqx'] } }, year: '2026', keep: '12345', dev_level: 'publisher',
     markdown: '# zqxspec', confirm: true, expected_revision: 4, words: ['zqxword'],
     criteria: [{ id: 'zqxline', text: 'zqxtext', check: 'person', status: 'open' }],
+    still_hold: ['zqxheld'],
     scenarios: [{ id: 'zqxscene', name: 'zqxname', steps: [{ do: 'wait', ms: 10 }] }],
     purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',
     proposals: { layout: [{ id: 'zqxproposal', name: 'n', note: 'n', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] },

@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-28 — criteria_set takes `still_hold` in place of `criteria`: evidenced lines checked
+ *     again after an update, by their ids.
  *   2026-11-27 — member_plan_set takes `sale`: the roles the owner sells, their price and renewal, and
  *     the owner's own Stripe Price ids (commerce/membership-sale.ts).
  *   2026-11-27 — scenarios_set and audit name the picture a scenario run answers per run at the
@@ -208,6 +210,11 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     confirm: { type: 'boolean', description: 'For spec_set, in place of markdown: true says the design spec that is there still describes the app, and marks it current for the app\'s version without sending the text again. Use it after a publish that changed nothing the spec says.' },
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. When nothing in it changed, send confirm: true instead of the text. For face_set: the whole agent face as one markdown document, at most 256 KB; it replaces the face there.' },
     words: { type: 'array', description: 'For scope_allowance_remove: the scopes to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+    still_hold: {
+        type: 'array',
+        description: 'For criteria_set, in place of criteria: the ids of evidenced criteria you checked again at the app\'s version now, e.g. ["phone-layout", "empty-state"]. Each keeps its evidence and is marked checked at this version. Every id must name an evidenced line.',
+        zod: z.array(z.string().max(40)).min(1).max(50),
+    },
     criteria: {
         type: 'array',
         description: 'For criteria_set: the WHOLE list of acceptance criteria, at most 50; it replaces what is there. Each line: { id (short, lowercase, e.g. "empty-state"), text (one behaviour, one sentence), check ("lint", "scenario", "screenshot", "eval" or "person"), status ("open", "evidenced" or "waived"), evidence (with evidenced: what proved it), waived_reason (with waived: why the app ships without it) }.',
@@ -333,8 +340,8 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'write the app\'s playtest scenarios, the whole list (read it first with spec, where it is design_spec.scenarios): steps the node\'s own browser runs on the published app, signed in as a throwaway member it makes and erases, at four sizes (390x844, 1280x900, 1280x460, 1920x1080) and both themes. Each scenario names the acceptance criteria it proves. audit { playtest: true } runs them and answers pass or fail per size and theme and the step that failed; a scenario that passes everywhere marks the criteria it names as evidenced, so no criteria_set is owed for them. Each run of a size and theme is on an account of its own that holds nothing. A short run is answered in the same call; a longer one goes on on the node for up to eight minutes and the answer says running: ask for the same audit again at once, which waits up to 45 seconds for the run and answers it when it has ended. Each run at 390x844 and 1280x900 also answers a picture address: the screen after its last step, or at the step that failed, to fetch with no sign-in and look at. Use it before any browser of your own, and in place of installing one. The spec and the criteria a scenario names must exist first' },
     freshness: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'what beside the app has fallen behind it, in one answer: the design spec (written against an older version), the acceptance criteria (open, or evidenced at an older version), the data map (missing), and each bound skill whose calls the app\'s tools now refuse. Each item behind says what to do. Read it before you change an app and after you publish one. The owner and everybody who may build the app' },
-    criteria_set: { fields: F(['filename', 'criteria'], ['owner', 'expected_revision']), scope: 'app:write',
-        summary: 'write the app\'s acceptance criteria, the whole list (read it first with spec, where it is design_spec.criteria): what "correct" means for the app, one line each, with how it is proven (check: lint, scenario, screenshot, eval or person) and where it stands (status: open, evidenced with evidence that says what proved it, or waived with waived_reason). Write the lines with the person before you build; the empty, error and loading states, the phone width and both themes are where builds fall short. At the finest level an update is refused while a line is open. Everybody who may build the app writes it; only the owner waives a line. The spec must exist first' },
+    criteria_set: { fields: F(['filename'], ['criteria', 'still_hold', 'owner', 'expected_revision']), scope: 'app:write',
+        summary: 'write the app\'s acceptance criteria, the whole list (read it first with spec, where it is design_spec.criteria): what "correct" means for the app, one line each, with how it is proven (check: lint, scenario, screenshot, eval or person) and where it stands (status: open, evidenced with evidence that says what proved it, or waived with waived_reason). Write the lines with the person before you build; the empty, error and loading states, the phone width and both themes are where builds fall short. At the finest level an update is refused while a line is open. Everybody who may build the app writes it; only the owner waives a line. The spec must exist first. After an update, the lines evidenced at an earlier version that you checked again are confirmed with still_hold: [ids] in place of criteria: their evidence is kept and they are marked checked at the app\'s version now (writing the same list again does not do that)' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
     // The permissions the app kept when the node moved to 4.0 (services/app/scope-allowance.ts).

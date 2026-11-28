@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.10.1 — 2026-11-28 — criteria_set passes `still_hold` to writeCriteriaFor.
  *   v1.10.0 — 2026-11-27 — member_plan_set passes `sale`, the roles the owner sells (commerce/membership-sale.ts).
  *   v1.9.0 — 2026-11-26 — scenarios_set calls writeScenariosFor (services/app/design-spec-ops.ts).
  *   v1.8.0 — 2026-11-26 — freshness calls appFreshnessFor (services/app/freshness.ts).
@@ -138,7 +139,7 @@ export async function appManageMemberAction(
     case 'spec_clear':
       return opAnswer(await clearDesignSpecFor(storage, config, caller, ref));
     case 'criteria_set':
-      return opAnswer(await writeCriteriaFor(storage, config, caller, ref, pick(args, ['criteria', 'expected_revision'])));
+      return opAnswer(await writeCriteriaFor(storage, config, caller, ref, pick(args, ['criteria', 'still_hold', 'expected_revision'])));
     case 'scenarios_set':
       return opAnswer(await writeScenariosFor(storage, config, caller, ref, pick(args, ['scenarios', 'expected_revision'])));
     case 'freshness':

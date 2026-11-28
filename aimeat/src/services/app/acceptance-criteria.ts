@@ -26,8 +26,11 @@
  *   item `criteria`, services/app/owed-gate.ts). At `proto` and `plain` the publish answer only
  *   counts them. The gate reads the lines; it does not judge the evidence, which stays readable to
  *   the owner in the spec.
- * @structure AppCriterion · checkCriteria(input, live) · criteriaCounts(list) · openCriteriaIds(spec)
+ * @structure AppCriterion · checkCriteria(input, live) · confirmCriteria(ids, live) ·
+ *   criteriaCounts(list) · openCriteriaIds(spec)
  * @version-history
+ *   v1.1.0 — 2026-11-28 — confirmCriteria: evidenced lines a builder checked again are stamped at
+ *     the app's version now, by their ids, without the list being written again.
  *   v1.0.0 — 2026-11-26 — Initial (wish-acceptance-criteria-in-the-design-spec-checked-at-publish).
  */
 
@@ -112,6 +115,34 @@ export function checkCriteria(
     out.push(line);
   }
   return { ok: true, criteria: out, newlyWaived };
+}
+
+/**
+ * Say that evidenced lines still hold at the app's version now: each named line keeps its evidence
+ * and is stamped with `by`, now and `appVersion`. WHY IT IS A CALL OF ITS OWN: a line written again
+ * with the same words keeps its stamps (checkCriteria), so a builder that looked again after an
+ * update had no way to say so short of rewording the evidence, and the list stayed marked as
+ * evidenced at an earlier version: four of five measured builds on 2026-11-28 ended that way.
+ * Every id must name an evidenced line; an open one is evidenced with the list, and a waived one
+ * has nothing to confirm.
+ */
+export function confirmCriteria(
+  ids: unknown, live: readonly AppCriterion[], stamp: { by: string; appVersion: number; now?: string },
+): { ok: true; criteria: AppCriterion[]; confirmed: string[] } | { ok: false; message: string } {
+  if (!Array.isArray(ids) || ids.length === 0 || ids.some(i => typeof i !== 'string')) {
+    return { ok: false, message: 'still_hold is the ids of the evidenced criteria you checked again at this version, for example ["phone-layout", "empty-state"].' };
+  }
+  const wanted = [...new Set(ids as string[])];
+  const byId = new Map(live.map(c => [c.id, c]));
+  const unknown = wanted.filter(id => !byId.has(id));
+  if (unknown.length) return { ok: false, message: `still_hold names criteria the spec does not have: ${unknown.join(', ')}. It has: ${live.map(c => c.id).join(', ') || 'none'}.` };
+  const notEvidenced = wanted.filter(id => byId.get(id)?.status !== 'evidenced');
+  if (notEvidenced.length) {
+    return { ok: false, message: `still_hold confirms evidenced criteria only, and these are not: ${notEvidenced.map(id => `${id} (${byId.get(id)?.status})`).join(', ')}. Evidence an open one with the whole list (criteria).` };
+  }
+  const now = stamp.now ?? new Date().toISOString();
+  const criteria = live.map(c => (wanted.includes(c.id) ? { ...c, evidencedBy: stamp.by, evidencedAt: now, evidencedVersion: stamp.appVersion } : c));
+  return { ok: true, criteria, confirmed: wanted };
 }
 
 /** How many lines are in each status. */

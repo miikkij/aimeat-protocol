@@ -14,6 +14,8 @@
  * @structure readDesignSpecFor · writeDesignSpecFor · writeCriteriaFor · writeScenariosFor · clearDesignSpecFor
  * @usage const out = await writeDesignSpecFor(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.4.0 — 2026-11-28 — writeCriteriaFor takes `still_hold` in place of the list: the ids of
+ *     evidenced criteria the caller checked again, stamped at the app's version now.
  *   v1.3.1 — 2026-11-27 — The scenarios answer names the pictures a run gives.
  *   v1.3.0 — 2026-11-27 — writeDesignSpecFor takes `confirm: true` in place of the text: the spec
  *     there is marked current for the app's version without the document being sent back.
@@ -34,7 +36,7 @@ import {
   APP_DESIGN_SPEC_TEMPLATE, checkDesignSpecMarkdown, deleteAppDesignSpec, designSpecMeaning, designSpecStamp,
   isDesignSpecStale, readAppDesignSpec, writeAppSpecParts, writeAppDesignSpec,
 } from './design-spec.js';
-import { checkCriteria, criteriaCounts, openCriteriaIds } from './acceptance-criteria.js';
+import { checkCriteria, confirmCriteria, criteriaCounts, openCriteriaIds } from './acceptance-criteria.js';
 import { checkScenarios } from './scenarios.js';
 import { done, refuse, type AppOpCaller, type AppOpOutcome, type AppOpRefusal } from './op-outcome.js';
 
@@ -156,7 +158,15 @@ export async function writeCriteriaFor(
     return refuse(409, 'NO_DESIGN_SPEC', 'The criteria live in the design spec, and this app has none yet: write it first with spec_set (PUT .../design-spec).');
   }
   const principal = resolveIdentity(caller, config.nodeId);
-  const checked = checkCriteria(body.criteria, live.criteria ?? [], { by: principal, appVersion: found.app.versionNumber });
+  const stamp = { by: principal, appVersion: found.app.versionNumber };
+  // `still_hold` in place of the list: evidenced lines the caller checked again at this version.
+  const confirming = body.still_hold !== undefined && body.still_hold !== null;
+  if (confirming && body.criteria !== undefined && body.criteria !== null) {
+    return refuse(400, 'INVALID_INPUT', 'Send criteria (the whole list) or still_hold (the ids of evidenced criteria that still hold at this version), not both.');
+  }
+  const confirmed = confirming ? confirmCriteria(body.still_hold, live.criteria ?? [], stamp) : null;
+  if (confirmed && !confirmed.ok) return refuse(400, 'INVALID_INPUT', confirmed.message);
+  const checked = confirmed?.ok ? { ok: true as const, criteria: confirmed.criteria, newlyWaived: [] as string[] } : checkCriteria(body.criteria, live.criteria ?? [], stamp);
   if (!checked.ok) return refuse(400, 'INVALID_INPUT', checked.message);
   if (found.delegated && checked.newlyWaived.length) {
     return refuse(403, 'FORBIDDEN', `Only the app owner waives a criterion (${checked.newlyWaived.join(', ')}): shipping without it is their call. Leave it open, or evidence it.`);
@@ -175,7 +185,10 @@ export async function writeCriteriaFor(
   const counts = criteriaCounts(out.spec.criteria);
   await recordAppAudit(storage, {
     ownerGhii: found.app.ownerGaii, filename: found.app.filename, by: principal, action: 'design_spec.criteria',
-    detail: { revision: out.spec.revision, open: counts.open, evidenced: counts.evidenced, waived: counts.waived, newly_waived: checked.newlyWaived.join(', ') || null },
+    detail: {
+      revision: out.spec.revision, open: counts.open, evidenced: counts.evidenced, waived: counts.waived, newly_waived: checked.newlyWaived.join(', ') || null,
+      ...(confirmed?.ok ? { still_hold: confirmed.confirmed.join(', '), at_version: found.app.versionNumber } : {}),
+    },
   });
   emitChange('apps');
   return done({
@@ -184,7 +197,10 @@ export async function writeCriteriaFor(
     criteria: out.spec.criteria,
     counts,
     revision: out.spec.revision,
-    meaning: counts.open
+    ...(confirmed?.ok ? { confirmed: confirmed.confirmed } : {}),
+    meaning: confirmed?.ok
+      ? `${confirmed.confirmed.length} criteria are marked as checked again at version ${found.app.versionNumber} (${confirmed.confirmed.join(', ')}); their evidence is kept.`
+      : counts.open
       ? `${counts.open} of ${counts.total} criteria are open (${openCriteriaIds(out.spec).join(', ')}). At the finest level an update is refused until each is evidenced or the owner waives it.`
       : `All ${counts.total} criteria are evidenced or waived.`,
   });

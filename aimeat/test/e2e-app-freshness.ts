@@ -12,6 +12,8 @@
  *   - another owner may not read it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-freshness
  * @version-history
+ *   v1.1.0 — 2026-11-28 — `still_hold`: a criterion checked again after an update is confirmed by
+ *     its id; the same list sent again leaves it at the earlier version.
  *   v1.0.0 — 2026-11-26 — Initial (wish-one-freshness-answer-per-app-spec-skill-pitfalls-behind-the-).
  */
 import { BASE, assert, finish, json, test } from './helpers/harness.js';
@@ -75,6 +77,30 @@ const page = (filename: string, word: string) => [
         assert(r.body.data.design_spec.stale === true, `stale after v2: ${JSON.stringify(r.body.data.design_spec)}`);
         const ev = r.body.data.criteria.evidenced_before;
         assert(ev.length === 1 && ev[0].id === 'says-word' && ev[0].evidenced_version === 1, `the old evidence is named: ${JSON.stringify(ev)}`);
+        assert(items(r).some(b => b.item === 'criteria' && /still_hold/.test(b.what)), `and the answer says how a re-checked line is confirmed: ${JSON.stringify(items(r))}`);
+    });
+
+    await test('a criterion checked again is confirmed by its id: the evidence stays and the line is at the live version', async () => {
+        const list = [{ id: 'says-word', text: 'The page shows its word.', check: 'screenshot', status: 'evidenced', evidence: 'screenshot at v1' }];
+        const put = (body: unknown) => json(`${app}/design-spec/criteria`, { method: 'PUT', headers: auth, body: JSON.stringify(body) });
+        // The same list again keeps the line's stamps, so it stays evidenced at version 1.
+        assert((await put({ criteria: list })).status === 200, 'the same list is accepted');
+        assert((await freshness()).body.data.criteria.evidenced_before.length === 1, 'and changes nothing about the version');
+        const unknown = await put({ still_hold: ['no-such-line'] });
+        assert(unknown.status === 400 && /does not have/.test(unknown.body?.error?.message ?? ''), `an id the spec lacks is refused: ${unknown.status} ${JSON.stringify(unknown.body?.error)}`);
+        const both = await put({ criteria: list, still_hold: ['says-word'] });
+        assert(both.status === 400, `the list and the ids together are refused: ${both.status}`);
+        const ok = await put({ still_hold: ['says-word'] });
+        assert(ok.status === 200 && JSON.stringify(ok.body.data.confirmed) === '["says-word"]', `confirmed: ${ok.status} ${JSON.stringify(ok.body?.error ?? ok.body?.data?.confirmed)}`);
+        const line = ok.body.data.criteria[0];
+        assert(line.evidence === 'screenshot at v1' && line.evidencedVersion === 2 && line.status === 'evidenced', `the evidence is kept and the version is the live one: ${JSON.stringify(line)}`);
+        const r = await freshness();
+        assert(r.body.data.criteria.evidenced_before.length === 0, `nothing is evidenced at an earlier version: ${JSON.stringify(r.body.data.criteria)}`);
+        // An open line has nothing to confirm: it is evidenced with the list.
+        assert((await put({ criteria: [...list, { id: 'open-line', text: 'Something not yet shown.', check: 'person' }] })).status === 200, 'an open line is added');
+        const open = await put({ still_hold: ['open-line'] });
+        assert(open.status === 400 && /evidenced criteria only/.test(open.body?.error?.message ?? ''), `an open line is not confirmed: ${open.status} ${JSON.stringify(open.body?.error)}`);
+        assert((await put({ criteria: list })).status === 200, 'the list is put back');
     });
 
     await test('a bound skill that matched the tools is named once the tools change under it, and the publish answer says so too', async () => {

@@ -35,6 +35,8 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.5.1 — 2026-11-28 — One budget of 50 seconds for an audit of an app with scenarios: the wait
+ *     for the scenario run gets what the playtest left. One call of thirty-seven timed out.
  *   v1.5.0 — 2026-11-27 — The audit hands the scenario run the app's owner identity, so the run
  *     keeps its pictures in the owner's files and the answer names their addresses.
  *   v1.4.1 — 2026-11-27 — `boots` counts the Atelier shell's status card as something on screen: an
@@ -63,6 +65,13 @@ import { readAppDesignSpec } from './design-spec.js';
 import { keptPlaytestFor, scenarioRunFor, type ScenarioRunAnswer } from './scenario-run.js';
 
 /** The phone the app has to work on, and the desktop it has to survive being stretched to. */
+/**
+ * How long one audit with a playtest may take when the app has scenarios: under the 60 seconds an
+ * MCP client waits for a tool, with room for the answer to travel. The wait for the scenario run
+ * gets what the audit's own playtest left of it, and never less than SCENARIO_WAIT_MIN_MS.
+ */
+const AUDIT_CALL_BUDGET_MS = 50_000;
+const SCENARIO_WAIT_MIN_MS = 3_000;
 const MOBILE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 720 };
 
@@ -706,12 +715,18 @@ export async function auditAppWithPlaytest(
   // A call that reads a run already started for this version answers the playtest taken then: the
   // bytes are the same, and running it again cost every such call 10 to 17 seconds and a slot.
   const target = { ownerName: app.ownerName, filename: app.filename, appVersion: record.versionNumber };
+  const startedAt = Date.now();
   const kept = await keptPlaytestFor(storage, target, scenarios) as AppPlaytestResult | undefined;
   const playtest = kept ?? await runAppPlaytest(storage, config, app.ownerName, app.filename, { html });
+  // ONE BUDGET FOR THE WHOLE CALL. The wait for the scenario run gets what the playtest left of it:
+  // with two fixed waits a playtest that took 35 seconds on a busy machine and the 25-second wait
+  // after it passed the minute an MCP client waits, and the caller got no answer (measured
+  // 2026-11-28, one call of thirty-seven).
+  const left = Math.max(SCENARIO_WAIT_MIN_MS, AUDIT_CALL_BUDGET_MS - (Date.now() - startedAt));
   const run = await scenarioRunFor(
     storage, config,
     { ...target, html, appName: record.manifest?.name ?? app.filename, ownerGaii: record.ownerGaii },
-    scenarios, () => takePlaytestSlot(app.ownerName), { playtest },
+    scenarios, () => takePlaytestSlot(app.ownerName), { playtest, waitBudgetMs: left },
   );
   return { artifact, playtest, scenarios: run };
 }

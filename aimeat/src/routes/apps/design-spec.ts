@@ -26,6 +26,7 @@
  *   GET /design-spec · PUT /design-spec · DELETE /design-spec
  * @usage registerDesignSpecRoutes(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-11-28 — PUT .../design-spec/criteria takes `still_hold` in place of `criteria`.
  *   v1.3.0 — 2026-11-26 — PUT .../design-spec/scenarios: the playtest scenarios (services/app/scenarios.ts).
  *   v1.2.0 — 2026-11-26 — PUT .../design-spec/criteria: the acceptance criteria inside the spec
  *     (services/app/acceptance-criteria.ts), checked by schema here and per status in the service.
@@ -55,7 +56,9 @@ const CriteriaWriteSchema = z.object({
         status: z.enum(CRITERION_STATUSES).optional(),
         evidence: safeText(400).optional(),
         waived_reason: safeText(400).optional(),
-    })).max(CRITERIA_MAX),
+    })).max(CRITERIA_MAX).optional(),
+    // In place of the list: the ids of evidenced criteria checked again at the app's version now.
+    still_hold: z.array(safeText(40)).min(1).max(CRITERIA_MAX).optional(),
     expected_revision: z.number().int().min(0).nullable().optional(),
 });
 

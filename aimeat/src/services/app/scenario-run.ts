@@ -25,6 +25,7 @@
  * @usage
  *   const scenarios = await scenarioRunFor(storage, config, app, list, () => takePlaytestSlot(owner));
  * @version-history
+ *   v1.1.1 — 2026-11-28 — opts.waitBudgetMs: neither wait is longer than what the caller has left.
  *   v1.1.0 — 2026-11-27 — With the app's `ownerGaii`, the run keeps a picture per run at the phone
  *     and the desktop size in the owner's files, removes the pictures it did not write, and every
  *     answer names an address per picture (scenario-pictures.ts).
@@ -101,8 +102,13 @@ export async function scenarioRunFor(
   app: { ownerName: string; filename: string; html: string; appName: string; appVersion: number; ownerGaii?: string },
   scenarios: readonly AppScenario[],
   takeSlot: () => { release(): void } | { reason: string },
-  opts: { launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; inlineWaitMs?: number; readWaitMs?: number; playtest?: unknown } = {},
+  opts: {
+    launch?: () => Promise<HeadlessBrowser | null>; now?: () => number; inlineWaitMs?: number; readWaitMs?: number; playtest?: unknown;
+    /** What the caller has left of its own time: neither wait is longer than this. */
+    waitBudgetMs?: number;
+  } = {},
 ): Promise<ScenarioRunAnswer> {
+  const within = (ms: number): number => Math.min(ms, opts.waitBudgetMs ?? ms);
   const appId = `${app.ownerName}/${app.filename}`;
   const now = opts.now ?? Date.now;
   const key = scenarioRunKey(app.appVersion, scenarios);
@@ -117,7 +123,7 @@ export async function scenarioRunFor(
     if (note.state === 'done' && note.result) return done(note);
     if (note.state === 'running' && now() - Date.parse(note.startedAt) < RUNNING_NOTE_MAX_MS) {
       // The run is under way: wait for it here, so one later call reads the result where three did.
-      const until = now() + (opts.readWaitMs ?? READ_WAIT_MS);
+      const until = now() + within(opts.readWaitMs ?? READ_WAIT_MS);
       while (now() < until) {
         await new Promise<void>((resolve) => { setTimeout(resolve, READ_EVERY_MS); });
         note = (await readAppDesignSpec(storage, appId))?.scenarioRun;
@@ -167,7 +173,7 @@ export async function scenarioRunFor(
     .finally(() => slot.release());
 
   let timer: NodeJS.Timeout | undefined;
-  const waited = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), opts.inlineWaitMs ?? INLINE_WAIT_MS); });
+  const waited = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), within(opts.inlineWaitMs ?? INLINE_WAIT_MS)); });
   const first = await Promise.race([work, waited]);
   clearTimeout(timer);
   return first ?? runningAnswer(started);

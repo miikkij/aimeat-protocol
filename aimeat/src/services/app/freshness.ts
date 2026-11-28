@@ -25,6 +25,8 @@
  *   publish that changed the tools is when a skill breaks.
  * @structure appFreshnessFor(storage, config, caller, ref) · boundSkillIssues(storage, config, ownerName, filename)
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The line about criteria evidenced at an earlier version names
+ *     criteria_set with still_hold, and says that the same list sent again changes nothing.
  *   v1.0.0 — 2026-11-26 — Initial (wish-one-freshness-answer-per-app-spec-skill-pitfalls-behind-the-).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -104,7 +106,7 @@ export async function appFreshnessFor(
   if (!spec) behind.push({ item: 'design_spec', what: 'There is no design spec: write one with spec_set.' });
   else if (isDesignSpecStale(spec, live)) behind.push({ item: 'design_spec', what: `Written against version ${spec.version}; the app is at version ${live}. Read it, then confirm it (spec_set with confirm: true) or update it with spec_set.` });
   if (counts.open) behind.push({ item: 'criteria', what: `${counts.open} acceptance criteria are open: evidence them, or ask the owner to waive them, with criteria_set.` });
-  if (evidencedBefore.length) behind.push({ item: 'criteria', what: `${evidencedBefore.length} criteria were evidenced at an earlier version (${evidencedBefore.map(c => `${c.id} at v${c.evidenced_version}`).join(', ')}): check that each still holds at version ${live}, and evidence it again or set it open.` });
+  if (evidencedBefore.length) behind.push({ item: 'criteria', what: `${evidencedBefore.length} criteria were evidenced at an earlier version (${evidencedBefore.map(c => `${c.id} at v${c.evidenced_version}`).join(', ')}): check that each still holds at version ${live}. For the ones that do: criteria_set with still_hold: [their ids], which keeps the evidence and marks them checked at this version (sending the same list again changes nothing). Set the others open.` });
   if (!dataMap) behind.push({ item: 'data_map', what: 'There is no data map: write one with aimeat_datamap_set, saying where each family of data lives and why.' });
   for (const s of skills) {
     if (s.tool_field_issues.length) behind.push({ item: 'bound_skill', what: `${s.ref} calls the app's tools with ${s.tool_field_issues.length} field(s) the tools refuse now (${s.tool_field_issues.slice(0, 3).map(i => `${i.tool}.${i.field}`).join(', ')}): correct the skill and publish it again.` });

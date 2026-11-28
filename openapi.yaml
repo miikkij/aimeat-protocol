@@ -45975,9 +45975,13 @@ paths:
         spec, which must exist first (409 `NO_DESIGN_SPEC`). The node stamps who evidenced or waived a
         line, when, and at which app version. A builder of another account may not newly waive a line
         (403). At the finest level an update of the app is refused while a line is open (422
-        `APP_OWES_ITEMS`, item `criteria`); every publish answer counts them in `next_steps`. Returns
-        `{ app, app_version, criteria, counts, revision, meaning }`. Needs `app:write` and the owner,
-        one of the owner's agents, or a development right.
+        `APP_OWES_ITEMS`, item `criteria`); every publish answer counts them in `next_steps`. A line
+        written again with the same words keeps its stamps, so after an update of the app the lines
+        that were checked again are confirmed with `{ still_hold: [ids] }` in place of `criteria`:
+        each named line must be evidenced, keeps its evidence, and is stamped at the app's version now
+        (400 for an id the spec lacks, a line that is not evidenced, or both fields together). Returns
+        `{ app, app_version, criteria, counts, revision, meaning }`, and `confirmed` after `still_hold`.
+        Needs `app:write` and the owner, one of the owner's agents, or a development right.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -45990,8 +45994,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [criteria]
               properties:
+                still_hold:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { type: string, maxLength: 40 }
+                  description: >-
+                    In place of `criteria`: the ids of evidenced lines checked again at the app's
+                    version now. Each keeps its evidence and is stamped with the caller, the time and
+                    that version.
                 criteria:
                   type: array
                   maxItems: 50

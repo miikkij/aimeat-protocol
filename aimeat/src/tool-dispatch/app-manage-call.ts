@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-28 -- criteria_set forwards `still_hold`.
  *   2026-11-27 -- member_plan_set sends `sale`, the roles the owner sells.
  *   2026-11-27 -- spec_set forwards `confirm`.
  *   2026-11-26 -- scenarios_set reaches PUT /v1/apps/:owner/:filename/design-spec/scenarios.
@@ -244,7 +245,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'spec_clear':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
         case 'criteria_set':
-            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec/criteria`, pick(input, ['criteria', 'expected_revision']));
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec/criteria`, pick(input, ['criteria', 'still_hold', 'expected_revision']));
         case 'scenarios_set':
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec/scenarios`, pick(input, ['scenarios', 'expected_revision']));
         case 'freshness':

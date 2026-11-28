@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-28 — The criteria line names `still_hold`, for a line checked again after an update.
  *   2026-11-27 — The member actions' line says how a role is sold (`sale` in member_plan_set).
  *   2026-11-27 — The scenarios line: the node's browser is the first one to use, and a run at the
  *     phone and the desktop size answers a picture address (services/app/scenario-pictures.ts).
@@ -449,7 +450,10 @@ where it stands (\`status\`: open, evidenced with \`evidence\` that says what pr
 empty, error and loading states, the phone width and both themes are where builds fall short. Write
 the whole list with \`aimeat_app_manage\` \`criteria_set\`; the spec must exist first. At the finest
 level an update is refused while a line is open (\`APP_OWES_ITEMS\`, item \`criteria\`); every
-publish answer counts them in \`next_steps\`. Only the owner waives a line. The node has a browser of
+publish answer counts them in \`next_steps\`. Only the owner waives a line. After an update of the
+app, a line you evidenced at an earlier version and checked again is confirmed with \`criteria_set\`
+\`{ still_hold: [ids] }\`: it keeps its evidence and is marked checked at the version now (the same
+list sent again leaves it at the earlier version). The node has a browser of
 its own, and it is the first one to use, whether or not you have another: write playtest scenarios
 with \`scenarios_set\` (steps: click, fill, press, wait,
 expect_text, expect_visible, expect_absent; each scenario names the criteria it proves) and run them

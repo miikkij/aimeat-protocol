@@ -197,7 +197,7 @@
       "digest": "sha256:971a873f9e2cfef7c14ae308"
     },
     "10. Apps": {
-      "reviewedOn": "2026-11-27",
+      "reviewedOn": "2026-11-28",
       "watches": [
         "aimeat/src/services/app/config.ts",
         "aimeat/src/routes/apps/read.ts",
@@ -217,7 +217,7 @@
         "aimeat/src/routes/app-store.ts",
         "aimeat/src/services/dependency-map.ts"
       ],
-      "digest": "sha256:dd99e32b5108af4b7675d4b5"
+      "digest": "sha256:1051297473e26f51ef97711f"
     },
     "11. Served libraries and the Design Book": {
       "reviewedOn": "2026-11-27",
@@ -940,7 +940,7 @@
     "10. Apps": {
       "aimeat/src/services/app/config.ts": "40bbad5aede08707",
       "aimeat/src/routes/apps/read.ts": "accd2534f58f083c",
-      "aimeat/src/tool-catalog/definitions/app-manage.ts": "fc745994b9ab6537",
+      "aimeat/src/tool-catalog/definitions/app-manage.ts": "bf6a80228fe85ebd",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "fe5938f7a46b5409",
       "aimeat/src/services/app/fork-gate.ts": "532f9095f35a4de8",
       "aimeat/src/services/design-book/grown-genre.ts": "0d632fb12ce38db0",
