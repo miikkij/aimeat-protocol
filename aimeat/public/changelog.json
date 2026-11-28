@@ -5,6 +5,23 @@
       "date": "2026-11-28",
       "version": "4.3.1",
       "kind": "feature",
+      "id": "2026-11-28-your-ai-sees-the-app-it-built",
+      "highlight": false,
+      "audience": ["user", "agent", "developer"],
+      "title": { "en": "Your AI sees the app it built", "fi": "Tekoälysi näkee rakentamansa sovelluksen" },
+      "body": {
+        "en": "The node's own browser now takes pictures of a published app, signed in as a test member, and your AI looks at them. It also reads how each part of the Atelier kit is used in one request. Five test builds took 40 % less time.",
+        "fi": "Noden oma selain ottaa nyt kuvat julkaistusta sovelluksesta testijäsenenä kirjautuneena, ja tekoälysi katsoo ne. Se lukee myös Atelier-kirjaston jokaisen osan käyttöohjeen yhdellä pyynnöllä. Viisi koerakennusta valmistui 40 % nopeammin."
+      },
+      "summary": {
+        "en": "Your AI looks at pictures of the app it built, taken by the node's own browser.",
+        "fi": "Tekoälysi katsoo rakentamastaan sovelluksesta kuvat, jotka noden oma selain ottaa."
+      }
+    },
+    {
+      "date": "2026-11-28",
+      "version": "4.3.1",
+      "kind": "feature",
       "id": "2026-11-28-sell-a-membership-of-your-app",
       "highlight": true,
       "audience": ["user", "agent", "developer"],
