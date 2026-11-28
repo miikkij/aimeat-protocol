@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-28 — 17r: the library reference, sections `lib` and `lib-<name>`, the same over MCP and REST.
  *   2026-11-28 — 17q: the kit reference, sections `kit` and `kit-<name>`, the same over MCP and REST.
  *   2026-11-28 — A part is held to HARD_PART_CHARS (50 000); 24 000 is the recommended size and no
  *     longer fails the suite (Jouni, 2026-11-28).
@@ -635,6 +636,19 @@ async function main() {
             assert(body.result?.isError === true, 'a name the kit does not have is refused');
             const platform = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/platform' } }, 486)).body);
             assert(platform.includes('- `kit` —'), 'the platform index names the kit reference');
+        });
+
+        // The libraries beside the kit (services/builder/lib-reference.ts): sign-in, data, words, formats.
+        await test('17r. the library reference: the index and the sign-in library arrive the same over MCP and REST', async () => {
+            const index = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/lib' } }, 487)).body);
+            assert(index.startsWith('## The libraries beside the kit') && index.includes('`lib-auth`') && index.includes('`lib-data`'), `the index names the libraries: ${index.slice(0, 160)}`);
+            const auth = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/lib-auth' } }, 488)).body);
+            assert(auth.includes('AIMEAT.auth.mountLoginButton(') && auth.includes('@property {string} displayName') && auth.includes('[onSession]'), `the login button's options and the session's shape: ${auth.slice(0, 200)}`);
+            assert(auth.length < 24_000, `one tool result carries it: ${auth.length}`);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/lib-auth?format=txt`).then(r => r.text());
+            assert(rest === auth, 'REST answers the same text');
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/lib-no-such-library' } }, 489);
+            assert(body.result?.isError === true, 'a library with no reference is refused');
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it

@@ -90,6 +90,7 @@ export const FAST_CHECKS = [
     { script: 'check:sdk', label: 'SDK-libs dist ↔ sources in sync' },
     { script: 'check:atelier', label: 'Atelier look matrix — every preset × palette × mode' },
     { script: 'check:atelier-parts', label: 'Atelier parts list ↔ the components\' own JSDoc' },
+    { script: 'check:lib-reference', label: 'Library reference ↔ the sign-in, data and language libraries\' own comments' },
     { script: 'check:living-nodes', label: 'Living node vocabulary ↔ the node modules\' own JSDoc' },
     { script: 'check:mcp-tools', label: 'MCP tool surface/handler parity' },
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },

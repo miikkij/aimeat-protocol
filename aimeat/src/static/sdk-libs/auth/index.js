@@ -10,6 +10,7 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   2026-11-28 — Comments only: setLang, setPalette and getPalettes say what they do.
  *   v1.10.1 — 2026-11-14 — auth, refreshOnFocus and authApi come from auth.js, which registers the
  *     sign-in dialog and the pill for session.js (two import cycles end). The surface apps see, and
  *     the bundle version, stay the same.
@@ -129,11 +130,15 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 // value without re-implementing the lookup and drifting from it. They hang off `auth` (NOT the
 // return of attach(), which is the whole window.AIMEAT namespace) so they land on AIMEAT.auth.
 auth.getLang = function (locales) { return aimeatReadLang(readLocales({ locales: locales })); };
+// Set the language for this browser, as the login button's own switch does: it is remembered and
+// 'aimeat-lang-change' fires on window, which is the event to draw the screen again from.
 auth.setLang = function (lang) { aimeatApplyLang(String(lang).toLowerCase()); };
 // Palette (the designed look, orthogonal to light/dark — 'aimeat-palette' + <html data-palette>).
 // The pill renders the picker; these let an app read/set/enumerate the same value.
 auth.getPalette = function () { return aimeatReadPalette(); };
+// Set the palette by its id, one of getPalettes().
 auth.setPalette = function (id) { aimeatApplyPalette(String(id).toLowerCase()); };
+// Every palette this node has, as { id, label, swatch }.
 auth.getPalettes = function () { return paletteRegistry().map(function (p) { return { id: p.id, label: p.label, swatch: p.swatch }; }); };
 // The signed-in person's own date-and-number format and clock, { region, timezone } (null = the
 // browser's). Every served library's _core/format.js asks this; the profile read starts at the

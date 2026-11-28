@@ -350,7 +350,7 @@
      * and leaves the caller out, and makes up both: one public read per row (at most six at a time) and
      * the caller's own public entries under the prefix, marked `mine: true`.
      *
-     * It needs a signed-in session, because the listing door does: a signed-out visitor gets the usual
+     * It needs a signed-in session, because the listing route does: a signed-out visitor gets the usual
      * "Not logged in" error, so design that state rather than rendering it as an empty feed. A row whose
      * value is gone by the time it is read (deleted, or made private) is left out; if every read fails,
      * the first error is thrown instead of returning an empty list.
@@ -519,6 +519,15 @@
       if (!res.ok) throw refusal(res, "The adult check could not be read.");
       return res.data;
     },
+    /**
+     * Run an action of an extension and answer what it returns. Sent with the signed-in person's
+     * session when there is one, and without any credential otherwise, so a public action also works
+     * for a visitor. A refusal throws, with the extension's own code and message.
+     * @param {string} ext  `name`, `name/instanceId`, `owner/name` or `owner/name/instanceId`
+     * @param {string} actionId
+     * @param {Record<string, any>} [input]
+     * @returns {Promise<any>} the action's `data`
+     */
     async action(ext, actionId, input) {
       const parts = String(ext).split("/");
       const segments = parts.length === 3 ? [parts[0] + "/" + parts[1], parts[2]] : parts;

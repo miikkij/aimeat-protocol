@@ -26,12 +26,49 @@
  *   loginWatcher(callbacks, liveSession) for a mounted pill · onLoginWhileOpen(callbacks) for one call.
  * @usage import { loginWatcher, onLoginWhileOpen } from './on-login.js';
  * @version-history
+ *   2026-11-28 — Comments only: the typedefs AuthSession (what a callback receives) and
+ *     MountLoginOptions (what the login button takes), which the library reference serves.
  *   v1.1.0 — 2026-09-13 — onSession(session, { restored }) is the handler that fires on a restore too;
  *     onLogin stays sign-in only, as it always was, after the measurement above.
  *   v1.0.0 — 2026-09-13 — Initial: taken out of modal.js (which called onLogin directly after an
  *     interactive sign-in) and put where every road reaches it.
  */
 import { on, off } from './events.js';
+
+/**
+ * @typedef {object} AuthSession
+ * @property {string} owner  the account name, for example "alice"
+ * @property {string|null} ghii  the person's full identity, "alice@node-id"
+ * @property {string|null} gaii  an agent's identity when the session is an agent's, else null
+ * @property {string|null} identity  gaii when there is one, else ghii
+ * @property {string} displayName  the name the person chose to show; may be empty, so show `owner` then
+ * @property {string[]} roles
+ * @property {string} nodeUrl  the node's address
+ * @property {boolean} federated  true for a visitor signed in from another node
+ * @property {string} homeNode  that visitor's own node id, else empty
+ * @property {string} homeUrl  that node's address, else empty
+ * @property {(path: string, opts?: RequestInit) => Promise<{ ok: boolean, data?: any, error?: { code: string, message: string } }>} fetch
+ *   an authenticated call to the node; answers the parsed envelope for every status and does not
+ *   throw on a refusal, so branch on `ok`
+ * @property {() => Promise<any>} refresh  renews the session; the library does it by itself before expiry
+ * @property {(title: string, opts?: { body?: string, link?: string, type?: string }) => Promise<any>} notify
+ *   sends the person a notification
+ */
+
+/**
+ * @typedef {object} MountLoginOptions
+ * @property {(session: AuthSession, how: { restored: boolean }) => void} [onSession]
+ *   once for every session that becomes available, a restore and a sign-in alike: show the app here
+ * @property {(session: AuthSession) => void} [onLogin]  after a sign-in or a registration only
+ * @property {() => void} [onLogout]
+ * @property {string[]} [locales]  the languages the app has (or `<meta name="aimeat-locales"
+ *   content="en fi">`): with two or more the button shows a language switch, with fewer none
+ * @property {boolean} [compact]  default true: one small button with the rest in a popover at
+ *   600 px and under; false keeps the full row at every width
+ * @property {string} [buttonText]  replaces the words on the signed-out button
+ * @property {string} [nameHref]  makes the person's name a link
+ * @property {Record<string, string>} [i18n]  replaces the button's own labels
+ */
 
 /**
  * Who a session belongs to, as one string, so a new sign-in can be told from a repeat about the same

@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-28 — Step 4 names the sections `lib-auth`, `lib-data`, `lib-i18n` and `lib-fmt`
+ *     (services/builder/lib-reference.ts): every builder searched aimeat-auth.js for the session's shape.
  *   2026-11-28 — Step 9: terms and privacy pages by who the app is offered to, never for an app
  *     only its owner opens, and written on the owner's yes (services/app-build/legal-readiness.ts).
  *   2026-11-28 — Step 4: the kit's reference over MCP (the sections `kit` and `kit-<name>`), read
@@ -513,7 +515,7 @@ changed after you fetched it says so.
    that asked for the decision. A Classic page may load the
    kit for these blocks alone; a page without the app frame sets their look with \`data-ak-look\` on
    \`<html>\` or \`<body>\`.
-4. **Ask the kit before you call it, and before you fork.** WITH NO BROWSER, the kit answers over MCP: \`aimeat_handbook_get { tier: "build-app-atelier/kit" }\` lists every function of \`AIMEAT.atelier\`, and \`.../kit-<name>\` (\`kit-form\`, \`kit-list\`, \`kit-mosaic\`, \`kit-app\`) answers one whole, with every option it takes and what it returns. Read that; never download the library and search its source for a function.
+4. **Ask the kit before you call it, and before you fork.** WITH NO BROWSER, the kit answers over MCP: \`aimeat_handbook_get { tier: "build-app-atelier/kit" }\` lists every function of \`AIMEAT.atelier\`, and \`.../kit-<name>\` (\`kit-form\`, \`kit-list\`, \`kit-mosaic\`, \`kit-app\`) answers one whole, with every option it takes and what it returns. The libraries beside the kit answer the same way: \`.../lib-auth\` (the login button's options, the session and its \`displayName\`), \`.../lib-data\`, \`.../lib-i18n\` and \`.../lib-fmt\`. Read those; never download a library and search its source for a function.
    In a browser, \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, use, fork }\` for the components that have the model,
    \`describe()\` lists them and \`find("<use>")\` names the ones for a job; the answer is generated from each component's source and held to

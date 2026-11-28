@@ -50,6 +50,8 @@
  * @fork form Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.
  * @use form edit
  * @version-history
+ *   2026-11-28 — Comment only: form()'s JSDoc says how a test reaches a field and the submit button.
+ *     A measured build's first scenario failed on a guessed selector.
  *   v0.66.0 — 2026-10-05 — Validation from one JSON Schema: field `format`, `pattern`, `minLength`,
  *     `sameAs` and `messages`, the host's `schema`, a format's hint under its field, the check when a
  *     field is left and the mark when it is right, `gate`, `check()`, `ready()`, `missing()`,
@@ -177,6 +179,10 @@ function modelControl(field, id, describedBy) {
 
 /**
  * The declared form.
+ * IN A TEST OR A PLAYTEST SCENARIO a field is reached by its name: the wrapper is
+ * `[data-ak-field="<name>"]` and the control is inside it, so `[data-ak-field="title"] input`
+ * (or `select`, `textarea`). The controls carry no `name` attribute. The submit button is
+ * `[data-ak-part="submit"]`.
  * @param {{
  *   target?: string|Element, fields: FormField[],
  *   submitLabel?: string, submit?: boolean, cancel?: { label?: string, onClick?: () => void },

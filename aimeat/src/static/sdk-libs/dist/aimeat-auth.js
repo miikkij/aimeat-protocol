@@ -1316,11 +1316,11 @@
      * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
      * returned as it is, and reports nothing.
      *
-     * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, on both
-     * roads, for the session this call produced (on-login.js). onLogin was the modal's to call until
+     * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, in both
+     * cases, for the session this call produced (on-login.js). onLogin was the modal's to call until
      * 2026-09-13, so on an app origin nobody called it.
      *
-     * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
+     * Added 2026-09-13. Before it the login pill's own button was the only interactive sign-in, and
      * apps reached it by clicking `#login button`, which is the theme control that renders first.
      * @param {object & { onLogin?: Function, register?: boolean, tab?: string }} [opts]
      * @returns {Promise<object|null>}
@@ -1389,7 +1389,10 @@
       const data = await passkeyAdd(currentSession.jwt, label);
       return data.data.passkey;
     },
-    /** Get the current session (or null if not logged in) */
+    /**
+     * The signed-in person's session, or null when nobody is signed in: the object onSession receives.
+     * @returns {import('./on-login.js').AuthSession|null}
+     */
     getSession() {
       return currentSession;
     },
@@ -1556,12 +1559,14 @@
     // Capability flag so an embedding app can feature-detect the compact login pill.
     compactPill: true,
     /**
-     * Mount a login/register button that handles the full flow. Delegates the render to pill.js.
-     * onLogin(session, { restored }) runs once for each session that appears while it is mounted,
-     * the restore on page load included (on-login.js).
+     * Mount the login button, which handles the whole sign-in and shows the signed-in person's name,
+     * the language switch, the theme switch and sign-out. Delegates the render to pill.js.
+     * SHOW THE APP FROM onSession: it runs once for every session that becomes available, the
+     * restore on page load (`restored: true`) and a sign-in (`restored: false`), so it is the one
+     * handler a page needs. onLogin runs after a sign-in or a registration only, never for a restored
+     * session (on-login.js). Never reload the page from either.
      * @param {string|Element|object} selector - CSS selector, DOM element, OR (options-first) the opts.
-     * @param {object} [opts] - { onLogin, onSession, onLogout, buttonText, compact }. onSession(session,
-     *   { restored }) runs for a restore and a sign-in alike; onLogin(session) for a sign-in only.
+     * @param {import('./on-login.js').MountLoginOptions} [opts]
      */
     mountLoginButton(selector, opts = {}) {
       return mountPill(auth, selector, opts);

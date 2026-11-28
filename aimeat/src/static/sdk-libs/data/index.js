@@ -13,6 +13,7 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
+ *   2026-11-28 — Comment only: action() has a JSDoc block.
  *   v1.9.0 — 2026-11-21 — set(key, value, { expectedVersion }) sends the node's optimistic lock
  *     (it went as an unknown field and locked nothing); patch(key, patch, { ifVersion }) merges fields
  *     through PATCH /v1/memory/:key, so an open page changes one field without writing over an AI's
@@ -387,7 +388,7 @@ const data = {
    * and leaves the caller out, and makes up both: one public read per row (at most six at a time) and
    * the caller's own public entries under the prefix, marked `mine: true`.
    *
-   * It needs a signed-in session, because the listing door does: a signed-out visitor gets the usual
+   * It needs a signed-in session, because the listing route does: a signed-out visitor gets the usual
    * "Not logged in" error, so design that state rather than rendering it as an empty feed. A row whose
    * value is gone by the time it is read (deleted, or made private) is left out; if every read fails,
    * the first error is thrown instead of returning an empty list.
@@ -555,6 +556,15 @@ const data = {
     return res.data;
   },
 
+  /**
+   * Run an action of an extension and answer what it returns. Sent with the signed-in person's
+   * session when there is one, and without any credential otherwise, so a public action also works
+   * for a visitor. A refusal throws, with the extension's own code and message.
+   * @param {string} ext  `name`, `name/instanceId`, `owner/name` or `owner/name/instanceId`
+   * @param {string} actionId
+   * @param {Record<string, any>} [input]
+   * @returns {Promise<any>} the action's `data`
+   */
   async action(ext, actionId, input) {
     // `name`, `name/instanceId`, `owner/name`, or `owner/name/instanceId`. With three parts the
     // owner's name travels as one encoded segment, so the node reads it as one extension.

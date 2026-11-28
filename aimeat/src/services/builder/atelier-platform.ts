@@ -24,6 +24,8 @@
  *   atelierPlatformIds() · ATELIER_PLATFORM_PART_LINE
  * @usage const piece = atelierPlatformPiece('group', config.baseUrl);   // null for an unknown id
  * @version-history
+ *   v1.6.0 — 2026-11-28 — The sections `lib` and `lib-<name>` (lib-reference.ts): the sign-in, data,
+ *     language and format libraries' functions from their own source.
  *   v1.5.0 — 2026-11-28 — The sections `kit` and `kit-<name>` (atelier-kit.ts): the kit's reference
  *     from the components' own source, for a builder with no browser to ask describe() in.
  *   v1.4.1 — 2026-11-24 — `server-side`: over MCP the extension skill is the specification; the HTTP
@@ -49,6 +51,7 @@ import { buildCapabilityPackLines } from '../../data/library-packs.js';
 import { OTHER_OWNERS_SECTION, OTHER_OWNERS_POINTER } from './atelier-other-owners.js';
 import { AI_PATH_SECTION, APP_TOOLS_SECTION } from './atelier-ai-path.js';
 import { kitComponent, kitIndex } from './atelier-kit.js';
+import { libIndex, libPage } from './lib-reference.js';
 
 /** The cut sections that end with the pointer to `other-owners`: the two a shared app is built from. */
 const POINTS_TO_OTHER_OWNERS = new Set(['group', 'row-spaces']);
@@ -95,6 +98,7 @@ export const ATELIER_PLATFORM: Array<{ id: string; from?: string; when: string }
   { id: 'install', when: 'The app is installed on a phone: the home-screen icon.' },
   { id: 'dates-numbers', when: 'The app shows a date, a time, a number, money or morsels: they follow the person\'s own format and clock, never the app\'s language.' },
   { id: 'kit', when: 'Before you call a kit component: every component in one line, and `kit-<name>` (for example `kit-form`, `kit-list`, `kit-mosaic`) answers one whole, with every option it takes, what it returns, and its parts, slots and variants. Read it in place of searching the library\'s source or starting a browser to ask `describe()`.' },
+  { id: 'lib', when: 'Before you call the sign-in, data, language or format library: `lib-auth` (the login button\'s options, the session and its `displayName`), `lib-data` (get, set with a version, list, delete, an extension\'s action), `lib-i18n` and `lib-fmt` answer every function of one library. Read it in place of downloading the library and searching its source.' },
   { id: 'verify', when: 'Before you say the app works: the one checklist for checking it in a browser (which browser, the visible path, the whole console, sign-up, what automation cannot do, driving an app with Playwright).' },
   { id: 'publish-checks', when: 'Before you publish: check the script so a parse error is not what the node refuses, and send a file over about 1 KB by presigned upload.' },
   { id: 'after-publish', when: 'After the publish: the template and the pitfall the next build starts from, the bound skill\'s reader, and the workstation for an app past about 300 kB.' },
@@ -201,6 +205,12 @@ export function atelierPlatformPiece(id: string, baseUrl: string): { id: string;
   if (id === 'kit') return { id, text: kitIndex() };
   if (id.startsWith('kit-')) {
     const text = kitComponent(id.slice('kit-'.length));
+    return text ? { id, text } : null;
+  }
+  // The libraries beside the kit (lib-reference.ts): the index, and one library whole under `lib-<name>`.
+  if (id === 'lib') return { id, text: libIndex() };
+  if (id.startsWith('lib-')) {
+    const text = libPage(id.slice('lib-'.length));
     return text ? { id, text } : null;
   }
   if (id === 'other-owners') return { id, text: OTHER_OWNERS_SECTION };

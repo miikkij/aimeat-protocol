@@ -26,6 +26,8 @@
  *   AIMEAT.fmt.{use,useProfile,region,timezone,number,date,time,dateTime,relative,money,morsels,
  *               resolvedTimeZone,zoneLabel}
  * @version-history
+ *   2026-11-28 — Comments only: t, setLocale, getLocale, locales, available, LanguageSwitcher and
+ *     fmt's number, date, time and dateTime have JSDoc. No change in behaviour, so the version stays.
  *   v1.4.1 — 2026-11-05 — fmt.useProfile() reads the profile with the app's own aimeat-auth session
  *     (the cookie fetch answered 401 on every app origin); a timeZone the caller names is kept, so a
  *     UTC-pinned calendar day no longer moves in the person's zone. Codebase analysis 2026-11-03,
@@ -92,6 +94,14 @@
     return loadDict(state.locale).then(function () { return state.locale; });
   }
 
+  /**
+   * The text for `key` in the language in use: the flat key first (`"list.empty"` as one key), then
+   * the same words as a path (`list` then `empty`), then the fallback language, then the key itself.
+   * `{name}` in the text is replaced from `vars`.
+   * @param {string} key
+   * @param {Record<string, string|number>} [vars]
+   * @returns {string}
+   */
   function t(key, vars) {
     var d = state.dicts[state.locale] || {};
     var raw = (d[key] != null) ? d[key] : getPath(d, key);
@@ -103,6 +113,14 @@
     return interpolate(String(raw), vars);
   }
 
+  /**
+   * Change the language. Loads its texts, remembers the choice in this browser (the `aimeat-lang`
+   * key and cookie the sign-in library reads too) and fires `aimeat-lang-change` and
+   * `aimeat-i18n-changed` on window: draw the screen again from one of them, because t() answers the
+   * new language only from then on. A language that is not in init()'s `locales` changes nothing.
+   * @param {string} locale
+   * @returns {Promise<string>} the language in use after the call
+   */
   function setLocale(locale) {
     if (state.localeList.indexOf(locale) === -1) return Promise.resolve(state.locale);
     return loadDict(locale).then(function () {
@@ -115,8 +133,11 @@
     });
   }
 
+  /** The language in use, for example "fi". @returns {string} */
   function getLocale() { return state.locale; }
+  /** The languages init() was given, in its order. @returns {string[]} */
   function locales() { return state.localeList.slice(); }
+  /** Has init() been given at least one language? @returns {boolean} */
   function available() { return state.localeList.length > 0; }
 
   // Translate every [data-i18n] element in root (textContent). Optional [data-i18n-attr].
@@ -130,6 +151,14 @@
     }
   }
 
+  /**
+   * A select of the languages init() was given, which calls setLocale() on a change. An app that
+   * mounts the login button with its languages (AIMEAT.auth.mountLoginButton, `locales`) already
+   * has a language switch in the bar and needs no second one.
+   * @param {{ target?: string|Element, labels?: Record<string, string>, className?: string,
+   *   onChange?: (locale: string) => void }} [opts]
+   * @returns {{ el: HTMLSelectElement, destroy: () => void }}
+   */
   function LanguageSwitcher(opts) {
     opts = opts || {}; injectStyles();
     var sel = document.createElement('select');
@@ -239,21 +268,38 @@
       .catch(function () { return use(null); });
   }
 
+  /**
+   * A number in the person's regional format. `opts` are Intl.NumberFormat's. Not a finite number: "—".
+   * @param {number} n @param {Intl.NumberFormatOptions} [opts] @returns {string}
+   */
   function fmtNumber(n, opts) {
     if (typeof n !== 'number' || !isFinite(n)) return '—';
     try { return new Intl.NumberFormat(fmtTag(), opts || {}).format(n); } catch (e) { return String(n); }
   }
 
+  /**
+   * A calendar date in the person's regional format and time zone. `v` is a Date, a timestamp or a
+   * date string; `opts` are Intl.DateTimeFormat's, and a `timeZone` named there is kept. No date: "—".
+   * @param {Date|number|string} v @param {Intl.DateTimeFormatOptions} [opts] @returns {string}
+   */
   function fmtDate(v, opts) {
     var d = asDate(v); if (!d) return '—';
     try { return d.toLocaleDateString(fmtTag(), withZone(opts)); } catch (e) { return String(v); }
   }
 
+  /**
+   * A time of day in the person's regional format and time zone; `v` and `opts` as in date().
+   * @param {Date|number|string} v @param {Intl.DateTimeFormatOptions} [opts] @returns {string}
+   */
   function fmtTime(v, opts) {
     var d = asDate(v); if (!d) return '—';
     try { return d.toLocaleTimeString(fmtTag(), withZone(opts)); } catch (e) { return String(v); }
   }
 
+  /**
+   * A date and a time together in the person's regional format and time zone; `v` and `opts` as in date().
+   * @param {Date|number|string} v @param {Intl.DateTimeFormatOptions} [opts] @returns {string}
+   */
   function fmtDateTime(v, opts) {
     var d = asDate(v); if (!d) return '—';
     try { return d.toLocaleString(fmtTag(), withZone(opts)); } catch (e) { return String(v); }
