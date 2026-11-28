@@ -27,7 +27,7 @@ Since 2026-11-15 the project's order is the area's suites, then `pnpm check:fast
 ## Reading a result
 
 - A shrinking assertion total with few or no failures is a collision or a boot failure, not a result (docs/pitfalls.md 18). Re-run that suite alone before reporting it.
-- No total at all means the server did not boot: report it as a boot failure with the first error line.
+- No total at all means the server did not boot: report it as a boot failure with the first error line. When the lane printed `port N is this suite's own, and another program listens on it` before the suite, that program is the cause: report the port and the program `netstat -ano | findstr :N` names, never a failure of the change.
 - `pnpm gate` and `pnpm ready` run a unit file that failed in the parallel run once more alone (`aimeat/scripts/lib/unit-rerun.ts`). A file the closing lines name as passed alone is the machine's load: report it as that, with its name, never as a regression. A file red alone too is a failure of the change.
 - A failure in a suite the change did not touch: run the same suite on a clean worktree of the base commit and say which of the three it is (asserted the hole, source broken, setup drifted; `.claude/rules/testing.md`).
 

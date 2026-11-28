@@ -638,12 +638,12 @@
       "note": "The locale loop it teaches, and the commit-msg hook whose limits it states (the limits themselves are in check-commit-msg.ts, which its eval grader within-hook-limits also mirrors)."
     },
     "project:security-audit": {
-      "reviewedOn": "2026-11-27",
+      "reviewedOn": "2026-11-28",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:c65dc5a0962f3e48f0c61486",
+      "digest": "sha256:8021c145a72bf50ed0c4c576",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -655,12 +655,12 @@
       "note": "It checks pages on the session's sandbox node; its viewports follow skill aimeat-frontend-verify."
     },
     "agent:gatekeeper": {
-      "reviewedOn": "2026-11-27",
+      "reviewedOn": "2026-11-28",
       "watches": [
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:c65dc5a0962f3e48f0c61486",
+      "digest": "sha256:8021c145a72bf50ed0c4c576",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -1059,14 +1059,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "6fd69097a58c17f1"
+      "aimeat/test/run-e2e-ci.ts": "cc1c4848f9ccddd7"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "211c8fbd99a62b9c"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "89d16397c4217803",
-      "aimeat/test/run-e2e-ci.ts": "6fd69097a58c17f1"
+      "aimeat/test/run-e2e-ci.ts": "cc1c4848f9ccddd7"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"
