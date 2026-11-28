@@ -12,6 +12,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=app-playtest
  * @version-history
+ *   v1.3.0 — 2026-11-28 — A game drawn in the middle of a dark canvas passes `paints`, in 2D and on
+ *     WebGL that does not keep its buffer. Seen red on the check that sampled one corner.
  *   v1.2.0 — 2026-11-27 — An Atelier app that needs a sign-in passes `boots`: the shipped shell,
  *     published as it is, shows its sign-in card. Six measured builds of such apps failed the check.
  *   v1.1.0 — 2026-10-05 — The app reaches the node's own origin and no private address (secaudit
@@ -104,6 +106,50 @@ function blackScreenApp(filename: string): string {
     ].join('\n');
 }
 
+/**
+ * A game as most are laid out: a dark backdrop to the edges and everything drawn in the middle. Its
+ * corners are one colour, so a check that samples a corner calls a working game a black screen.
+ */
+function centredApp(filename: string): string {
+    return [
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        `<meta name="aimeat-app" content="${filename}">`,
+        '<title>Centred game</title>',
+        '<style>html,body{margin:0;background:#000}canvas{width:100%;height:auto;display:block}</style>',
+        '</head><body><canvas id="stage" width="640" height="360"></canvas><script>',
+        'var g=document.getElementById("stage").getContext("2d");',
+        'g.fillStyle="#000000";g.fillRect(0,0,640,360);',
+        'g.fillStyle="#ffcc33";g.fillRect(260,140,120,80);',
+        'g.fillStyle="#33ddaa";g.fillRect(300,60,40,40);',
+        '</' + 'script></body></html>',
+    ].join('\n');
+}
+
+/**
+ * A game on WebGL as an engine sets it up: no alpha, the buffer not kept, a frame drawn on every
+ * tick. Outside a frame its canvas reads as opaque black. Without WebGL it draws the same in 2D.
+ */
+function webglApp(filename: string): string {
+    return [
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        `<meta name="aimeat-app" content="${filename}">`,
+        '<title>WebGL game</title>',
+        '<style>html,body{margin:0;background:#000}canvas{width:100%;height:auto;display:block}</style>',
+        '</head><body><canvas id="stage" width="640" height="360"></canvas><script>',
+        'var c=document.getElementById("stage");var gl=null;',
+        'try{gl=c.getContext("webgl",{alpha:false,preserveDrawingBuffer:false});}catch(e){gl=null;}',
+        'function frame(){',
+        '  if(gl){gl.disable(gl.SCISSOR_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);',
+        '    gl.enable(gl.SCISSOR_TEST);gl.scissor(260,140,120,80);gl.clearColor(1,0.8,0.2,1);gl.clear(gl.COLOR_BUFFER_BIT);',
+        '    gl.scissor(300,240,40,40);gl.clearColor(0.2,0.87,0.67,1);gl.clear(gl.COLOR_BUFFER_BIT);}',
+        '  requestAnimationFrame(frame);}',
+        'if(gl){frame();}else{var g=c.getContext("2d");g.fillStyle="#000";g.fillRect(0,0,640,360);g.fillStyle="#ffcc33";g.fillRect(260,140,120,80);g.fillStyle="#33ddaa";g.fillRect(300,60,40,40);}',
+        '</' + 'script></body></html>',
+    ].join('\n');
+}
+
 const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated', 'touch-targets', 'saves', 'reduced-motion'];
 
 (async () => {
@@ -183,6 +229,29 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
         assert(paints.ok === false, `one flat colour is a black screen, got "${paints.detail}"`);
         assert(/one colour/i.test(paints.detail), `the sentence names what is wrong, got "${paints.detail}"`);
         assert(pt.summary.ok === false && pt.summary.failed >= 1, `the summary carries the failure, got ${JSON.stringify(pt.summary)}`);
+    });
+
+    // Seen red on the check that sampled one 32-pixel corner of the canvas: three measured builds of
+    // a working game, dark to its edges, were told they showed a black screen.
+    // The second app is the same finding on WebGL: a canvas with no alpha that does not keep its
+    // buffer reads as opaque black outside a frame, which a measured build's working game did.
+    await test('a game drawn in the middle of a dark canvas is not a black screen, in 2D and on WebGL', async () => {
+        if (!ran) skip('no browser on this machine');
+        for (const [kind, build] of [['2D', centredApp], ['WebGL', webglApp]] as const) {
+            const file = `ptmid${kind.toLowerCase()}${Date.now()}.html`;
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: auth(a.token),
+                body: JSON.stringify({ filename: file, mime_type: 'text/html', content: b64(build(file)), name: `Centred ${kind}`, description: 'A game drawn in the middle of its canvas.' }),
+            });
+            assert(pub.status === 201, `publish ${kind}: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+            try {
+                const r = await json(`/v1/apps/me/${file}/audit?playtest=true`, { headers: auth(a.token) });
+                const paints = r.body.data.live?.playtest?.checks?.find((c: any) => c.id === 'paints');
+                assert(paints?.ok === true && /distinct colours/.test(paints.detail), `${kind}: what is drawn in the middle is read and counts, got "${paints?.detail}"`);
+            } finally {
+                await json(`/v1/apps/${file}`, { method: 'DELETE', headers: auth(a.token) });
+            }
+        }
     });
 
     // Secaudit 2026-10, SSRF-1: the app runs on the node's machine, so what it asks for the node

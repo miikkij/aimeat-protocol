@@ -35,6 +35,9 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.5.2 — 2026-11-28 — `paints` reads the whole canvas scaled down, in place of one 32-pixel
+ *     corner, and reads a WebGL canvas that does not keep its buffer inside a frame: a working game
+ *     failed the check in three measured builds, and its builder went looking for a fault.
  *   v1.5.1 — 2026-11-28 — One budget of 50 seconds for an audit of an app with scenarios: the wait
  *     for the scenario run gets what the playtest left. One call of thirty-seven timed out.
  *   v1.5.0 — 2026-11-27 — The audit hands the scenario run the app's owner identity, so the run
@@ -223,36 +226,45 @@ const PAINT_JS = `(() => {
     }
     return { colours: seen.size, opaque, samples: data.length / 4, first: Array.from(seen)[0] };
   };
+  // THE WHOLE CANVAS, scaled into S by S, whatever it is drawn with. Reading one S-pixel corner of
+  // it called a working game a black screen: a game is dark to its edges and draws in the middle
+  // (three measured builds of the same game, 2026-11-27 and 28). Which context the canvas has is
+  // asked only to word the one case that cannot be read.
   let two = null;
   try { two = c.getContext('2d'); } catch (err) { two = null; }
-  if (two && typeof two.getImageData === 'function') {
-    try {
-      const w = Math.min(S, c.width), h = Math.min(S, c.height);
-      return Object.assign({ kind: 'read', how: '2d' }, count(two.getImageData(0, 0, w, h).data));
-    } catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
-  }
   let gl = null;
-  try { gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (err) { gl = null; }
+  if (!two) { try { gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (err) { gl = null; } }
   const kept = !!(gl && gl.getContextAttributes && gl.getContextAttributes().preserveDrawingBuffer);
-  if (gl && kept) {
-    try {
-      const w = Math.min(S, c.width), h = Math.min(S, c.height);
-      const buf = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-      return Object.assign({ kind: 'read', how: 'webgl' }, count(buf));
-    } catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
-  }
   const scratch = document.createElement('canvas');
   scratch.width = S; scratch.height = S;
   const g = scratch.getContext('2d', { willReadFrequently: true });
   if (!g) return { kind: 'unreadable', why: 'this browser gave no 2d context to copy the canvas into' };
-  try { g.drawImage(c, 0, 0, S, S); } catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
-  let read;
-  try { read = count(g.getImageData(0, 0, S, S).data); } catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
-  if (read.opaque === 0 && gl && !kept) {
-    return { kind: 'unreadable', why: 'this canvas is WebGL with preserveDrawingBuffer off, so its pixels are gone by the time anything outside the frame can read them' };
-  }
-  return Object.assign({ kind: 'read', how: 'copy' }, read);
+  const sample = () => {
+    g.clearRect(0, 0, S, S);
+    try { g.drawImage(c, 0, 0, S, S); } catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
+    try { return Object.assign({ kind: 'read', how: two ? '2d' : (gl ? 'webgl' : 'copy') }, count(g.getImageData(0, 0, S, S).data)); }
+    catch (err) { return { kind: 'unreadable', why: String((err && err.message) || err) }; }
+  };
+  if (!gl || kept) return sample();
+  // WEBGL THAT DOES NOT KEEP ITS BUFFER (the default, and what a game engine uses): the pixels are
+  // cleared once the frame is shown, and a context without alpha then reads as opaque black, which
+  // is the very picture of a black screen. So the read happens inside a frame, after the app's own
+  // frame callback, which was asked for before this one and so runs first. A game that is not
+  // drawing in that frame (paused, or drawn once) still reads as one colour: that is "could not be
+  // read", never "blank". The timer answers when the page gets no frame at all.
+  return new Promise((resolve) => {
+    let done = false;
+    const answer = () => {
+      if (done) return;
+      done = true;
+      const read = sample();
+      resolve(read.kind === 'read' && (read.opaque === 0 || read.colours < 2)
+        ? { kind: 'unreadable', why: 'this canvas is WebGL with preserveDrawingBuffer off and drew nothing in the frame it was read in, so its pixels were already gone' }
+        : read);
+    };
+    requestAnimationFrame(answer);
+    setTimeout(answer, 700);
+  });
 })()`;
 
 /** Layout at whatever viewport the page is currently at: overflow, the canvas box, the controls. */
