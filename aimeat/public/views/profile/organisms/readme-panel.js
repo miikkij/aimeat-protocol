@@ -108,7 +108,7 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
           <${HeadDesc}>${t('readme.emptyHint') || 'No description yet. Add a README so people (and agents) know what this is about.'}<//>
           <${Actions}>
             <${Action} small onClick=${() => { setDraft(''); setEditing(true); }}>${t('readme.write') || 'Write'}<//>
-            ${aiPromptSeed !== undefined ? html`<${Action} small onClick=${() => { setDraft(''); setEditing(true); setTimeout(openEditorAndCopy, 0); }}>${t('readme.generateAi') || 'Generate with AI'}<//>` : null}
+            ${aiPromptSeed !== undefined ? html`<${Action} small onClick=${() => { setDraft(''); setEditing(true); setTimeout(openEditorAndCopy, 0); }}>${t('common.copyForAi')}<//>` : null}
           <//>
         <//>
       <//>`;
