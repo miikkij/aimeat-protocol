@@ -7,6 +7,7 @@
  *   the rendered page (whose page it is, the platform disclaimer), the head links and the
  *   listing strip. The route, the audit entries and the origin are in test/e2e-app-legal.ts.
  * @version-history
+ *   v1.1.0 — 2026-11-28 — legalReadiness by who the app is offered to.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -76,6 +77,29 @@ describe('readiness, state, links, strip', () => {
     expect(selling.recommended).toEqual(['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'support']);
     expect(selling.missing).toEqual(['privacy', 'imprint', 'refunds', 'accessibility', 'support']);
     expect(legalReadiness(app(), { sellsForMoney: false }).recommended).toEqual(['terms', 'privacy']);
+  });
+
+  it('the recommendation follows who the app is offered to: none for an app only its owner or one organism opens', () => {
+    const offered = (facts: Partial<AppRecord>, opts?: { sellsForMoney?: boolean; personalData?: boolean }) =>
+      legalReadiness({ ...app(), ...facts } as AppRecord, opts);
+    // Unlisted and for signed-in members: the owner, and the people they hand the address to.
+    expect(offered({ parked: true, access: 'signed-in' })).toMatchObject({ audience: 'nobody-else', recommended: [], missing: [] });
+    expect(offered({ accessCode: 'x9' })).toMatchObject({ audience: 'nobody-else', recommended: [] });
+    expect(offered({ parked: true, access: 'organism:abc' })).toMatchObject({ audience: 'organism', recommended: [] });
+    expect(offered({ access: 'organism:abc' })).toMatchObject({ audience: 'organism', recommended: [] });
+    // Offered to this node's members, or to anyone with the address: what it does with their data.
+    expect(offered({ access: 'signed-in' })).toMatchObject({ audience: 'members', recommended: ['privacy'] });
+    expect(offered({ parked: true, community: true, access: 'signed-in' })).toMatchObject({ audience: 'members', recommended: ['privacy'] });
+    expect(offered({ parked: true })).toMatchObject({ audience: 'link', recommended: ['privacy'] });
+    // Listed for everyone: terms as well.
+    expect(offered({})).toMatchObject({ audience: 'public', recommended: ['terms', 'privacy'] });
+    // The data map says the app keeps no personal data: no privacy page.
+    expect(offered({ parked: true }, { personalData: false }).recommended).toEqual([]);
+    expect(offered({}, { personalData: false }).recommended).toEqual(['terms']);
+    // A shop answers for its sale whoever it is offered to.
+    expect(offered({ parked: true, access: 'signed-in' }, { sellsForMoney: true }).recommended).toHaveLength(6);
+    // The reason says why, in words a person can act on.
+    expect(offered({ parked: true, access: 'signed-in' }).reason).toMatch(/Nobody but its owner/);
   });
 
   it('state carries no content; the strip empties it except for a URL; the provenance id rides along', () => {

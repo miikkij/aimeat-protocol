@@ -43111,11 +43111,17 @@ paths:
                                 url: { type: string }
                           legal_readiness:
                             type: object
-                            description: Which pages the app ought to have, given what it is, and which are missing
+                            description: >-
+                              Which pages the app ought to have and which are missing, by who the app is
+                              offered to: none for an app only its owner is offered or one organism's
+                              members open, a privacy page for one offered to this node's members or to
+                              anyone with the address, terms as well for one listed for everyone, and the
+                              whole set for an app that sells for money.
                             properties:
                               recommended: { type: array, items: { type: string } }
                               missing: { type: array, items: { type: string } }
                               reason: { type: string }
+                              audience: { type: string, enum: [nobody-else, organism, members, link, public] }
                           install:
                             type: object
                             description: >
@@ -84818,10 +84824,15 @@ paths:
                           legal: { type: object, additionalProperties: true }
                           readiness:
                             type: object
+                            description: >-
+                              The pages the app ought to have and which are missing, by who the app is
+                              offered to (`audience`); an app only its owner or one organism opens is
+                              recommended none.
                             properties:
                               recommended: { type: array, items: { type: string } }
                               missing: { type: array, items: { type: string } }
                               reason: { type: string }
+                              audience: { type: string, enum: [nobody-else, organism, members, link, public] }
                           links:
                             type: array
                             items:

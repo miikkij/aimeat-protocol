@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './publish-next-steps.js';
  * @version-history
+ *   v1.12.0 — 2026-11-28 — `legal_pages` follows who the app is offered to: no line for an app only
+ *     its owner or one organism opens, the reason in the line, and the page written on the owner's yes.
  *   v1.11.1 — 2026-11-27 — `acceptance` says the node takes the screenshots: scenarios, the audit
  *     with the playtest, and the picture address of each run (scenario-pictures.ts).
  *   v1.11.0 — 2026-11-27 — `declared_needs`, `needs_proof` and `needs_proof_ready`: a page that
@@ -172,7 +174,10 @@ export async function buildPublishNextSteps(
     ]);
     // The legal pages the app's structure page reports as open, said here first. A real build met
     // them only on the structure page after the four owed items were done (2026-11-08).
-    const legalMissing = appRec ? legalReadiness(appRec).missing : [];
+    // By who the app is offered to (legal-readiness.ts): an app only its owner or one organism
+    // opens gets no line here, so a builder writes no page nobody asked for.
+    const legal = appRec ? legalReadiness(appRec) : null;
+    const legalMissing = legal?.missing ?? [];
     const balancing = await balancingTestStep({ storage, config }, ownerName, filename);
     // Not `register`: that name is the Atelier register this function takes.
     const recordsOfProcessing = await registerStep({ storage, config }, ownerName, filename);
@@ -275,9 +280,11 @@ export async function buildPublishNextSteps(
       ...(html ? needsProof(ownerName, filename, html, documents?.criteria) : {}),
       // Recommended, never blocking (app-legal.ts): the publish does not wait for them.
       ...(legalMissing.length ? {
-        legal_pages: `Recommended, not blocking: this app has no ${legalMissing.join(' or ')} page yet. `
-          + `Write each with aimeat_app_manage { action: "legal", filename: "${filename}", kind, format: "markdown", content }; `
-          + 'the structure page lists them as open until they exist. Say what the app really does with data: '
+        legal_pages: `Recommended, not blocking: this app has no ${legalMissing.join(' or ')} page yet. ${legal?.reason ?? ''} `
+          + 'FIRST CHECK WHO THE APP IS FOR: when only its owner or one organism uses it, set that (settings: open_to, listing) and no page is recommended; never write one for an app nobody else is offered. '
+          + 'The words of such a page are the owner\'s: propose them and write the page on their yes, with '
+          + `aimeat_app_manage { action: "legal", filename: "${filename}", kind, format: "markdown", content }. `
+          + 'Say what the app really does with data: '
           + 'the node itself adds a cookie notice to the page, which names any analytics the operator runs.',
       } : {}),
       // Only for an app that needs a balancing test (legitimate interests) and has no approved one

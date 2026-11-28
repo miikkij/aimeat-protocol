@@ -24,6 +24,8 @@
  * @structure STEP_IDS · structurePageUrl · computeStructure · readStructureFor · writePlanFor · listPlansFor
  * @usage const out = await readStructureFor(storage, config, req.auth!, { owner, filename });
  * @version-history
+ *   v1.3.1 — 2026-11-28 — The requirements step counts the legal pages the app's reach calls for
+ *     (legal-readiness.ts), none for an app only its owner or one organism opens.
  *   v1.3.0 — 2026-11-27 — The layout step carries the `frame` and `moments` choices, and a person's one
  *     the AI has not built makes it in progress; `values` lists both (wish-atelier-contextual-templates-pyynt-lohko-ask).
  *   v1.2.1 — 2026-11-08 — The visibility step reads forkable as the store and the settings do: an app
@@ -148,7 +150,7 @@ export function computeStructure(input: {
       said: open ? `Open: ${legalMissing.length ? `legal pages ${legalMissing.join(', ')}` : ''}${legalMissing.length && map?.aiUnanswered ? '; ' : ''}${map?.aiUnanswered ? `${map.aiUnanswered} EU AI Act questions` : ''}.` : 'The legal pages and the EU AI Act answers are in place.' });
   } else {
     const personal = plan?.data?.personalData === 'yes';
-    steps.push({ id: 'requirements', state: 'later', detail: { personal }, said: personal ? 'The app keeps personal data, so it will need a privacy notice when it is published.' : 'The requirements are read from the data map at the first publish.' });
+    steps.push({ id: 'requirements', state: 'later', detail: { personal }, said: personal ? 'The app keeps personal data, so it will need a privacy notice when it is opened to other people.' : 'The requirements are read from the data map at the first publish.' });
   }
   return steps;
 }
@@ -200,7 +202,8 @@ async function structureOf(storage: Storage, config: AimeatConfig, t: Target, pl
       };
     }
     builders = (await listDevGrants(storage, t.appId)).length;
-    legalMissing = legalReadiness(app).missing;
+    // By who the app is offered to, and without a privacy page when the data map says it keeps no personal data.
+    legalMissing = legalReadiness(app, map ? { personalData: map.personal > 0 } : undefined).missing;
   }
   const steps = computeStructure({ plan, app, hasDraft, specWritten, map, builders, legalMissing });
   return {

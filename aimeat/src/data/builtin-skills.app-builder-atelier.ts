@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-28 — Step 9: terms and privacy pages by who the app is offered to, never for an app
+ *     only its owner opens, and written on the owner's yes (services/app-build/legal-readiness.ts).
  *   2026-11-28 — Step 4: the kit's reference over MCP (the sections `kit` and `kit-<name>`), read
  *     in place of the library's source. Five measured builds each searched the bundle for functions.
  *   2026-11-27 — A membership the owner sells is the node's: the plan's `sale`, joinRequest's Buy
@@ -586,7 +588,7 @@ changed after you fetched it says so.
    there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`
    \`{ action: "spec_set" }\`). Write the two documents after the first publish and again after
    any publish that changed the screens, the decisions or where data is stored. The terms and privacy
-   pages are recommended, not owed: \`legal_pages\` names the missing ones and how to write them.
+   pages belong to an app that is OFFERED TO OTHER PEOPLE, by how far: none for an app only its owner or one organism opens, and never one nobody asked for. \`legal_pages\` appears only when the app's reach calls for a page, with the reason; the words are the owner's, so propose them and write the page on their yes.
 10. **Write down why, and put nothing into the Design Book because the build is finished.** As
    you choose, the page holds your reasons, one true sentence each, in
    \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this

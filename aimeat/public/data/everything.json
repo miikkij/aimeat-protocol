@@ -2693,10 +2693,10 @@
      "slug": "g-10-app-legal-pages",
      "cells": [
       "<strong>App legal pages</strong>",
-      "Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing.",
+      "Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. What is recommended follows who the app is offered to: nothing for an app only its owner or one organism opens, a privacy page for one offered to this node's members or to anyone with the address, terms as well for one listed for everyone, and the whole set for an app that sells for money. An AI that builds an app is told about a page only when the app's reach calls for one, and writes it on the owner's yes.",
       "<code>/v1/apps/:owner/:filename/legal</code>, <code>aimeat_app_manage</code> action <code>legal</code>"
      ],
-     "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. /v1/apps/:owner/:filename/legal, aimeat_app_manage action legal"
+     "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. What is recommended follows who the app is offered to: nothing for an app only its owner or one organism opens, a privacy page for one offered to this node's members or to anyone with the address, terms as well for one listed for everyone, and the whole set for an app that sells for money. An AI that builds an app is told about a page only when the app's reach calls for one, and writes it on the owner's yes. /v1/apps/:owner/:filename/legal, aimeat_app_manage action legal"
     },
     {
      "slug": "g-10-visitors",

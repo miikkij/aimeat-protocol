@@ -24,6 +24,8 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.5.0 — 2026-11-28 — The recommendation follows who the app is offered to: none for an app
+ *     only its owner is offered, in the readiness and in the publish answer.
  *   v1.4.1 — 2026-10-12 — The republish sets the app's morsel amount as toll_morsels: 100 instead of
  *     price_morsels: 500, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED (3.x read the old field
  *     as the same pacing amount and capped it at 100). The test still proves a morsel amount makes
@@ -159,6 +161,26 @@ await test('A fresh app has no pages and ought to have terms and privacy', async
     assert(typeof body.data.documents === 'object', 'the owner gets the documents map');
     const { status: s404 } = await page('terms');
     assert(s404 === 404, `no terms page yet: ${s404}`);
+});
+
+// Seen red on the rule that recommended terms and privacy to every published app: an errands list
+// only its owner opens was told it lacked both, on every publish.
+await test('An app only its owner is offered ought to have no page; offered to everyone again, it ought to', async () => {
+    const narrowed = await patchA({ listing: 'unlisted', open_to: 'signed-in' });
+    assert(narrowed.status === 200, `narrow: ${narrowed.status} ${JSON.stringify(narrowed.body?.error)}`);
+    const own = (await json(`${appPath}/legal`, aAuthed())).body.data.readiness;
+    assert(own.audience === 'nobody-else' && own.recommended.length === 0 && own.missing.length === 0, `nobody else is offered it: ${JSON.stringify(own)}`);
+    assert(/Nobody but its owner/.test(own.reason), `the reason says why: ${own.reason}`);
+    // The publish answer carries no line about legal pages for it.
+    const again = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({ filename: FILE, content: b64(HTML_V1), name: 'Legal Shop', description: 'a shop', category: 'utility', tags: ['demo'], roadmap: 'No change to the page.' }),
+    }));
+    assert(again.status === 201 && again.body.data?.next_steps?.legal_pages === undefined, `no legal line in the publish answer: ${again.status} ${JSON.stringify(again.body?.data?.next_steps?.legal_pages ?? again.body?.error)}`);
+    const widened = await patchA({ listing: 'listed', open_to: 'anyone' });
+    assert(widened.status === 200, `widen: ${widened.status} ${JSON.stringify(widened.body?.error)}`);
+    const all = (await json(`${appPath}/legal`, aAuthed())).body.data.readiness;
+    assert(all.audience === 'public' && JSON.stringify(all.missing) === '["terms","privacy"]', `listed for everyone, both are recommended: ${JSON.stringify(all)}`);
 });
 
 await test('Terms as markdown: rendered, escaped, named after whose page it is', async () => {
