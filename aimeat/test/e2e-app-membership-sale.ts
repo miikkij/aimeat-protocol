@@ -24,13 +24,11 @@
  *        the end of the running term.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-membership-sale
  * @version-history
+ *   v1.0.1 — 2026-11-28 — The node boots through test/helpers/boot-node.ts, which
+ *     test/unit/boot-node-helper.test.ts requires of a suite that starts its own node.
  *   v1.0.0 — 2026-11-27 — Initial (wish-sovelluksen-j-senyyden-voi-myyd-maksu-uusinta-ja-p-ttyminen-).
  */
 import { createHmac, randomBytes } from 'node:crypto';
-import type { Server } from 'node:http';
-import { createServer } from '../src/server.js';
-import { loadConfig, type AimeatConfig } from '../src/config.js';
-import type { Storage } from '../src/storage/interface.js';
 import { runSubscriptionRenewals } from '../src/commerce/subscriptions.js';
 import { membershipExt } from '../src/commerce/membership-sale.js';
 import { updateMemberRow } from '../src/services/app/members.js';
@@ -38,7 +36,7 @@ import { applyAppInvitesForVerifiedEmail } from '../src/services/app/member-invi
 import { emailHashOf } from '../src/services/owner/provisioning.js';
 import { UNCHANGED } from '../src/services/record-cas.js';
 import { runAsNode } from '../src/utils/gaii.js';
-import { ownNodeDb } from './helpers/own-node-db.js';
+import { bootNode } from './helpers/boot-node.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { BASE as RUNNER_BASE, assert, expectRefusal, finish, json as runnerJson, test } from './helpers/harness.js';
 
@@ -47,30 +45,12 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const NODE_ID = `memsale-${PORT}`;
 const DAY = 86_400_000;
 
-async function bootNode(): Promise<{ server: Server; config: AimeatConfig; storage: Storage }> {
-  const adminPw = randomBytes(16).toString('base64url');
-  process.env.AIMEAT_PORT = String(PORT);
-  process.env.AIMEAT_DEV_MODE = 'true';
-  process.env.AIMEAT_TEST_MODE = 'true';
-  process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
-  process.env.AIMEAT_NODE_ID = NODE_ID;
-  process.env.AIMEAT_BASE_URL = BASE;
-  const { config } = loadConfig({});
-  Object.assign(config, {
-    port: PORT, nodeId: NODE_ID, baseUrl: BASE, devMode: true, testMode: true, adminPassword: adminPw,
-    ...(await ownNodeDb(String(PORT), { memory: true })).config, testMoneyHandler: true,
-  });
-  const { app, storage } = await createServer(config);
-  const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
-  return { server, config, storage };
-}
-
 const json = (path: string, opts: RequestInit = {}) => runnerJson(`${BASE}${path}`, opts);
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const near = (a: string | number, b: string | number, ms = 60_000) => Math.abs(Date.parse(String(a)) - (typeof b === 'number' ? b : Date.parse(b))) < ms;
 
 console.log('\n=== Selling an app\'s membership ===\n');
-const node = await bootNode();
+const node = await bootNode({ port: PORT, nodeId: NODE_ID, configure: (c) => { c.testMoneyHandler = true; } });
 const renew = (at: number) => runAsNode(NODE_ID, () => runSubscriptionRenewals(node.storage, node.config, at));
 
 const stamp = Date.now().toString(36);
