@@ -23,7 +23,9 @@
  *   - describe blocks: the cutoff · the cut table · the fold, per provider
  * @usage cd aimeat && pnpm exec vitest run test/unit/visit-retention.test.ts
  * @version-history
- *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
+ *   2026-11-28 — The report window counts the days since NOW, because the report reads the real clock;
+ *     from 2026-11-28 the oldest seeded open fell outside a fixed 500 days and CI on main went red.
+ *   2026-10-16 —A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.1.0 — 2026-09-26 — An app's member list forgets a signed-in visitor thirteen months after
  *     their last visit (A6-14). Failed on the code before the fix: both guests stayed.
  *   v1.0.0 — 2026-09-25 — Initial, with the thirteen-month rule in the privacy notice.
@@ -190,8 +192,11 @@ async function rollup(storage: Storage, cut: string, bucket: string, filter: { a
 }
 
 async function report(storage: Storage, s: Seeded): Promise<AppVisitorsReport> {
-  // 500 days: wider than the App Catalog's 360, which cannot reach a folded day, on purpose.
-  return readAppVisitors(storage, { app: { owner: s.author, filename: s.filename }, days: 500, geoAvailable: false });
+  // 500 days before NOW: wider than the App Catalog's 360, which cannot reach a folded day, on purpose.
+  // The report counts back from the real clock, not from NOW, so the days since NOW are added; a fixed
+  // 500 let the oldest seeded open fall out of the window from 2026-11-28 on.
+  const sinceNow = Math.max(0, Math.ceil((Date.now() - NOW.getTime()) / 86_400_000));
+  return readAppVisitors(storage, { app: { owner: s.author, filename: s.filename }, days: 500 + sinceNow, geoAvailable: false });
 }
 
 describe('the cutoff', () => {
